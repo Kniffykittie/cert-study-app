@@ -14,39 +14,42 @@ export default function Home() {
       {/* Cert Readiness Cards */}
       <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px'}}>
         {[
-          { cert: 'CCNA', score: 71, color: '#0080FF' },
-          { cert: 'Network+', score: 58, color: '#7B2FBE' },
-          { cert: 'Security+', score: 45, color: '#CC0000' },
+          { cert: 'CCNA', score: 71, color: '#0080FF', href: '/ccna' },
+          { cert: 'Network+', score: 58, color: '#7B2FBE', href: '/network-plus' },
+          { cert: 'Security+', score: 45, color: '#CC0000', href: '/security-plus' },
         ].map((item) => (
-          <div key={item.cert} style={{
-            backgroundColor: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: '10px',
-            padding: '20px',
-          }}>
-            <div style={{color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px'}}>
-              {item.cert} Readiness
-            </div>
-            <div style={{color: item.color, fontSize: '36px', fontWeight: '700', marginBottom: '8px'}}>
-              {item.score}%
-            </div>
+          <a key={item.cert} href={item.href} style={{textDecoration: 'none'}}>
             <div style={{
-              height: '6px',
-              backgroundColor: 'var(--border)',
-              borderRadius: '3px',
-              overflow: 'hidden'
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: '10px',
+              padding: '20px',
+              cursor: 'pointer'
             }}>
+              <div style={{color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px'}}>
+                {item.cert} Readiness
+              </div>
+              <div style={{color: item.color, fontSize: '36px', fontWeight: '700', marginBottom: '8px'}}>
+                {item.score}%
+              </div>
               <div style={{
-                height: '100%',
-                width: `${item.score}%`,
-                backgroundColor: item.color,
-                borderRadius: '3px'
-              }}/>
+                height: '6px',
+                backgroundColor: 'var(--border)',
+                borderRadius: '3px',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: `${item.score}%`,
+                  backgroundColor: item.color,
+                  borderRadius: '3px'
+                }}/>
+              </div>
             </div>
-          </div>
+          </a>
         ))}
       </div>
-
+      
       {/* Stats Row */}
       <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px'}}>
         {[
