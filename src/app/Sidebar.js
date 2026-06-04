@@ -14,13 +14,13 @@ export default function Sidebar() {
       flexShrink: 0
     }}>
       <div style={{
-        backgroundColor: 'var(--surface)',
+        backgroundColor: '#0A0A0A',
         borderRadius: '8px',
         padding: '8px 12px',
         marginBottom: '16px',
         textAlign: 'center',
         fontWeight: '600',
-        fontSize: '14px',
+        fontSize: '20px',
         color: '#0080FF',
       }}>
         CSA

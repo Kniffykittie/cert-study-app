@@ -77,6 +77,7 @@ export default function Home() {
         border: '1px solid var(--border)',
         borderRadius: '10px',
         padding: '20px',
+        marginBottom: '16px'
       }}>
         <h2 style={{color: '#0080FF', fontSize: '16px', fontWeight: '600', marginBottom: '16px'}}>
           Recent Activity
@@ -85,6 +86,25 @@ export default function Home() {
           No activity yet. Take your first test to get started.
         </p>
       </div>
+
+      {/* Recommendations */}
+      <div style={{
+        backgroundColor: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: '10px',
+        padding: '20px',
+      }}>
+        <h2 style={{color: '#0080FF', fontSize: '16px', fontWeight: '600', marginBottom: '4px'}}>
+          Recommended Focus Areas
+        </h2>
+        <p style={{color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '16px'}}>
+          Based on your performance data
+        </p>
+        <p style={{color: 'var(--text-secondary)', fontSize: '14px'}}>
+          Complete your first test to unlock personalized recommendations.
+        </p>
+      </div>
+
     </div>
   )
 }
