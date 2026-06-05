@@ -60,7 +60,8 @@ Rules:
     messages: [{ role: 'user', content: prompt }]
   })
 
-  const text = message.content[0].text.trim()
+  let text = message.content[0].text.trim()
+  text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
   const questions = JSON.parse(text)
 
   return Response.json({ questions })
