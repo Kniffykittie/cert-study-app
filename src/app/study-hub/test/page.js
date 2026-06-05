@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const TOPICS = {
@@ -9,11 +9,79 @@ const TOPICS = {
 }
 const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
 const COUNTS = [10, 25, 50]
+const letters = ['A', 'B', 'C', 'D']
+
+function ChatPanel({ cert, question, topic, options }) {
+  const [messages, setMessages] = useState([{ role: 'assistant', text: 'Ask me anything about this question or topic. I won\'t give away the answer, but I can help you understand the concepts.' }])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const bottomRef = useRef(null)
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+
+  async function send() {
+    if (!input.trim() || loading) return
+    const userMsg = input.trim()
+    setInput('')
+    setMessages(prev => [...prev, { role: 'user', text: userMsg }])
+    setLoading(true)
+    try {
+      const res = await fetch('/api/test-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMsg, cert, topic, question, options })
+      })
+      const data = await res.json()
+      setMessages(prev => [...prev, { role: 'assistant', text: data.reply }])
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', text: 'Something went wrong. Try again.' }])
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div style={{ width: '320px', minWidth: '320px', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '600' }}>Tutor Chat</div>
+        <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>Ask about this question — no spoilers</div>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '300px', maxHeight: '500px' }}>
+        {messages.map((m, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+            <div style={{ maxWidth: '85%', padding: '8px 12px', borderRadius: '8px', backgroundColor: m.role === 'user' ? 'var(--accent-blue)' : 'var(--background)', color: m.role === 'user' ? '#E8E8E8' : 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5' }}>
+              {m.text}
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+            <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: 'var(--background)', color: 'var(--text-secondary)', fontSize: '13px' }}>Thinking...</div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+      <div style={{ padding: '10px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px' }}>
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && send()}
+          placeholder="Ask a question..."
+          style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }}
+        />
+        <button onClick={send} disabled={!input.trim() || loading}
+          style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '6px', padding: '8px 14px', fontSize: '13px', fontWeight: '600', cursor: !input.trim() || loading ? 'not-allowed' : 'pointer', opacity: !input.trim() || loading ? 0.5 : 1 }}>
+          Send
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export default function TestPage() {
   const [cert, setCert] = useState(null)
   const [count, setCount] = useState(10)
   const [selectedTopics, setSelectedTopics] = useState([])
+  const [mode, setMode] = useState('practice')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -53,6 +121,35 @@ export default function TestPage() {
     setLoading(false)
   }
 
+  async function saveResults(finalAnswers) {
+    setSaving(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const correct = questions.filter((q, i) => finalAnswers[i] === q.correct).length
+    const scorePct = Math.round((correct / questions.length) * 100)
+    const { data: session } = await supabase.from('test_sessions').insert({
+      user_id: user.id, cert, total_questions: questions.length, correct, score_pct: scorePct
+    }).select().single()
+    if (session) {
+      await supabase.from('question_answers').insert(questions.map((q, i) => ({
+        session_id: session.id, user_id: user.id, cert, topic: q.topic,
+        question_text: q.question, correct_answer: q.correct,
+        user_answer: finalAnswers[i] || '', is_correct: finalAnswers[i] === q.correct
+      })))
+      const topicMap = {}
+      questions.forEach((q, i) => {
+        if (!topicMap[q.topic]) topicMap[q.topic] = { total: 0, correct: 0 }
+        topicMap[q.topic].total++
+        if (finalAnswers[i] === q.correct) topicMap[q.topic].correct++
+      })
+      for (const [topic, stats] of Object.entries(topicMap)) {
+        await supabase.rpc('upsert_topic_performance', { p_user_id: user.id, p_cert: cert, p_topic: topic, p_total: stats.total, p_correct: stats.correct })
+      }
+    }
+    setSaving(false)
+  }
+
+  // Practice mode: submit one answer at a time
   function submitAnswer() {
     if (!selectedAnswer) return
     setAnswers(prev => ({ ...prev, [current]: selectedAnswer }))
@@ -60,48 +157,29 @@ export default function TestPage() {
   }
 
   async function nextQuestion() {
+    const finalAnswers = { ...answers, [current]: selectedAnswer }
     if (current < questions.length - 1) {
       setCurrent(c => c + 1)
       setSelectedAnswer(null)
       setRevealed(false)
     } else {
-      // Save results
-      setSaving(true)
-      const finalAnswers = { ...answers, [current]: selectedAnswer }
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      const correct = questions.filter((q, i) => finalAnswers[i] === q.correct).length
-      const scorePct = Math.round((correct / questions.length) * 100)
-
-      const { data: session } = await supabase.from('test_sessions').insert({
-        user_id: user.id, cert, total_questions: questions.length, correct, score_pct: scorePct
-      }).select().single()
-
-      if (session) {
-        const answerRows = questions.map((q, i) => ({
-          session_id: session.id, user_id: user.id, cert, topic: q.topic,
-          question_text: q.question, correct_answer: q.correct,
-          user_answer: finalAnswers[i] || '', is_correct: finalAnswers[i] === q.correct
-        }))
-        await supabase.from('question_answers').insert(answerRows)
-
-        const topicMap = {}
-        questions.forEach((q, i) => {
-          if (!topicMap[q.topic]) topicMap[q.topic] = { total: 0, correct: 0 }
-          topicMap[q.topic].total++
-          if (finalAnswers[i] === q.correct) topicMap[q.topic].correct++
-        })
-        for (const [topic, stats] of Object.entries(topicMap)) {
-          await supabase.rpc('upsert_topic_performance', {
-            p_user_id: user.id, p_cert: cert, p_topic: topic,
-            p_total: stats.total, p_correct: stats.correct
-          })
-        }
-      }
+      await saveResults(finalAnswers)
       setAnswers(finalAnswers)
-      setSaving(false)
       setDone(true)
     }
+  }
+
+  // Simulation mode: submit all at end
+  function simSelectAnswer(letter) {
+    setAnswers(prev => ({ ...prev, [current]: letter }))
+    setSelectedAnswer(letter)
+  }
+
+  async function submitSimulation() {
+    const finalAnswers = { ...answers }
+    await saveResults(finalAnswers)
+    setAnswers(finalAnswers)
+    setDone(true)
   }
 
   // Config screen
@@ -110,7 +188,21 @@ export default function TestPage() {
       <div>
         <div style={{ marginBottom: '32px' }}>
           <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Take a Test</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Select a cert, topics, and question count to generate your practice test.</p>
+          <p style={{ color: 'var(--text-secondary)' }}>Configure your practice test or exam simulation.</p>
+        </div>
+
+        {/* Mode selector */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+          {[
+            { key: 'practice', label: 'Practice Mode', desc: 'Immediate feedback + tutor chat after each answer' },
+            { key: 'simulation', label: 'Simulation Mode', desc: 'Real exam conditions — no feedback until the end' }
+          ].map(m => (
+            <div key={m.key} onClick={() => setMode(m.key)}
+              style={{ padding: '16px 20px', backgroundColor: mode === m.key ? 'rgba(0,128,255,0.1)' : 'var(--surface)', border: `2px solid ${mode === m.key ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '10px', cursor: 'pointer' }}>
+              <div style={{ color: mode === m.key ? 'var(--accent-blue)' : 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>{m.label}</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{m.desc}</div>
+            </div>
+          ))}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -125,7 +217,6 @@ export default function TestPage() {
               ))}
             </div>
           </div>
-
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
             <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Question Count</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -159,7 +250,6 @@ export default function TestPage() {
         )}
 
         {error && <p style={{ color: 'var(--error)', fontSize: '13px', marginBottom: '12px' }}>{error}</p>}
-
         <button onClick={generateTest} disabled={loading || !cert}
           style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: loading || !cert ? 'not-allowed' : 'pointer', opacity: loading || !cert ? 0.5 : 1 }}>
           {loading ? 'Generating...' : 'Generate Test'}
@@ -180,6 +270,24 @@ export default function TestPage() {
           <div style={{ color, fontSize: '72px', fontWeight: '700', lineHeight: 1 }}>{pct}%</div>
           <div style={{ color: 'var(--text-secondary)', fontSize: '14px', marginTop: '8px' }}>{correct} / {questions.length} correct</div>
         </div>
+
+        {/* Answer review */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+          {questions.map((q, i) => {
+            const isCorrect = answers[i] === q.correct
+            return (
+              <div key={i} style={{ backgroundColor: 'var(--surface)', border: `1px solid ${isCorrect ? 'var(--success-border)' : 'var(--error-border)'}`, borderRadius: '10px', padding: '16px' }}>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '6px' }}>
+                  <span style={{ color: isCorrect ? 'var(--success)' : 'var(--error)', fontWeight: '600' }}>{isCorrect ? '✓' : '✗'}</span>
+                  <span style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{q.question}</span>
+                </div>
+                {!isCorrect && <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '4px' }}>Your answer: <span style={{ color: 'var(--error)' }}>{answers[i] || 'No answer'}</span> — Correct: <span style={{ color: 'var(--success)' }}>{q.correct}</span></div>}
+                {q.explanations?.[q.correct] && <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontStyle: 'italic' }}>{q.explanations[q.correct]}</div>}
+              </div>
+            )
+          })}
+        </div>
+
         <button onClick={() => { setQuestions(null); setCert(null) }}
           style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
           Take Another Test
@@ -188,81 +296,147 @@ export default function TestPage() {
     )
   }
 
-  // Question screen
   const q = questions[current]
-  const letters = ['A', 'B', 'C', 'D']
   const isLast = current === questions.length - 1
+  const isPractice = mode === 'practice'
 
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div>
-          <h1 style={{ color: 'var(--accent-blue)', fontSize: '20px', fontWeight: '700' }}>{CERT_LABELS[cert]} Practice Test</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Question {current + 1} of {questions.length}</p>
+  // Progress tracker
+  const progressBar = (
+    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+      {questions.map((q, i) => {
+        const ans = isPractice ? answers[i] : answers[i]
+        let bg = 'var(--border)'
+        if (i === current) bg = 'var(--accent-blue)'
+        else if (ans !== undefined) bg = isPractice ? (ans === q.correct ? 'var(--success)' : 'var(--error)') : 'var(--accent-blue)'
+        return <div key={i} style={{ width: '20px', height: '20px', borderRadius: '4px', backgroundColor: bg, opacity: i > current && ans === undefined ? 0.3 : 1, cursor: 'pointer' }} onClick={() => { if (isPractice && !revealed) return; setCurrent(i); setSelectedAnswer(answers[i] || null); setRevealed(!!answers[i]) }} />
+      })}
+    </div>
+  )
+
+  // Simulation mode question screen
+  if (!isPractice) {
+    const unanswered = questions.filter((_, i) => answers[i] === undefined).length
+    return (
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+              <h1 style={{ color: 'var(--accent-blue)', fontSize: '20px', fontWeight: '700' }}>{CERT_LABELS[cert]} Simulation</h1>
+              <span style={{ backgroundColor: 'rgba(241,196,15,0.15)', border: '1px solid var(--warning-border)', color: 'var(--warning)', fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '4px' }}>EXAM MODE</span>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Question {current + 1} of {questions.length}</p>
+          </div>
+          {progressBar}
         </div>
-        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '300px' }}>
-          {questions.map((q, i) => {
-            const ans = answers[i]
-            const bg = i < current ? (ans === q.correct ? 'var(--success)' : 'var(--error)') : i === current ? 'var(--accent-blue)' : 'var(--border)'
-            return <div key={i} style={{ width: '20px', height: '20px', borderRadius: '4px', backgroundColor: bg, opacity: i > current ? 0.3 : 1 }} />
-          })}
-        </div>
-      </div>
 
-      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
-        <div style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>{q.topic}</div>
-        <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {q.options.map((opt, i) => {
-            const letter = letters[i]
-            const isSelected = selectedAnswer === letter
-            const isCorrect = letter === q.correct
-            const isWrong = revealed && isSelected && !isCorrect
-
-            let borderColor = 'var(--border)'
-            let bgColor = 'var(--background)'
-            let textColor = 'var(--text-secondary)'
-
-            if (revealed) {
-              if (isCorrect) { borderColor = 'var(--success)'; bgColor = 'rgba(46,204,113,0.08)'; textColor = 'var(--success)' }
-              else if (isSelected) { borderColor = 'var(--error)'; bgColor = 'rgba(204,0,0,0.08)'; textColor = 'var(--error)' }
-            } else if (isSelected) {
-              borderColor = 'var(--accent-blue)'; bgColor = 'rgba(0,128,255,0.1)'; textColor = 'var(--accent-blue)'
-            }
-
-            return (
-              <div key={letter}>
-                <div onClick={() => !revealed && setSelectedAnswer(letter)}
-                  style={{ padding: '12px 16px', backgroundColor: bgColor, border: `1px solid ${borderColor}`, borderRadius: revealed && q.explanations ? '8px 8px 0 0' : '8px', color: textColor, fontSize: '14px', cursor: revealed ? 'default' : 'pointer', fontWeight: isSelected || (revealed && isCorrect) ? '600' : '400', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>{opt}</span>
-                  {revealed && isCorrect && <span style={{ fontSize: '16px' }}>✓</span>}
-                  {revealed && isWrong && <span style={{ fontSize: '16px' }}>✗</span>}
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
+          <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {q.options.map((opt, i) => {
+              const letter = letters[i]
+              const isSelected = answers[current] === letter
+              return (
+                <div key={letter} onClick={() => simSelectAnswer(letter)}
+                  style={{ padding: '12px 16px', backgroundColor: isSelected ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `1px solid ${isSelected ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '8px', color: isSelected ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer', fontWeight: isSelected ? '600' : '400' }}>
+                  {opt}
                 </div>
-                {revealed && q.explanations?.[letter] && (
-                  <div style={{ padding: '10px 16px', backgroundColor: isCorrect ? 'rgba(46,204,113,0.05)' : 'rgba(204,0,0,0.05)', border: `1px solid ${isCorrect ? 'var(--success-border)' : 'var(--error-border)'}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5', margin: 0 }}>{q.explanations[letter]}</p>
+              )
+            })}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={() => { setCurrent(c => c - 1); setSelectedAnswer(answers[current - 1] || null) }} disabled={current === 0}
+              style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', cursor: current === 0 ? 'not-allowed' : 'pointer', opacity: current === 0 ? 0.4 : 1 }}>
+              ← Previous
+            </button>
+            {!isLast && (
+              <button onClick={() => { setCurrent(c => c + 1); setSelectedAnswer(answers[current + 1] || null) }}
+                style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', cursor: 'pointer' }}>
+                Next →
+              </button>
+            )}
+          </div>
+          {isLast && (
+            <button onClick={submitSimulation} disabled={saving}
+              style={{ backgroundColor: unanswered > 0 ? 'var(--warning)' : 'var(--success)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: saving ? 'not-allowed' : 'pointer' }}>
+              {saving ? 'Saving...' : unanswered > 0 ? `Submit (${unanswered} unanswered)` : 'Submit Exam'}
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Practice mode question screen with chat
+  return (
+    <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+      {/* Question panel */}
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <div>
+            <h1 style={{ color: 'var(--accent-blue)', fontSize: '20px', fontWeight: '700' }}>{CERT_LABELS[cert]} Practice Test</h1>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Question {current + 1} of {questions.length}</p>
+          </div>
+          {progressBar}
+        </div>
+
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
+          <div style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>{q.topic}</div>
+          <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {q.options.map((opt, i) => {
+              const letter = letters[i]
+              const isSelected = selectedAnswer === letter
+              const isCorrect = letter === q.correct
+              const isWrong = revealed && isSelected && !isCorrect
+
+              let borderColor = 'var(--border)', bgColor = 'var(--background)', textColor = 'var(--text-secondary)'
+              if (revealed) {
+                if (isCorrect) { borderColor = 'var(--success)'; bgColor = 'rgba(46,204,113,0.08)'; textColor = 'var(--success)' }
+                else if (isSelected) { borderColor = 'var(--error)'; bgColor = 'rgba(204,0,0,0.08)'; textColor = 'var(--error)' }
+              } else if (isSelected) {
+                borderColor = 'var(--accent-blue)'; bgColor = 'rgba(0,128,255,0.1)'; textColor = 'var(--accent-blue)'
+              }
+
+              return (
+                <div key={letter}>
+                  <div onClick={() => !revealed && setSelectedAnswer(letter)}
+                    style={{ padding: '12px 16px', backgroundColor: bgColor, border: `1px solid ${borderColor}`, borderRadius: revealed && q.explanations ? '8px 8px 0 0' : '8px', color: textColor, fontSize: '14px', cursor: revealed ? 'default' : 'pointer', fontWeight: isSelected || (revealed && isCorrect) ? '600' : '400', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{opt}</span>
+                    {revealed && isCorrect && <span>✓</span>}
+                    {revealed && isWrong && <span>✗</span>}
                   </div>
-                )}
-              </div>
-            )
-          })}
+                  {revealed && q.explanations?.[letter] && (
+                    <div style={{ padding: '10px 16px', backgroundColor: isCorrect ? 'rgba(46,204,113,0.05)' : 'rgba(204,0,0,0.05)', border: `1px solid ${isCorrect ? 'var(--success-border)' : 'var(--error-border)'}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5', margin: 0 }}>{q.explanations[letter]}</p>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          {!revealed ? (
+            <button onClick={submitAnswer} disabled={!selectedAnswer}
+              style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: !selectedAnswer ? 'not-allowed' : 'pointer', opacity: !selectedAnswer ? 0.5 : 1 }}>
+              Submit Answer
+            </button>
+          ) : (
+            <button onClick={nextQuestion} disabled={saving}
+              style={{ backgroundColor: 'var(--success)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: saving ? 'not-allowed' : 'pointer' }}>
+              {saving ? 'Saving...' : isLast ? 'Finish Test' : 'Next Question →'}
+            </button>
+          )}
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        {!revealed ? (
-          <button onClick={submitAnswer} disabled={!selectedAnswer}
-            style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: !selectedAnswer ? 'not-allowed' : 'pointer', opacity: !selectedAnswer ? 0.5 : 1 }}>
-            Submit Answer
-          </button>
-        ) : (
-          <button onClick={nextQuestion} disabled={saving}
-            style={{ backgroundColor: 'var(--success)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: saving ? 'not-allowed' : 'pointer' }}>
-            {saving ? 'Saving...' : isLast ? 'Finish Test' : 'Next Question →'}
-          </button>
-        )}
-      </div>
+      {/* Chat panel */}
+      <ChatPanel cert={cert} question={q.question} topic={q.topic} options={q.options} />
     </div>
   )
 }
