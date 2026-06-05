@@ -478,6 +478,7 @@ export default function TestPage() {
   if (!isPractice) {
     const unanswered = questions.filter((_, i) => answers[i] === undefined).length
     return (
+      <>
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div>
@@ -531,11 +532,13 @@ export default function TestPage() {
         </div>
       </div>
       {pauseModal}
+      </>
     )
   }
 
   // Practice mode question screen with chat
   return (
+    <>
     <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
       {/* Question panel */}
       <div style={{ flex: 1 }}>
@@ -607,5 +610,6 @@ export default function TestPage() {
       <ChatPanel cert={cert} question={q.question} topic={q.topic} options={q.options} />
     </div>
     {pauseModal}
+    </>
   )
 }
