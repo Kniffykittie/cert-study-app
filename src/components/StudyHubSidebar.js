@@ -1,34 +1,37 @@
 'use client'
-
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 export default function StudyHubSidebar() {
+  const [displayName, setDisplayName] = useState('')
+
+  useEffect(() => {
+    async function fetchProfile() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('profiles').select('display_name').eq('id', user.id).single()
+      if (data?.display_name) setDisplayName(data.display_name)
+    }
+    fetchProfile()
+  }, [])
+
+  const initial = displayName ? displayName[0].toUpperCase() : '?'
+
   return (
-    <aside style={{
-      width: '220px',
-      minHeight: '100vh',
-      backgroundColor: 'var(--surface)',
-      borderRight: '1px solid var(--border)',
-      display: 'flex',
-      flexDirection: 'column',
-      padding: '16px 12px',
-      gap: '4px',
-      flexShrink: 0,
-    }}>
+    <aside style={{ width: '220px', minHeight: '100vh', backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '16px 12px', gap: '4px', flexShrink: 0 }}>
       <div style={{ backgroundColor: '#0A0A0A', borderRadius: '8px', padding: '8px 12px', marginBottom: '8px', textAlign: 'center', fontWeight: '700', fontSize: '20px', color: 'var(--accent-blue)' }}>
         CSA
       </div>
 
       <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', marginBottom: '8px' }}
         onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(0,128,255,0.08)'}
-        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-      >
+        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
         ← Home
       </Link>
 
-      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '4px 12px', marginBottom: '4px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-        Study Hub
-      </div>
+      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '4px 12px', marginBottom: '4px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Study Hub</div>
 
       {[
         { label: 'Overview', href: '/study-hub' },
@@ -38,15 +41,12 @@ export default function StudyHubSidebar() {
       ].map(item => (
         <Link key={item.href} href={item.href} style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'block' }}
           onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(0,128,255,0.1)'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-        >
+          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
           {item.label}
         </Link>
       ))}
 
-      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '12px 12px 4px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-        Practice
-      </div>
+      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '12px 12px 4px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Practice</div>
 
       {[
         { label: 'Take a Test', href: '/study-hub/test' },
@@ -56,8 +56,7 @@ export default function StudyHubSidebar() {
       ].map(item => (
         <Link key={item.href} href={item.href} style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'block' }}
           onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(0,128,255,0.1)'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-        >
+          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
           {item.label}
         </Link>
       ))}
@@ -65,10 +64,9 @@ export default function StudyHubSidebar() {
       <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
         <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '6px', textDecoration: 'none' }}
           onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(0,128,255,0.08)'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-        >
-          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--accent-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', flexShrink: 0 }}>S</div>
-          <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Seth</span>
+          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--accent-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', flexShrink: 0 }}>{initial}</div>
+          <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{displayName || 'Account'}</span>
         </Link>
       </div>
     </aside>
