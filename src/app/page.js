@@ -18,7 +18,12 @@ export default function Home() {
       {/* Morning brief */}
       <div style={{ padding: '48px 32px 32px', maxWidth: '900px', width: '100%', margin: '0 auto', flex: 1 }}>
         <h1 style={{ color: 'var(--accent-blue)', fontSize: '32px', fontWeight: '700', marginBottom: '4px' }}>
-          Good morning, Seth.
+          {(() => {
+            const h = new Date().getHours()
+            if (h < 12) return 'Good morning.'
+            if (h < 18) return 'Good afternoon.'
+            return 'Good evening.'
+          })()}
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '16px', marginBottom: '48px' }}>
           Here's your command center for today.

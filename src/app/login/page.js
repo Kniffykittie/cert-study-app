@@ -1,7 +1,6 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
@@ -73,10 +72,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px', marginTop: '24px' }}>
-          Don't have an account?{' '}
-          <Link href="/signup" style={{ color: 'var(--accent-blue)' }}>Sign up</Link>
-        </p>
 
       </div>
     </div>
