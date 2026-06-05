@@ -195,7 +195,7 @@ Complete the full architecture shell of the entire app before moving to authenti
 **General**
 - General Chat page
 
-### Phase 5 - Up Next
+### Phase 5 - Complete
 Authentication — login, signup, protected routes, user sessions via Supabase Auth
 
 ## Future Features
