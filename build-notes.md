@@ -169,7 +169,7 @@ Building this app is actively reinforcing cert concepts:
 - All pages navigable and styled consistently
 - Changes pushed to GitHub
 
-### Phase 4.5 - Up Next
+### Phase 4.5 - Complete
 Complete the full architecture shell of the entire app before moving to authentication:
 
 **Study Hub — remaining shells**
@@ -195,7 +195,7 @@ Complete the full architecture shell of the entire app before moving to authenti
 **General**
 - General Chat page
 
-### Phase 5 - Planned
+### Phase 5 - Up Next
 Authentication — login, signup, protected routes, user sessions via Supabase Auth
 
 ## Future Features
