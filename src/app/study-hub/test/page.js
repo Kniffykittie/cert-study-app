@@ -10,6 +10,11 @@ const TOPICS = {
 const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
 const COUNTS = [10, 25, 50]
 const letters = ['A', 'B', 'C', 'D']
+const REAL_EXAM = {
+  ccna: { questions: 110, minutes: 120 },
+  'network-plus': { questions: 90, minutes: 90 },
+  'security-plus': { questions: 90, minutes: 90 },
+}
 
 function ChatPanel({ cert, question, topic, options }) {
   const [messages, setMessages] = useState([{ role: 'assistant', text: 'Ask me anything about this question or topic. I won\'t give away the answer, but I can help you understand the concepts.' }])
@@ -77,6 +82,100 @@ function ChatPanel({ cert, question, topic, options }) {
   )
 }
 
+function useTimer(minutes, onExpire) {
+  const [secondsLeft, setSecondsLeft] = useState(minutes * 60)
+  const intervalRef = useRef(null)
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      setSecondsLeft(s => {
+        if (s <= 1) { clearInterval(intervalRef.current); onExpire(); return 0 }
+        return s - 1
+      })
+    }, 1000)
+    return () => clearInterval(intervalRef.current)
+  }, [])
+
+  const m = Math.floor(secondsLeft / 60).toString().padStart(2, '0')
+  const s = (secondsLeft % 60).toString().padStart(2, '0')
+  const urgent = secondsLeft <= 300
+  return { display: `${m}:${s}`, urgent, secondsLeft }
+}
+
+function RealExam({ cert, questions, answers, setAnswers, current, setCurrent, saving, timedOut, onTimeout, onSubmit }) {
+  const { display, urgent } = useTimer(REAL_EXAM[cert].minutes, onTimeout)
+  const unanswered = questions.filter((_, i) => answers[i] === undefined).length
+  const q = questions[current]
+  const isLast = current === questions.length - 1
+
+  return (
+    <div>
+      {/* Header with timer */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <h1 style={{ color: 'var(--accent-blue)', fontSize: '20px', fontWeight: '700' }}>{CERT_LABELS[cert]} Real Exam</h1>
+            <span style={{ backgroundColor: 'rgba(204,0,0,0.15)', border: '1px solid var(--error-border)', color: 'var(--error)', fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '4px' }}>REAL EXAM</span>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Question {current + 1} of {questions.length}</p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {/* Progress dots */}
+          <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', maxWidth: '220px' }}>
+            {questions.map((_, i) => (
+              <div key={i} onClick={() => setCurrent(i)} style={{ width: '16px', height: '16px', borderRadius: '3px', backgroundColor: i === current ? 'var(--accent-blue)' : answers[i] !== undefined ? 'var(--accent-blue)' : 'var(--border)', opacity: answers[i] !== undefined || i === current ? 1 : 0.3, cursor: 'pointer' }} />
+            ))}
+          </div>
+          {/* Timer */}
+          <div style={{ backgroundColor: urgent ? 'rgba(204,0,0,0.15)' : 'var(--surface)', border: `2px solid ${urgent ? 'var(--error)' : 'var(--border)'}`, borderRadius: '8px', padding: '8px 16px', textAlign: 'center', minWidth: '90px' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '10px', fontWeight: '600', letterSpacing: '0.08em', marginBottom: '2px' }}>TIME LEFT</div>
+            <div style={{ color: urgent ? 'var(--error)' : 'var(--text-primary)', fontSize: '22px', fontWeight: '700', fontVariantNumeric: 'tabular-nums' }}>{display}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Question */}
+      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
+        <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {q.options.map((opt, i) => {
+            const letter = letters[i]
+            const isSelected = answers[current] === letter
+            return (
+              <div key={letter} onClick={() => setAnswers(prev => ({ ...prev, [current]: letter }))}
+                style={{ padding: '12px 16px', backgroundColor: isSelected ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `1px solid ${isSelected ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '8px', color: isSelected ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer', fontWeight: isSelected ? '600' : '400' }}>
+                {opt}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={() => setCurrent(c => c - 1)} disabled={current === 0}
+            style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', cursor: current === 0 ? 'not-allowed' : 'pointer', opacity: current === 0 ? 0.4 : 1 }}>
+            ← Previous
+          </button>
+          {!isLast && (
+            <button onClick={() => setCurrent(c => c + 1)}
+              style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', cursor: 'pointer' }}>
+              Next →
+            </button>
+          )}
+        </div>
+        {isLast && (
+          <button onClick={onSubmit} disabled={saving}
+            style={{ backgroundColor: unanswered > 0 ? 'var(--warning)' : 'var(--success)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: saving ? 'not-allowed' : 'pointer' }}>
+            {saving ? 'Saving...' : unanswered > 0 ? `Submit (${unanswered} unanswered)` : 'Submit Exam'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function TestPage() {
   const [cert, setCert] = useState(null)
   const [count, setCount] = useState(10)
@@ -92,6 +191,7 @@ export default function TestPage() {
   const [answers, setAnswers] = useState({})
   const [done, setDone] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [timedOut, setTimedOut] = useState(false)
 
   function toggleTopic(topic) {
     setSelectedTopics(prev => prev.includes(topic) ? prev.filter(t => t !== topic) : [...prev, topic])
@@ -101,11 +201,12 @@ export default function TestPage() {
     if (!cert) { setError('Please select a certification.'); return }
     setLoading(true)
     setError('')
+    const actualCount = mode === 'real' ? REAL_EXAM[cert].questions : count
     try {
       const res = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cert, count, topics: selectedTopics })
+        body: JSON.stringify({ cert, count: actualCount, topics: selectedTopics })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to generate questions')
@@ -115,6 +216,7 @@ export default function TestPage() {
       setRevealed(false)
       setAnswers({})
       setDone(false)
+      setTimedOut(false)
     } catch (e) {
       setError(e.message)
     }
@@ -192,10 +294,11 @@ export default function TestPage() {
         </div>
 
         {/* Mode selector */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
           {[
             { key: 'practice', label: 'Practice Mode', desc: 'Immediate feedback + tutor chat after each answer' },
-            { key: 'simulation', label: 'Simulation Mode', desc: 'Real exam conditions — no feedback until the end' }
+            { key: 'simulation', label: 'Simulation Mode', desc: 'Real exam conditions — no feedback until the end' },
+            { key: 'real', label: 'Real Exam', desc: cert ? `${REAL_EXAM[cert]?.questions ?? '—'} questions, ${REAL_EXAM[cert]?.minutes ?? '—'} min timer` : 'Full question count with countdown timer' }
           ].map(m => (
             <div key={m.key} onClick={() => setMode(m.key)}
               style={{ padding: '16px 20px', backgroundColor: mode === m.key ? 'rgba(0,128,255,0.1)' : 'var(--surface)', border: `2px solid ${mode === m.key ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '10px', cursor: 'pointer' }}>
@@ -217,8 +320,8 @@ export default function TestPage() {
               ))}
             </div>
           </div>
-          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-            <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Question Count</h2>
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', opacity: mode === 'real' ? 0.4 : 1, pointerEvents: mode === 'real' ? 'none' : 'auto' }}>
+            <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>{mode === 'real' && cert ? `Question Count — ${REAL_EXAM[cert].questions} (fixed)` : 'Question Count'}</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {COUNTS.map(n => (
                 <div key={n} onClick={() => setCount(n)}
@@ -312,6 +415,11 @@ export default function TestPage() {
       })}
     </div>
   )
+
+  // Real exam mode
+  if (mode === 'real') {
+    return <RealExam cert={cert} questions={questions} answers={answers} setAnswers={setAnswers} current={current} setCurrent={setCurrent} saving={saving} timedOut={timedOut} onTimeout={async () => { setTimedOut(true); await saveResults(answers); setDone(true) }} onSubmit={async () => { await saveResults(answers); setDone(true) }} />
+  }
 
   // Simulation mode question screen
   if (!isPractice) {
