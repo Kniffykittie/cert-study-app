@@ -43,13 +43,21 @@ Return ONLY a valid JSON array with this exact structure, no other text:
     "question": "The question text",
     "options": ["A. option", "B. option", "C. option", "D. option"],
     "correct": "A",
-    "explanation": "Brief explanation of why this answer is correct"
+    "explanations": {
+      "A": "Why this answer is correct...",
+      "B": "Why this answer is wrong...",
+      "C": "Why this answer is wrong...",
+      "D": "Why this answer is wrong..."
+    }
   }
 ]
 
 Rules:
 - Each question must have exactly 4 options labeled A, B, C, D
 - The "correct" field must be just the letter: A, B, C, or D
+- The "explanations" object must have an entry for every option A through D
+- For the correct answer, explain why it is right
+- For each wrong answer, explain specifically why it is incorrect or what makes it a distractor
 - Questions must be realistic exam-level difficulty
 - Distribute questions across the provided topics
 - No duplicate questions`
