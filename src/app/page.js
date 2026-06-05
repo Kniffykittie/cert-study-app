@@ -1,7 +1,26 @@
 'use client'
-import Link from 'next/link';
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 export default function Home() {
+  const [displayName, setDisplayName] = useState('')
+
+  useEffect(() => {
+    async function fetchProfile() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('profiles').select('display_name').eq('id', user.id).single()
+      if (data?.display_name) setDisplayName(data.display_name)
+    }
+    fetchProfile()
+  }, [])
+
+  const hour = new Date().getHours()
+  const timeGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+  const greeting = displayName ? `${timeGreeting}, ${displayName}.` : `${timeGreeting}.`
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--background)', display: 'flex', flexDirection: 'column' }}>
 
@@ -11,19 +30,16 @@ export default function Home() {
         <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
           <Link href="/chat" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '14px' }}>Chat</Link>
           <Link href="/settings" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '14px' }}>Settings</Link>
-          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--accent-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '600' }}>S</div>
+          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--accent-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '600' }}>
+            {displayName ? displayName[0].toUpperCase() : '?'}
+          </div>
         </div>
       </div>
 
       {/* Morning brief */}
       <div style={{ padding: '48px 32px 32px', maxWidth: '900px', width: '100%', margin: '0 auto', flex: 1 }}>
         <h1 style={{ color: 'var(--accent-blue)', fontSize: '32px', fontWeight: '700', marginBottom: '4px' }}>
-          {(() => {
-            const h = new Date().getHours()
-            if (h < 12) return 'Good morning.'
-            if (h < 18) return 'Good afternoon.'
-            return 'Good evening.'
-          })()}
+          {greeting}
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '16px', marginBottom: '48px' }}>
           Here's your command center for today.
@@ -34,17 +50,9 @@ export default function Home() {
 
           {/* Study Hub door */}
           <Link href="/study-hub" style={{ textDecoration: 'none' }}>
-            <div style={{
-              backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: '12px',
-              padding: '32px',
-              cursor: 'pointer',
-              transition: 'border-color 0.2s',
-            }}
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '32px', cursor: 'pointer', transition: 'border-color 0.2s' }}
               onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-blue)'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-            >
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
               <div style={{ fontSize: '32px', marginBottom: '16px' }}>📚</div>
               <h2 style={{ color: 'var(--accent-blue)', fontSize: '22px', fontWeight: '700', marginBottom: '8px' }}>Study Hub</h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.5', marginBottom: '24px' }}>
@@ -70,27 +78,16 @@ export default function Home() {
 
           {/* Life Hub door */}
           <Link href="/life-hub" style={{ textDecoration: 'none' }}>
-            <div style={{
-              backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: '12px',
-              padding: '32px',
-              cursor: 'pointer',
-            }}
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '32px', cursor: 'pointer' }}
               onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-purple)'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-            >
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
               <div style={{ fontSize: '32px', marginBottom: '16px' }}>🏃</div>
               <h2 style={{ color: 'var(--accent-purple)', fontSize: '22px', fontWeight: '700', marginBottom: '8px' }}>Life Hub</h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.5', marginBottom: '24px' }}>
                 Nutrition logging, workout tracking, sleep monitoring, and supplement management.
               </p>
               <div style={{ display: 'flex', gap: '16px' }}>
-                {[
-                  { label: 'Calories', value: '—' },
-                  { label: 'Sleep', value: '—' },
-                  { label: 'Workouts', value: '—' },
-                ].map(item => (
+                {[{ label: 'Calories', value: '—' }, { label: 'Sleep', value: '—' }, { label: 'Workouts', value: '—' }].map(item => (
                   <div key={item.label} style={{ flex: 1 }}>
                     <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '4px' }}>{item.label}</div>
                     <div style={{ color: 'var(--text-primary)', fontSize: '20px', fontWeight: '700' }}>{item.value}</div>
@@ -113,5 +110,5 @@ export default function Home() {
 
       </div>
     </div>
-  );
+  )
 }
