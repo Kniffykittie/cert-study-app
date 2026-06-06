@@ -27,6 +27,7 @@ export default function StudyHubPage() {
   const [topicPerf, setTopicPerf] = useState({})
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [streak, setStreak] = useState(0)
 
   useEffect(() => {
     async function load() {
@@ -43,7 +44,21 @@ export default function StudyHubPage() {
         grouped[row.cert].push(row)
       }
       setTopicPerf(grouped)
-      setSessions(sess ?? [])
+      const allSessions = sess ?? []
+      setSessions(allSessions)
+
+      // Compute streak: consecutive calendar days with at least one session
+      const days = new Set(allSessions.map(s => new Date(s.completed_at).toDateString()))
+      let streak = 0
+      const today = new Date()
+      for (let i = 0; i < 365; i++) {
+        const d = new Date(today)
+        d.setDate(today.getDate() - i)
+        if (days.has(d.toDateString())) streak++
+        else if (i > 0) break
+      }
+      setStreak(streak)
+
       setLoading(false)
     }
     load()

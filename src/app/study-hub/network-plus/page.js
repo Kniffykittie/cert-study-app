@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import PausedTests from '@/components/PausedTests'
+import ScoreChart from '@/components/ScoreChart'
 
 const CERT = 'network-plus'
 const ACCENT = 'var(--accent-purple)'
@@ -103,6 +104,11 @@ export default function NetworkPlusPage() {
         </div>
       </div>
 
+      {sessions.length >= 2 && (
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
+          <ScoreChart sessions={sessions} color={ACCENT} />
+        </div>
+      )}
       <PausedTests cert="network-plus" accentColor={ACCENT} />
 
       {/* Topic Buckets */}

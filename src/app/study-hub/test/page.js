@@ -215,6 +215,9 @@ export default function TestPage() {
   const [pausedTestId, setPausedTestId] = useState(null)
   const [initialSeconds, setInitialSeconds] = useState(null)
   const [mostRecentPaused, setMostRecentPaused] = useState(null)
+  const [reviewMode, setReviewMode] = useState(false)
+  const [reviewIndex, setReviewIndex] = useState(0)
+  const [weakLoading, setWeakLoading] = useState(false)
   const searchParams = useSearchParams()
 
   // Auto-resume if ?resume=id is in the URL
@@ -286,6 +289,24 @@ export default function TestPage() {
 
   function toggleTopic(topic) {
     setSelectedTopics(prev => prev.includes(topic) ? prev.filter(t => t !== topic) : [...prev, topic])
+  }
+
+  async function loadWeakDomains() {
+    if (!cert) return
+    setWeakLoading(true)
+    const supabase = createClient()
+    const { data } = await supabase.from('topic_performance').select('topic, total_seen, total_correct').eq('cert', cert)
+    const weak = (data ?? []).filter(r => r.total_seen >= 3 && (r.total_correct / r.total_seen) < 0.65)
+    const domains = DOMAINS[cert] ?? []
+    const matched = domains.filter(d =>
+      weak.some(w => w.topic.toLowerCase().includes(d.name.toLowerCase()) || d.name.toLowerCase().includes(w.topic.toLowerCase()))
+    )
+    if (matched.length > 0) {
+      setSelectedTopics(matched.map(d => domainKey(d)))
+    } else {
+      alert('Not enough data yet. Take a few tests first to identify weak domains.')
+    }
+    setWeakLoading(false)
   }
 
   async function generateTest() {
@@ -475,10 +496,18 @@ export default function TestPage() {
         )}
 
         {error && <p style={{ color: 'var(--error)', fontSize: '13px', marginBottom: '12px' }}>{error}</p>}
-        <button onClick={generateTest} disabled={loading || !cert}
-          style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: loading || !cert ? 'not-allowed' : 'pointer', opacity: loading || !cert ? 0.5 : 1 }}>
-          {loading ? 'Generating...' : 'Generate Test'}
-        </button>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={generateTest} disabled={loading || !cert}
+            style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: loading || !cert ? 'not-allowed' : 'pointer', opacity: loading || !cert ? 0.5 : 1 }}>
+            {loading ? 'Generating...' : 'Generate Test'}
+          </button>
+          {cert && mode !== 'real' && (
+            <button onClick={loadWeakDomains} disabled={weakLoading || !cert}
+              style={{ backgroundColor: 'rgba(241,196,15,0.1)', color: 'var(--warning)', border: '1px solid var(--warning-border)', borderRadius: '8px', padding: '12px 20px', fontSize: '14px', fontWeight: '600', cursor: weakLoading ? 'not-allowed' : 'pointer', opacity: weakLoading ? 0.5 : 1 }}>
+              {weakLoading ? 'Loading...' : '⚠ Focus Weak Domains'}
+            </button>
+          )}
+        </div>
       </div>
     )
   }
@@ -488,12 +517,88 @@ export default function TestPage() {
     const correct = questions.filter((q, i) => answers[i] === q.correct).length
     const pct = Math.round((correct / questions.length) * 100)
     const color = pct >= 80 ? 'var(--success)' : pct >= 65 ? 'var(--warning)' : 'var(--error)'
+    const wrongAnswers = questions.map((q, i) => ({ ...q, idx: i, userAnswer: answers[i] })).filter(q => q.userAnswer !== q.correct)
+
+    if (reviewMode && wrongAnswers.length > 0) {
+      const rq = wrongAnswers[reviewIndex]
+      return (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div>
+              <button onClick={() => setReviewMode(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', padding: 0, marginBottom: '8px', display: 'block' }}>← Back to Results</button>
+              <h1 style={{ color: 'var(--accent-blue)', fontSize: '24px', fontWeight: '700' }}>Review Wrong Answers</h1>
+            </div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{reviewIndex + 1} of {wrongAnswers.length}</div>
+          </div>
+
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--error-border)', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
+            <div style={{ color: 'var(--error)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>{rq.topic}</div>
+            <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{rq.question}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {rq.options.map((opt, i) => {
+                const letter = letters[i]
+                const isCorrect = letter === rq.correct
+                const isWrong = letter === rq.userAnswer && !isCorrect
+                let bg = 'var(--background)', border = 'var(--border)', textColor = 'var(--text-secondary)'
+                if (isCorrect) { bg = 'rgba(46,204,113,0.08)'; border = 'var(--success)'; textColor = 'var(--success)' }
+                if (isWrong) { bg = 'rgba(204,0,0,0.08)'; border = 'var(--error)'; textColor = 'var(--error)' }
+                return (
+                  <div key={letter}>
+                    <div style={{ padding: '12px 16px', backgroundColor: bg, border: `1px solid ${border}`, borderRadius: rq.explanations?.[letter] ? '8px 8px 0 0' : '8px', color: textColor, fontSize: '14px', fontWeight: isCorrect || isWrong ? '600' : '400', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>{opt}</span>
+                      {isCorrect && <span>✓ Correct</span>}
+                      {isWrong && <span>✗ Your Answer</span>}
+                    </div>
+                    {rq.explanations?.[letter] && (isCorrect || isWrong) && (
+                      <div style={{ padding: '10px 16px', backgroundColor: isCorrect ? 'rgba(46,204,113,0.05)' : 'rgba(204,0,0,0.05)', border: `1px solid ${isCorrect ? 'var(--success-border)' : 'var(--error-border)'}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5', margin: 0 }}>{rq.explanations[letter]}</p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <button onClick={() => setReviewIndex(i => i - 1)} disabled={reviewIndex === 0}
+              style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', cursor: reviewIndex === 0 ? 'not-allowed' : 'pointer', opacity: reviewIndex === 0 ? 0.4 : 1 }}>
+              ← Previous
+            </button>
+            {reviewIndex < wrongAnswers.length - 1 ? (
+              <button onClick={() => setReviewIndex(i => i + 1)}
+                style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                Next →
+              </button>
+            ) : (
+              <button onClick={() => setReviewMode(false)}
+                style={{ backgroundColor: 'var(--success)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                Done Reviewing ✓
+              </button>
+            )}
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div>
-        <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '32px' }}>Test Complete</h1>
+        <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>Test Complete</h1>
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '32px', marginBottom: '24px', textAlign: 'center' }}>
           <div style={{ color, fontSize: '72px', fontWeight: '700', lineHeight: 1 }}>{pct}%</div>
           <div style={{ color: 'var(--text-secondary)', fontSize: '14px', marginTop: '8px' }}>{correct} / {questions.length} correct</div>
+        </div>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+          <button onClick={() => { setQuestions(null); setCert(null) }}
+            style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+            Take Another Test
+          </button>
+          {wrongAnswers.length > 0 && (
+            <button onClick={() => { setReviewMode(true); setReviewIndex(0) }}
+              style={{ backgroundColor: 'rgba(204,0,0,0.1)', color: 'var(--error)', border: '1px solid var(--error-border)', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+              Review {wrongAnswers.length} Wrong Answer{wrongAnswers.length !== 1 ? 's' : ''} →
+            </button>
+          )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
           {questions.map((q, i) => {
@@ -510,10 +615,6 @@ export default function TestPage() {
             )
           })}
         </div>
-        <button onClick={() => { setQuestions(null); setCert(null) }}
-          style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-          Take Another Test
-        </button>
       </div>
     )
   }
