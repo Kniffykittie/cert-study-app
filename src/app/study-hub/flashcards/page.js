@@ -20,15 +20,20 @@ export default function FlashcardsPage() {
     const supabase = createClient()
     const [{ data: cards }, { data: progress }] = await Promise.all([
       supabase.from('flashcards').select('cert, id'),
-      supabase.from('flashcard_progress').select('flashcard_id, mastered')
+      supabase.from('flashcard_progress').select('flashcard_id, mastered, consecutive_correct')
     ])
 
-    const masteredIds = new Set((progress ?? []).filter(p => p.mastered).map(p => p.flashcard_id))
+    const progMap = {}
+    for (const p of progress ?? []) progMap[p.flashcard_id] = p
+
     const s = {}
     for (const c of cards ?? []) {
-      if (!s[c.cert]) s[c.cert] = { total: 0, mastered: 0 }
+      if (!s[c.cert]) s[c.cert] = { total: 0, mastered: 0, learning: 0, unlearned: 0 }
       s[c.cert].total++
-      if (masteredIds.has(c.id)) s[c.cert].mastered++
+      const p = progMap[c.id]
+      if (!p || p.consecutive_correct === 0) s[c.cert].unlearned++
+      else if (p.mastered) s[c.cert].mastered++
+      else s[c.cert].learning++
     }
     setStats(s)
     setLoading(false)
@@ -76,6 +81,7 @@ export default function FlashcardsPage() {
                 <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Loading...</div>
               ) : hasDeck ? (
                 <>
+                  {/* Mastery progress bar */}
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                       <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{s.total} cards</span>
@@ -85,6 +91,23 @@ export default function FlashcardsPage() {
                       <div style={{ height: '100%', width: `${masteryPct}%`, backgroundColor: masteryPct === 100 ? 'var(--success)' : cert.color, borderRadius: '3px' }} />
                     </div>
                   </div>
+
+                  {/* Stats breakdown */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', backgroundColor: 'rgba(46,204,113,0.06)', borderRadius: '6px', border: '1px solid var(--success-border)' }}>
+                      <span style={{ color: 'var(--success)', fontSize: '13px', fontWeight: '600' }}>Mastered</span>
+                      <span style={{ color: 'var(--success)', fontSize: '13px', fontWeight: '700' }}>{s.mastered} of {s.total}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', backgroundColor: 'rgba(241,196,15,0.06)', borderRadius: '6px', border: '1px solid var(--warning-border)' }}>
+                      <span style={{ color: 'var(--warning)', fontSize: '13px', fontWeight: '600' }}>Learning</span>
+                      <span style={{ color: 'var(--warning)', fontSize: '13px', fontWeight: '700' }}>{s.learning} of {s.total}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', backgroundColor: 'var(--background)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Unlearned</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '700' }}>{s.unlearned} of {s.total}</span>
+                    </div>
+                  </div>
+
                   <Link href={cert.href} style={{ textDecoration: 'none' }}>
                     <button style={{ width: '100%', backgroundColor: cert.color, color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
                       Study Flashcards →

@@ -103,6 +103,8 @@ export default function StudySession({ cert, label, color }) {
 
   const masteredCount = Object.values(progress).filter(p => p.mastered).length
   const totalCount = cards.length
+  const [browserOpen, setBrowserOpen] = useState(false)
+  const [expandedCard, setExpandedCard] = useState(null)
 
   if (loading) return <div style={{ color: 'var(--text-secondary)', padding: '40px', textAlign: 'center' }}>Loading flashcards...</div>
 
@@ -132,6 +134,10 @@ export default function StudySession({ cert, label, color }) {
             <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Mastered</div>
             <div style={{ color, fontSize: '18px', fontWeight: '700' }}>{masteredCount} / {totalCount}</div>
           </div>
+          <button onClick={() => setBrowserOpen(b => !b)}
+            style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>
+            {browserOpen ? 'Hide Cards' : 'Browse All Cards'}
+          </button>
           <button onClick={() => setAddingCard(true)}
             style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>
             + Add Card
@@ -213,6 +219,45 @@ export default function StudySession({ cert, label, color }) {
             </div>
           )}
         </>
+      )}
+
+      {/* Card Browser */}
+      {browserOpen && (
+        <div style={{ marginTop: '32px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+          <h2 style={{ color, fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>All Cards — {label}</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '16px' }}>{cards.length} cards total. Click any card to expand.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '500px', overflowY: 'auto' }}>
+            {cards.map(c => {
+              const p = progress[c.id]
+              const isExpanded = expandedCard === c.id
+              const status = p?.mastered ? 'Mastered' : p?.consecutive_correct > 0 ? 'Learning' : 'Unlearned'
+              const statusColor = p?.mastered ? 'var(--success)' : p?.consecutive_correct > 0 ? 'var(--warning)' : 'var(--text-secondary)'
+              return (
+                <div key={c.id} style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                  <div onClick={() => setExpandedCard(isExpanded ? null : c.id)}
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: 'var(--background)', cursor: 'pointer' }}>
+                    <span style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{c.front}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ color: statusColor, fontSize: '11px', fontWeight: '600' }}>{status}</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{isExpanded ? '▲' : '▼'}</span>
+                    </div>
+                  </div>
+                  {isExpanded && (
+                    <div style={{ padding: '14px', backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
+                      <div style={{ color: 'var(--text-primary)', fontSize: '14px', lineHeight: '1.6', marginBottom: c.example ? '12px' : 0 }}>{c.back}</div>
+                      {c.example && (
+                        <div style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px 14px' }}>
+                          <div style={{ color, fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Example</div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6' }}>{c.example}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
       )}
 
       {/* Add Card Modal */}

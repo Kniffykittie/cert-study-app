@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import PausedTests from '@/components/PausedTests'
 
 const CERT = 'security-plus'
 const ACCENT = 'var(--error)'
@@ -101,6 +102,8 @@ export default function SecurityPlusPage() {
           ))}
         </div>
       </div>
+
+      <PausedTests cert="security-plus" accentColor={ACCENT} />
 
       {/* Topic Buckets */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
