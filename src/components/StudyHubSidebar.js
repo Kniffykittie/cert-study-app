@@ -60,6 +60,21 @@ export default function StudyHubSidebar() {
         { label: 'Study Mode', href: '/study-hub/study' },
         { label: 'Progress', href: '/study-hub/progress' },
         { label: 'Results', href: '/study-hub/results' },
+      ].map(item => {
+        const active = pathname === item.href
+        return (
+          <Link key={item.href} href={item.href}
+            style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', textDecoration: 'none', display: 'block', backgroundColor: active ? 'rgba(0,128,255,0.12)' : 'transparent', color: active ? 'var(--accent-blue)' : 'var(--text-secondary)', fontWeight: active ? '600' : '400', borderLeft: active ? '2px solid var(--accent-blue)' : '2px solid transparent' }}
+            onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = 'rgba(0,128,255,0.08)' }}
+            onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}>
+            {item.label}
+          </Link>
+        )
+      })}
+
+      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '12px 12px 4px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Settings</div>
+
+      {[
         { label: 'Flagged Questions', href: '/study-hub/flagged' },
         { label: 'Templates', href: '/study-hub/templates' },
       ].map(item => {
