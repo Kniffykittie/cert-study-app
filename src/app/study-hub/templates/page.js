@@ -53,7 +53,7 @@ export default function TemplatesPage() {
       const res = await fetch('/api/generate-templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cert: selectedCert, domain: selectedDomain, difficulty: selectedDifficulty, count: genCount })
+        body: JSON.stringify({ cert: selectedCert, domain: selectedDomain, difficulty: selectedDifficulty, count: 5 })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
