@@ -86,7 +86,7 @@ export default function StudyHubSidebar() {
               <span style={{ fontSize: '11px', color: hasActive ? 'var(--accent-blue)' : 'var(--text-secondary)', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                 {section.label}
               </span>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>{isOpen ? '▾' : '▸'}</span>
+              <span style={{ color: 'var(--text-primary)', fontSize: '13px' }}>{isOpen ? '▾' : '▸'}</span>
             </div>
 
             {/* Items */}
