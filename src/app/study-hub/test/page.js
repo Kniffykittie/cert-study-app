@@ -390,8 +390,8 @@ export default function TestPage() {
         </div>
 
         {cert ? (
-          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
-            <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Exam Domains</h2>
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px', opacity: mode === 'real' ? 0.4 : 1, pointerEvents: mode === 'real' ? 'none' : 'auto' }}>
+            <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>{mode === 'real' ? 'Exam Domains — All domains covered (fixed)' : 'Exam Domains'}</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '12px' }}>Leave all unselected to cover all domains weighted by official exam percentages, or pick specific domains to drill.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {DOMAINS[cert].map(d => {
