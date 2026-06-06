@@ -17,6 +17,8 @@ export default function StudySession({ cert, label, color }) {
   const [newBack, setNewBack] = useState('')
   const [newExample, setNewExample] = useState('')
   const [saving, setSaving] = useState(false)
+  const [browserOpen, setBrowserOpen] = useState(false)
+  const [expandedCard, setExpandedCard] = useState(null)
 
   useEffect(() => { loadCards() }, [])
 
@@ -103,8 +105,6 @@ export default function StudySession({ cert, label, color }) {
 
   const masteredCount = Object.values(progress).filter(p => p.mastered).length
   const totalCount = cards.length
-  const [browserOpen, setBrowserOpen] = useState(false)
-  const [expandedCard, setExpandedCard] = useState(null)
 
   if (loading) return <div style={{ color: 'var(--text-secondary)', padding: '40px', textAlign: 'center' }}>Loading flashcards...</div>
 
@@ -226,29 +226,29 @@ export default function StudySession({ cert, label, color }) {
         <div style={{ marginTop: '32px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
           <h2 style={{ color, fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>All Cards — {label}</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '16px' }}>{cards.length} cards total. Click any card to expand.</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '500px', overflowY: 'auto' }}>
-            {cards.map(c => {
+          <div style={{ maxHeight: '500px', overflowY: 'auto', borderRadius: '8px', border: '1px solid #2a2a2a' }}>
+            {cards.map((c, i) => {
               const p = progress[c.id]
               const isExpanded = expandedCard === c.id
               const status = p?.mastered ? 'Mastered' : p?.consecutive_correct > 0 ? 'Learning' : 'Unlearned'
-              const statusColor = p?.mastered ? 'var(--success)' : p?.consecutive_correct > 0 ? 'var(--warning)' : 'var(--text-secondary)'
+              const statusColor = p?.mastered ? '#2ECC71' : p?.consecutive_correct > 0 ? '#F1C40F' : '#888888'
               return (
-                <div key={c.id} style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+                <div key={c.id} style={{ borderBottom: i < cards.length - 1 ? '1px solid #2a2a2a' : 'none' }}>
                   <div onClick={() => setExpandedCard(isExpanded ? null : c.id)}
-                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: '#1a1a1a', cursor: 'pointer', minHeight: '40px' }}>
-                    <span style={{ color: '#E8E8E8', fontSize: '14px', flex: 1, marginRight: '12px' }}>{c.front}</span>
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: isExpanded ? '#222' : '#111', cursor: 'pointer' }}>
+                    <p style={{ color: '#ffffff', fontSize: '14px', margin: '0', lineHeight: '1.4', flex: 1, marginRight: '12px' }}>{c.front}</p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                       <span style={{ color: statusColor, fontSize: '11px', fontWeight: '600' }}>{status}</span>
                       <span style={{ color: '#888', fontSize: '12px' }}>{isExpanded ? '▲' : '▼'}</span>
                     </div>
                   </div>
                   {isExpanded && (
-                    <div style={{ padding: '14px', backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
-                      <div style={{ color: '#E8E8E8', fontSize: '14px', lineHeight: '1.6', marginBottom: c.example ? '12px' : 0 }}>{c.back}</div>
+                    <div style={{ padding: '14px 16px', background: '#1a1a1a', borderTop: '1px solid #2a2a2a' }}>
+                      <p style={{ color: '#cccccc', fontSize: '14px', lineHeight: '1.6', margin: '0 0 8px 0' }}>{c.back}</p>
                       {c.example && (
-                        <div style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px 14px' }}>
-                          <div style={{ color, fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Example</div>
-                          <div style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6' }}>{c.example}</div>
+                        <div style={{ background: '#111', border: '1px solid #2a2a2a', borderRadius: '6px', padding: '10px 14px', marginTop: '8px' }}>
+                          <p style={{ color: statusColor, fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', margin: '0 0 4px 0' }}>Example</p>
+                          <p style={{ color: '#888', fontSize: '13px', lineHeight: '1.6', margin: '0' }}>{c.example}</p>
                         </div>
                       )}
                     </div>
