@@ -60,6 +60,8 @@ export default function StudyHubSidebar() {
         { label: 'Study Mode', href: '/study-hub/study' },
         { label: 'Progress', href: '/study-hub/progress' },
         { label: 'Results', href: '/study-hub/results' },
+        { label: 'Flagged Questions', href: '/study-hub/flagged' },
+        { label: 'Templates', href: '/study-hub/templates' },
       ].map(item => {
         const active = pathname === item.href
         return (

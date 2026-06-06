@@ -218,6 +218,11 @@ export default function TestPage() {
   const [reviewMode, setReviewMode] = useState(false)
   const [reviewIndex, setReviewIndex] = useState(0)
   const [weakLoading, setWeakLoading] = useState(false)
+  const [difficulty, setDifficulty] = useState('hard')
+  const [flagModal, setFlagModal] = useState(null) // { questionIndex }
+  const [flagFeedbackType, setFlagFeedbackType] = useState('')
+  const [flagFeedbackText, setFlagFeedbackText] = useState('')
+  const [flagSubmitting, setFlagSubmitting] = useState(false)
   const searchParams = useSearchParams()
 
   // Auto-resume if ?resume=id is in the URL
@@ -333,16 +338,57 @@ export default function TestPage() {
     setWeakLoading(false)
   }
 
+  async function submitFlag() {
+    if (!flagModal || !flagFeedbackType) return
+    setFlagSubmitting(true)
+    const q = questions[flagModal.questionIndex]
+    const usedTemplateIds = questions.filter(q => q.template_id).map(q => q.template_id)
+    try {
+      const res = await fetch('/api/flag-question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question_snapshot: { ...q, user_answer: answers[flagModal.questionIndex] },
+          feedback_type: flagFeedbackType,
+          feedback_text: flagFeedbackText,
+          cert,
+          domain: q.topic,
+          difficulty,
+          exclude_template_ids: usedTemplateIds,
+        })
+      })
+      const data = await res.json()
+      if (data.replacement) {
+        setQuestions(prev => {
+          const updated = [...prev]
+          updated[flagModal.questionIndex] = data.replacement
+          return updated
+        })
+        // Clear any answer for this question since it's now a new question
+        setAnswers(prev => { const a = { ...prev }; delete a[flagModal.questionIndex]; return a })
+        if (flagModal.questionIndex === current) {
+          setSelectedAnswer(null)
+          setRevealed(false)
+        }
+      }
+    } catch (e) { console.error(e) }
+    setFlagModal(null)
+    setFlagFeedbackType('')
+    setFlagFeedbackText('')
+    setFlagSubmitting(false)
+  }
+
   async function generateTest() {
     if (!cert) { setError('Please select a certification.'); return }
     setLoading(true)
     setError('')
     const actualCount = mode === 'real' ? REAL_EXAM[cert].questions : count
+    const actualDifficulty = mode === 'real' ? 'hard' : difficulty
     try {
       const res = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cert, count: actualCount, topics: selectedTopics })
+        body: JSON.stringify({ cert, count: actualCount, topics: selectedTopics, difficulty: actualDifficulty })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to generate questions')
@@ -433,6 +479,39 @@ export default function TestPage() {
     </div>
   )
 
+  const flagModalEl = flagModal && (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '32px', maxWidth: '460px', width: '90%' }}>
+        <h2 style={{ color: 'var(--warning)', fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>⚑ Flag This Question</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>This question will be replaced immediately. Your feedback goes to the review queue.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+          {[
+            { key: 'wrong_answer', label: 'Wrong answer marked correct' },
+            { key: 'confusing', label: 'Confusing or ambiguous wording' },
+            { key: 'outdated', label: 'Outdated or inaccurate info' },
+            { key: 'other', label: 'Other' },
+          ].map(opt => (
+            <div key={opt.key} onClick={() => setFlagFeedbackType(opt.key)}
+              style={{ padding: '10px 14px', backgroundColor: flagFeedbackType === opt.key ? 'rgba(241,196,15,0.1)' : 'var(--background)', border: `1px solid ${flagFeedbackType === opt.key ? 'var(--warning)' : 'var(--border)'}`, borderRadius: '6px', color: flagFeedbackType === opt.key ? 'var(--warning)' : 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontWeight: flagFeedbackType === opt.key ? '600' : '400' }}>
+              {opt.label}
+            </div>
+          ))}
+        </div>
+        <textarea value={flagFeedbackText} onChange={e => setFlagFeedbackText(e.target.value)}
+          placeholder="Additional details (optional)..." rows={3}
+          style={{ width: '100%', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', marginBottom: '16px' }} />
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <button onClick={() => { setFlagModal(null); setFlagFeedbackType(''); setFlagFeedbackText('') }}
+            style={{ backgroundColor: 'var(--background)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
+          <button onClick={submitFlag} disabled={!flagFeedbackType || flagSubmitting}
+            style={{ backgroundColor: 'var(--warning)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '700', cursor: !flagFeedbackType || flagSubmitting ? 'not-allowed' : 'pointer', opacity: !flagFeedbackType || flagSubmitting ? 0.5 : 1 }}>
+            {flagSubmitting ? 'Submitting...' : 'Submit & Replace'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
   // Config screen
   if (!questions) {
     const modeLabel = mostRecentPaused ? { practice: 'Practice', simulation: 'Simulation', real: 'Real Exam' }[mostRecentPaused.mode] : null
@@ -463,6 +542,24 @@ export default function TestPage() {
               <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{m.desc}</div>
             </div>
           ))}
+        </div>
+
+        {/* Difficulty */}
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '16px', opacity: mode === 'real' ? 0.4 : 1, pointerEvents: mode === 'real' ? 'none' : 'auto' }}>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>{mode === 'real' ? 'Difficulty — Hard (fixed for Real Exam)' : 'Difficulty'}</h2>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {[
+              { key: 'easy', label: 'Easy', desc: 'Basic recall & definitions' },
+              { key: 'medium', label: 'Medium', desc: 'Application & concepts' },
+              { key: 'hard', label: 'Hard', desc: 'Scenarios, traps & analysis' },
+            ].map(d => (
+              <div key={d.key} onClick={() => setDifficulty(d.key)}
+                style={{ flex: 1, padding: '12px', backgroundColor: difficulty === d.key ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `2px solid ${difficulty === d.key ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '8px', cursor: 'pointer', textAlign: 'center' }}>
+                <div style={{ color: difficulty === d.key ? 'var(--accent-blue)' : 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>{d.label}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>{d.desc}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -721,6 +818,10 @@ export default function TestPage() {
             </div>
           </div>
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+              <button onClick={() => setFlagModal({ questionIndex: current })}
+                style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-secondary)', fontSize: '11px', padding: '2px 8px', cursor: 'pointer' }}>⚑ Flag</button>
+            </div>
             <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {q.options.map((opt, i) => {
@@ -757,6 +858,7 @@ export default function TestPage() {
           </div>
         </div>
         {pauseModal}
+        {flagModalEl}
       </>
     )
   }
@@ -776,7 +878,11 @@ export default function TestPage() {
             </div>
           </div>
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
-            <div style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>{q.topic}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{q.topic}</div>
+              <button onClick={() => setFlagModal({ questionIndex: current })}
+                style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-secondary)', fontSize: '11px', padding: '2px 8px', cursor: 'pointer' }}>⚑ Flag</button>
+            </div>
             <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {q.options.map((opt, i) => {
@@ -827,6 +933,7 @@ export default function TestPage() {
         <ChatPanel cert={cert} question={q.question} topic={q.topic} options={q.options} />
       </div>
       {pauseModal}
+      {flagModalEl}
     </>
   )
 }

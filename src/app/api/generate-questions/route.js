@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { fillTemplate } from '@/lib/fillTemplate'
 
 const client = new Anthropic()
 
@@ -84,7 +85,7 @@ export async function POST(request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { cert, count, topics } = await request.json()
+  const { cert, count, topics, difficulty = 'hard' } = await request.json()
 
   if (!DOMAINS[cert]) return Response.json({ error: 'Invalid cert' }, { status: 400 })
 
@@ -97,15 +98,60 @@ export async function POST(request) {
     : allDomains
 
   const distribution = weightedDistribution(activeDomains, count)
+
+  // --- Pull from template pool first ---
+  const domainNames = activeDomains.map(d => `${d.id} ${d.name}`)
+  const { data: poolTemplates } = await supabase
+    .from('question_templates')
+    .select('*')
+    .eq('cert', cert)
+    .eq('difficulty', difficulty)
+    .eq('is_retired', false)
+    .in('domain', domainNames)
+
+  // Shuffle pool and fill templates
+  const shuffled = (poolTemplates ?? []).sort(() => Math.random() - 0.5)
+  const usedDomainCounts = {}
+  const templateQuestions = []
+
+  for (const tmpl of shuffled) {
+    if (templateQuestions.length >= count) break
+    const domainAlloc = distribution.find(d => d.domain === tmpl.domain)
+    if (!domainAlloc) continue
+    const used = usedDomainCounts[tmpl.domain] ?? 0
+    if (used >= domainAlloc.count) continue
+    templateQuestions.push(fillTemplate(tmpl))
+    usedDomainCounts[tmpl.domain] = used + 1
+  }
+
+  // If we got enough from templates, return immediately
+  if (templateQuestions.length >= count) {
+    return Response.json({ questions: templateQuestions.slice(0, count) })
+  }
+
+  // --- Supplement remaining with AI ---
+  const aiNeeded = count - templateQuestions.length
+  const remainingDist = distribution.map(d => ({
+    ...d,
+    count: Math.max(0, d.count - (usedDomainCounts[d.domain] ?? 0))
+  })).filter(d => d.count > 0)
+
   const scenarioGuidance = buildScenarioGuidance(cert)
 
-  const distributionInstructions = distribution
+  const distributionInstructions = remainingDist
     .map(d => `  - "${d.domain}": exactly ${d.count} question${d.count !== 1 ? 's' : ''}`)
     .join('\n')
 
+  const difficultyInstruction = difficulty === 'easy'
+    ? 'DIFFICULTY: Easy — recall-level questions testing basic definitions and concepts. Wrong answers are clearly incorrect to someone who studied.'
+    : difficulty === 'medium'
+    ? 'DIFFICULTY: Medium — application-level questions requiring understanding of how concepts work together. Wrong answers are plausible to partial knowledge.'
+    : 'DIFFICULTY: Hard — analysis and scenario-based. Wrong answers are traps designed to catch common misconceptions. Require precise knowledge to eliminate.'
+
   const prompt = `You are an expert ${certLabel} exam question generator. Your goal is to generate questions that are as close to the real exam as possible — realistic scenarios, accurate technical details, and plausible wrong answers that trip up underprepared students.
+${difficultyInstruction}
 ${scenarioGuidance}
-Generate exactly ${count} multiple choice questions distributed across domains as follows:
+Generate exactly ${aiNeeded} multiple choice questions distributed across domains as follows:
 ${distributionInstructions}
 
 The "topic" field in each question must be the exact domain name from the distribution above (e.g. "3.0 IP Connectivity").
@@ -151,5 +197,7 @@ Rules:
     questions = JSON.parse(trimmed)
   }
 
-  return Response.json({ questions })
+  // Merge template questions + AI questions and shuffle
+  const allQuestions = [...templateQuestions, ...questions].sort(() => Math.random() - 0.5)
+  return Response.json({ questions: allQuestions })
 }
