@@ -11,6 +11,8 @@ export default function StudySession({ cert, label, color }) {
   const [flipped, setFlipped] = useState(false)
   const [showExample, setShowExample] = useState(false)
   const [sessionDone, setSessionDone] = useState(false)
+  const [seen, setSeen] = useState(0)
+  const [sessionTotal, setSessionTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [addingCard, setAddingCard] = useState(false)
   const [newFront, setNewFront] = useState('')
@@ -67,6 +69,8 @@ export default function StudySession({ cert, label, color }) {
     setFlipped(false)
     setShowExample(false)
     setSessionDone(sessionCards.length === 0)
+    setSeen(0)
+    setSessionTotal(sessionCards.length)
   }
 
   async function markCard(gotIt) {
@@ -87,6 +91,7 @@ export default function StudySession({ cert, label, color }) {
     }, { onConflict: 'user_id,flashcard_id' })
 
     setProgress(prev => ({ ...prev, [card.id]: { ...prev[card.id], consecutive_correct: newConsec, mastered } }))
+    setSeen(s => s + 1)
 
     // If "Still Learning", put it back near the end of the deck
     let newDeck = deck.filter((_, i) => i !== index)
@@ -181,7 +186,7 @@ export default function StudySession({ cert, label, color }) {
         <>
           {/* Card counter */}
           <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '12px', textAlign: 'center' }}>
-            Card {index + 1} of {deck.length} · <span style={{ fontSize: '12px' }}>Space to flip · ← Still Learning · → Got It</span>
+            Card {seen + 1} of {sessionTotal} · <span style={{ fontSize: '12px' }}>Space to flip · ← Still Learning · → Got It</span>
           </div>
 
           {/* Flashcard */}
