@@ -18,17 +18,20 @@ function scoreColor(pct) {
 export default function CCNAPage() {
   const [topicRows, setTopicRows] = useState([])
   const [sessions, setSessions] = useState([])
+  const [personalBest, setPersonalBest] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
       const supabase = createClient()
-      const [{ data: perf }, { data: sess }] = await Promise.all([
+      const [{ data: perf }, { data: sess }, { data: realSess }] = await Promise.all([
         supabase.from('topic_performance').select('topic, total_seen, total_correct, last_seen').eq('cert', CERT),
-        supabase.from('test_sessions').select('score_pct, total_questions, correct, completed_at').eq('cert', CERT).order('completed_at', { ascending: false }).limit(50)
+        supabase.from('test_sessions').select('score_pct, total_questions, correct, completed_at').eq('cert', CERT).order('completed_at', { ascending: false }).limit(50),
+        supabase.from('test_sessions').select('score_pct, total_questions').eq('cert', CERT).eq('mode', 'real').order('score_pct', { ascending: false }).limit(1)
       ])
       setTopicRows(perf ?? [])
       setSessions(sess ?? [])
+      setPersonalBest(realSess?.[0] ?? null)
       setLoading(false)
     }
     load()
@@ -94,11 +97,12 @@ export default function CCNAPage() {
           {[
             { label: 'Questions Done', value: loading ? '...' : totalSeen.toLocaleString() },
             { label: 'Tests Taken', value: loading ? '...' : sessions.length },
+            { label: 'Real Exam Best', value: loading ? '...' : personalBest ? `${personalBest.score_pct}%` : '—' },
             { label: 'Last Studied', value: loading ? '...' : lastStudied }
           ].map(stat => (
             <div key={stat.label}>
               <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px' }}>{stat.label}</div>
-              <div style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '600' }}>{stat.value}</div>
+              <div style={{ color: stat.label === 'Real Exam Best' && personalBest ? scoreColor(personalBest.score_pct) : 'var(--text-primary)', fontSize: '18px', fontWeight: '600' }}>{stat.value}</div>
             </div>
           ))}
         </div>

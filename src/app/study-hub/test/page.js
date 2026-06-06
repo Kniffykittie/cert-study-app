@@ -236,6 +236,30 @@ export default function TestPage() {
     loadMostRecent()
   }, [questions])
 
+  // Keyboard shortcuts during a test
+  useEffect(() => {
+    if (!questions || done || showPauseConfirm) return
+    function handleKey(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      const num = { '1': 0, '2': 1, '3': 2, '4': 3 }[e.key]
+      if (num !== undefined) {
+        const letter = letters[num]
+        if (mode === 'practice' && !revealed) setSelectedAnswer(letter)
+        if (mode === 'simulation') simSelectAnswer(letter)
+        if (mode === 'real') setAnswers(prev => ({ ...prev, [current]: letter }))
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        if (mode === 'practice') {
+          if (!revealed && selectedAnswer) submitAnswer()
+          else if (revealed) nextQuestion()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [questions, done, showPauseConfirm, mode, revealed, selectedAnswer, current])
+
   async function saveToSupabase(secondsLeft) {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -343,7 +367,7 @@ export default function TestPage() {
     const correct = questions.filter((q, i) => finalAnswers[i] === q.correct).length
     const scorePct = Math.round((correct / questions.length) * 100)
     const { data: session } = await supabase.from('test_sessions').insert({
-      user_id: user.id, cert, total_questions: questions.length, correct, score_pct: scorePct
+      user_id: user.id, cert, mode, total_questions: questions.length, correct, score_pct: scorePct
     }).select().single()
     if (session) {
       await supabase.from('question_answers').insert(questions.map((q, i) => ({
@@ -581,17 +605,51 @@ export default function TestPage() {
       )
     }
 
+    // Domain breakdown
+    const domainBreakdown = {}
+    questions.forEach((q, i) => {
+      if (!domainBreakdown[q.topic]) domainBreakdown[q.topic] = { correct: 0, total: 0 }
+      domainBreakdown[q.topic].total++
+      if (answers[i] === q.correct) domainBreakdown[q.topic].correct++
+    })
+    const domainRows = Object.entries(domainBreakdown).sort((a, b) => (a[1].correct / a[1].total) - (b[1].correct / b[1].total))
+
     return (
       <div>
         <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>Test Complete</h1>
-        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '32px', marginBottom: '24px', textAlign: 'center' }}>
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '32px', marginBottom: '16px', textAlign: 'center' }}>
           <div style={{ color, fontSize: '72px', fontWeight: '700', lineHeight: 1 }}>{pct}%</div>
           <div style={{ color: 'var(--text-secondary)', fontSize: '14px', marginTop: '8px' }}>{correct} / {questions.length} correct</div>
         </div>
+
+        {/* Domain breakdown */}
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Score by Domain</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {domainRows.map(([topic, stats]) => {
+              const domPct = Math.round((stats.correct / stats.total) * 100)
+              const domColor = domPct >= 80 ? 'var(--success)' : domPct >= 65 ? 'var(--warning)' : 'var(--error)'
+              return (
+                <div key={topic} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '13px', flex: 1 }}>{topic}</span>
+                  <div style={{ width: '120px', height: '6px', backgroundColor: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${domPct}%`, backgroundColor: domColor, borderRadius: '3px' }} />
+                  </div>
+                  <span style={{ color: domColor, fontSize: '13px', fontWeight: '600', minWidth: '60px', textAlign: 'right' }}>{stats.correct}/{stats.total} ({domPct}%)</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
         <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
           <button onClick={() => { setQuestions(null); setCert(null) }}
             style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-            Take Another Test
+            New Test
+          </button>
+          <button onClick={() => { setDone(false); setReviewMode(false); generateTest() }}
+            style={{ backgroundColor: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+            Same Settings Again ↺
           </button>
           {wrongAnswers.length > 0 && (
             <button onClick={() => { setReviewMode(true); setReviewIndex(0) }}
@@ -750,7 +808,8 @@ export default function TestPage() {
               })}
             </div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>1–4 to select · Enter to submit/next</span>
             {!revealed ? (
               <button onClick={submitAnswer} disabled={!selectedAnswer}
                 style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: !selectedAnswer ? 'not-allowed' : 'pointer', opacity: !selectedAnswer ? 0.5 : 1 }}>
