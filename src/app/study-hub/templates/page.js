@@ -135,13 +135,9 @@ export default function TemplatesPage() {
           </div>
           <div>
             <label style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>COUNT</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {[5, 10, 20].map(n => (
-                <div key={n} onClick={() => setGenCount(n)}
-                  style={{ padding: '6px 14px', backgroundColor: genCount === n ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `1px solid ${genCount === n ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '6px', color: genCount === n ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontWeight: genCount === n ? '600' : '400' }}>
-                  {n}
-                </div>
-              ))}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ padding: '6px 14px', backgroundColor: 'rgba(0,128,255,0.1)', border: '1px solid var(--accent-blue)', borderRadius: '6px', color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '600' }}>5</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>per batch</span>
             </div>
           </div>
         </div>
@@ -152,7 +148,7 @@ export default function TemplatesPage() {
         )}
         <button onClick={generate} disabled={!!generating}
           style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.5 : 1 }}>
-          {generating ? 'Generating... (~30s)' : `Generate ${genCount} Templates`}
+          {generating ? 'Generating... (~30s)' : 'Generate 5 Templates'}
         </button>
         <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Templates are added to the pool permanently. Generating more for the same domain adds to the existing set.</p>
       </div>
