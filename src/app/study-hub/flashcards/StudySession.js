@@ -22,6 +22,23 @@ export default function StudySession({ cert, label, color }) {
 
   useEffect(() => { loadCards() }, [])
 
+  useEffect(() => {
+    function handleKey(e) {
+      if (addingCard || browserOpen) return
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (sessionDone) return
+      if (e.code === 'Space') {
+        e.preventDefault()
+        setFlipped(f => !f)
+        setShowExample(false)
+      }
+      if (e.code === 'ArrowRight' && flipped) { e.preventDefault(); markCard(true) }
+      if (e.code === 'ArrowLeft' && flipped) { e.preventDefault(); markCard(false) }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [flipped, sessionDone, addingCard, browserOpen])
+
   async function loadCards() {
     const supabase = createClient()
     const [{ data: allCards }, { data: allProg }] = await Promise.all([
@@ -164,22 +181,25 @@ export default function StudySession({ cert, label, color }) {
         <>
           {/* Card counter */}
           <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '12px', textAlign: 'center' }}>
-            {index + 1} of {deck.length} remaining
+            Card {index + 1} of {deck.length} · <span style={{ fontSize: '12px' }}>Space to flip · ← Still Learning · → Got It</span>
           </div>
 
           {/* Flashcard */}
-          <div onClick={() => { if (!flipped) { setFlipped(true); setShowExample(false) } }}
-            style={{ backgroundColor: 'var(--surface)', border: `2px solid ${flipped ? color : 'var(--border)'}`, borderRadius: '12px', padding: '40px', minHeight: '220px', cursor: flipped ? 'default' : 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', marginBottom: '16px', transition: 'border-color 0.2s ease', position: 'relative' }}>
+          <div onClick={() => { setFlipped(f => !f); setShowExample(false) }}
+            style={{ backgroundColor: 'var(--surface)', border: `2px solid ${flipped ? color : 'var(--border)'}`, borderRadius: '12px', padding: '40px', minHeight: '220px', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', marginBottom: '16px', transition: 'border-color 0.2s ease', position: 'relative' }}>
 
             {!flipped ? (
               <>
                 <div style={{ color, fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '16px' }}>Term</div>
                 <div style={{ color: 'var(--text-primary)', fontSize: '22px', fontWeight: '700' }}>{card?.front}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '20px' }}>Click to reveal</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '20px' }}>Click or press Space to reveal</div>
               </>
             ) : (
               <>
-                <div style={{ color, fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '16px' }}>Definition</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ color, fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Definition</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>(click to flip back)</div>
+                </div>
                 <div style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', maxWidth: '560px' }}>{card?.back}</div>
 
                 {card?.example && (
@@ -203,7 +223,7 @@ export default function StudySession({ cert, label, color }) {
 
           {/* Action buttons */}
           {flipped ? (
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
               <button onClick={() => markCard(false)}
                 style={{ flex: 1, maxWidth: '200px', backgroundColor: 'rgba(204,0,0,0.1)', color: 'var(--error)', border: '1px solid var(--error-border)', borderRadius: '8px', padding: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
                 Still Learning
