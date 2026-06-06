@@ -648,8 +648,9 @@ export default function TestPage() {
             New Test
           </button>
           <button onClick={() => { setDone(false); setReviewMode(false); generateTest() }}
-            style={{ backgroundColor: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-            Same Settings Again ↺
+            style={{ backgroundColor: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', lineHeight: '1.3' }}>
+            <div>New Test</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '400' }}>same settings again ↺</div>
           </button>
           {wrongAnswers.length > 0 && (
             <button onClick={() => { setReviewMode(true); setReviewIndex(0) }}
