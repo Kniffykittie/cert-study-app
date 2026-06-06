@@ -86,13 +86,22 @@ Rules:
 
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 8096,
+    max_tokens: 16000,
     messages: [{ role: 'user', content: prompt }]
   })
 
   let text = message.content[0].text.trim()
   text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-  const questions = JSON.parse(text)
+
+  // If JSON is truncated, trim to the last complete object
+  let questions
+  try {
+    questions = JSON.parse(text)
+  } catch {
+    const lastBrace = text.lastIndexOf('}')
+    const trimmed = text.slice(0, lastBrace + 1) + ']'
+    questions = JSON.parse(trimmed)
+  }
 
   return Response.json({ questions })
 }
