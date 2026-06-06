@@ -134,11 +134,12 @@ export default function StudyHubPage() {
       </div>
 
       {/* Stats Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
         {[
           { label: 'Questions Answered', value: totalQuestions.toLocaleString(), color: 'var(--accent-blue)' },
           { label: 'Weak Topics', value: weakTopics.length, color: weakTopics.length > 0 ? 'var(--error)' : 'var(--success)' },
           { label: 'Tests Taken', value: testsTaken, color: 'var(--accent-blue)' },
+          { label: 'Study Streak', value: streak === 0 ? '—' : `${streak} day${streak !== 1 ? 's' : ''}`, color: streak >= 7 ? 'var(--success)' : streak >= 3 ? 'var(--warning)' : 'var(--accent-blue)' },
         ].map(stat => (
           <div key={stat.label} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px 20px' }}>
             <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px' }}>{stat.label}</div>
@@ -173,6 +174,29 @@ export default function StudyHubPage() {
           </div>
         )}
       </div>
+
+      {/* Recommended Next Action */}
+      {(() => {
+        const allWeak = Object.values(topicPerf).flat().filter(r => r.total_seen >= 3 && (r.total_correct / r.total_seen) < 0.65)
+        if (allWeak.length === 0) return null
+        const worst = allWeak.sort((a, b) => (a.total_correct / a.total_seen) - (b.total_correct / b.total_seen))[0]
+        const certLabel = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }[worst.cert]
+        const pct = Math.round((worst.total_correct / worst.total_seen) * 100)
+        return (
+          <div style={{ backgroundColor: 'rgba(241,196,15,0.06)', border: '1px solid var(--warning-border)', borderRadius: '10px', padding: '16px 20px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ color: 'var(--warning)', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>⚡ Recommended Focus</div>
+              <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>{certLabel} — {worst.topic}</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Your weakest area at {pct}% — drill this domain to raise your readiness</div>
+            </div>
+            <a href="/study-hub/test" style={{ textDecoration: 'none' }}>
+              <button style={{ backgroundColor: 'var(--warning)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                Practice Now →
+              </button>
+            </a>
+          </div>
+        )
+      })()}
 
       {/* Recommended Focus Areas */}
       <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
