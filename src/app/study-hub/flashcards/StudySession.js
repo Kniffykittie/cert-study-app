@@ -235,8 +235,8 @@ export default function StudySession({ cert, label, color }) {
               return (
                 <div key={c.id} style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
                   <div onClick={() => setExpandedCard(isExpanded ? null : c.id)}
-                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: 'var(--background)', cursor: 'pointer' }}>
-                    <span style={{ color: '#E8E8E8', fontSize: '14px' }}>{c.front}</span>
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: '#1a1a1a', cursor: 'pointer', minHeight: '40px' }}>
+                    <span style={{ color: '#E8E8E8', fontSize: '14px', flex: 1, marginRight: '12px' }}>{c.front}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                       <span style={{ color: statusColor, fontSize: '11px', fontWeight: '600' }}>{status}</span>
                       <span style={{ color: '#888', fontSize: '12px' }}>{isExpanded ? '▲' : '▼'}</span>
@@ -244,7 +244,7 @@ export default function StudySession({ cert, label, color }) {
                   </div>
                   {isExpanded && (
                     <div style={{ padding: '14px', backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
-                      <div style={{ color: 'var(--text-primary)', fontSize: '14px', lineHeight: '1.6', marginBottom: c.example ? '12px' : 0 }}>{c.back}</div>
+                      <div style={{ color: '#E8E8E8', fontSize: '14px', lineHeight: '1.6', marginBottom: c.example ? '12px' : 0 }}>{c.back}</div>
                       {c.example && (
                         <div style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px 14px' }}>
                           <div style={{ color, fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Example</div>
