@@ -236,10 +236,10 @@ export default function StudySession({ cert, label, color }) {
                 <div key={c.id} style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
                   <div onClick={() => setExpandedCard(isExpanded ? null : c.id)}
                     style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: 'var(--background)', cursor: 'pointer' }}>
-                    <span style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{c.front}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ color: '#E8E8E8', fontSize: '14px' }}>{c.front}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                       <span style={{ color: statusColor, fontSize: '11px', fontWeight: '600' }}>{status}</span>
-                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{isExpanded ? '▲' : '▼'}</span>
+                      <span style={{ color: '#888', fontSize: '12px' }}>{isExpanded ? '▲' : '▼'}</span>
                     </div>
                   </div>
                   {isExpanded && (
