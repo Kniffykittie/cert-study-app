@@ -3,21 +3,80 @@ import { createClient } from '@/lib/supabase/server'
 
 const client = new Anthropic()
 
-const TOPICS = {
+export const DOMAINS = {
   ccna: [
-    'Network Fundamentals', 'IP Addressing & Subnetting', 'Switching', 'Routing',
-    'OSPF', 'ACLs', 'NAT/PAT', 'WAN Technologies', 'Network Security', 'Automation & Programmability'
+    { id: '1.0', name: 'Network Fundamentals', weight: 20 },
+    { id: '2.0', name: 'Network Access', weight: 20 },
+    { id: '3.0', name: 'IP Connectivity', weight: 25 },
+    { id: '4.0', name: 'IP Services', weight: 10 },
+    { id: '5.0', name: 'Security Fundamentals', weight: 15 },
+    { id: '6.0', name: 'Automation & Programmability', weight: 10 },
   ],
   'network-plus': [
-    'Network Topologies', 'TCP/IP Suite', 'DNS & DHCP', 'Wireless Standards',
-    'Network Security', 'Cloud Networking', 'Virtualization', 'WAN Technologies',
-    'Troubleshooting', 'Network Tools'
+    { id: '1.0', name: 'Networking Concepts', weight: 23 },
+    { id: '2.0', name: 'Network Implementation', weight: 20 },
+    { id: '3.0', name: 'Network Operations', weight: 19 },
+    { id: '4.0', name: 'Network Security', weight: 14 },
+    { id: '5.0', name: 'Network Troubleshooting', weight: 24 },
   ],
   'security-plus': [
-    'Threats & Attacks', 'Cryptography', 'PKI', 'Identity & Access Management',
-    'Risk Management', 'Incident Response', 'Network Security', 'Application Security',
-    'Compliance & Frameworks', 'Forensics'
-  ]
+    { id: '1.0', name: 'General Security Concepts', weight: 12 },
+    { id: '2.0', name: 'Threats, Vulnerabilities & Mitigations', weight: 22 },
+    { id: '3.0', name: 'Security Architecture', weight: 18 },
+    { id: '4.0', name: 'Security Operations', weight: 28 },
+    { id: '5.0', name: 'Security Program Management & Oversight', weight: 20 },
+  ],
+}
+
+// Build weighted domain list: given selected domains and total count,
+// return array of { domain, count } respecting official weight ratios
+function weightedDistribution(domains, totalCount) {
+  const totalWeight = domains.reduce((s, d) => s + d.weight, 0)
+  let assigned = 0
+  const dist = domains.map((d, i) => {
+    const isLast = i === domains.length - 1
+    const n = isLast ? totalCount - assigned : Math.round((d.weight / totalWeight) * totalCount)
+    assigned += n
+    return { domain: `${d.id} ${d.name}`, count: Math.max(n, 1) }
+  })
+  return dist
+}
+
+const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'CompTIA Network+', 'security-plus': 'CompTIA Security+' }
+
+function buildScenarioGuidance(cert) {
+  if (cert === 'ccna') return `
+CCNA DIFFICULTY REQUIREMENTS — every question must meet at least one:
+1. SCENARIO + CLI OUTPUT: Include real router/switch output (show ip route, show ip ospf neighbor, show running-config, show interfaces, show vlan brief, show mac address-table, show ip nat translations) and ask the student to interpret, troubleshoot, or predict behavior.
+2. TOPOLOGY DRIVEN: Describe a multi-device network with specific IPs, interface names (GigabitEthernet0/0, Serial0/0/0, Loopback0), and ask what will happen or what is misconfigured.
+3. SUBNETTING: Give a real constraint ("need 6 subnets supporting 28 hosts from 172.16.0.0/24") and ask for subnet mask, usable range, broadcast, or VLSM design.
+4. COMMAND ACCURACY: Show partial/incorrect IOS config and ask which command fixes it. Use real syntax: ip route, router ospf 1, network x.x.x.x wildcard area, ip access-list extended, ip nat inside source list, spanning-tree portfast.
+5. TROUBLESHOOTING: Broken network scenario — ping fails, route missing, OSPF neighbor down, VLAN not passing, NAT not translating. Ask the cause or next command.
+- At least 60% of questions must embed CLI output or specific IP scenarios
+- Use realistic hostnames (R1, R2, SW1, Core-SW), real interface names, mathematically correct subnet/wildcard masks
+- Wrong options must be plausible IOS commands — not obviously fake
+`
+  if (cert === 'network-plus') return `
+NETWORK+ DIFFICULTY REQUIREMENTS — every question must feel like the real CompTIA exam:
+1. SCENARIO BASED: Present a real-world IT scenario (help desk ticket, network outage, new deployment) and ask what to do or what is wrong.
+2. OUTPUT/TOOL BASED: Include ipconfig /all, nslookup, traceroute, netstat, ping output and ask the student to diagnose from it.
+3. TOPOLOGY: Describe a network with VLANs, subnets, wireless SSIDs, cloud components and ask about connectivity or design.
+4. TROUBLESHOOTING: A user can't connect, DNS isn't resolving, wireless drops — ask for the most likely cause using OSI layer methodology.
+5. PROTOCOL KNOWLEDGE: Ask about specific port numbers, protocol behavior, encapsulation, or standards (802.11ax, 802.1Q, LACP, STP, BGP vs OSPF).
+- Wrong answers must be plausible — common misconceptions or similar-sounding protocols
+- Use realistic IP ranges, VLAN IDs, SSID names, error messages
+`
+  if (cert === 'security-plus') return `
+SECURITY+ DIFFICULTY REQUIREMENTS — every question must match CompTIA SY0-701 exam style:
+1. SCENARIO BASED: Present a realistic security incident, audit finding, or architecture decision and ask what the analyst/engineer should do.
+2. LOG/ALERT BASED: Include a SIEM alert, firewall log snippet, IDS output, or vulnerability scan result and ask for the correct response or classification.
+3. ATTACK IDENTIFICATION: Describe an attack in progress (phishing email content, network traffic anomaly, malware behavior) and ask what type of attack it is or the best mitigation.
+4. POLICY/COMPLIANCE: Give a business scenario and ask which framework, control, or policy applies (NIST, ISO 27001, SOC 2, GDPR, HIPAA, PCI-DSS).
+5. CRYPTOGRAPHY/PKI: Ask about certificate chains, key exchange, cipher suites, hashing algorithms with specific technical parameters.
+- Wrong answers must be plausible — similar attack names, similar frameworks, similar cryptographic terms
+- Use realistic org names, CVE-style descriptions, real tool names (Wireshark, Metasploit, Nessus, Splunk)
+`
+  return ''
 }
 
 export async function POST(request) {
@@ -27,50 +86,42 @@ export async function POST(request) {
 
   const { cert, count, topics } = await request.json()
 
-  if (!TOPICS[cert]) return Response.json({ error: 'Invalid cert' }, { status: 400 })
+  if (!DOMAINS[cert]) return Response.json({ error: 'Invalid cert' }, { status: 400 })
 
-  const topicList = topics?.length ? topics : TOPICS[cert]
-  const certLabel = { ccna: 'CCNA', 'network-plus': 'CompTIA Network+', 'security-plus': 'CompTIA Security+' }[cert]
+  const certLabel = CERT_LABELS[cert]
+  const allDomains = DOMAINS[cert]
 
-  const ccnaScenarioGuidance = cert === 'ccna' ? `
-CCNA-SPECIFIC DIFFICULTY REQUIREMENTS — every question must meet at least one of these:
+  // Filter to selected domains, or use all
+  const activeDomains = topics?.length
+    ? allDomains.filter(d => topics.includes(`${d.id} ${d.name}`))
+    : allDomains
 
-1. SCENARIO + OUTPUT BASED: Present a realistic network scenario with actual router/switch CLI output (show ip route, show interfaces, show running-config, show ip ospf neighbor, show mac address-table, show vlan brief, show ip nat translations, etc.) and ask the student to interpret, troubleshoot, or predict behavior from the output.
+  const distribution = weightedDistribution(activeDomains, count)
+  const scenarioGuidance = buildScenarioGuidance(cert)
 
-2. TOPOLOGY DRIVEN: Describe a multi-device network (Router1 connects to Router2 via 192.168.1.0/30, hosts on 10.0.0.0/24, etc.) with specific IP addresses, interface names (GigabitEthernet0/0, Serial0/0/0), and ask what will happen, what is misconfigured, or what command fixes the problem.
+  const distributionInstructions = distribution
+    .map(d => `  - "${d.domain}": exactly ${d.count} question${d.count !== 1 ? 's' : ''}`)
+    .join('\n')
 
-3. SUBNETTING UNDER PRESSURE: Give a real-world constraint ("You need 6 subnets each supporting 28 hosts from 172.16.0.0/24") and ask for the correct subnet mask, usable range, broadcast address, or VLSM design choice.
+  const prompt = `You are an expert ${certLabel} exam question generator. Your goal is to generate questions that are as close to the real exam as possible — realistic scenarios, accurate technical details, and plausible wrong answers that trip up underprepared students.
+${scenarioGuidance}
+Generate exactly ${count} multiple choice questions distributed across domains as follows:
+${distributionInstructions}
 
-4. COMMAND ACCURACY: Show a partial or incorrect config and ask which command or command sequence achieves the goal or corrects the error. Use real IOS syntax (ip route, router ospf 1, network x.x.x.x wildcard area, ip access-list extended, ip nat inside source list, spanning-tree portfast, etc.).
-
-5. TROUBLESHOOTING: Describe a broken network (ping fails, route missing, OSPF neighbor down, VLAN not passing traffic, NAT not translating) and ask what the most likely cause is or what command to run next.
-
-Question mix guidance for CCNA:
-- At least 60% of questions must include actual CLI output blocks or specific IP addressing scenarios embedded in the question text
-- Use realistic hostnames: R1, R2, SW1, SW2, Core-SW, Branch-Router
-- Use real interface names: Gi0/0, Gi0/1, Fa0/1, Se0/0/0, Lo0
-- Wildcard masks, subnet masks, prefix lengths must all be mathematically correct
-- OSPF process IDs, area numbers, cost values must be realistic
-- ACL sequence numbers, permit/deny logic must be accurate
-- Wrong answer options must be plausible IOS commands or values — not obviously fake
-` : ''
-
-  const prompt = `You are an expert ${certLabel} exam question generator. Your goal is to generate questions that are HARDER than the actual exam so the student is overprepared.
-${ccnaScenarioGuidance}
-Generate exactly ${count} multiple choice questions. Cover these topics: ${topicList.join(', ')}.
+The "topic" field in each question must be the exact domain name from the distribution above (e.g. "3.0 IP Connectivity").
 
 Return ONLY a valid JSON array with this exact structure, no other text:
 [
   {
-    "topic": "Topic Name",
-    "question": "The question text — for CCNA include CLI output or topology details inline using \\n for line breaks",
+    "topic": "X.0 Domain Name",
+    "question": "Full question text. Include CLI output, logs, or scenario details inline using \\n for line breaks where needed.",
     "options": ["A. option", "B. option", "C. option", "D. option"],
     "correct": "A",
     "explanations": {
-      "A": "Why this answer is correct with specific technical reasoning...",
-      "B": "Why this answer is wrong — what exactly makes it incorrect...",
-      "C": "Why this answer is wrong — what exactly makes it incorrect...",
-      "D": "Why this answer is wrong — what exactly makes it incorrect..."
+      "A": "Detailed technical explanation of why this is correct, citing specific protocol behavior, RFC, standard, or IOS behavior.",
+      "B": "Specific technical reason this is wrong — not just 'incorrect' but WHY.",
+      "C": "Specific technical reason this is wrong.",
+      "D": "Specific technical reason this is wrong."
     }
   }
 ]
@@ -78,11 +129,9 @@ Return ONLY a valid JSON array with this exact structure, no other text:
 Rules:
 - Each question must have exactly 4 options labeled A, B, C, D
 - The "correct" field must be just the letter: A, B, C, or D
-- The "explanations" object must have an entry for every option A through D
-- Explanations must be technically detailed — cite specific IOS behavior, RFC behavior, or protocol rules
-- Distribute questions across the provided topics
+- Every explanation must be technically detailed and educational
 - No duplicate questions
-- Wrong answers must be plausible — a student who half-knows the material should be genuinely fooled`
+- Wrong answers must be genuinely plausible — a student who half-knows the material should be fooled`
 
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',
@@ -93,7 +142,6 @@ Rules:
   let text = message.content[0].text.trim()
   text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
 
-  // If JSON is truncated, trim to the last complete object
   let questions
   try {
     questions = JSON.parse(text)

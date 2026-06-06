@@ -2,11 +2,33 @@
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-const TOPICS = {
-  ccna: ['Network Fundamentals', 'IP Addressing & Subnetting', 'Switching', 'Routing', 'OSPF', 'ACLs', 'NAT/PAT', 'WAN Technologies', 'Network Security', 'Automation & Programmability'],
-  'network-plus': ['Network Topologies', 'TCP/IP Suite', 'DNS & DHCP', 'Wireless Standards', 'Network Security', 'Cloud Networking', 'Virtualization', 'WAN Technologies', 'Troubleshooting', 'Network Tools'],
-  'security-plus': ['Threats & Attacks', 'Cryptography', 'PKI', 'Identity & Access Management', 'Risk Management', 'Incident Response', 'Network Security', 'Application Security', 'Compliance & Frameworks', 'Forensics']
+const DOMAINS = {
+  ccna: [
+    { id: '1.0', name: 'Network Fundamentals', weight: 20 },
+    { id: '2.0', name: 'Network Access', weight: 20 },
+    { id: '3.0', name: 'IP Connectivity', weight: 25 },
+    { id: '4.0', name: 'IP Services', weight: 10 },
+    { id: '5.0', name: 'Security Fundamentals', weight: 15 },
+    { id: '6.0', name: 'Automation & Programmability', weight: 10 },
+  ],
+  'network-plus': [
+    { id: '1.0', name: 'Networking Concepts', weight: 23 },
+    { id: '2.0', name: 'Network Implementation', weight: 20 },
+    { id: '3.0', name: 'Network Operations', weight: 19 },
+    { id: '4.0', name: 'Network Security', weight: 14 },
+    { id: '5.0', name: 'Network Troubleshooting', weight: 24 },
+  ],
+  'security-plus': [
+    { id: '1.0', name: 'General Security Concepts', weight: 12 },
+    { id: '2.0', name: 'Threats, Vulnerabilities & Mitigations', weight: 22 },
+    { id: '3.0', name: 'Security Architecture', weight: 18 },
+    { id: '4.0', name: 'Security Operations', weight: 28 },
+    { id: '5.0', name: 'Security Program Management & Oversight', weight: 20 },
+  ],
 }
+
+// Convert domain object to the key string sent to the API
+const domainKey = d => `${d.id} ${d.name}`
 const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
 const COUNTS = [10, 25, 50]
 const letters = ['A', 'B', 'C', 'D']
@@ -369,20 +391,34 @@ export default function TestPage() {
 
         {cert ? (
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
-            <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Topics</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '12px' }}>Leave all unselected to cover everything, or pick specific topics.</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {TOPICS[cert].map(topic => (
-                <div key={topic} onClick={() => toggleTopic(topic)}
-                  style={{ padding: '6px 14px', backgroundColor: selectedTopics.includes(topic) ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `1px solid ${selectedTopics.includes(topic) ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '20px', color: selectedTopics.includes(topic) ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>
-                  {topic}
-                </div>
-              ))}
+            <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Exam Domains</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '12px' }}>Leave all unselected to cover all domains weighted by official exam percentages, or pick specific domains to drill.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {DOMAINS[cert].map(d => {
+                const key = domainKey(d)
+                const isSelected = selectedTopics.includes(key)
+                return (
+                  <div key={key} onClick={() => toggleTopic(key)}
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', backgroundColor: isSelected ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `1px solid ${isSelected ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '8px', cursor: 'pointer' }}>
+                    <span style={{ color: isSelected ? 'var(--accent-blue)' : 'var(--text-primary)', fontSize: '14px', fontWeight: isSelected ? '600' : '400' }}>
+                      {d.id} {d.name}
+                    </span>
+                    <span style={{ color: isSelected ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', backgroundColor: isSelected ? 'rgba(0,128,255,0.15)' : 'var(--surface)', padding: '2px 8px', borderRadius: '4px', border: `1px solid ${isSelected ? 'var(--accent-blue)' : 'var(--border)'}` }}>
+                      {d.weight}%
+                    </span>
+                  </div>
+                )
+              })}
             </div>
+            {selectedTopics.length > 0 && (
+              <button onClick={() => setSelectedTopics([])} style={{ marginTop: '10px', background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}>
+                Clear selection (use all domains)
+              </button>
+            )}
           </div>
         ) : (
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Select a certification above to choose specific topics.</p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Select a certification above to see exam domains.</p>
           </div>
         )}
 
