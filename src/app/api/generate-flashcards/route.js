@@ -21,14 +21,24 @@ export async function POST(request) {
 
   const certLabel = CERT_LABELS[cert]
 
-  const prompt = `You are an expert ${certLabel} flashcard creator. Generate exactly 60 flashcards covering all major topics for the ${certLabel} exam.
+  // Fetch existing card fronts so we never duplicate
+  const { data: existing } = await supabase.from('flashcards').select('front').eq('user_id', user.id).eq('cert', cert)
+  const existingFronts = (existing ?? []).map(c => c.front)
+  const isFirstGeneration = existingFronts.length === 0
+  const generateCount = isFirstGeneration ? 60 : 40
 
-Topics to cover: ${CARD_TOPICS[cert]}
+  const existingNote = existingFronts.length > 0
+    ? `\n\nThe following cards already exist in this deck — do NOT create duplicates or near-duplicates of these:\n${existingFronts.map(f => `- ${f}`).join('\n')}`
+    : ''
+
+  const prompt = `You are an expert ${certLabel} flashcard creator. Generate exactly ${generateCount} NEW flashcards covering topics for the ${certLabel} exam.
+
+Topics to cover: ${CARD_TOPICS[cert]}${existingNote}
 
 Each flashcard must have:
 - front: A term, acronym, concept, protocol, or command that appears on the ${certLabel} exam
 - back: A clear, accurate definition or explanation (2-4 sentences max)
-- example: A concrete real-world example showing exactly how/when this is used in a network or security context. Use specific details like IP addresses, command syntax, scenario descriptions. Start with the term name, e.g. "ARP is used when..."
+- example: A concrete real-world example showing exactly how/when this is used. Use specific details like IP addresses, command syntax, scenario descriptions. Start with the term name.
 
 Return ONLY a valid JSON array, no other text:
 [
@@ -44,7 +54,7 @@ Rules:
 - Front should be concise (1-6 words typically)
 - Back should be clear enough to understand without context
 - Example must be practical and specific — not generic
-- No duplicate cards
+- No duplicates of existing cards listed above
 - All technical details must be accurate`
 
   const message = await client.messages.create({
@@ -64,10 +74,7 @@ Rules:
     cards = JSON.parse(text.slice(0, lastBrace + 1) + ']')
   }
 
-  // Delete existing AI-generated cards for this cert
-  await supabase.from('flashcards').delete().eq('user_id', user.id).eq('cert', cert).eq('source', 'ai')
-
-  // Insert new cards
+  // Insert new cards — never delete existing ones
   const rows = cards.map(c => ({
     user_id: user.id,
     cert,
@@ -80,5 +87,5 @@ Rules:
   const { error } = await supabase.from('flashcards').insert(rows)
   if (error) return Response.json({ error: error.message }, { status: 500 })
 
-  return Response.json({ count: rows.length })
+  return Response.json({ count: rows.length, total: existingFronts.length + rows.length })
 }
