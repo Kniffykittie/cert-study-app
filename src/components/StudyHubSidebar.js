@@ -1,10 +1,12 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function StudyHubSidebar() {
   const [displayName, setDisplayName] = useState('')
+  const pathname = usePathname()
 
   useEffect(() => {
     async function fetchProfile() {
@@ -38,13 +40,17 @@ export default function StudyHubSidebar() {
         { label: 'CCNA', href: '/study-hub/ccna' },
         { label: 'Network+', href: '/study-hub/network-plus' },
         { label: 'Security+', href: '/study-hub/security-plus' },
-      ].map(item => (
-        <Link key={item.href} href={item.href} style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'block' }}
-          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(0,128,255,0.1)'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-          {item.label}
-        </Link>
-      ))}
+      ].map(item => {
+        const active = pathname === item.href
+        return (
+          <Link key={item.href} href={item.href}
+            style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', textDecoration: 'none', display: 'block', backgroundColor: active ? 'rgba(0,128,255,0.12)' : 'transparent', color: active ? 'var(--accent-blue)' : 'var(--text-secondary)', fontWeight: active ? '600' : '400', borderLeft: active ? '2px solid var(--accent-blue)' : '2px solid transparent' }}
+            onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = 'rgba(0,128,255,0.08)' }}
+            onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}>
+            {item.label}
+          </Link>
+        )
+      })}
 
       <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '12px 12px 4px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Practice</div>
 
@@ -53,13 +59,17 @@ export default function StudyHubSidebar() {
         { label: 'Study Mode', href: '/study-hub/study' },
         { label: 'Progress', href: '/study-hub/progress' },
         { label: 'Results', href: '/study-hub/results' },
-      ].map(item => (
-        <Link key={item.href} href={item.href} style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'block' }}
-          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(0,128,255,0.1)'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-          {item.label}
-        </Link>
-      ))}
+      ].map(item => {
+        const active = pathname === item.href
+        return (
+          <Link key={item.href} href={item.href}
+            style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', textDecoration: 'none', display: 'block', backgroundColor: active ? 'rgba(0,128,255,0.12)' : 'transparent', color: active ? 'var(--accent-blue)' : 'var(--text-secondary)', fontWeight: active ? '600' : '400', borderLeft: active ? '2px solid var(--accent-blue)' : '2px solid transparent' }}
+            onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = 'rgba(0,128,255,0.08)' }}
+            onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}>
+            {item.label}
+          </Link>
+        )
+      })}
 
       <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
         <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '6px', textDecoration: 'none' }}

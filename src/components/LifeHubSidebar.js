@@ -1,10 +1,12 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LifeHubSidebar() {
   const [displayName, setDisplayName] = useState('')
+  const pathname = usePathname()
 
   useEffect(() => {
     async function fetchProfile() {
@@ -39,13 +41,17 @@ export default function LifeHubSidebar() {
         { label: 'Nutrition', href: '/life-hub/nutrition' },
         { label: 'Workouts', href: '/life-hub/workouts' },
         { label: 'Sleep', href: '/life-hub/sleep' },
-      ].map(item => (
-        <Link key={item.href} href={item.href} style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'block' }}
-          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.1)'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-          {item.label}
-        </Link>
-      ))}
+      ].map(item => {
+        const active = pathname === item.href
+        return (
+          <Link key={item.href} href={item.href}
+            style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', textDecoration: 'none', display: 'block', backgroundColor: active ? 'rgba(123,47,190,0.12)' : 'transparent', color: active ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: active ? '600' : '400', borderLeft: active ? '2px solid var(--accent-purple)' : '2px solid transparent' }}
+            onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.08)' }}
+            onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}>
+            {item.label}
+          </Link>
+        )
+      })}
 
       <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
         <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '6px', textDecoration: 'none' }}
