@@ -160,3 +160,8 @@ npm run dev
 # Stop dev server
 Ctrl+C
 ```
+
+## Session Rules
+- After every commit/push, always give the user the pull command:
+  `git pull origin claude/adoring-shannon-sTxW8`
+- Update both `CLAUDE.md` and `build-notes.md` at the end of every session or after any significant feature is completed.
