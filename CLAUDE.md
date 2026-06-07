@@ -94,10 +94,12 @@ src/
 - **Real Exam** — timed (per cert), no feedback, matches real exam question counts
 
 ### Pause / Resume
-- Explicit **Pause** button saves to `paused_tests`
-- Navigating away via sidebar triggers a confirm dialog ("test will be saved automatically")
-- Auto-saves to `paused_tests` on component unmount if test was active
-- `beforeunload` warns on browser refresh/close
+- Explicit **Pause** button saves to Supabase `paused_tests`
+- Navigating away via sidebar triggers a confirm dialog; test state is saved to `localStorage` synchronously on every answer/navigation change — no async timing issues
+- `beforeunload` warns on browser refresh/close during active test
+- On return to Take a Test: checks `localStorage` first (interrupted tests), falls back to Supabase (manually paused tests)
+- `loadMostRecent` resets banner to null before each check to prevent stale state
+- localStorage snapshot cleared explicitly on: test complete, pause, resume, "Take Another Test"
 - "Return to Test" banner appears on test setup screen; also resumable via `?resume=<id>` URL
 
 ### Bookmarks

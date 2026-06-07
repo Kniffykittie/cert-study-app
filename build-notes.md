@@ -228,6 +228,16 @@ Template system and library management:
 - Approved duplicate pairs stored in localStorage
 - Retire/restore templates — `is_retired` flag in Supabase
 
+### Phase 9 - Complete
+Pause/resume reliability fixes:
+- Navigate-away guard: sidebar intercepts link clicks during active test, shows confirm dialog
+- Auto-save via localStorage snapshot written on every state change during active test
+- Fixed race condition: snapshot was being deleted on component mount before loadMostRecent could read it
+- Fixed stale banner: loadMostRecent now clears mostRecentPaused to null before async checks
+- Fixed post-completion banner: localStorage cleared when done becomes true and on "Take Another Test"
+- beforeunload warning on browser refresh/close during active test
+- Manual pause (Pause button) continues to save to Supabase paused_tests as before
+
 ### Phase 8 - Complete
 Progress, analytics, and study tools:
 - Daily streak tracker — 30q/day goal, 28-day calendar heatmap
