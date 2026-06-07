@@ -113,7 +113,8 @@ export default function PremadeTemplatesPage() {
 
   const diffColor = { easy: 'var(--success)', medium: 'var(--warning)', hard: 'var(--error)' }
 
-  const allLivePairs = dupPairs ? dupPairs.filter(p => !p.a.is_retired && !p.b.is_retired) : []
+  const retiredIds = new Set(templates.filter(t => t.is_retired).map(t => t.id))
+  const allLivePairs = dupPairs ? dupPairs.filter(p => !retiredIds.has(p.a.id) && !retiredIds.has(p.b.id)) : []
   const livePairs = allLivePairs.filter(p => !approvedKeys.has(p.key))
   const approvedPairs = allLivePairs.filter(p => approvedKeys.has(p.key))
   const retiredTemplates = templates.filter(t => t.is_retired)
