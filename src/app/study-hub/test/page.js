@@ -165,7 +165,12 @@ function RealExam({ cert, questions, answers, setAnswers, current, setCurrent, s
       </div>
 
       <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
-        {q.from_template && <div style={{ marginBottom: '10px' }}><span style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600', opacity: 0.7 }}>⚡ Template</span></div>}
+        {(q.from_template || q.source_cert) && (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px' }}>
+            {q.from_template && <span style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600', opacity: 0.7 }}>⚡ Template</span>}
+            {q.source_cert && <span style={{ fontSize: '11px', fontWeight: '700', color: CERT_COLORS[q.source_cert], backgroundColor: 'var(--background)', border: `1px solid ${CERT_COLORS[q.source_cert]}`, borderRadius: '4px', padding: '1px 7px', opacity: 0.9 }}>{CERT_LABELS[q.source_cert]}</span>}
+          </div>
+        )}
         <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {q.options.map((opt, i) => {
@@ -574,11 +579,12 @@ export default function TestPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ cert: c, count: perCert, topics: MIXED_DOMAINS[c], difficulty })
-          }).then(r => r.json())
+          }).then(r => r.json()).then(data => ({ ...data, _cert: c }))
         ))
         for (const res of results) {
           if (res.error) throw new Error(res.error)
-          allQuestions.push(...(res.questions ?? []))
+          // Tag each question with its source cert so we can show a badge
+          allQuestions.push(...(res.questions ?? []).map(q => ({ ...q, source_cert: res._cert })))
         }
         // Shuffle merged questions
         for (let i = allQuestions.length - 1; i > 0; i--) {
@@ -1103,7 +1109,12 @@ export default function TestPage() {
           </div>
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
-              {q.from_template && <span style={{ marginRight: 'auto', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600' }}>⚡ Template</span>}
+              {(q.from_template || q.source_cert) && (
+                <span style={{ marginRight: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {q.from_template && <span style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600' }}>⚡ Template</span>}
+                  {q.source_cert && <span style={{ fontSize: '11px', fontWeight: '700', color: CERT_COLORS[q.source_cert], backgroundColor: 'var(--background)', border: `1px solid ${CERT_COLORS[q.source_cert]}`, borderRadius: '4px', padding: '1px 7px', opacity: 0.9 }}>{CERT_LABELS[q.source_cert]}</span>}
+                </span>
+              )}
               <button onClick={() => setFlagModal({ questionIndex: current })}
                 style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-secondary)', fontSize: '11px', padding: '2px 8px', cursor: 'pointer' }}>⚑ Flag</button>
             </div>
@@ -1169,6 +1180,7 @@ export default function TestPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{q.topic}</div>
                 {q.from_template && <span style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600', opacity: 0.7 }}>⚡ Template</span>}
+                {q.source_cert && <span style={{ fontSize: '11px', fontWeight: '700', color: CERT_COLORS[q.source_cert], backgroundColor: 'var(--background)', border: `1px solid ${CERT_COLORS[q.source_cert]}`, borderRadius: '4px', padding: '1px 7px', opacity: 0.9 }}>{CERT_LABELS[q.source_cert]}</span>}
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button onClick={() => toggleBookmark(current)}
