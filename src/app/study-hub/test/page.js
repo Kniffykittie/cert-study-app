@@ -255,6 +255,17 @@ export default function TestPage() {
     }
   }, [questions, done])
 
+  // Save full snapshot to localStorage on every state change so navigation-away can restore instantly
+  useEffect(() => {
+    if (questions && !done) {
+      localStorage.setItem('interruptedTest', JSON.stringify({
+        cert, mode, questions, answers, current
+      }))
+    } else {
+      localStorage.removeItem('interruptedTest')
+    }
+  }, [questions, answers, current, done, cert, mode])
+
   // Warn on browser refresh/close when test is active
   useEffect(() => {
     if (!questions || done) return
@@ -263,28 +274,9 @@ export default function TestPage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [questions, done])
 
-  // Auto-save on unmount if test was in progress and not already manually paused
+  // On unmount: clear sessionStorage flag (localStorage snapshot already written above)
   useEffect(() => {
-    return () => {
-      sessionStorage.removeItem('testInProgress')
-      if (questionsRef.current && !doneRef.current && !manualPausedRef.current) {
-        const supabase = createClient()
-        supabase.auth.getUser().then(({ data: { user } }) => {
-          if (!user) return
-          supabase.from('paused_tests').insert({
-            user_id: user.id,
-            cert: certRef.current,
-            mode: modeRef.current,
-            questions: questionsRef.current,
-            answers: answersRef.current,
-            current_index: currentRef.current,
-            seconds_remaining: null,
-            total_questions: questionsRef.current.length,
-            answered_count: Object.keys(answersRef.current).length,
-          })
-        })
-      }
-    }
+    return () => { sessionStorage.removeItem('testInProgress') }
   }, [])
 
   // Auto-resume if ?resume=id is in the URL
@@ -294,8 +286,29 @@ export default function TestPage() {
   }, [])
 
   // Load most recent paused test on mount for "Return to Test" button
+  // Also check localStorage for an interrupted test (navigation-away mid-test)
   useEffect(() => {
     async function loadMostRecent() {
+      // Check localStorage first — set synchronously so no timing issues
+      const raw = localStorage.getItem('interruptedTest')
+      if (raw) {
+        try {
+          const snap = JSON.parse(raw)
+          if (snap.questions && !snap.done) {
+            setMostRecentPaused({
+              id: '__local__',
+              cert: snap.cert,
+              mode: snap.mode,
+              total_questions: snap.questions.length,
+              answered_count: Object.keys(snap.answers || {}).length,
+              paused_at: new Date().toISOString(),
+              _local: true,
+            })
+            return
+          }
+        } catch { localStorage.removeItem('interruptedTest') }
+      }
+      // Fall back to Supabase paused_tests
       const supabase = createClient()
       const { data } = await supabase.from('paused_tests').select('id, cert, mode, total_questions, answered_count, paused_at').order('paused_at', { ascending: false }).limit(1).single()
       if (data) setMostRecentPaused(data)
@@ -348,6 +361,7 @@ export default function TestPage() {
 
   async function confirmPause() {
     manualPausedRef.current = true
+    localStorage.removeItem('interruptedTest')
     const id = await saveToSupabase(pendingPauseSeconds)
     setPausedTestId(id)
     setQuestions(null)
@@ -356,6 +370,25 @@ export default function TestPage() {
   }
 
   async function resumeTest(testId) {
+    // Resume from localStorage snapshot (navigation-away case)
+    if (testId === '__local__') {
+      const raw = localStorage.getItem('interruptedTest')
+      if (!raw) return
+      const snap = JSON.parse(raw)
+      localStorage.removeItem('interruptedTest')
+      setQuestions(snap.questions)
+      setCurrent(snap.current)
+      setAnswers(snap.answers)
+      setMode(snap.mode)
+      setCert(snap.cert)
+      setSelectedAnswer(snap.answers?.[snap.current] || null)
+      setRevealed(false)
+      setDone(false)
+      setTimedOut(false)
+      setMostRecentPaused(null)
+      return
+    }
+    // Resume from Supabase paused_tests (manual pause case)
     const supabase = createClient()
     const { data } = await supabase.from('paused_tests').select('*').eq('id', testId).single()
     if (!data) return
@@ -369,7 +402,6 @@ export default function TestPage() {
     setDone(false)
     setTimedOut(false)
     if (data.mode === 'real' && data.seconds_remaining) setInitialSeconds(data.seconds_remaining)
-    // Delete the paused test row now that it's resumed
     await supabase.from('paused_tests').delete().eq('id', testId)
     setMostRecentPaused(null)
   }
