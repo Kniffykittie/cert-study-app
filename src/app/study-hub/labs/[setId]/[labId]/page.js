@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { getLabSet, getLab } from '@/data/labs/index'
 import LabTopology from '@/components/LabTopology'
 import FloatingCommandPanel from '@/components/FloatingCommandPanel'
+import LabTimer from '@/components/LabTimer'
 import { createClient } from '@/lib/supabase/client'
 
 const DIFF_COLOR = { beginner: 'var(--success)', intermediate: 'var(--warning)', advanced: 'var(--error)' }
@@ -271,11 +272,14 @@ export default function LabPage() {
             <h1 style={{ color: 'var(--text-primary)', fontSize: '20px', fontWeight: '700', margin: '0 0 8px' }}>{lab.title}</h1>
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0, lineHeight: '1.6' }}>{lab.description}</p>
           </div>
-          <div style={{ textAlign: 'center', flexShrink: 0 }}>
-            <div style={{ fontSize: '28px', fontWeight: '700', color: pct === 100 ? 'var(--success)' : 'var(--text-primary)' }}>{pct}%</div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '6px' }}>{completedCount}/{lab.steps.length} steps</div>
-            <div style={{ width: '80px', height: '6px', backgroundColor: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${pct}%`, backgroundColor: pct === 100 ? 'var(--success)' : 'var(--accent-blue)', borderRadius: '3px', transition: 'width 0.3s' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px', flexShrink: 0 }}>
+            <LabTimer labSetId={setId} labId={labId} />
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '28px', fontWeight: '700', color: pct === 100 ? 'var(--success)' : 'var(--text-primary)' }}>{pct}%</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '6px' }}>{completedCount}/{lab.steps.length} steps</div>
+              <div style={{ width: '80px', height: '6px', backgroundColor: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${pct}%`, backgroundColor: pct === 100 ? 'var(--success)' : 'var(--accent-blue)', borderRadius: '3px', transition: 'width 0.3s' }} />
+              </div>
             </div>
           </div>
         </div>

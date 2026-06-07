@@ -340,6 +340,7 @@ Multi-feature expansion — contextual panels, new lab sets, and smart study too
 | `lab_notes` | Per-lab freeform notes per user (user_id, lab_set_id, lab_id, notes, updated_at) |
 | `flashcards` | Generated flashcard decks — saved permanently per cert |
 | `flashcard_progress` | Per-card mastery state: mastered flag, consecutive_correct count |
+| `lab_timers` | Per-lab timer state — elapsed_seconds, is_running, last_started_at; unique per user+lab |
 
 ## Future Features (Study Hub)
 - More concept cards in Study Mode
@@ -353,6 +354,23 @@ Multi-feature expansion — contextual panels, new lab sets, and smart study too
 - Supplement tracking and encyclopedia
 - Correlation engine (study performance vs health data)
 - Daily morning brief page
+
+### Phase 20 - Complete
+Wrong Answer Review + Per-Lab Timer:
+
+**Wrong Answer Review**
+- `question_snapshot` JSONB column added to `question_answers` (nullable, only populated for incorrect answers)
+- Snapshot contains: question, options, correct letter, topic, explanations
+- New API route `/api/wrong-answers?cert=X` — fetches wrong answer snapshots, dedupes by question text, returns array
+- "🔁 Wrong Answer Review" card on Take a Test setup — cert selector, live count of saved wrong answers, Start Review button
+- Loads directly as a practice session (tutor chat, bookmarks, explanations all active)
+- Runs as mode='practice' so all existing practice UI and stats tracking work unchanged
+
+**Per-Lab Timer**
+- New `lab_timers` Supabase table with RLS — unique per user+lab, stores elapsed_seconds + is_running + last_started_at
+- `LabTimer.js` component in lab page header — Start / Pause / Reset controls, HH:MM:SS display
+- Timer is persistent: on load recalculates elapsed using last_started_at so closing the tab mid-run loses no time
+- Green border + color when running, normal when paused
 
 ### Phase 19c - Complete
 Lab data quality audit — empty verify fields and topology build clarity:

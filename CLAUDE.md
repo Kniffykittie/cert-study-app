@@ -66,7 +66,9 @@ src/
       templates/page.js           Generate AI templates (5 per batch)
       premade-templates/page.js   Browse/manage template library (duplicates, retired)
       labs/page.js                Packet Tracer Labs landing (all lab sets) — includes per-lab progress dots
-      labs/commands/page.js       IOS Command Reference — exports IOS_COMMANDS for FloatingCommandPanel
+      api/
+      wrong-answers/route.js      GET wrong answers by cert (question_snapshot JSONB, deduped by question text)
+    labs/commands/page.js       IOS Command Reference — exports IOS_COMMANDS for FloatingCommandPanel
       labs/tips/page.js           Packet Tracer Tips & Tricks (50+ tips, 8 categories)
       labs/[setId]/page.js        Lab set overview — weak domain labs highlighted in yellow
       labs/[setId]/[labId]/page.js  Individual lab — FloatingCommandPanel mounted here
@@ -85,6 +87,7 @@ src/
     ScoreChart.js                 Overall score chart
     LabTopology.js                SVG topology renderer (router/switch/PC/server/cloud icons, trunk/access/redundant lines)
     FloatingCommandPanel.js       Fixed bottom-right button on lab pages — searchable IOS command reference (imports IOS_COMMANDS)
+    LabTimer.js                   Per-lab persistent timer — Start/Pause/Reset, survives navigation via Supabase lab_timers table
     FloatingReferencePanel.js     Fixed button on test page (practice mode only) — cert-filtered quick reference (subnetting, ports, OSI, attacks, encryption)
     FloatingChat.js               Fixed chat bubble on all Study Hub pages — session-only tutor chat via /api/chat
 ```
@@ -117,6 +120,7 @@ src/
 | `profiles` | User display name |
 | `lab_progress` | Completed lab steps per user (user_id, lab_set_id, lab_id, step_id, completed_at) |
 | `lab_notes` | Per-lab notes per user (user_id, lab_set_id, lab_id, notes, updated_at) |
+| `lab_timers` | Per-lab timer state (user_id, lab_set_id, lab_id, elapsed_seconds, is_running, last_started_at) — unique per user+lab |
 
 ---
 
@@ -201,6 +205,23 @@ src/
 - Saved as `cert = 'mixed'` — does NOT update individual cert `topic_performance`
 - Progress page and Results page include Mixed as a 4th cert (green, `var(--success)`)
 - `MIXED_DOMAINS` constant in test/page.js maps each cert to its overlap domains
+
+### Wrong Answer Review
+- Card on Take a Test setup screen (purple, below Fix My Weaknesses)
+- Select a cert → shows count of stored wrong answers → "Start Review" loads them as a practice session
+- Wrong answers stored as `question_snapshot` JSONB in `question_answers` (only for incorrect answers, null for correct)
+- Snapshot contains: question text, options, correct letter, topic, explanations
+- API route `/api/wrong-answers?cert=X` deduplicates by question text, returns most recent unique wrong answers
+- Runs as normal practice mode: tutor chat, bookmarks, explanations all work
+- `question_snapshot` column is nullable — existing rows are unaffected; only new wrong answers get snapshots
+
+### Per-Lab Timer
+- `LabTimer.js` component mounted in lab page header alongside step completion percentage
+- Persistent via Supabase `lab_timers` table — survives page refresh, navigation, and browser close
+- Uses `last_started_at` trick: on load, if `is_running=true`, elapsed = stored_seconds + (now - last_started_at)
+- Controls: ▶ Start / ⏸ Pause / ↺ Reset
+- Displays as MM:SS or HH:MM:SS, green color when running, normal when paused
+- One timer row per user+lab (unique constraint on user_id, lab_set_id, lab_id)
 
 ### Fix My Weaknesses
 - Button on Take a Test setup screen

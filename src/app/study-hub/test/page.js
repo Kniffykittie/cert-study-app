@@ -244,6 +244,9 @@ export default function TestPage() {
   const [bookmarkPending, setBookmarkPending] = useState(null) // idx waiting for modal
   const [weaknessLoading, setWeaknessLoading] = useState(false)
   const [weaknessSummary, setWeaknessSummary] = useState(null)
+  const [wrongReviewCert, setWrongReviewCert] = useState(null)
+  const [wrongReviewCount, setWrongReviewCount] = useState(null)
+  const [wrongReviewLoading, setWrongReviewLoading] = useState(false)
   const searchParams = useSearchParams()
 
   // Refs so unmount cleanup can read latest state without stale closures
@@ -566,6 +569,39 @@ export default function TestPage() {
     setWeaknessLoading(false)
   }
 
+  async function checkWrongCount(certKey) {
+    if (!certKey) { setWrongReviewCount(null); return }
+    const res = await fetch(`/api/wrong-answers?cert=${certKey}`)
+    const data = await res.json()
+    setWrongReviewCount(data.total ?? 0)
+  }
+
+  async function startWrongReview() {
+    if (!wrongReviewCert) return
+    setWrongReviewLoading(true)
+    setError('')
+    const res = await fetch(`/api/wrong-answers?cert=${wrongReviewCert}`)
+    const data = await res.json()
+    if (!data.questions?.length) {
+      setError('No wrong answers saved yet for this cert. Take a practice test first.')
+      setWrongReviewLoading(false)
+      return
+    }
+    startTimeRef.current = Date.now()
+    setWeaknessSummary(null)
+    setQuestions(data.questions)
+    setCert(wrongReviewCert)
+    setMode('practice')
+    setCurrent(0)
+    setSelectedAnswer(null)
+    setRevealed(false)
+    setAnswers({})
+    setDone(false)
+    setTimedOut(false)
+    setInitialSeconds(null)
+    setWrongReviewLoading(false)
+  }
+
   async function generateTest() {
     if (!cert) { setError('Please select a certification.'); return }
     setLoading(true)
@@ -631,11 +667,15 @@ export default function TestPage() {
       user_id: user.id, cert, mode, total_questions: questions.length, correct, score_pct: scorePct, duration_seconds: durationSeconds
     }).select().single()
     if (session) {
-      await supabase.from('question_answers').insert(questions.map((q, i) => ({
-        session_id: session.id, user_id: user.id, cert, topic: q.topic,
-        question_text: q.question, correct_answer: q.correct,
-        user_answer: finalAnswers[i] || '', is_correct: finalAnswers[i] === q.correct
-      })))
+      await supabase.from('question_answers').insert(questions.map((q, i) => {
+        const isCorrect = finalAnswers[i] === q.correct
+        return {
+          session_id: session.id, user_id: user.id, cert, topic: q.topic,
+          question_text: q.question, correct_answer: q.correct,
+          user_answer: finalAnswers[i] || '', is_correct: isCorrect,
+          question_snapshot: isCorrect ? null : { question: q.question, options: q.options, correct: q.correct, topic: q.topic, explanations: q.explanations ?? {} },
+        }
+      }))
       const topicMap = {}
       questions.forEach((q, i) => {
         if (!topicMap[q.topic]) topicMap[q.topic] = { total: 0, correct: 0 }
@@ -897,6 +937,33 @@ export default function TestPage() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Wrong Answer Review */}
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px 20px', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: 'var(--accent-purple)', fontSize: '14px', fontWeight: '700', marginBottom: '2px' }}>🔁 Wrong Answer Review</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '12px' }}>Re-study questions you got wrong in past tests. Runs as practice mode with tutor chat and explanations.</div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {['ccna', 'network-plus', 'security-plus'].map(c => (
+                  <div key={c} onClick={() => { setWrongReviewCert(c); checkWrongCount(c) }}
+                    style={{ padding: '7px 14px', backgroundColor: wrongReviewCert === c ? 'rgba(167,139,250,0.1)' : 'var(--background)', border: `1px solid ${wrongReviewCert === c ? 'var(--accent-purple)' : 'var(--border)'}`, borderRadius: '6px', color: wrongReviewCert === c ? 'var(--accent-purple)' : 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontWeight: wrongReviewCert === c ? '600' : '400' }}>
+                    {CERT_LABELS[c]}
+                  </div>
+                ))}
+              </div>
+              {wrongReviewCert && wrongReviewCount !== null && (
+                <div style={{ marginTop: '10px', fontSize: '12px', color: wrongReviewCount === 0 ? 'var(--text-secondary)' : 'var(--text-primary)' }}>
+                  {wrongReviewCount === 0 ? 'No wrong answers saved yet — take a practice test first.' : `${wrongReviewCount} unique wrong answer${wrongReviewCount !== 1 ? 's' : ''} saved for ${CERT_LABELS[wrongReviewCert]}`}
+                </div>
+              )}
+            </div>
+            <button onClick={startWrongReview} disabled={wrongReviewLoading || !wrongReviewCert || wrongReviewCount === 0}
+              style={{ backgroundColor: wrongReviewCert && wrongReviewCount > 0 ? 'rgba(167,139,250,0.1)' : 'var(--background)', color: 'var(--accent-purple)', border: '1px solid rgba(167,139,250,0.4)', borderRadius: '8px', padding: '10px 18px', fontSize: '13px', fontWeight: '600', cursor: (!wrongReviewCert || wrongReviewCount === 0 || wrongReviewLoading) ? 'not-allowed' : 'pointer', opacity: (!wrongReviewCert || wrongReviewCount === 0 || wrongReviewLoading) ? 0.4 : 1, flexShrink: 0 }}>
+              {wrongReviewLoading ? 'Loading...' : 'Start Review'}
+            </button>
+          </div>
         </div>
 
         {error && <p style={{ color: 'var(--error)', fontSize: '13px', marginBottom: '12px' }}>{error}</p>}
