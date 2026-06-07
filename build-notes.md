@@ -263,6 +263,14 @@ Progress, analytics, and study tools:
 - Bookmarks page — cert tabs, reason badges, expandable full question view with notes
 - Mobile responsive layout via `@media (max-width: 768px)`
 
+### Generate Templates - Complete
+Template generation page confirmed fully built and working:
+- Cert, domain, and difficulty selectors
+- Generates 5 templates per batch (locked at 5 — higher counts caused API crashes during development)
+- Coverage table shows active/retired counts per cert/domain/difficulty combination
+- Results saved permanently to `question_templates` table, deduplicated against existing
+- Pre-made Templates page handles browsing, duplicates, approved similar, and retired tabs
+
 ### Phase 13 - Complete
 Flashcards feature confirmed fully built and working:
 - Flashcards landing page with per-cert deck stats (mastered / learning / unlearned)

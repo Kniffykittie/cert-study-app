@@ -123,10 +123,11 @@ src/
 
 ### Template System
 - Templates use `{{placeholder}}` variables filled from `variable_sets` JSON
-- Generate 5 at a time (AI deduplicates against existing library)
+- Generate 5 at a time — **count is intentionally locked at 5** (higher counts caused API/JSON truncation crashes)
 - Pre-made Templates page: Browse / Duplicates / Approved Similar / Retired tabs
 - Duplicate detection: Jaccard word-overlap ≥50%, same cert/domain/difficulty
 - Approved duplicate pairs stored in `localStorage`
+- Coverage table on Generate Templates page shows active/retired counts per cert/domain/difficulty
 
 ### Spaced Repetition
 - Domain weights multiplied by accuracy-based multipliers before question distribution:
