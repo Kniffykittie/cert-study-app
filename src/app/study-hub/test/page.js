@@ -256,14 +256,12 @@ export default function TestPage() {
   }, [questions, done])
 
   // Save full snapshot to localStorage on every state change so navigation-away can restore instantly
+  // Only write when test is active — never clear reactively (clearing happens explicitly on pause/done/resume)
   useEffect(() => {
-    if (questions && !done) {
-      localStorage.setItem('interruptedTest', JSON.stringify({
-        cert, mode, questions, answers, current
-      }))
-    } else {
-      localStorage.removeItem('interruptedTest')
-    }
+    if (!questions || done) return
+    localStorage.setItem('interruptedTest', JSON.stringify({
+      cert, mode, questions, answers, current
+    }))
   }, [questions, answers, current, done, cert, mode])
 
   // Warn on browser refresh/close when test is active
@@ -565,6 +563,7 @@ export default function TestPage() {
       setRevealed(false)
     } else {
       manualPausedRef.current = true
+      localStorage.removeItem('interruptedTest')
       await saveResults(finalAnswers)
       setAnswers(finalAnswers)
       setDone(true)
@@ -578,6 +577,7 @@ export default function TestPage() {
 
   async function submitSimulation() {
     manualPausedRef.current = true
+    localStorage.removeItem('interruptedTest')
     const finalAnswers = { ...answers }
     await saveResults(finalAnswers)
     setAnswers(finalAnswers)
@@ -929,7 +929,7 @@ export default function TestPage() {
   if (mode === 'real') {
     return (
       <>
-        <RealExam cert={cert} questions={questions} answers={answers} setAnswers={setAnswers} current={current} setCurrent={setCurrent} saving={saving} onTimeout={async () => { manualPausedRef.current = true; setTimedOut(true); await saveResults(answers); setDone(true) }} onSubmit={async () => { manualPausedRef.current = true; await saveResults(answers); setDone(true) }} onPause={triggerPause} initialSeconds={initialSeconds} />
+        <RealExam cert={cert} questions={questions} answers={answers} setAnswers={setAnswers} current={current} setCurrent={setCurrent} saving={saving} onTimeout={async () => { manualPausedRef.current = true; localStorage.removeItem('interruptedTest'); setTimedOut(true); await saveResults(answers); setDone(true) }} onSubmit={async () => { manualPausedRef.current = true; localStorage.removeItem('interruptedTest'); await saveResults(answers); setDone(true) }} onPause={triggerPause} initialSeconds={initialSeconds} />
         {pauseModal}
       </>
     )
