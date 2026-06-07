@@ -157,7 +157,6 @@ export default function FlashcardsPage() {
             No weak domains detected yet. Take some practice tests first — this section will highlight areas to focus on once you have data.
           </div>
         ) : (
-          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
             {weakDomains.map((d, i) => {
               const certInfo = CERTS.find(c => c.key === d.cert)
