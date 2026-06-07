@@ -62,7 +62,7 @@ const set = {
           title: 'Build the topology',
           description: 'Add one Cisco 1941 router and three Catalyst 2960 switches. Connect R1 G0/0 to SW1 G0/1. Connect SW1 G0/2 to SW2 G0/1, and SW1 G0/3 to SW3 G0/1. Connect three PCs to each access switch: SW1 Fa0/1–3 (HR), SW2 Fa0/1–3 (Sales), SW3 Fa0/1–3 (IT). Use straight-through copper cables throughout.',
           commands: [],
-          verify: '',
+          verify: 'All 13 devices are on the canvas. All link lights turn green within 30 seconds. Run "show interfaces status" on SW1 to confirm G0/1 (to R1), G0/2 (to SW2), G0/3 (to SW3), and Fa0/1–3 (to HR PCs) all show "connected".',
           expectedOutput: 'All link lights should turn amber then green within 30 seconds.',
           hints: [
             'Switch-to-switch and switch-to-router links all use straight-through cables in Packet Tracer.',
@@ -740,7 +740,7 @@ const set = {
             '! ASW1: Fa0/1-2 = VLAN 10, Fa0/3-4 = VLAN 20',
             '! ASW2: Fa0/1-2 = VLAN 30, Fa0/3-4 = VLAN 40',
           ],
-          verify: '',
+          verify: 'All link lights go green. Run "show interfaces status" on DSW to confirm all five uplinks (G0/1–G0/5) show "connected". You should see two physical links to each access switch — STP will put one port on each pair into blocking state.',
           expectedOutput: 'All link lights go green. Two physical links visible between DSW↔ASW1 and DSW↔ASW2 — STP will block one port on each redundant pair.',
           hints: [
             'Plan before you configure — draw the topology on paper with port assignments and IP addresses. This is what you\'d do in a real job.',

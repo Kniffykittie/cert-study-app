@@ -45,7 +45,7 @@ const set = {
           title: 'Build the topology',
           description: 'In Packet Tracer, add one Cisco 1941 router, one Catalyst 2960 switch, and three PCs. Connect R1 G0/0 to SW1 G0/1 with a straight-through cable. Connect PC1 to Fa0/1, PC2 to Fa0/2, PC3 to Fa0/3.',
           commands: [],
-          verify: '',
+          verify: 'All five devices are on the canvas, all four cables are connected, and all link indicator lights have turned green.',
           expectedOutput: 'All link lights should turn green after a few seconds.',
           hints: [
             'Use Copper Straight-Through cables for all connections in this lab.',
@@ -407,7 +407,7 @@ const set = {
           title: 'Build the two-switch topology',
           description: 'Add a second Catalyst 2960 (SW2). Connect R1 G0/1 to SW2 G0/1. Connect PC3 to SW2 Fa0/1 (VLAN 10) and PC4 to SW2 Fa0/2 (VLAN 20). Do NOT connect SW1 to SW2 yet.',
           commands: [],
-          verify: '',
+          verify: 'Confirm both switches appear in the workspace with green link lights on all active connections. Run "show interfaces status" on SW2 to confirm Fa0/1 and Fa0/2 are connected.',
           expectedOutput: 'Both switches are connected to R1. PCs on SW2 can communicate with the router.',
           hints: [
             'Use the same VLAN and trunk config from Lab 1 on SW2.',

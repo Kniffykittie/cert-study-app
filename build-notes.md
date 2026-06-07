@@ -354,6 +354,18 @@ Multi-feature expansion — contextual panels, new lab sets, and smart study too
 - Correlation engine (study performance vs health data)
 - Daily morning brief page
 
+### Phase 19c - Complete
+Lab data quality audit — empty verify fields and topology build clarity:
+
+**Empty verify fields fixed**
+- CCNA Fundamentals Lab 3 Step 1: added verify command (show interfaces status on SW2)
+- Small Office Network Lab 1 Step 1: added verify command (show interfaces status on SW1 confirming all 6 ports connected)
+- Small Office Network Lab 5 Step 1: added verify command (show interfaces status on DSW confirming all 5 uplinks)
+
+**Security+ lab improvements**
+- All four lab topologies now include device model sublabels (Cisco 1841 router, Catalyst 2960 switch)
+- Lab 1, 2, 3, and 4 Step 1 now includes explicit topology build instructions before any CLI work — user is told exactly which devices to add, how to connect them, and what IPs to pre-assign so they have a clear starting point
+
 ### Phase 19b - Complete
 Bug fixes and lab improvements:
 

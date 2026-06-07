@@ -24,9 +24,9 @@ export const SECURITY_PLUS_LAB_SET = {
       topology: {
         nodes: [
           { id: 'Internet', type: 'cloud', label: 'Internet\n(Simulated)', x: 400, y: 60 },
-          { id: 'FW', type: 'router', label: 'FW-R1\nACL Firewall', x: 400, y: 190 },
-          { id: 'SW_INT', type: 'switch', label: 'SW-Internal', x: 230, y: 330 },
-          { id: 'SW_DMZ', type: 'switch', label: 'SW-DMZ', x: 570, y: 330 },
+          { id: 'FW', type: 'router', label: 'FW-R1', sublabel: 'Cisco 1841\nACL Firewall', x: 400, y: 190 },
+          { id: 'SW_INT', type: 'switch', label: 'SW-Internal', sublabel: 'Catalyst 2960', x: 230, y: 330 },
+          { id: 'SW_DMZ', type: 'switch', label: 'SW-DMZ', sublabel: 'Catalyst 2960', x: 570, y: 330 },
           { id: 'PC_INT', type: 'pc', label: 'PC-Internal\n10.1.0.10', x: 130, y: 460 },
           { id: 'PC_INT2', type: 'pc', label: 'PC-Internal2\n10.1.0.11', x: 330, y: 460 },
           { id: 'WebServer', type: 'server', label: 'WebServer\n10.2.0.10', x: 470, y: 460 },
@@ -46,7 +46,7 @@ export const SECURITY_PLUS_LAB_SET = {
         {
           id: 'step-1',
           title: 'Build and configure base network',
-          content: 'Configure all three router interfaces (internal 10.1.0.0/24, DMZ 10.2.0.0/24, external 203.0.113.0/24). Assign static IPs to all end devices and verify full connectivity before adding ACLs.',
+          content: 'Add a Cisco 1841 router (FW-R1), two Catalyst 2960 switches (SW-Internal, SW-DMZ), two PCs on the internal switch, one server on the DMZ switch, and one PC connected directly to the cloud to simulate the internet. Connect FW-R1 Fa0/0 → SW-Internal, Fa0/1 → SW-DMZ, Fa0/2 → ExtPC. Then configure all three router interfaces: internal 10.1.0.1/24 (Fa0/0), DMZ 10.2.0.1/24 (Fa0/1), external 203.0.113.1/24 (Fa0/2). Assign static IPs to all end devices and verify full connectivity before adding ACLs.',
           commands: [
             'interface Fa0/0',
             'ip address 10.1.0.1 255.255.255.0',
@@ -145,10 +145,10 @@ export const SECURITY_PLUS_LAB_SET = {
       ],
       topology: {
         nodes: [
-          { id: 'ExtRouter', type: 'router', label: 'ExtRouter\n(ISP)', x: 400, y: 60 },
-          { id: 'FW', type: 'router', label: 'Firewall-R1', x: 400, y: 190 },
-          { id: 'SW_INT', type: 'switch', label: 'Internal SW', x: 200, y: 330 },
-          { id: 'SW_DMZ', type: 'switch', label: 'DMZ SW', x: 600, y: 330 },
+          { id: 'ExtRouter', type: 'router', label: 'ExtRouter', sublabel: 'Cisco 1841\n(ISP sim)', x: 400, y: 60 },
+          { id: 'FW', type: 'router', label: 'Firewall-R1', sublabel: 'Cisco 1841\nZone boundary', x: 400, y: 190 },
+          { id: 'SW_INT', type: 'switch', label: 'Internal SW', sublabel: 'Catalyst 2960', x: 200, y: 330 },
+          { id: 'SW_DMZ', type: 'switch', label: 'DMZ SW', sublabel: 'Catalyst 2960', x: 600, y: 330 },
           { id: 'IntPC', type: 'pc', label: 'IntPC\n10.10.0.10', x: 100, y: 460 },
           { id: 'IntPC2', type: 'pc', label: 'IntPC2\n10.10.0.11', x: 300, y: 460 },
           { id: 'WebSrv', type: 'server', label: 'Web\n172.16.0.10', x: 500, y: 460 },
@@ -168,7 +168,7 @@ export const SECURITY_PLUS_LAB_SET = {
         {
           id: 'step-1',
           title: 'Understand DMZ design principles',
-          content: 'Before building, plan the security policy: (1) External users may reach DMZ servers on specific ports only. (2) Internal users may reach DMZ and external. (3) DMZ servers must NOT initiate connections to internal hosts. Document your policy before configuring.',
+          content: 'Build the topology first: add two Cisco 1841 routers (ExtRouter for ISP simulation, Firewall-R1 as your zone boundary) and two Catalyst 2960 switches (Internal SW, DMZ SW). Connect ExtRouter Fa0/0 → Firewall-R1 Fa0/2. Connect Firewall-R1 Fa0/0 → Internal SW, Firewall-R1 Fa0/1 → DMZ SW. Add two PCs on Internal SW and two servers (Web, Mail) on DMZ SW.\n\nThen plan your security policy before any configuration: (1) External may reach DMZ servers on specific ports only. (2) Internal may reach DMZ and external freely. (3) DMZ servers must NOT initiate connections inward. Document this policy as a table before touching the CLI.',
           commands: [],
           verify: 'Security policy documented in your notes before configuration begins.',
           document: [
@@ -264,8 +264,8 @@ export const SECURITY_PLUS_LAB_SET = {
       ],
       topology: {
         nodes: [
-          { id: 'R1', type: 'router', label: 'R1\n(to harden)', x: 400, y: 180 },
-          { id: 'SW1', type: 'switch', label: 'SW-Mgmt', x: 400, y: 320 },
+          { id: 'R1', type: 'router', label: 'R1', sublabel: 'Cisco 1841\n(to harden)', x: 400, y: 180 },
+          { id: 'SW1', type: 'switch', label: 'SW-Mgmt', sublabel: 'Catalyst 2960', x: 400, y: 320 },
           { id: 'Admin', type: 'pc', label: 'Admin PC\n192.168.99.10', x: 220, y: 460 },
           { id: 'Attacker', type: 'pc', label: 'Attacker\n192.168.1.50', x: 580, y: 460 },
         ],
@@ -279,7 +279,7 @@ export const SECURITY_PLUS_LAB_SET = {
         {
           id: 'step-1',
           title: 'Configure base access and verify Telnet (insecure baseline)',
-          content: 'Set up the router with a password and Telnet access on VTY lines. Verify Telnet works from Admin PC — this confirms connectivity before hardening.',
+          content: 'Build the topology: add one Cisco 1841 router (R1), one Catalyst 2960 switch (SW-Mgmt). Connect R1 Fa0/0 → SW-Mgmt Fa0/1. Add two PCs: Admin PC (Fa0/2) and Attacker PC (Fa0/3). Assign Admin PC IP 192.168.99.10/24, gateway 192.168.99.1. Assign Attacker PC IP 192.168.1.50/24 (different subnet — no gateway needed yet).\n\nThen configure the router with a password and Telnet access on VTY lines. Verify Telnet works from Admin PC — this confirms connectivity before hardening.',
           commands: [
             'hostname R1',
             'enable secret Cisco123!',
@@ -382,8 +382,8 @@ export const SECURITY_PLUS_LAB_SET = {
       ],
       topology: {
         nodes: [
-          { id: 'R1', type: 'router', label: 'R1\nGateway', x: 400, y: 60 },
-          { id: 'Core', type: 'switch', label: 'Core-SW', x: 400, y: 200 },
+          { id: 'R1', type: 'router', label: 'R1', sublabel: 'Cisco 1841\nGateway', x: 400, y: 60 },
+          { id: 'Core', type: 'switch', label: 'Core-SW', sublabel: 'Catalyst 2960', x: 400, y: 200 },
           { id: 'UserPC1', type: 'pc', label: 'UserPC\nVLAN 10', x: 100, y: 360 },
           { id: 'Server1', type: 'server', label: 'Server\nVLAN 20', x: 280, y: 360 },
           { id: 'IoT1', type: 'pc', label: 'IoT Device\nVLAN 30', x: 520, y: 360 },
@@ -401,7 +401,7 @@ export const SECURITY_PLUS_LAB_SET = {
         {
           id: 'step-1',
           title: 'Design segmentation policy',
-          content: 'Before building, define the policy: Users (VLAN 10) can reach Servers (VLAN 20) but not IoT (VLAN 30). IoT (VLAN 30) is isolated — no inbound or outbound except internet. Management (VLAN 99) can reach all segments. Document this policy.',
+          content: 'Build the topology: add one Cisco 1841 router (R1) and one Catalyst 2960 switch (Core-SW). Connect R1 Fa0/0 → Core-SW Fa0/1 (trunk). Add four end devices: UserPC (Fa0/2), Server (Fa0/3), IoT Device (Fa0/4), Mgmt PC (Fa0/5). Assign IPs after subinterfaces are configured in step 3.\n\nThen define your segmentation policy before any CLI work: Users (VLAN 10) can reach Servers (VLAN 20) but not IoT (VLAN 30). IoT is isolated — no access to any other segment. Management (VLAN 99) can reach all segments. Document this policy as a traffic matrix.',
           commands: [],
           verify: 'Policy matrix documented before any configuration.',
           document: [
