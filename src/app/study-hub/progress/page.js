@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const CERT_ORDER = ['ccna', 'network-plus', 'security-plus']
@@ -22,6 +22,8 @@ function scoreBg(pct) {
 }
 
 function ScoreTrendChart({ sessions }) {
+  const [tooltip, setTooltip] = useState(null)
+  const wrapperRef = useRef(null)
   const W = 600, H = 160
   const PAD = { t: 12, r: 30, b: 24, l: 32 }
   const chartW = W - PAD.l - PAD.r
@@ -50,73 +52,123 @@ function ScoreTrendChart({ sessions }) {
     byCert[s.cert].push(s)
   }
 
+  function showDotTooltip(e, s) {
+    const rect = wrapperRef.current.getBoundingClientRect()
+    setTooltip({ x: e.clientX - rect.left, y: e.clientY - rect.top, cert: s.cert, score: s.score_pct, date: new Date(s.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) })
+  }
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
-      {[0, 25, 50, 75, 100].map(v => (
-        <g key={v}>
-          <text x={PAD.l - 4} y={toY(v) + 4} textAnchor="end" fontSize="9" fill="#555">{v}%</text>
-          <line x1={PAD.l} y1={toY(v)} x2={W - PAD.r} y2={toY(v)} stroke="#2A2A2A" strokeWidth="1" />
-        </g>
-      ))}
-
-      <line x1={PAD.l} y1={threshY} x2={W - PAD.r} y2={threshY} stroke="#F1C40F" strokeWidth="1" strokeDasharray="4 3" opacity="0.7" />
-      <text x={W - PAD.r + 4} y={threshY + 4} fontSize="8" fill="#F1C40F" opacity="0.8">82.5%</text>
-
-      {CERT_ORDER.map(cert => {
-        const rows = byCert[cert]
-        if (!rows || rows.length < 1) return null
-        const sorted = [...rows].sort((a, b) => new Date(a.completed_at) - new Date(b.completed_at))
-        const pts = sorted.map(s => `${toX(new Date(s.completed_at).getTime())},${toY(s.score_pct)}`)
-        const color = CERT_COLORS_HEX[cert]
-        return (
-          <g key={cert}>
-            {sorted.length > 1 && (
-              <polyline points={pts.join(' ')} fill="none" stroke={color} strokeWidth="2" opacity="0.85" strokeLinejoin="round" />
-            )}
-            {sorted.map((s, i) => (
-              <circle key={i} cx={toX(new Date(s.completed_at).getTime())} cy={toY(s.score_pct)} r="3" fill={color} />
-            ))}
+    <div ref={wrapperRef} style={{ position: 'relative' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }} onMouseLeave={() => setTooltip(null)}>
+        {[0, 25, 50, 75, 100].map(v => (
+          <g key={v}>
+            <text x={PAD.l - 4} y={toY(v) + 4} textAnchor="end" fontSize="9" fill="#555">{v}%</text>
+            <line x1={PAD.l} y1={toY(v)} x2={W - PAD.r} y2={toY(v)} stroke="#2A2A2A" strokeWidth="1" />
           </g>
-        )
-      })}
-    </svg>
+        ))}
+        <line x1={PAD.l} y1={threshY} x2={W - PAD.r} y2={threshY} stroke="#F1C40F" strokeWidth="1" strokeDasharray="4 3" opacity="0.7" />
+        <text x={W - PAD.r + 4} y={threshY + 4} fontSize="8" fill="#F1C40F" opacity="0.8">82.5%</text>
+        {CERT_ORDER.map(cert => {
+          const rows = byCert[cert]
+          if (!rows || rows.length < 1) return null
+          const sorted = [...rows].sort((a, b) => new Date(a.completed_at) - new Date(b.completed_at))
+          const pts = sorted.map(s => `${toX(new Date(s.completed_at).getTime())},${toY(s.score_pct)}`)
+          const color = CERT_COLORS_HEX[cert]
+          return (
+            <g key={cert}>
+              {sorted.length > 1 && <polyline points={pts.join(' ')} fill="none" stroke={color} strokeWidth="2" opacity="0.85" strokeLinejoin="round" />}
+              {sorted.map((s, i) => (
+                <circle key={i} cx={toX(new Date(s.completed_at).getTime())} cy={toY(s.score_pct)} r="5"
+                  fill={color} opacity="0.9" style={{ cursor: 'pointer' }}
+                  onMouseEnter={e => showDotTooltip(e, s)}
+                  onMouseMove={e => showDotTooltip(e, s)} />
+              ))}
+            </g>
+          )
+        })}
+      </svg>
+      {tooltip && (
+        <div style={{ position: 'absolute', left: tooltip.x + 12, top: tooltip.y - 48, backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '7px', padding: '7px 11px', fontSize: '12px', pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+          <div style={{ color: CERT_COLORS[tooltip.cert], fontWeight: '700', marginBottom: '2px' }}>{CERT_LABELS[tooltip.cert]}</div>
+          <div style={{ color: scoreColor(tooltip.score), fontWeight: '700', fontSize: '14px' }}>{tooltip.score}%</div>
+          <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>{tooltip.date}</div>
+        </div>
+      )}
+    </div>
   )
 }
 
 function DailyVolumeChart({ dailyCounts }) {
-  const W = 600, H = 110
-  const PAD = { t: 10, r: 12, b: 20, l: 32 }
+  const [tooltip, setTooltip] = useState(null)
+  const wrapperRef = useRef(null)
+  const W = 600, H = 130
+  const PAD = { t: 10, r: 12, b: 20, l: 36 }
   const chartW = W - PAD.l - PAD.r
   const chartH = H - PAD.t - PAD.b
   const n = dailyCounts.length
   const slotW = chartW / n
   const barW = Math.max(slotW - 2, 2)
 
-  const maxCount = Math.max(...dailyCounts.map(d => d.count), 30)
-  const toBarH = count => count > 0 ? Math.max((count / maxCount) * chartH, 2) : 0
-  const goalY = PAD.t + chartH - (30 / maxCount) * chartH
+  const rawMax = Math.max(...dailyCounts.map(d => d.count), 30)
+  const step = rawMax <= 40 ? 10 : rawMax <= 80 ? 20 : 25
+  const maxTick = Math.ceil(rawMax / step) * step
+  const ticks = []
+  for (let v = 0; v <= maxTick; v += step) ticks.push(v)
+
+  const toBarH = count => count > 0 ? Math.max((count / maxTick) * chartH, 2) : 0
+  const toTickY = v => PAD.t + chartH - (v / maxTick) * chartH
+  const goalY = toTickY(30)
+
+  function showBarTooltip(e, d) {
+    const rect = wrapperRef.current.getBoundingClientRect()
+    setTooltip({ x: e.clientX - rect.left, y: e.clientY - rect.top, date: new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), count: d.count })
+  }
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
-      <text x={PAD.l - 4} y={goalY + 4} textAnchor="end" fontSize="9" fill="#F1C40F" opacity="0.8">30</text>
-      <line x1={PAD.l} y1={goalY} x2={W - PAD.r} y2={goalY} stroke="#F1C40F" strokeWidth="1" strokeDasharray="4 3" opacity="0.6" />
+    <div ref={wrapperRef} style={{ position: 'relative' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }} onMouseLeave={() => setTooltip(null)}>
+        {/* Y-axis gridlines and labels */}
+        {ticks.map(v => (
+          <g key={v}>
+            <text x={PAD.l - 4} y={toTickY(v) + 4} textAnchor="end" fontSize="9" fill={v === 30 ? '#F1C40F' : '#555'} opacity={v === 30 ? 0.8 : 1}>{v}</text>
+            <line x1={PAD.l} y1={toTickY(v)} x2={W - PAD.r} y2={toTickY(v)} stroke={v === 30 ? '#F1C40F' : '#2A2A2A'} strokeWidth="1" strokeDasharray={v === 30 ? '4 3' : undefined} opacity={v === 30 ? 0.6 : 1} />
+          </g>
+        ))}
 
-      {dailyCounts.map((d, i) => {
-        const x = PAD.l + i * slotW + (slotW - barW) / 2
-        const bh = toBarH(d.count)
-        const y = PAD.t + chartH - bh
-        const color = d.count >= 30 ? '#2ECC71' : d.count > 0 ? '#0080FF' : '#2A2A2A'
-        const opacity = d.count > 0 ? 0.85 : 0.25
-        return <rect key={i} x={x} y={y} width={barW} height={Math.max(bh, 1)} fill={color} opacity={opacity} rx="1" />
-      })}
+        {/* Bars */}
+        {dailyCounts.map((d, i) => {
+          const x = PAD.l + i * slotW + (slotW - barW) / 2
+          const bh = toBarH(d.count)
+          const y = PAD.t + chartH - bh
+          const color = d.count >= 30 ? '#2ECC71' : d.count > 0 ? '#0080FF' : '#2A2A2A'
+          return (
+            <rect key={i} x={x} y={y} width={barW} height={Math.max(bh, 1)} fill={color}
+              opacity={d.count > 0 ? 0.85 : 0.2} rx="1" style={{ cursor: d.count > 0 ? 'pointer' : 'default' }}
+              onMouseEnter={e => showBarTooltip(e, d)}
+              onMouseMove={e => showBarTooltip(e, d)} />
+          )
+        })}
 
-      {dailyCounts.map((d, i) => {
-        if (i % 7 !== 0 && i !== n - 1) return null
-        const x = PAD.l + i * slotW + slotW / 2
-        const label = new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        return <text key={i} x={x} y={H - 4} textAnchor="middle" fontSize="8" fill="#555">{label}</text>
-      })}
-    </svg>
+        {/* X-axis date labels */}
+        {dailyCounts.map((d, i) => {
+          if (i % 7 !== 0 && i !== n - 1) return null
+          const x = PAD.l + i * slotW + slotW / 2
+          const label = new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          return <text key={i} x={x} y={H - 4} textAnchor="middle" fontSize="8" fill="#555">{label}</text>
+        })}
+      </svg>
+
+      {tooltip && (
+        <div style={{ position: 'absolute', left: tooltip.x + 12, top: tooltip.y - 52, backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '7px', padding: '7px 11px', fontSize: '12px', pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+          <div style={{ color: 'var(--text-secondary)', marginBottom: '2px' }}>{tooltip.date}</div>
+          <div style={{ color: tooltip.count >= 30 ? 'var(--success)' : tooltip.count > 0 ? 'var(--accent-blue)' : 'var(--text-secondary)', fontWeight: '700', fontSize: '14px' }}>
+            {tooltip.count} question{tooltip.count !== 1 ? 's' : ''}
+          </div>
+          {tooltip.count >= 30 && <div style={{ color: 'var(--success)', fontSize: '11px', marginTop: '2px' }}>✓ Goal met</div>}
+          {tooltip.count > 0 && tooltip.count < 30 && <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>{30 - tooltip.count} away from goal</div>}
+        </div>
+      )}
+    </div>
   )
 }
 
