@@ -230,6 +230,63 @@ export default function TestPage() {
   const [bookmarkPending, setBookmarkPending] = useState(null) // idx waiting for modal
   const searchParams = useSearchParams()
 
+  // Refs so unmount cleanup can read latest state without stale closures
+  const questionsRef = useRef(null)
+  const answersRef = useRef({})
+  const currentRef = useRef(0)
+  const certRef = useRef(null)
+  const modeRef = useRef('practice')
+  const doneRef = useRef(false)
+  const manualPausedRef = useRef(false)
+
+  useEffect(() => { questionsRef.current = questions }, [questions])
+  useEffect(() => { answersRef.current = answers }, [answers])
+  useEffect(() => { currentRef.current = current }, [current])
+  useEffect(() => { certRef.current = cert }, [cert])
+  useEffect(() => { modeRef.current = mode }, [mode])
+  useEffect(() => { doneRef.current = done }, [done])
+
+  // Track active test in sessionStorage so sidebar can detect it
+  useEffect(() => {
+    if (questions && !done) {
+      sessionStorage.setItem('testInProgress', '1')
+    } else {
+      sessionStorage.removeItem('testInProgress')
+    }
+  }, [questions, done])
+
+  // Warn on browser refresh/close when test is active
+  useEffect(() => {
+    if (!questions || done) return
+    function handleBeforeUnload(e) { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [questions, done])
+
+  // Auto-save on unmount if test was in progress and not already manually paused
+  useEffect(() => {
+    return () => {
+      sessionStorage.removeItem('testInProgress')
+      if (questionsRef.current && !doneRef.current && !manualPausedRef.current) {
+        const supabase = createClient()
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (!user) return
+          supabase.from('paused_tests').insert({
+            user_id: user.id,
+            cert: certRef.current,
+            mode: modeRef.current,
+            questions: questionsRef.current,
+            answers: answersRef.current,
+            current_index: currentRef.current,
+            seconds_remaining: null,
+            total_questions: questionsRef.current.length,
+            answered_count: Object.keys(answersRef.current).length,
+          })
+        })
+      }
+    }
+  }, [])
+
   // Auto-resume if ?resume=id is in the URL
   useEffect(() => {
     const resumeId = searchParams.get('resume')
@@ -290,6 +347,7 @@ export default function TestPage() {
   }
 
   async function confirmPause() {
+    manualPausedRef.current = true
     const id = await saveToSupabase(pendingPauseSeconds)
     setPausedTestId(id)
     setQuestions(null)
@@ -474,6 +532,7 @@ export default function TestPage() {
       setSelectedAnswer(null)
       setRevealed(false)
     } else {
+      manualPausedRef.current = true
       await saveResults(finalAnswers)
       setAnswers(finalAnswers)
       setDone(true)
@@ -486,6 +545,7 @@ export default function TestPage() {
   }
 
   async function submitSimulation() {
+    manualPausedRef.current = true
     const finalAnswers = { ...answers }
     await saveResults(finalAnswers)
     setAnswers(finalAnswers)
@@ -837,7 +897,7 @@ export default function TestPage() {
   if (mode === 'real') {
     return (
       <>
-        <RealExam cert={cert} questions={questions} answers={answers} setAnswers={setAnswers} current={current} setCurrent={setCurrent} saving={saving} onTimeout={async () => { setTimedOut(true); await saveResults(answers); setDone(true) }} onSubmit={async () => { await saveResults(answers); setDone(true) }} onPause={triggerPause} initialSeconds={initialSeconds} />
+        <RealExam cert={cert} questions={questions} answers={answers} setAnswers={setAnswers} current={current} setCurrent={setCurrent} saving={saving} onTimeout={async () => { manualPausedRef.current = true; setTimedOut(true); await saveResults(answers); setDone(true) }} onSubmit={async () => { manualPausedRef.current = true; await saveResults(answers); setDone(true) }} onPause={triggerPause} initialSeconds={initialSeconds} />
         {pauseModal}
       </>
     )

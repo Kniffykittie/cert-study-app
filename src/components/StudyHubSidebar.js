@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 const SECTIONS = [
@@ -40,6 +40,17 @@ export default function StudyHubSidebar() {
   const [displayName, setDisplayName] = useState('')
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
+  const router = useRouter()
+
+  function handleNavClick(e, href) {
+    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('testInProgress')) {
+      e.preventDefault()
+      const confirmed = window.confirm('You have an active test in progress.\n\nIt will be automatically saved so you can resume it later. Leave anyway?')
+      if (confirmed) {
+        router.push(href)
+      }
+    }
+  }
 
   // Auto-expand the section containing the active route; all open by default
   const defaultOpen = SECTIONS.reduce((acc, s) => {
@@ -86,7 +97,7 @@ export default function StudyHubSidebar() {
         CSA
       </div>
 
-      <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', marginBottom: '4px' }}
+      <Link href="/" onClick={e => handleNavClick(e, '/')} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', marginBottom: '4px' }}
         onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(0,128,255,0.08)'}
         onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
         ← Home
@@ -112,7 +123,7 @@ export default function StudyHubSidebar() {
             {isOpen && section.items.map(item => {
               const active = pathname === item.href
               return (
-                <Link key={item.href} href={item.href}
+                <Link key={item.href} href={item.href} onClick={e => handleNavClick(e, item.href)}
                   style={{ padding: '7px 12px 7px 20px', borderRadius: '6px', fontSize: '13px', textDecoration: 'none', display: 'block', backgroundColor: active ? 'rgba(0,128,255,0.12)' : 'transparent', color: active ? 'var(--accent-blue)' : 'var(--text-secondary)', fontWeight: active ? '600' : '400', borderLeft: active ? '2px solid var(--accent-blue)' : '2px solid transparent' }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = 'rgba(0,128,255,0.08)' }}
                   onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}>
@@ -125,7 +136,7 @@ export default function StudyHubSidebar() {
       })}
 
       <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
-        <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '6px', textDecoration: 'none' }}
+        <Link href="/settings" onClick={e => handleNavClick(e, '/settings')} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '6px', textDecoration: 'none' }}
           onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(0,128,255,0.08)'}
           onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
           <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--accent-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', flexShrink: 0 }}>{initial}</div>
