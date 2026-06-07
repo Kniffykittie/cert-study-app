@@ -116,6 +116,7 @@ export default function PremadeTemplatesPage() {
   const allLivePairs = dupPairs ? dupPairs.filter(p => !p.a.is_retired && !p.b.is_retired) : []
   const livePairs = allLivePairs.filter(p => !approvedKeys.has(p.key))
   const approvedPairs = allLivePairs.filter(p => approvedKeys.has(p.key))
+  const retiredTemplates = templates.filter(t => t.is_retired)
 
   return (
     <div>
@@ -136,6 +137,7 @@ export default function PremadeTemplatesPage() {
           { id: 'browse', label: 'Browse All' },
           { id: 'duplicates', label: `Duplicates${dupPairs ? ` (${livePairs.length})` : ''}` },
           { id: 'approved', label: `Approved Similar${approvedPairs.length > 0 ? ` (${approvedPairs.length})` : ''}` },
+          { id: 'retired', label: `Retired (${retiredTemplates.length})` },
         ].map(v => (
           <div key={v.id} onClick={() => setView(v.id)}
             style={{ padding: '6px 16px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', fontWeight: view === v.id ? '600' : '400', backgroundColor: view === v.id ? 'rgba(0,128,255,0.12)' : 'var(--surface)', border: `1px solid ${view === v.id ? 'var(--accent-blue)' : 'var(--border)'}`, color: view === v.id ? 'var(--accent-blue)' : 'var(--text-secondary)' }}>
@@ -234,6 +236,30 @@ export default function PremadeTemplatesPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── RETIRED VIEW ── */}
+      {view === 'retired' && (
+        <div>
+          {retiredTemplates.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary)' }}>No retired templates yet.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }}>{retiredTemplates.length} retired template{retiredTemplates.length !== 1 ? 's' : ''} — these are excluded from tests.</p>
+              {retiredTemplates.map(t => (
+                <div key={t.id} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '14px 16px', opacity: 0.6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                    <span style={{ color: CERT_COLORS[t.cert] ?? 'var(--accent-blue)', fontSize: '11px', fontWeight: '700' }}>{CERT_LABELS[t.cert]}</span>
+                    <span style={{ color: diffColor[t.difficulty], fontSize: '11px', fontWeight: '600', textTransform: 'capitalize' }}>{t.difficulty}</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{t.domain}</span>
+                    <span style={{ color: 'var(--error)', fontSize: '11px', fontWeight: '600', marginLeft: 'auto' }}>RETIRED</span>
+                  </div>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5', margin: 0 }}>{t.question_template}</p>
                 </div>
               ))}
             </div>
