@@ -246,6 +246,10 @@ Progress, analytics, and study tools:
 - After every commit/push, always give the user the pull command:
   `git pull origin claude/adoring-shannon-sTxW8`
 - Update both `CLAUDE.md` and `build-notes.md` at the end of every session or after any significant feature is completed.
+- After every change or fix, always provide a brief end-of-change summary covering:
+  1. **What the problem was** (or what was requested)
+  2. **What was changed** (files/logic updated)
+  3. **What to test** to confirm it works correctly
 
 ## Database Tables
 | Table | Purpose |
