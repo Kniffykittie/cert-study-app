@@ -56,7 +56,9 @@ src/
       test/page.js                Take a Test (practice / simulation / real exam)
       study/page.js               Study Mode (concept cards + per-domain question)
       bookmarks/page.js           Saved bookmarks with cert tabs + reason badges
-      flashcards/page.js          Flashcard study
+      flashcards/page.js          Flashcard landing — per-cert deck stats + weak domain section
+      flashcards/[cert]/page.js   Per-cert flashcard study session (StudySession component)
+      cert-guide/page.js          5-tab cert reference hub (Overview, Overlap, Exam Details, Career, Roadmap)
       progress/page.js            Progress tracking
       results/page.js             Past test results
       reference/page.js           Reference sheets (subnetting, ports, OSI, etc.)
@@ -73,6 +75,8 @@ src/
       index.js                    Exports LAB_SETS, getLabSet(), getLab() helpers
       ccna-fundamentals.js        CCNA lab set — 8 labs, 49 steps — all steps have document arrays
       small-office-network.js     Small Office series — 5 labs, 27 steps — all steps have document arrays
+      network-plus-fundamentals.js  Network+ lab set — 5 labs, 25 steps — all steps have document arrays
+      security-plus-labs.js       Security+ lab set — 4 labs, 20 steps — all steps have document arrays
   components/
     StudyHubSidebar.js            Nav sidebar with test-in-progress guard
     BookmarkModal.js              Bookmark reason + notes modal
@@ -82,6 +86,7 @@ src/
     LabTopology.js                SVG topology renderer (router/switch/PC/server/cloud icons, trunk/access/redundant lines)
     FloatingCommandPanel.js       Fixed bottom-right button on lab pages — searchable IOS command reference (imports IOS_COMMANDS)
     FloatingReferencePanel.js     Fixed button on test page (practice mode only) — cert-filtered quick reference (subnetting, ports, OSI, attacks, encryption)
+    FloatingChat.js               Fixed chat bubble on all Study Hub pages — session-only tutor chat via /api/chat
 ```
 
 ---
@@ -182,6 +187,7 @@ src/
 - Cards generated via `/api/generate-flashcards`, saved permanently to `flashcards` table
 - Per-cert study sessions at `/study-hub/flashcards/[cert]` via `StudySession.js`
 - Progress tracked in `flashcard_progress` table: `mastered` flag, `consecutive_correct` count
+- **Weak Domain Section** below cert cards — queries `topic_performance` for domains <65% accuracy (≥5 seen), shows up to 6 cards with accuracy bar and direct link to that cert's flashcard session
 
 ### Study Mode
 - Cert selection → concept card (domain + bullets) → "I'm ready" loads a question for that domain
@@ -250,7 +256,7 @@ src/
 - The `StepCard` component renders a "📝 DOCUMENT YOUR WORK" section after hints when `step.document` exists
 - Textarea auto-saves to `localStorage` on blur; manual Save button turns "✓ Saved" briefly
 - Storage key pattern: `lab_step_doc_${setId}_${labId}_${stepId}`
-- **All 49 steps in ccna-fundamentals.js and all 27 steps in small-office-network.js have document arrays — do NOT add a new lab step without including a document array**
+- **All steps in all four lab set files have document arrays — do NOT add a new lab step without including a document array**
 
 ### Lab Sets
 - **CCNA Fundamentals** (`ccna-fundamentals.js`): 8 labs — VLANs/Router-on-a-Stick, DHCP, STP, ACLs, SSH hardening, OSPF, NAT/PAT, Capstone

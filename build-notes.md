@@ -338,6 +338,10 @@ New features:
 | `bookmarked_questions` | Bookmarks with reason, notes, full question snapshot |
 | `flagged_questions` | User-reported question issues |
 | `profiles` | User display name |
+| `lab_progress` | Completed lab steps per user (user_id, lab_set_id, lab_id, step_id, completed_at) |
+| `lab_notes` | Per-lab freeform notes per user (user_id, lab_set_id, lab_id, notes, updated_at) |
+| `flashcards` | Generated flashcard decks saved permanently per cert |
+| `flashcard_progress` | Per-card mastery state: mastered flag, consecutive_correct count |
 
 ### Phase 18 - Complete
 Per-step documentation system for Packet Tracer Labs:
@@ -366,7 +370,7 @@ Packet Tracer Labs section:
 ## Future Features (Study Hub)
 - More concept cards in Study Mode
 - Exam countdown timer with target date
-- New lab sets (Network+, Security+, advanced CCNA)
+- Advanced CCNA lab set
 - PWA conversion
 
 ## Future Features (Life Hub — not yet started)
@@ -376,6 +380,7 @@ Packet Tracer Labs section:
 - Correlation engine (study performance vs health data)
 - Daily morning brief page
 - General purpose Claude chat section
+
 ### Phase 19 - Complete
 Multi-feature expansion — contextual panels, new lab sets, and smart flashcards:
 
