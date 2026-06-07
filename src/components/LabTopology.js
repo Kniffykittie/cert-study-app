@@ -121,12 +121,12 @@ function ConnectionLine({ from, to, fromLabel, toLabel, style: connStyle, nodes 
   const tlx = x2 - Math.cos(angle) * gap
   const tly = y2 - Math.sin(angle) * gap
 
-  // Place labels ~25% and ~75% along the line, offset perpendicularly
-  const offset = 14
-  const flLabelX = flx + (tlx - flx) * 0.18 + perpX * offset
-  const flLabelY = fly + (tly - fly) * 0.18 + perpY * offset
-  const tlLabelX = flx + (tlx - flx) * 0.82 + perpX * offset
-  const tlLabelY = fly + (tly - fly) * 0.82 + perpY * offset
+  // Place labels 33% and 67% along the line, offset perpendicularly
+  const offset = 20
+  const flLabelX = flx + (tlx - flx) * 0.33 + perpX * offset
+  const flLabelY = fly + (tly - fly) * 0.33 + perpY * offset
+  const tlLabelX = flx + (tlx - flx) * 0.67 + perpX * offset
+  const tlLabelY = fly + (tly - fly) * 0.67 + perpY * offset
 
   return (
     <g>
