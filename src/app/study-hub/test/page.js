@@ -31,6 +31,7 @@ const DOMAINS = {
 
 const domainKey = d => `${d.id} ${d.name}`
 const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
+const CERT_COLORS = { ccna: 'var(--accent-blue)', 'network-plus': 'var(--accent-purple)', 'security-plus': 'var(--error)' }
 const COUNTS = [10, 25, 50]
 const letters = ['A', 'B', 'C', 'D']
 const REAL_EXAM = {
@@ -228,6 +229,8 @@ export default function TestPage() {
   const [flagSubmitting, setFlagSubmitting] = useState(false)
   const [bookmarked, setBookmarked] = useState({})
   const [bookmarkPending, setBookmarkPending] = useState(null) // idx waiting for modal
+  const [weaknessLoading, setWeaknessLoading] = useState(false)
+  const [weaknessSummary, setWeaknessSummary] = useState(null)
   const searchParams = useSearchParams()
 
   // Refs so unmount cleanup can read latest state without stale closures
@@ -238,6 +241,7 @@ export default function TestPage() {
   const modeRef = useRef('practice')
   const doneRef = useRef(false)
   const manualPausedRef = useRef(false)
+  const startTimeRef = useRef(null)
 
   useEffect(() => { questionsRef.current = questions }, [questions])
   useEffect(() => { answersRef.current = answers }, [answers])
@@ -380,6 +384,7 @@ export default function TestPage() {
       if (!raw) return
       const snap = JSON.parse(raw)
       localStorage.removeItem('interruptedTest')
+      startTimeRef.current = Date.now()
       setQuestions(snap.questions)
       setCurrent(snap.current)
       setAnswers(snap.answers)
@@ -405,6 +410,7 @@ export default function TestPage() {
     setRevealed(false)
     setDone(false)
     setTimedOut(false)
+    startTimeRef.current = Date.now()
     if (data.mode === 'real' && data.seconds_remaining) setInitialSeconds(data.seconds_remaining)
     await supabase.from('paused_tests').delete().eq('id', testId)
     setMostRecentPaused(null)
@@ -499,6 +505,54 @@ export default function TestPage() {
     if (data.id) setBookmarked(prev => ({ ...prev, [idx]: data.id }))
   }
 
+  async function discardTest(paused) {
+    if (paused.id === '__local__') {
+      localStorage.removeItem('interruptedTest')
+    } else {
+      const supabase = createClient()
+      await supabase.from('paused_tests').delete().eq('id', paused.id)
+    }
+    setMostRecentPaused(null)
+  }
+
+  async function fixMyWeaknesses() {
+    setWeaknessLoading(true)
+    setWeaknessSummary(null)
+    const supabase = createClient()
+    const { data } = await supabase.from('topic_performance').select('cert, topic, total_seen, total_correct')
+    const weakByCert = {}
+    for (const c of ['ccna', 'network-plus', 'security-plus']) {
+      const rows = (data ?? []).filter(r => r.cert === c && r.total_seen >= 5)
+      weakByCert[c] = rows.filter(r => (r.total_correct / r.total_seen) < 0.65)
+    }
+    const [targetCert] = Object.entries(weakByCert).sort((a, b) => b[1].length - a[1].length)
+    if (!targetCert || targetCert[1].length === 0) {
+      setError('Not enough data yet — take a few tests first to identify weak domains.')
+      setWeaknessLoading(false)
+      return
+    }
+    const [targetCertKey, weakRows] = targetCert
+    const domains = DOMAINS[targetCertKey] ?? []
+    const matched = domains
+      .filter(d => weakRows.some(w => w.topic === domainKey(d)))
+      .sort((a, b) => {
+        const rA = weakRows.find(w => w.topic === domainKey(a))
+        const rB = weakRows.find(w => w.topic === domainKey(b))
+        return (rA.total_correct / rA.total_seen) - (rB.total_correct / rB.total_seen)
+      })
+    setCert(targetCertKey)
+    setMode('practice')
+    setSelectedTopics(matched.map(d => domainKey(d)))
+    setWeaknessSummary({
+      cert: targetCertKey,
+      domains: matched.map(d => {
+        const r = weakRows.find(w => w.topic === domainKey(d))
+        return { name: d.name, pct: Math.round((r.total_correct / r.total_seen) * 100) }
+      })
+    })
+    setWeaknessLoading(false)
+  }
+
   async function generateTest() {
     if (!cert) { setError('Please select a certification.'); return }
     setLoading(true)
@@ -513,6 +567,8 @@ export default function TestPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to generate questions')
+      startTimeRef.current = Date.now()
+      setWeaknessSummary(null)
       setQuestions(data.questions)
       setCurrent(0)
       setSelectedAnswer(null)
@@ -533,8 +589,9 @@ export default function TestPage() {
     const { data: { user } } = await supabase.auth.getUser()
     const correct = questions.filter((q, i) => finalAnswers[i] === q.correct).length
     const scorePct = Math.round((correct / questions.length) * 100)
+    const durationSeconds = startTimeRef.current ? Math.round((Date.now() - startTimeRef.current) / 1000) : null
     const { data: session } = await supabase.from('test_sessions').insert({
-      user_id: user.id, cert, mode, total_questions: questions.length, correct, score_pct: scorePct
+      user_id: user.id, cert, mode, total_questions: questions.length, correct, score_pct: scorePct, duration_seconds: durationSeconds
     }).select().single()
     if (session) {
       await supabase.from('question_answers').insert(questions.map((q, i) => ({
@@ -658,10 +715,16 @@ export default function TestPage() {
             <p style={{ color: 'var(--text-secondary)' }}>Configure your practice test or exam simulation.</p>
           </div>
           {mostRecentPaused && (
-            <button onClick={() => resumeTest(mostRecentPaused.id)}
-              style={{ backgroundColor: 'var(--warning)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-              ↩ Return to Test — {CERT_LABELS[mostRecentPaused.cert]} {modeLabel} ({mostRecentPaused.answered_count}/{mostRecentPaused.total_questions})
-            </button>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button onClick={() => resumeTest(mostRecentPaused.id)}
+                style={{ backgroundColor: 'var(--warning)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                ↩ Return to Test — {CERT_LABELS[mostRecentPaused.cert]} {modeLabel} ({mostRecentPaused.answered_count}/{mostRecentPaused.total_questions})
+              </button>
+              <button onClick={() => discardTest(mostRecentPaused)}
+                style={{ backgroundColor: 'var(--background)', color: 'var(--error)', border: '1px solid var(--error-border)', borderRadius: '8px', padding: '10px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                Discard
+              </button>
+            </div>
           )}
         </div>
 
@@ -750,6 +813,34 @@ export default function TestPage() {
             <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Select a certification above to see exam domains.</p>
           </div>
         )}
+
+        {/* Fix My Weaknesses */}
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px 20px', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ color: 'var(--error)', fontSize: '14px', fontWeight: '700', marginBottom: '2px' }}>🎯 Fix My Weaknesses</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Auto-selects your lowest-scoring domains across all certs and generates a targeted drill.</div>
+            </div>
+            <button onClick={fixMyWeaknesses} disabled={weaknessLoading}
+              style={{ backgroundColor: 'rgba(204,0,0,0.1)', color: 'var(--error)', border: '1px solid var(--error-border)', borderRadius: '8px', padding: '10px 18px', fontSize: '13px', fontWeight: '600', cursor: weaknessLoading ? 'not-allowed' : 'pointer', opacity: weaknessLoading ? 0.5 : 1, flexShrink: 0, marginLeft: '16px' }}>
+              {weaknessLoading ? 'Analyzing...' : 'Find My Weak Spots'}
+            </button>
+          </div>
+          {weaknessSummary && (
+            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '8px' }}>
+                Targeting <strong style={{ color: 'var(--text-primary)' }}>{weaknessSummary.domains.length} weak domain{weaknessSummary.domains.length !== 1 ? 's' : ''}</strong> in <strong style={{ color: CERT_COLORS[weaknessSummary.cert] }}>{CERT_LABELS[weaknessSummary.cert]}</strong> — select count and hit Generate Test:
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {weaknessSummary.domains.map(d => (
+                  <span key={d.name} style={{ backgroundColor: 'rgba(204,0,0,0.08)', border: '1px solid var(--error-border)', borderRadius: '5px', padding: '3px 10px', fontSize: '12px', color: 'var(--error)' }}>
+                    {d.name} — {d.pct}%
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {error && <p style={{ color: 'var(--error)', fontSize: '13px', marginBottom: '12px' }}>{error}</p>}
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>

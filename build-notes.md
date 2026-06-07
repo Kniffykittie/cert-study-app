@@ -263,6 +263,14 @@ Progress, analytics, and study tools:
 - Bookmarks page — cert tabs, reason badges, expandable full question view with notes
 - Mobile responsive layout via `@media (max-width: 768px)`
 
+### Phase 12 - Complete
+New features:
+- Total Study Time stat on Progress page — sums `duration_seconds` from `test_sessions`, displayed as "Xh Ym" or "Xm", shown as 5th stat card
+- Predicted Exam Score on CCNA, Network+, and Security+ cert pages — weighted average of domain accuracy using official exam domain percentages, requires ≥5 questions per domain to include it, shows domain breakdown chips color-coded by score, appears once at least one domain has enough data
+- Fix My Weaknesses mode on Take a Test page — auto-selects cert and domains with most <65% accuracy (≥5 seen), sets practice mode, shows summary panel
+- Discard button on Return to Test banner — removes localStorage or Supabase paused test without resuming
+- `duration_seconds` column added to `test_sessions` table — measured from test start to submit
+
 ## Active Branch
 `claude/adoring-shannon-sTxW8`
 

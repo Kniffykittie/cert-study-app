@@ -177,6 +177,7 @@ export default function ProgressPage() {
   const [topicPerf, setTopicPerf] = useState([])
   const [dailyCounts, setDailyCounts] = useState([])
   const [totalQuestions, setTotalQuestions] = useState(0)
+  const [totalStudySeconds, setTotalStudySeconds] = useState(null)
   const [loading, setLoading] = useState(true)
   const [heatmapCert, setHeatmapCert] = useState('all')
 
@@ -188,7 +189,7 @@ export default function ProgressPage() {
     if (!user) return
 
     const [{ data: sess }, { data: perf }, { data: answers }] = await Promise.all([
-      supabase.from('test_sessions').select('cert, score_pct, completed_at').eq('user_id', user.id).order('completed_at', { ascending: true }).limit(300),
+      supabase.from('test_sessions').select('cert, score_pct, completed_at, duration_seconds').eq('user_id', user.id).order('completed_at', { ascending: true }).limit(300),
       supabase.from('topic_performance').select('cert, topic, total_seen, total_correct').eq('user_id', user.id),
       supabase.from('question_answers').select('answered_at').eq('user_id', user.id),
     ])
@@ -196,6 +197,8 @@ export default function ProgressPage() {
     setSessions(sess ?? [])
     setTopicPerf(perf ?? [])
     setTotalQuestions((answers ?? []).length)
+    const seconds = (sess ?? []).reduce((sum, s) => sum + (s.duration_seconds ?? 0), 0)
+    setTotalStudySeconds(seconds)
 
     const counts = {}
     for (const a of answers ?? []) {
@@ -239,12 +242,13 @@ export default function ProgressPage() {
       </div>
 
       {/* Top stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '24px' }}>
         {[
           { label: 'Total Questions', value: loading ? '...' : totalQuestions.toLocaleString(), color: 'var(--accent-blue)' },
           { label: 'Average Score', value: loading ? '...' : avgScore !== null ? `${avgScore}%` : '—', color: avgScore !== null ? scoreColor(avgScore) : 'var(--text-secondary)' },
           { label: 'Best Score', value: loading ? '...' : bestScore !== null ? `${bestScore}%` : '—', color: bestScore !== null ? scoreColor(bestScore) : 'var(--text-secondary)' },
           { label: 'Day Streak', value: loading ? '...' : `${streak}d`, color: streak > 0 ? 'var(--success)' : 'var(--text-secondary)' },
+          { label: 'Study Time', value: loading ? '...' : totalStudySeconds === null || totalStudySeconds === 0 ? '—' : totalStudySeconds >= 3600 ? `${Math.floor(totalStudySeconds / 3600)}h ${Math.floor((totalStudySeconds % 3600) / 60)}m` : `${Math.floor(totalStudySeconds / 60)}m`, color: 'var(--accent-purple)' },
         ].map(stat => (
           <div key={stat.label} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px 20px' }}>
             <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px' }}>{stat.label}</div>

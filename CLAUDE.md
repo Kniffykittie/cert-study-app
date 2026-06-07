@@ -155,6 +155,33 @@ src/
 - Cert selection → concept card (domain + bullets) → "I'm ready" loads a question for that domain
 - Bookmark button available on questions
 
+### Fix My Weaknesses
+- Button on Take a Test setup screen
+- Queries `topic_performance`, finds the cert with the most domains under 65% accuracy (≥5 seen)
+- Auto-selects cert and those domains in practice mode, shows a summary panel of targeted domains with their accuracy
+- User picks question count and hits Generate Test
+
+### Predicted Exam Score
+- Shown on each cert page (CCNA, Network+, Security+) once ≥1 domain has ≥5 questions answered
+- Weighted average of domain accuracy using official exam domain percentages
+- Formula: `sum(domainWeight × accuracy) / sum(coveredWeights) × 100`
+- Domain breakdown chips shown color-coded by score
+- Hidden until there's enough data
+
+### Total Study Time
+- Shown on Progress page as 5th stat card
+- Sums `duration_seconds` from `test_sessions` (only tests where timing was tracked)
+- Displayed as "Xh Ym" or "Xm"
+
+### Test History (Results page)
+- Mode badge per result: Practice (blue), Simulation (yellow), Real Exam (red)
+- Discard button removes test session and its `question_answers` from DB
+- Discard button also available on Return to Test resume banner (removes without resuming)
+
+### Study Time Tracking
+- `duration_seconds` column on `test_sessions` — measured from first question to submit
+- `startTimeRef` set in `generateTest()` and both `resumeTest()` paths in test/page.js
+
 ---
 
 ## Cost Reference (Anthropic API)

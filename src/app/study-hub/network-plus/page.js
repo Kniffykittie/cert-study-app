@@ -9,6 +9,13 @@ import DomainTrend from '@/components/DomainTrend'
 const CERT = 'network-plus'
 const ACCENT = 'var(--accent-purple)'
 const PASSING = { score: 720, outOf: 900, pct: 80 }
+const DOMAIN_WEIGHTS = {
+  'Networking Concepts': 23,
+  'Network Implementation': 20,
+  'Network Operations': 19,
+  'Network Security': 14,
+  'Network Troubleshooting': 24,
+}
 
 function scoreColor(pct) {
   if (pct >= 80) return 'var(--success)'
@@ -41,6 +48,23 @@ export default function NetworkPlusPage() {
   const totalSeen = topicRows.reduce((s, r) => s + r.total_seen, 0)
   const totalCorrect = topicRows.reduce((s, r) => s + r.total_correct, 0)
   const readiness = totalSeen ? Math.round((totalCorrect / totalSeen) * 100) : null
+
+  let predictedScore = null
+  let predictedDomainCount = 0
+  {
+    let weightedSum = 0, coveredWeight = 0
+    for (const r of topicRows) {
+      if (r.total_seen < 5) continue
+      const domainName = r.topic.replace(/^\d+\.\d+\s+/, '')
+      const w = DOMAIN_WEIGHTS[domainName] ?? 0
+      if (w === 0) continue
+      weightedSum += (r.total_correct / r.total_seen) * w
+      coveredWeight += w
+      predictedDomainCount++
+    }
+    if (coveredWeight > 0) predictedScore = Math.round((weightedSum / coveredWeight) * 100)
+  }
+
   const lastStudied = sessions[0]?.completed_at
     ? new Date(sessions[0].completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : 'Never'
@@ -108,6 +132,38 @@ export default function NetworkPlusPage() {
           ))}
         </div>
       </div>
+
+      {/* Predicted Readiness Score */}
+      {!loading && predictedScore !== null && (
+        <div style={{ backgroundColor: 'var(--surface)', border: `1px solid ${scoreColor(predictedScore)}`, borderRadius: '10px', padding: '20px 24px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '32px' }}>
+          <div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: '600' }}>Predicted Exam Score</div>
+            <div style={{ color: scoreColor(predictedScore), fontSize: '48px', fontWeight: '700', lineHeight: 1 }}>{predictedScore}%</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '6px' }}>Based on {predictedDomainCount} of {Object.keys(DOMAIN_WEIGHTS).length} domains</div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ height: '8px', backgroundColor: 'var(--border)', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
+              <div style={{ height: '100%', width: `${predictedScore}%`, backgroundColor: scoreColor(predictedScore), borderRadius: '4px', transition: 'width 0.4s ease' }} />
+            </div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+              {predictedScore >= PASSING.pct ? '✓ On track to pass — weighted by official domain percentages' : `${(PASSING.pct - predictedScore).toFixed(1)}% below passing — weighted by official domain percentages`}
+            </div>
+            <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {topicRows.filter(r => r.total_seen >= 5).map(r => {
+                const domainName = r.topic.replace(/^\d+\.\d+\s+/, '')
+                const w = DOMAIN_WEIGHTS[domainName]
+                if (!w) return null
+                const pct = Math.round((r.total_correct / r.total_seen) * 100)
+                return (
+                  <div key={r.topic} style={{ fontSize: '11px', backgroundColor: 'var(--background)', border: `1px solid ${scoreColor(pct)}`, borderRadius: '6px', padding: '3px 8px', color: scoreColor(pct) }}>
+                    {domainName} ({w}%) — {pct}%
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {sessions.length >= 2 && (
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
