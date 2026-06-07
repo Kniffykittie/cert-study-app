@@ -292,6 +292,7 @@ export default function TestPage() {
   // Also check localStorage for an interrupted test (navigation-away mid-test)
   useEffect(() => {
     async function loadMostRecent() {
+      setMostRecentPaused(null)
       // Check localStorage first — set synchronously so no timing issues
       const raw = localStorage.getItem('interruptedTest')
       if (raw) {
