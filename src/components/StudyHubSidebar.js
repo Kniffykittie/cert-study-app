@@ -20,6 +20,8 @@ const SECTIONS = [
       { label: 'Take a Test', href: '/study-hub/test' },
       { label: 'Flashcards', href: '/study-hub/flashcards' },
       { label: 'Study Mode', href: '/study-hub/study' },
+      { label: 'Bookmarks', href: '/study-hub/bookmarks' },
+      { label: 'Reference Sheets', href: '/study-hub/reference' },
       { label: 'Progress', href: '/study-hub/progress' },
       { label: 'Results', href: '/study-hub/results' },
     ]

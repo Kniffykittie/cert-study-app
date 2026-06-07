@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import PausedTests from '@/components/PausedTests'
 import ScoreChart from '@/components/ScoreChart'
+import DomainTrend from '@/components/DomainTrend'
 
 const CERT = 'security-plus'
 const ACCENT = 'var(--error)'
@@ -114,6 +115,7 @@ export default function SecurityPlusPage() {
         </div>
       )}
       <PausedTests cert="security-plus" accentColor={ACCENT} />
+      <DomainTrend cert="security-plus" />
 
       {/* Recommended Focus */}
       {!loading && (

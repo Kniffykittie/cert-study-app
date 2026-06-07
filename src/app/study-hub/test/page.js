@@ -225,6 +225,7 @@ export default function TestPage() {
   const [flagFeedbackType, setFlagFeedbackType] = useState('')
   const [flagFeedbackText, setFlagFeedbackText] = useState('')
   const [flagSubmitting, setFlagSubmitting] = useState(false)
+  const [bookmarked, setBookmarked] = useState({})
   const searchParams = useSearchParams()
 
   // Auto-resume if ?resume=id is in the URL
@@ -378,6 +379,21 @@ export default function TestPage() {
     setFlagFeedbackType('')
     setFlagFeedbackText('')
     setFlagSubmitting(false)
+  }
+
+  async function toggleBookmark(idx) {
+    const q = questions[idx]
+    if (bookmarked[idx]) {
+      await fetch('/api/bookmarks', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: bookmarked[idx] }) })
+      setBookmarked(prev => { const n = { ...prev }; delete n[idx]; return n })
+    } else {
+      const res = await fetch('/api/bookmarks', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cert, topic: q.topic, question_text: q.question, options: q.options, correct_answer: q.correct, explanations: q.explanations ?? {}, difficulty })
+      })
+      const data = await res.json()
+      if (data.id) setBookmarked(prev => ({ ...prev, [idx]: data.id }))
+    }
   }
 
   async function generateTest() {
@@ -905,8 +921,14 @@ export default function TestPage() {
                 <div style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{q.topic}</div>
                 {q.from_template && <span style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600', opacity: 0.7 }}>⚡ Template</span>}
               </div>
-              <button onClick={() => setFlagModal({ questionIndex: current })}
-                style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-secondary)', fontSize: '11px', padding: '2px 8px', cursor: 'pointer' }}>⚑ Flag</button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button onClick={() => toggleBookmark(current)}
+                  style={{ background: 'none', border: `1px solid ${bookmarked[current] ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '4px', color: bookmarked[current] ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '11px', padding: '2px 8px', cursor: 'pointer', fontWeight: bookmarked[current] ? '600' : '400' }}>
+                  🔖 {bookmarked[current] ? 'Saved' : 'Save'}
+                </button>
+                <button onClick={() => setFlagModal({ questionIndex: current })}
+                  style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-secondary)', fontSize: '11px', padding: '2px 8px', cursor: 'pointer' }}>⚑ Flag</button>
+              </div>
             </div>
             <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

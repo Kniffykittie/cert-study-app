@@ -97,7 +97,33 @@ export async function POST(request) {
     ? allDomains.filter(d => topics.includes(`${d.id} ${d.name}`))
     : allDomains
 
-  const distribution = weightedDistribution(activeDomains, count)
+  // Spaced repetition: fetch topic performance and boost weak domains
+  const { data: topicPerf } = await supabase
+    .from('topic_performance')
+    .select('topic, total_seen, total_correct')
+    .eq('cert', cert)
+    .eq('user_id', user.id)
+
+  const perfMap = {}
+  for (const row of topicPerf ?? []) {
+    perfMap[row.topic] = row.total_seen > 0 ? row.total_correct / row.total_seen : null
+  }
+
+  // Apply spaced repetition multiplier to domain weights
+  const spacedDomains = activeDomains.map(d => {
+    const key = `${d.id} ${d.name}`
+    const acc = perfMap[key]
+    let multiplier = 1
+    if (acc !== null && acc !== undefined) {
+      if (acc < 0.4) multiplier = 2.5
+      else if (acc < 0.6) multiplier = 1.8
+      else if (acc < 0.75) multiplier = 1.3
+      else if (acc >= 0.9) multiplier = 0.6
+    }
+    return { ...d, weight: Math.round(d.weight * multiplier) }
+  })
+
+  const distribution = weightedDistribution(spacedDomains, count)
 
   // --- Pull from template pool first ---
   const domainNames = activeDomains.map(d => `${d.id} ${d.name}`)

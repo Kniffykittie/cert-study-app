@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import DailyStreak from '@/components/DailyStreak'
 
 const CERT_KEYS = ['ccna', 'network-plus', 'security-plus']
 const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
@@ -103,6 +104,8 @@ export default function StudyHubPage() {
         <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Study Hub</h1>
         <p style={{ color: 'var(--text-secondary)' }}>Your cert readiness command center.</p>
       </div>
+
+      <DailyStreak />
 
       {/* Cert Readiness Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px' }}>

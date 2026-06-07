@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import PausedTests from '@/components/PausedTests'
 import ScoreChart from '@/components/ScoreChart'
+import DomainTrend from '@/components/DomainTrend'
 
 const CERT = 'ccna'
 const ACCENT = 'var(--accent-blue)'
@@ -114,6 +115,7 @@ export default function CCNAPage() {
         </div>
       )}
       <PausedTests cert="ccna" accentColor={ACCENT} />
+      <DomainTrend cert="ccna" />
 
       {/* Recommended Focus */}
       {!loading && (
