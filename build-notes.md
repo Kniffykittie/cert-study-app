@@ -263,6 +263,14 @@ Progress, analytics, and study tools:
 - Bookmarks page — cert tabs, reason badges, expandable full question view with notes
 - Mobile responsive layout via `@media (max-width: 768px)`
 
+### Phase 13 - Complete
+Flashcards feature confirmed fully built and working:
+- Flashcards landing page with per-cert deck stats (mastered / learning / unlearned)
+- Generate Deck button (60 cards) and Add More Cards button (40 cards) via `/api/generate-flashcards`
+- Per-cert study session pages (CCNA, Network+, Security+) via `StudySession.js` component
+- `flashcards` and `flashcard_progress` Supabase tables confirmed present
+- Mastery tracking with consecutive correct answer logic
+
 ### Phase 12 - Complete
 New features:
 - Total Study Time stat on Progress page — sums `duration_seconds` from `test_sessions`, displayed as "Xh Ym" or "Xm", shown as 5th stat card

@@ -151,6 +151,13 @@ src/
 - Security+: attack types, encryption algorithms, MFA factors, 8 compliance frameworks
 - Available in practice mode only (not simulation or real exam)
 
+### Flashcards
+- Landing page shows per-cert deck stats: mastered / learning / unlearned counts, mastery progress bar
+- Generate Deck (60 cards) on first visit; Add 40 More Cards once a deck exists
+- Cards generated via `/api/generate-flashcards`, saved permanently to `flashcards` table
+- Per-cert study sessions at `/study-hub/flashcards/[cert]` via `StudySession.js`
+- Progress tracked in `flashcard_progress` table: `mastered` flag, `consecutive_correct` count
+
 ### Study Mode
 - Cert selection → concept card (domain + bullets) → "I'm ready" loads a question for that domain
 - Bookmark button available on questions
