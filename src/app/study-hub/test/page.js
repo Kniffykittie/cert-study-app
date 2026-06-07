@@ -272,6 +272,11 @@ export default function TestPage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [questions, done])
 
+  // Clear snapshot when test finishes (done = true)
+  useEffect(() => {
+    if (done) localStorage.removeItem('interruptedTest')
+  }, [done])
+
   // On unmount: clear sessionStorage flag (localStorage snapshot already written above)
   useEffect(() => {
     return () => { sessionStorage.removeItem('testInProgress') }
@@ -869,7 +874,7 @@ export default function TestPage() {
         </div>
 
         <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
-          <button onClick={() => { setQuestions(null); setCert(null) }}
+          <button onClick={() => { localStorage.removeItem('interruptedTest'); setDone(false); setQuestions(null); setCert(null) }}
             style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
             New Test
           </button>
