@@ -8,13 +8,31 @@ export async function POST(req) {
     const { cert, domain, difficulty = 'hard', count = 10 } = await req.json()
     if (!cert || !domain) return Response.json({ error: 'cert and domain required' }, { status: 400 })
 
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Fetch existing templates for this domain so Claude can avoid duplicates
+    const { data: existing } = await supabase
+      .from('question_templates')
+      .select('question_template')
+      .eq('cert', cert)
+      .eq('domain', domain)
+      .eq('difficulty', difficulty)
+
+    const existingList = (existing ?? []).map((t, i) => `${i + 1}. ${t.question_template}`)
+
     const difficultyGuide = {
       easy: 'Recall-level questions testing basic definitions and concepts. Wrong answers are clearly incorrect to someone who studied.',
       medium: 'Application-level questions requiring understanding of how concepts work together. Wrong answers are plausible to someone with partial knowledge.',
       hard: 'Analysis and scenario-based questions. Wrong answers are specifically designed to catch common misconceptions or require precise knowledge to eliminate. Include CLI output, routing tables, subnet calculations, or multi-step reasoning where appropriate.',
     }
 
-    const prompt = `Generate exactly ${count} question TEMPLATES for ${cert.toUpperCase()} certification, domain: "${domain}", difficulty: ${difficulty}.
+    const existingSection = existingList.length > 0
+      ? `\nEXISTING TEMPLATES TO AVOID DUPLICATING:\n${existingList.join('\n')}\n\nDo NOT generate questions that test the same concept or scenario as any of the above. Each new template must cover a distinct topic, scenario type, or skill within the domain.\n`
+      : ''
+
+    const prompt = `Generate exactly ${count} question TEMPLATES for ${cert.toUpperCase()} certification, domain: "${domain}", difficulty: ${difficulty}.${existingSection}
 
 Difficulty guidance: ${difficultyGuide[difficulty]}
 
@@ -61,9 +79,6 @@ Return ONLY the JSON array, no markdown, no explanation.`
       const end = text.lastIndexOf(']')
       templates = JSON.parse(text.slice(start, end + 1))
     }
-
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
 
     const rows = templates.map(t => ({
       cert,
