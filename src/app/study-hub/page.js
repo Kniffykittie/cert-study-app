@@ -198,35 +198,6 @@ export default function StudyHubPage() {
         )
       })()}
 
-      {/* Recommended Focus Areas */}
-      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-        <h2 style={{ color: 'var(--accent-blue)', fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>Recommended Focus Areas</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '12px' }}>Your weakest topics — based on real performance</p>
-        {recommendations.length === 0 ? (
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Complete more tests to unlock personalized recommendations.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {recommendations.map((r, i) => {
-              const pct = Math.round((r.total_correct / r.total_seen) * 100)
-              const color = scoreColor(pct)
-              return (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: 'var(--background)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                  <div>
-                    <span style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{r.topic}</span>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '12px', marginLeft: '10px' }}>{CERT_LABELS[r.cert]}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '80px', height: '6px', backgroundColor: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${pct}%`, backgroundColor: color, borderRadius: '3px' }} />
-                    </div>
-                    <span style={{ color, fontSize: '14px', fontWeight: '600', minWidth: '36px', textAlign: 'right' }}>{pct}%</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
     </div>
   )
 }

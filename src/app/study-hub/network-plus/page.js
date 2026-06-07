@@ -115,6 +115,34 @@ export default function NetworkPlusPage() {
       )}
       <PausedTests cert="network-plus" accentColor={ACCENT} />
 
+      {/* Recommended Focus */}
+      {!loading && (
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--warning-border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
+          <h2 style={{ color: 'var(--warning)', fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>⚡ Recommended Focus</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '12px' }}>Your weakest Network+ domains — study these first</p>
+          {weak.length === 0 ? (
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{totalSeen === 0 ? 'Take a test to unlock personalized recommendations.' : 'No weak domains yet — keep it up!'}</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {[...weak].sort((a, b) => (a.total_correct / a.total_seen) - (b.total_correct / b.total_seen)).slice(0, 5).map(r => {
+                const pct = Math.round((r.total_correct / r.total_seen) * 100)
+                return (
+                  <div key={r.topic} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: 'var(--background)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <span style={{ color: 'var(--text-primary)', fontSize: '13px' }}>{r.topic}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '80px', height: '6px', backgroundColor: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, backgroundColor: 'var(--error)', borderRadius: '3px' }} />
+                      </div>
+                      <span style={{ color: 'var(--error)', fontSize: '13px', fontWeight: '600', minWidth: '36px', textAlign: 'right' }}>{pct}%</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Topic Buckets */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
         {[
