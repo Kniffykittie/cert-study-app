@@ -80,7 +80,7 @@ function StepCard({ step, index, completed, onToggle, isActive, onClick, docKey 
 
       {isActive && (
         <div style={{ padding: '0 18px 18px', borderTop: '1px solid var(--border)' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.7', margin: '14px 0 0' }}>{step.description}</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.7', margin: '14px 0 0', whiteSpace: 'pre-line' }}>{step.description ?? step.content}</p>
 
           <CommandBlock commands={step.commands} />
 
