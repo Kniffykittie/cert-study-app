@@ -30,14 +30,21 @@ const DOMAINS = {
 }
 
 const domainKey = d => `${d.id} ${d.name}`
-const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
-const CERT_COLORS = { ccna: 'var(--accent-blue)', 'network-plus': 'var(--accent-purple)', 'security-plus': 'var(--error)' }
+const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+', mixed: 'Mixed — All Certs' }
+const CERT_COLORS = { ccna: 'var(--accent-blue)', 'network-plus': 'var(--accent-purple)', 'security-plus': 'var(--error)', mixed: 'var(--success)' }
 const COUNTS = [10, 25, 50]
 const letters = ['A', 'B', 'C', 'D']
 const REAL_EXAM = {
   ccna: { questions: 110, minutes: 120 },
   'network-plus': { questions: 90, minutes: 90 },
   'security-plus': { questions: 90, minutes: 90 },
+}
+
+// Overlap domains used for Mixed mode — maps each cert to its shared-topic domains
+const MIXED_DOMAINS = {
+  ccna: ['1.0 Network Fundamentals', '3.0 IP Connectivity', '5.0 Security Fundamentals'],
+  'network-plus': ['1.0 Networking Concepts', '4.0 Network Security', '5.0 Network Troubleshooting'],
+  'security-plus': ['1.0 General Security Concepts', '2.0 Threats, Vulnerabilities & Mitigations', '3.0 Security Architecture'],
 }
 
 function ChatPanel({ cert, question, topic, options }) {
@@ -557,19 +564,42 @@ export default function TestPage() {
     if (!cert) { setError('Please select a certification.'); return }
     setLoading(true)
     setError('')
-    const actualCount = mode === 'real' ? REAL_EXAM[cert].questions : count
-    const actualDifficulty = mode === 'real' ? 'hard' : difficulty
     try {
-      const res = await fetch('/api/generate-questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cert, count: actualCount, topics: selectedTopics, difficulty: actualDifficulty })
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to generate questions')
+      let allQuestions = []
+      if (cert === 'mixed') {
+        const certKeys = ['ccna', 'network-plus', 'security-plus']
+        const perCert = Math.ceil(count / certKeys.length)
+        const results = await Promise.all(certKeys.map(c =>
+          fetch('/api/generate-questions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cert: c, count: perCert, topics: MIXED_DOMAINS[c], difficulty })
+          }).then(r => r.json())
+        ))
+        for (const res of results) {
+          if (res.error) throw new Error(res.error)
+          allQuestions.push(...(res.questions ?? []))
+        }
+        // Shuffle merged questions
+        for (let i = allQuestions.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [allQuestions[i], allQuestions[j]] = [allQuestions[j], allQuestions[i]]
+        }
+      } else {
+        const actualCount = mode === 'real' ? REAL_EXAM[cert].questions : count
+        const actualDifficulty = mode === 'real' ? 'hard' : difficulty
+        const res = await fetch('/api/generate-questions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cert, count: actualCount, topics: selectedTopics, difficulty: actualDifficulty })
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Failed to generate questions')
+        allQuestions = data.questions
+      }
       startTimeRef.current = Date.now()
       setWeaknessSummary(null)
-      setQuestions(data.questions)
+      setQuestions(allQuestions)
       setCurrent(0)
       setSelectedAnswer(null)
       setRevealed(false)
@@ -732,11 +762,11 @@ export default function TestPage() {
           {[
             { key: 'practice', label: 'Practice Mode', desc: 'Immediate feedback + tutor chat after each answer' },
             { key: 'simulation', label: 'Simulation Mode', desc: 'Real exam conditions — no feedback until the end' },
-            { key: 'real', label: 'Real Exam', desc: cert ? `${REAL_EXAM[cert]?.questions ?? '—'} questions, ${REAL_EXAM[cert]?.minutes ?? '—'} min timer` : 'Full question count with countdown timer' }
+            { key: 'real', label: 'Real Exam', desc: cert && cert !== 'mixed' ? `${REAL_EXAM[cert]?.questions ?? '—'} questions, ${REAL_EXAM[cert]?.minutes ?? '—'} min timer` : cert === 'mixed' ? 'Not available for Mixed mode' : 'Full question count with countdown timer', disabled: cert === 'mixed' }
           ].map(m => (
-            <div key={m.key} onClick={() => setMode(m.key)}
-              style={{ padding: '16px 20px', backgroundColor: mode === m.key ? 'rgba(0,128,255,0.1)' : 'var(--surface)', border: `2px solid ${mode === m.key ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '10px', cursor: 'pointer' }}>
-              <div style={{ color: mode === m.key ? 'var(--accent-blue)' : 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>{m.label}</div>
+            <div key={m.key} onClick={() => { if (!m.disabled) setMode(m.key) }}
+              style={{ padding: '16px 20px', backgroundColor: mode === m.key && !m.disabled ? 'rgba(0,128,255,0.1)' : 'var(--surface)', border: `2px solid ${mode === m.key && !m.disabled ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '10px', cursor: m.disabled ? 'not-allowed' : 'pointer', opacity: m.disabled ? 0.4 : 1 }}>
+              <div style={{ color: mode === m.key && !m.disabled ? 'var(--accent-blue)' : 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>{m.label}</div>
               <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{m.desc}</div>
             </div>
           ))}
@@ -765,9 +795,10 @@ export default function TestPage() {
             <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Certification</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {Object.entries(CERT_LABELS).map(([key, label]) => (
-                <div key={key} onClick={() => { setCert(key); setSelectedTopics([]) }}
-                  style={{ padding: '10px 14px', backgroundColor: cert === key ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `1px solid ${cert === key ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '6px', color: cert === key ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer', fontWeight: cert === key ? '600' : '400' }}>
+                <div key={key} onClick={() => { setCert(key); setSelectedTopics([]); if (key === 'mixed' && mode === 'real') setMode('practice') }}
+                  style={{ padding: '10px 14px', backgroundColor: cert === key ? `rgba(${key === 'mixed' ? '46,204,113' : '0,128,255'},0.1)` : 'var(--background)', border: `1px solid ${cert === key ? CERT_COLORS[key] : 'var(--border)'}`, borderRadius: '6px', color: cert === key ? CERT_COLORS[key] : 'var(--text-secondary)', fontSize: key === 'mixed' ? '13px' : '14px', cursor: 'pointer', fontWeight: cert === key ? '600' : '400' }}>
                   {label}
+                  {key === 'mixed' && <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px', fontWeight: '400' }}>Shared overlap topics across all 3 certs</div>}
                 </div>
               ))}
             </div>
@@ -785,7 +816,26 @@ export default function TestPage() {
           </div>
         </div>
 
-        {cert ? (
+        {cert === 'mixed' ? (
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--success)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
+            <h2 style={{ color: 'var(--success)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Overlap Domains — Locked</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '14px' }}>Questions are pulled evenly from all 3 certs using only the shared overlap domains. Results are tracked separately and won't affect your individual cert stats.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {Object.entries(MIXED_DOMAINS).map(([c, domains]) => (
+                <div key={c}>
+                  <div style={{ color: CERT_COLORS[c], fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>{CERT_LABELS[c]}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    {domains.map(d => (
+                      <div key={d} style={{ padding: '8px 14px', backgroundColor: 'rgba(46,204,113,0.06)', border: '1px solid rgba(46,204,113,0.25)', borderRadius: '6px', color: 'var(--success)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '10px' }}>🔒</span> {d}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : cert ? (
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px', opacity: mode === 'real' ? 0.4 : 1, pointerEvents: mode === 'real' ? 'none' : 'auto' }}>
             <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>{mode === 'real' ? 'Exam Domains — All domains covered (fixed)' : 'Exam Domains'}</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '12px' }}>Leave all unselected to cover all domains weighted by official exam percentages, or pick specific domains to drill.</p>

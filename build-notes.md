@@ -263,6 +263,16 @@ Progress, analytics, and study tools:
 - Bookmarks page — cert tabs, reason badges, expandable full question view with notes
 - Mobile responsive layout via `@media (max-width: 768px)`
 
+### Phase 15 - Complete
+Mixed — All Certs test mode:
+- New "Mixed — All Certs" option in the cert selector on Take a Test
+- Locks domains to the shared overlap topics across all 3 certs (Network Fundamentals, IP Connectivity, Security Fundamentals for CCNA; Networking Concepts, Network Security, Network Troubleshooting for N+; General Security, Threats & Mitigations, Security Architecture for S+)
+- Generates questions from all 3 certs in parallel, shuffles results together
+- Real Exam mode disabled for Mixed (greyed out with explanation)
+- Results saved as `cert = 'mixed'` — does NOT affect individual cert stats
+- Progress page and Results page updated to include Mixed as a 4th cert (green color)
+- Mixed test history shows in Results page under its own "Mixed — All Certs" group
+
 ### Phase 14 - Complete
 Cert Guide page built — a full reference hub for all three certifications:
 - **Overview tab** — cert cards with summaries, domain weight bars, quick stats, quick comparison table

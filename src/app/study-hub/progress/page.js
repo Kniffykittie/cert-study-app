@@ -2,10 +2,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-const CERT_ORDER = ['ccna', 'network-plus', 'security-plus']
-const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
-const CERT_COLORS_HEX = { ccna: '#0080FF', 'network-plus': '#a78bfa', 'security-plus': '#CC0000' }
-const CERT_COLORS = { ccna: 'var(--accent-blue)', 'network-plus': 'var(--accent-purple)', 'security-plus': 'var(--error)' }
+const CERT_ORDER = ['ccna', 'network-plus', 'security-plus', 'mixed']
+const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+', mixed: 'Mixed' }
+const CERT_COLORS_HEX = { ccna: '#0080FF', 'network-plus': '#a78bfa', 'security-plus': '#CC0000', mixed: '#2ECC71' }
+const CERT_COLORS = { ccna: 'var(--accent-blue)', 'network-plus': 'var(--accent-purple)', 'security-plus': 'var(--error)', mixed: 'var(--success)' }
 
 function scoreColor(pct) {
   if (pct === null || pct === undefined) return 'var(--text-secondary)'

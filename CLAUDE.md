@@ -172,6 +172,15 @@ src/
 - Cert selection → concept card (domain + bullets) → "I'm ready" loads a question for that domain
 - Bookmark button available on questions
 
+### Mixed — All Certs Mode
+- "Mixed — All Certs" option in the cert selector on Take a Test
+- Domains locked to shared overlap topics: Network Fundamentals/IP Connectivity/Security Fundamentals (CCNA), Networking Concepts/Network Security/Network Troubleshooting (N+), General Security/Threats & Mitigations/Security Architecture (S+)
+- Generates questions via 3 parallel API calls (one per cert), shuffles results together
+- Real Exam mode disabled for Mixed
+- Saved as `cert = 'mixed'` — does NOT update individual cert `topic_performance`
+- Progress page and Results page include Mixed as a 4th cert (green, `var(--success)`)
+- `MIXED_DOMAINS` constant in test/page.js maps each cert to its overlap domains
+
 ### Fix My Weaknesses
 - Button on Take a Test setup screen
 - Queries `topic_performance`, finds the cert with the most domains under 65% accuracy (≥5 seen)

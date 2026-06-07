@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
-const CERT_COLORS = { ccna: 'var(--accent-blue)', 'network-plus': 'var(--accent-purple)', 'security-plus': 'var(--error)' }
-const CERT_ORDER = ['ccna', 'network-plus', 'security-plus']
+const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+', mixed: 'Mixed — All Certs' }
+const CERT_COLORS = { ccna: 'var(--accent-blue)', 'network-plus': 'var(--accent-purple)', 'security-plus': 'var(--error)', mixed: 'var(--success)' }
+const CERT_ORDER = ['ccna', 'network-plus', 'security-plus', 'mixed']
 const MODE_LABELS = { practice: 'Practice', simulation: 'Simulation', real: 'Real Exam' }
 const MODE_COLORS = { practice: 'var(--accent-blue)', simulation: 'var(--warning)', real: 'var(--error)' }
 
