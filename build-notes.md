@@ -5,11 +5,12 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 and Security+ certifications with a life tracking hub for health, nutrition, and wellness.
 
 ## Tech Stack
-- **Frontend:** Next.js, Tailwind CSS
-- **Backend:** Supabase (PostgreSQL)
-- **AI:** Anthropic Claude API
+- **Frontend:** Next.js 16.2.7 (App Router, `src/` directory, Turbopack)
+- **Backend:** Supabase (PostgreSQL + RLS)
+- **AI:** Anthropic Claude API (`claude-sonnet-4-6`)
 - **Hosting:** Vercel
 - **Version Control:** GitHub
+- **Styling:** Inline styles only — no Tailwind classes in JSX (switched during build)
 
 ## Architecture
 Three section approach:
@@ -198,20 +199,71 @@ Complete the full architecture shell of the entire app before moving to authenti
 ### Phase 5 - Complete
 Authentication — login, signup, protected routes, user sessions via Supabase Auth
 
-## Future Features
-- Active sidebar state highlighting current page
-- Back button on cert detail pages
-- Trend indicators per cert showing improvement over time
-- Last 5 tests summary per cert page
-- Exam countdown timer with target date setting
-- Google Fit / Fitbit API integration
-- Cross cert overlap section
-- Confidence rating breakdown per topic bucket
-- Weakness heatmap visual per cert
-- Spaced repetition system
-- Exam simulation mode
-- Predicted readiness score
-- In context AI tutor per question
-- Full correlation engine with daily snapshots
+## Phase Log (continued)
+
+### Phase 6 - Complete
+Core study features built and functional:
+- AI question generation per cert, domain, difficulty via `/api/generate-questions`
+- Three test modes: Practice (immediate feedback), Simulation (submit at end), Real Exam (timed)
+- Real exam timer with per-cert durations (CCNA 120min/110q, N+/S+ 90min/90q)
+- Pause/resume system — saves to `paused_tests` table, restores full state
+- Navigate-away guard — confirm dialog if leaving mid-test, auto-saves on unmount
+- `beforeunload` warning on browser close/refresh during active test
+- In-context tutor chat per question (practice mode only)
+- Keyboard shortcuts: 1–4 to select answers, Enter to submit/advance
+- Performance tracking to `question_answers` and `topic_performance` tables
+- Spaced repetition — domain weights multiplied by accuracy before question distribution
+- Results page with score breakdown per domain
+- Flagged questions — report bad/incorrect questions with feedback type
+
+### Phase 7 - Complete
+Template system and library management:
+- AI template generation with `{{placeholder}}` variables and `variable_sets`
+- Hybrid test generation: template pool first, AI supplements remainder
+- Template count bar in test header (e.g. "⚡ 8/10 from template pool")
+- ⚡ Template badge on individual template-sourced questions
+- Generate 5 templates per batch (JSON truncation recovery, dedup against existing)
+- Pre-made Templates page: Browse / Duplicates / Approved Similar / Retired tabs
+- Duplicate detection via Jaccard word-overlap ≥50% (client-side, same cert/domain/difficulty)
+- Approved duplicate pairs stored in localStorage
+- Retire/restore templates — `is_retired` flag in Supabase
+
+### Phase 8 - Complete
+Progress, analytics, and study tools:
+- Daily streak tracker — 30q/day goal, 28-day calendar heatmap
+- Per-domain score trend — SVG line chart, 80% threshold line, ▲/▼ trend indicator
+- Recommended Focus panel on each cert page (CCNA, Network+, Security+)
+- Study Mode — concept card review then per-domain practice question, bookmark support
+- Reference Sheets — subnetting tables, IOS commands, port numbers, OSI layers, attack types, encryption, compliance frameworks (practice mode only)
+- Bookmarks — save questions with reason (🔥/🤔/📢/⭐) and notes via modal
+- Bookmarks page — cert tabs, reason badges, expandable full question view with notes
+- Mobile responsive layout via `@media (max-width: 768px)`
+
+## Active Branch
+`claude/adoring-shannon-sTxW8`
+
+## Database Tables
+| Table | Purpose |
+|-------|---------|
+| `question_answers` | Every answered question with cert, topic, correct flag, timestamp |
+| `topic_performance` | Aggregated accuracy per cert+topic for spaced repetition |
+| `paused_tests` | In-progress tests saved as JSON with full state |
+| `question_templates` | Template library with variable_sets, is_retired flag |
+| `bookmarked_questions` | Bookmarks with reason, notes, full question snapshot |
+| `flagged_questions` | User-reported question issues |
+| `profiles` | User display name |
+
+## Future Features (Study Hub)
+- More concept cards in Study Mode
+- Predicted readiness score per cert
+- Cross-cert overlap highlighting
+- Exam countdown timer with target date
 - PWA conversion
+
+## Future Features (Life Hub — not yet started)
+- Fitbit / Google Fit integration
+- Sleep, workout, nutrition logging
+- Supplement tracking and encyclopedia
+- Correlation engine (study performance vs health data)
+- Daily morning brief page
 - General purpose Claude chat section
