@@ -63,9 +63,11 @@ src/
       flagged/page.js             Flagged/reported questions
       templates/page.js           Generate AI templates (5 per batch)
       premade-templates/page.js   Browse/manage template library (duplicates, retired)
-      labs/page.js                Packet Tracer Labs landing (all lab sets)
-      labs/[setId]/page.js        Lab set overview (all labs in a set)
-      labs/[setId]/[labId]/page.js  Individual lab (topology, steps, hints, notes)
+      labs/page.js                Packet Tracer Labs landing (all lab sets) — includes per-lab progress dots
+      labs/commands/page.js       IOS Command Reference — exports IOS_COMMANDS for FloatingCommandPanel
+      labs/tips/page.js           Packet Tracer Tips & Tricks (50+ tips, 8 categories)
+      labs/[setId]/page.js        Lab set overview — weak domain labs highlighted in yellow
+      labs/[setId]/[labId]/page.js  Individual lab — FloatingCommandPanel mounted here
   data/
     labs/
       index.js                    Exports LAB_SETS, getLabSet(), getLab() helpers
@@ -78,6 +80,8 @@ src/
     DomainTrend.js                Per-domain score trend SVG chart
     ScoreChart.js                 Overall score chart
     LabTopology.js                SVG topology renderer (router/switch/PC/server/cloud icons, trunk/access/redundant lines)
+    FloatingCommandPanel.js       Fixed bottom-right button on lab pages — searchable IOS command reference (imports IOS_COMMANDS)
+    FloatingReferencePanel.js     Fixed button on test page (practice mode only) — cert-filtered quick reference (subnetting, ports, OSI, attacks, encryption)
 ```
 
 ---
@@ -251,6 +255,8 @@ src/
 ### Lab Sets
 - **CCNA Fundamentals** (`ccna-fundamentals.js`): 8 labs — VLANs/Router-on-a-Stick, DHCP, STP, ACLs, SSH hardening, OSPF, NAT/PAT, Capstone
 - **Small Office Network Series** (`small-office-network.js`): 5 labs — Labs 1–4 share a base topology (1 router, 3 switches, 9 PCs) building VLANs → DHCP → STP redundancy → ACLs; Lab 5 is a standalone full-office build challenge with distribution/access switch hierarchy, 4 VLANs + VLAN 99, redundant uplinks, DHCP, SSH, STP root, and guest isolation ACL
+- **Network+ Fundamentals** (`network-plus-fundamentals.js`): 5 labs — Topology documentation, VLAN segmentation + inter-VLAN routing, wireless AP config (WPA2), troubleshooting methodology (OSI layers), port security with sticky MACs and violation modes
+- **Security+ Network Labs** (`security-plus-labs.js`): 4 labs — ACL-based firewall rules with DMZ, DMZ network design (three-zone architecture), device hardening (SSH v2, encrypted passwords, login rate limiting), network segmentation (VLANs per trust level with IoT isolation)
 
 ## Cost Reference (Anthropic API)
 - ~$0.003–$0.005 per question generated

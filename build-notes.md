@@ -376,3 +376,39 @@ Packet Tracer Labs section:
 - Correlation engine (study performance vs health data)
 - Daily morning brief page
 - General purpose Claude chat section
+### Phase 19 - Complete
+Multi-feature expansion — contextual panels, new lab sets, and smart flashcards:
+
+**IOS Command Reference + Floating Panel**
+- New page `/study-hub/labs/commands` — full reference with ~90 commands across 10 categories (Basic Setup, Interfaces, VLANs/Trunking, STP, DHCP, Routing, OSPF, NAT/PAT, ACLs, Troubleshooting)
+- Exports `IOS_COMMANDS` array for reuse by the floating panel
+- Search bar, category filter pills, expandable cards with syntax-highlighted examples
+- `FloatingCommandPanel.js` — keyboard icon button (bottom-right) on individual lab pages, opens searchable condensed panel
+- "IOS Commands" link added to sidebar under Labs section
+
+**Floating Reference Panel**
+- `FloatingReferencePanel.js` — book icon button on test page, practice mode only (cert-filtered)
+- CCNA: subnetting quick ref + private IP ranges
+- Network+: port numbers table + OSI model
+- Security+: attack types + encryption algorithms
+- Togglable section pills within the panel
+
+**Flashcard Weak Domain Section**
+- Queries `topic_performance` for domains <65% accuracy (≥5 questions seen)
+- Shows up to 6 weak domain cards below the cert decks
+- Color-coded accuracy bars, cert badge, link to the right cert's flashcard study session
+
+**Lab Progress Dashboard**
+- Labs landing page now shows progress dots for each lab in a set (green=complete, yellow=partial, grey=not started)
+- Queries `lab_progress` Supabase table on load
+- Completion count summary shown per set
+
+**Weak Domain → Lab Connection**
+- Lab set overview queries `topic_performance` for weak domains (<65% accuracy) in that cert
+- Labs whose `domains` array overlaps with weak topics get a yellow "🎯 Weak Area" badge and yellow border
+- Helps the user focus lab practice on their weakest exam domains
+
+**New Lab Sets**
+- `network-plus-fundamentals.js`: 5 labs — Topology Documentation, VLAN Segmentation + Inter-VLAN Routing, Wireless AP Config (WPA2), Troubleshooting Methodology (OSI layers), Port Security (sticky MACs, violation modes)
+- `security-plus-labs.js`: 4 labs — ACL Firewall Rules (with DMZ), DMZ Three-Zone Architecture, Device Hardening (SSH v2, encrypted passwords, login rate limiting, VTY ACL restriction), Network Segmentation (VLANs per trust level with IoT isolation)
+- Both sets imported in `src/data/labs/index.js` — automatically appear in the labs landing page

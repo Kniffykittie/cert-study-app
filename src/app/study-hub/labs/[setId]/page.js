@@ -1,6 +1,8 @@
 'use client'
 import { useParams, useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { getLabSet } from '@/data/labs/index'
+import { createClient } from '@/lib/supabase/client'
 
 const DIFF_COLOR = { beginner: 'var(--success)', intermediate: 'var(--warning)', advanced: 'var(--error)' }
 const DIFF_BG = { beginner: 'var(--success)', intermediate: 'var(--warning)', advanced: 'var(--error)' }
@@ -22,6 +24,19 @@ export default function LabSetPage() {
   const { setId } = useParams()
   const router = useRouter()
   const set = getLabSet(setId)
+  const [weakTopics, setWeakTopics] = useState([])
+
+  useEffect(() => {
+    async function loadWeak() {
+      if (!set) return
+      const supabase = createClient()
+      const { data } = await supabase.from('topic_performance').select('topic, correct_count, total_count').eq('cert', set.cert).gte('total_count', 5)
+      if (!data) return
+      const weak = data.filter(d => (d.correct_count / d.total_count) < 0.65).map(d => d.topic.toLowerCase())
+      setWeakTopics(weak)
+    }
+    loadWeak()
+  }, [set])
 
   if (!set) {
     return (
@@ -57,19 +72,24 @@ export default function LabSetPage() {
       </div>
 
       <div style={{ display: 'grid', gap: '12px' }}>
-        {set.labs.map((lab, idx) => (
+        {set.labs.map((lab, idx) => {
+          const isWeak = weakTopics.length > 0 && lab.domains.some(d => weakTopics.some(w => d.toLowerCase().includes(w) || w.includes(d.toLowerCase())))
+          return (
           <div
             key={lab.id}
             onClick={() => router.push(`/study-hub/labs/${setId}/${lab.id}`)}
-            style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '18px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '16px', transition: 'border-color 0.15s' }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-blue)'}
-            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+            style={{ backgroundColor: 'var(--surface)', border: `1px solid ${isWeak ? 'var(--warning)' : 'var(--border)'}`, borderRadius: '10px', padding: '18px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '16px', transition: 'border-color 0.15s' }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = isWeak ? 'var(--warning)' : 'var(--accent-blue)'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = isWeak ? 'var(--warning)' : 'var(--border)'}
           >
             <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--background)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '700', flexShrink: 0 }}>
               {lab.number}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: 'var(--text-primary)', fontWeight: '700', fontSize: '14px', marginBottom: '4px' }}>{lab.title}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <div style={{ color: 'var(--text-primary)', fontWeight: '700', fontSize: '14px' }}>{lab.title}</div>
+                {isWeak && <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--warning)', backgroundColor: 'rgba(241,196,15,0.12)', border: '1px solid rgba(241,196,15,0.3)', borderRadius: '20px', padding: '1px 7px', flexShrink: 0 }}>🎯 Weak Area</span>}
+              </div>
               <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px', lineHeight: '1.5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lab.description}</div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {lab.domains.map(d => (
@@ -83,7 +103,8 @@ export default function LabSetPage() {
               <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{lab.steps.length} steps</span>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
