@@ -15,7 +15,16 @@ function similarity(a, b) {
   return intersection / Math.max(setA.size, setB.size)
 }
 
-function findDuplicates(templates) {
+const APPROVED_KEY = 'approvedDuplicatePairs'
+
+function getApproved() {
+  try { return new Set(JSON.parse(localStorage.getItem(APPROVED_KEY) || '[]')) } catch { return new Set() }
+}
+function saveApproved(set) {
+  localStorage.setItem(APPROVED_KEY, JSON.stringify([...set]))
+}
+
+function findDuplicates(templates, approvedSet) {
   const active = templates.filter(t => !t.is_retired)
   const pairs = []
   const seen = new Set()
@@ -28,7 +37,7 @@ function findDuplicates(templates) {
       const score = similarity(a.question_template, b.question_template)
       if (score >= 0.5) {
         seen.add(key)
-        pairs.push({ a, b, score })
+        pairs.push({ a, b, score, key, approved: approvedSet.has(key) })
       }
     }
   }
@@ -43,11 +52,15 @@ export default function PremadeTemplatesPage() {
   const [filterDomain, setFilterDomain] = useState('all')
   const [showRetired, setShowRetired] = useState(false)
   const [expanded, setExpanded] = useState(null)
-  const [view, setView] = useState('browse') // 'browse' | 'duplicates'
+  const [view, setView] = useState('browse') // 'browse' | 'duplicates' | 'approved'
   const [retiring, setRetiring] = useState(null)
   const [dupPairs, setDupPairs] = useState(null)
+  const [approvedKeys, setApprovedKeys] = useState(new Set())
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    setApprovedKeys(getApproved())
+  }, [])
 
   async function load() {
     const supabase = createClient()
@@ -70,8 +83,22 @@ export default function PremadeTemplatesPage() {
   }
 
   function scanDuplicates() {
-    setDupPairs(findDuplicates(templates))
+    setDupPairs(findDuplicates(templates, getApproved()))
     setView('duplicates')
+  }
+
+  function approvePair(key) {
+    const next = new Set(approvedKeys)
+    next.add(key)
+    saveApproved(next)
+    setApprovedKeys(next)
+  }
+
+  function unapprove(key) {
+    const next = new Set(approvedKeys)
+    next.delete(key)
+    saveApproved(next)
+    setApprovedKeys(next)
   }
 
   const domains = [...new Set(templates.map(t => t.domain))].sort()
@@ -86,8 +113,9 @@ export default function PremadeTemplatesPage() {
 
   const diffColor = { easy: 'var(--success)', medium: 'var(--warning)', hard: 'var(--error)' }
 
-  // Live-update dup pairs when a retirement happens
-  const livePairs = dupPairs ? dupPairs.filter(p => !p.a.is_retired && !p.b.is_retired) : []
+  const allLivePairs = dupPairs ? dupPairs.filter(p => !p.a.is_retired && !p.b.is_retired) : []
+  const livePairs = allLivePairs.filter(p => !approvedKeys.has(p.key))
+  const approvedPairs = allLivePairs.filter(p => approvedKeys.has(p.key))
 
   return (
     <div>
@@ -104,10 +132,14 @@ export default function PremadeTemplatesPage() {
 
       {/* View tabs */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-        {['browse', 'duplicates'].map(v => (
-          <div key={v} onClick={() => setView(v)}
-            style={{ padding: '6px 16px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', fontWeight: view === v ? '600' : '400', backgroundColor: view === v ? 'rgba(0,128,255,0.12)' : 'var(--surface)', border: `1px solid ${view === v ? 'var(--accent-blue)' : 'var(--border)'}`, color: view === v ? 'var(--accent-blue)' : 'var(--text-secondary)', textTransform: 'capitalize' }}>
-            {v === 'duplicates' ? `Duplicates${dupPairs ? ` (${livePairs.length})` : ''}` : 'Browse All'}
+        {[
+          { id: 'browse', label: 'Browse All' },
+          { id: 'duplicates', label: `Duplicates${dupPairs ? ` (${livePairs.length})` : ''}` },
+          { id: 'approved', label: `Approved Similar${approvedPairs.length > 0 ? ` (${approvedPairs.length})` : ''}` },
+        ].map(v => (
+          <div key={v.id} onClick={() => setView(v.id)}
+            style={{ padding: '6px 16px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', fontWeight: view === v.id ? '600' : '400', backgroundColor: view === v.id ? 'rgba(0,128,255,0.12)' : 'var(--surface)', border: `1px solid ${view === v.id ? 'var(--accent-blue)' : 'var(--border)'}`, color: view === v.id ? 'var(--accent-blue)' : 'var(--text-secondary)' }}>
+            {v.label}
           </div>
         ))}
       </div>
@@ -134,9 +166,13 @@ export default function PremadeTemplatesPage() {
                     <span style={{ color: 'var(--warning)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase' }}>
                       {CERT_LABELS[pair.a.cert]} · {pair.a.domain} · {pair.a.difficulty}
                     </span>
-                    <span style={{ marginLeft: 'auto', color: 'var(--warning)', fontSize: '11px', fontWeight: '600' }}>
+                    <span style={{ color: 'var(--warning)', fontSize: '11px', fontWeight: '600' }}>
                       {Math.round(pair.score * 100)}% similar
                     </span>
+                    <button onClick={() => approvePair(pair.key)}
+                      style={{ marginLeft: 'auto', backgroundColor: 'rgba(0,200,100,0.08)', border: '1px solid var(--success-border)', borderRadius: '6px', padding: '4px 12px', fontSize: '11px', fontWeight: '600', color: 'var(--success)', cursor: 'pointer' }}>
+                      ✓ Keep Both
+                    </button>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     {[pair.a, pair.b].map(t => (
@@ -157,6 +193,44 @@ export default function PremadeTemplatesPage() {
                           style={{ width: '100%', backgroundColor: 'rgba(204,0,0,0.08)', border: '1px solid var(--error-border)', borderRadius: '6px', padding: '6px', fontSize: '12px', fontWeight: '600', color: 'var(--error)', cursor: retiring === t.id ? 'not-allowed' : 'pointer', opacity: retiring === t.id ? 0.5 : 1 }}>
                           {retiring === t.id ? 'Retiring...' : 'Retire This One'}
                         </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── APPROVED VIEW ── */}
+      {view === 'approved' && (
+        <div>
+          {approvedPairs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary)' }}>
+              No approved pairs yet. Use <strong style={{ color: 'var(--success)' }}>Keep Both</strong> on a duplicate to move it here.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '4px' }}>
+                These pairs were marked as intentionally similar and will be skipped in future scans.
+              </p>
+              {approvedPairs.map((pair, idx) => (
+                <div key={idx} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--success-border)', borderRadius: '10px', padding: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <span style={{ color: 'var(--success)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase' }}>
+                      ✓ {CERT_LABELS[pair.a.cert]} · {pair.a.domain} · {pair.a.difficulty}
+                    </span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{Math.round(pair.score * 100)}% similar</span>
+                    <button onClick={() => unapprove(pair.key)}
+                      style={{ marginLeft: 'auto', background: 'none', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 12px', fontSize: '11px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                      ✕ Remove Approval
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    {[pair.a, pair.b].map(t => (
+                      <div key={t.id} style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '14px' }}>
+                        <p style={{ color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{t.question_template}</p>
                       </div>
                     ))}
                   </div>
