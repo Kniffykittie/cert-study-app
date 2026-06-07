@@ -24,19 +24,31 @@ export default function LabSetPage() {
   const { setId } = useParams()
   const router = useRouter()
   const set = getLabSet(setId)
-  const [weakTopics, setWeakTopics] = useState([])
+  const [domainAccuracy, setDomainAccuracy] = useState({})
 
   useEffect(() => {
-    async function loadWeak() {
+    async function loadAccuracy() {
       if (!set) return
       const supabase = createClient()
-      const { data } = await supabase.from('topic_performance').select('topic, correct_count, total_count').eq('cert', set.cert).gte('total_count', 5)
+      const { data } = await supabase.from('topic_performance').select('topic, correct_count, total_count').eq('cert', set.cert).gte('total_count', 3)
       if (!data) return
-      const weak = data.filter(d => (d.correct_count / d.total_count) < 0.65).map(d => d.topic.toLowerCase())
-      setWeakTopics(weak)
+      const acc = {}
+      for (const d of data) {
+        acc[d.topic.toLowerCase()] = Math.round((d.correct_count / d.total_count) * 100)
+      }
+      setDomainAccuracy(acc)
     }
-    loadWeak()
+    loadAccuracy()
   }, [set])
+
+  function getDomainStrength(domainName) {
+    const key = Object.keys(domainAccuracy).find(k => domainName.toLowerCase().includes(k) || k.includes(domainName.toLowerCase()))
+    if (!key) return null
+    const pct = domainAccuracy[key]
+    if (pct < 65) return { label: 'weak', color: 'var(--error)', bg: 'rgba(204,0,0,0.1)', border: 'rgba(204,0,0,0.3)', pct }
+    if (pct < 80) return { label: 'avg', color: 'var(--warning)', bg: 'rgba(241,196,15,0.1)', border: 'rgba(241,196,15,0.3)', pct }
+    return { label: 'strong', color: 'var(--success)', bg: 'rgba(46,204,113,0.1)', border: 'rgba(46,204,113,0.3)', pct }
+  }
 
   if (!set) {
     return (
@@ -73,14 +85,16 @@ export default function LabSetPage() {
 
       <div style={{ display: 'grid', gap: '12px' }}>
         {set.labs.map((lab, idx) => {
-          const isWeak = weakTopics.length > 0 && lab.domains.some(d => weakTopics.some(w => d.toLowerCase().includes(w) || w.includes(d.toLowerCase())))
+          const domainStrengths = lab.domains.map(d => ({ domain: d, strength: getDomainStrength(d) }))
+          const hasWeak = domainStrengths.some(ds => ds.strength?.label === 'weak')
+          const hasData = domainStrengths.some(ds => ds.strength !== null)
           return (
           <div
             key={lab.id}
             onClick={() => router.push(`/study-hub/labs/${setId}/${lab.id}`)}
-            style={{ backgroundColor: 'var(--surface)', border: `1px solid ${isWeak ? 'var(--warning)' : 'var(--border)'}`, borderRadius: '10px', padding: '18px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '16px', transition: 'border-color 0.15s' }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = isWeak ? 'var(--warning)' : 'var(--accent-blue)'}
-            onMouseLeave={e => e.currentTarget.style.borderColor = isWeak ? 'var(--warning)' : 'var(--border)'}
+            style={{ backgroundColor: 'var(--surface)', border: `1px solid ${hasWeak ? 'var(--error)' : 'var(--border)'}`, borderRadius: '10px', padding: '18px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '16px', transition: 'border-color 0.15s' }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = hasWeak ? 'var(--error)' : 'var(--accent-blue)'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = hasWeak ? 'var(--error)' : 'var(--border)'}
           >
             <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--background)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '700', flexShrink: 0 }}>
               {lab.number}
@@ -88,13 +102,24 @@ export default function LabSetPage() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                 <div style={{ color: 'var(--text-primary)', fontWeight: '700', fontSize: '14px' }}>{lab.title}</div>
-                {isWeak && <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--warning)', backgroundColor: 'rgba(241,196,15,0.12)', border: '1px solid rgba(241,196,15,0.3)', borderRadius: '20px', padding: '1px 7px', flexShrink: 0 }}>🎯 Weak Area</span>}
+                {hasWeak && <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--error)', backgroundColor: 'rgba(204,0,0,0.1)', border: '1px solid rgba(204,0,0,0.3)', borderRadius: '20px', padding: '1px 7px', flexShrink: 0 }}>🎯 Needs Practice</span>}
               </div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px', lineHeight: '1.5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lab.description}</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '8px', lineHeight: '1.5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lab.description}</div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {lab.domains.map(d => (
-                  <span key={d} style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: 'var(--text-secondary)' }}>{d}</span>
+                {domainStrengths.map(({ domain, strength }) => (
+                  <span key={domain} style={{
+                    backgroundColor: strength ? strength.bg : 'var(--background)',
+                    border: `1px solid ${strength ? strength.border : 'var(--border)'}`,
+                    borderRadius: '20px', padding: '2px 9px', fontSize: '10px', fontWeight: '600',
+                    color: strength ? strength.color : 'var(--text-secondary)',
+                    display: 'flex', alignItems: 'center', gap: '4px',
+                  }}>
+                    {strength && <span>{strength.label === 'weak' ? '▼' : strength.label === 'avg' ? '◆' : '▲'}</span>}
+                    {domain}
+                    {strength && <span style={{ opacity: 0.8 }}>{strength.pct}%</span>}
+                  </span>
                 ))}
+                {!hasData && <span style={{ fontSize: '10px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No test data yet</span>}
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', flexShrink: 0 }}>

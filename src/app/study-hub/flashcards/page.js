@@ -42,7 +42,7 @@ export default function FlashcardsPage() {
 
   async function loadWeakDomains() {
     const supabase = createClient()
-    const { data } = await supabase.from('topic_performance').select('cert, topic, correct_count, total_count').gte('total_count', 5)
+    const { data } = await supabase.from('topic_performance').select('cert, topic, correct_count, total_count').gte('total_count', 3)
     if (!data) return
     const weak = data
       .map(d => ({ cert: d.cert, topic: d.topic, accuracy: Math.round((d.correct_count / d.total_count) * 100) }))
@@ -145,13 +145,18 @@ export default function FlashcardsPage() {
         })}
       </div>
 
-      {weakDomains.length > 0 && (
-        <div style={{ marginTop: '40px' }}>
-          <div style={{ marginBottom: '16px' }}>
-            <h2 style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700', margin: '0 0 4px' }}>🎯 Weak Domain Study</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>
-              Domains where you're scoring below 65% — focus your flashcard sessions here for the biggest gains.
-            </p>
+      <div style={{ marginTop: '40px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700', margin: '0 0 4px' }}>🎯 Weak Domain Study</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>
+            Domains where you're scoring below 65% in practice tests — focus your flashcard sessions here for the biggest gains.
+          </p>
+        </div>
+        {weakDomains.length === 0 ? (
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+            No weak domains detected yet. Take some practice tests first — this section will highlight areas to focus on once you have data.
+          </div>
+        ) : (
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
             {weakDomains.map((d, i) => {
@@ -181,8 +186,8 @@ export default function FlashcardsPage() {
               )
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

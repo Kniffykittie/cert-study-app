@@ -166,7 +166,27 @@ function NodeSublabel({ sublabel, cx, baseY }) {
 
 export default function LabTopology({ topology }) {
   if (!topology) return null
-  const { viewBox, nodes = [], connections = [] } = topology
+  const { nodes = [] } = topology
+
+  // Support both `connections` (old format) and `links` (new format)
+  const rawLinks = topology.connections ?? topology.links ?? []
+  const connections = rawLinks.map(link => {
+    if ('fromLabel' in link || 'toLabel' in link) return link
+    // New format: { from, to, label, type } → split label on \n into fromLabel/toLabel
+    const parts = (link.label ?? '').split('\n').filter(Boolean)
+    return { from: link.from, to: link.to, style: link.type, fromLabel: parts[0] ?? '', toLabel: parts[1] ?? '' }
+  })
+
+  // Auto-compute viewBox from node positions if not provided
+  let viewBox = topology.viewBox
+  if (!viewBox && nodes.length > 0) {
+    const pad = 80
+    const minX = Math.min(...nodes.map(n => n.x)) - pad
+    const minY = Math.min(...nodes.map(n => n.y)) - pad
+    const maxX = Math.max(...nodes.map(n => n.x)) + ICON_SIZE + pad
+    const maxY = Math.max(...nodes.map(n => n.y)) + ICON_SIZE + pad + 40
+    viewBox = `${minX} ${minY} ${maxX - minX} ${maxY - minY}`
+  }
 
   return (
     <div style={{ backgroundColor: '#0D0D0D', border: '1px solid #2A2A2A', borderRadius: '10px', padding: '8px', overflowX: 'auto' }}>
@@ -177,14 +197,19 @@ export default function LabTopology({ topology }) {
         {nodes.map(node => {
           const cx = node.x + ICON_SIZE / 2
           const labelY = node.y + ICON_SIZE + 13
+          // Support both old (label + sublabel) and new (label with \n) formats
+          const labelParts = (node.label ?? '').split('\n')
+          const mainLabel = labelParts[0]
+          const inlineSublabel = labelParts.slice(1).join('\n')
+          const sublabel = node.sublabel ?? inlineSublabel
           const sublabelY = node.y + ICON_SIZE + 24
           return (
             <g key={node.id}>
               <NodeIcon type={node.type} x={node.x} y={node.y} />
               <text x={cx} y={labelY} fontSize="11" fill="#E8E8E8" textAnchor="middle" fontWeight="600">
-                {node.label}
+                {mainLabel}
               </text>
-              <NodeSublabel sublabel={node.sublabel} cx={cx} baseY={sublabelY} />
+              <NodeSublabel sublabel={sublabel} cx={cx} baseY={sublabelY} />
             </g>
           )
         })}
