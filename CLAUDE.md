@@ -210,6 +210,14 @@ src/
 
 ---
 
+### Floating Chat
+- 💬 bubble fixed bottom-right on every Study Hub page (mounted in `study-hub/layout.js`)
+- Opens a 360×520 chat panel — full conversation, Clear button, starter suggestions
+- Light markdown rendering in assistant messages (bold, inline code, code blocks, bullets)
+- API route: `/api/chat` — simple multi-turn, system prompt tuned for cert study help
+- Session-only history (not persisted to DB)
+- Component: `src/components/FloatingChat.js`
+
 ## Cost Reference (Anthropic API)
 - ~$0.003–$0.005 per question generated
 - ~$0.015–$0.025 per template generated (larger prompt)

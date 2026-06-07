@@ -263,6 +263,16 @@ Progress, analytics, and study tools:
 - Bookmarks page — cert tabs, reason badges, expandable full question view with notes
 - Mobile responsive layout via `@media (max-width: 768px)`
 
+### Phase 16 - Complete
+Floating Claude chat bubble:
+- 💬 bubble fixed to bottom-right corner on every Study Hub page
+- Click to open a 360×520px chat panel above the bubble
+- Full conversation history within the session, Clear button to reset
+- Starter prompt suggestions shown when chat is empty
+- Light markdown rendering: bold, inline code, code blocks, bullet points
+- API route at `/api/chat` — system prompt tuned for cert study assistance
+- Chat history is session-only (not saved to DB)
+
 ### Phase 15 - Complete
 Mixed — All Certs test mode:
 - New "Mixed — All Certs" option in the cert selector on Take a Test
