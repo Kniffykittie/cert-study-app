@@ -33,6 +33,12 @@ const SECTIONS = [
     ]
   },
   {
+    label: 'Labs',
+    items: [
+      { label: 'Packet Tracer Labs', href: '/study-hub/labs' },
+    ]
+  },
+  {
     label: 'Settings',
     items: [
       { label: 'Flagged Questions', href: '/study-hub/flagged' },

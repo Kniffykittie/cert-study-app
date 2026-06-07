@@ -63,12 +63,20 @@ src/
       flagged/page.js             Flagged/reported questions
       templates/page.js           Generate AI templates (5 per batch)
       premade-templates/page.js   Browse/manage template library (duplicates, retired)
+      labs/page.js                Packet Tracer Labs landing (all lab sets)
+      labs/[setId]/page.js        Lab set overview (all labs in a set)
+      labs/[setId]/[labId]/page.js  Individual lab (topology, steps, hints, notes)
+  data/
+    labs/
+      index.js                    Exports LAB_SETS, getLabSet(), getLab() helpers
+      ccna-fundamentals.js        CCNA lab set — 8 labs (VLANs, DHCP, STP, ACLs, SSH, OSPF, NAT, Capstone)
   components/
     StudyHubSidebar.js            Nav sidebar with test-in-progress guard
     BookmarkModal.js              Bookmark reason + notes modal
     DailyStreak.js                30q/day streak tracker with 28-day calendar
     DomainTrend.js                Per-domain score trend SVG chart
     ScoreChart.js                 Overall score chart
+    LabTopology.js                SVG topology renderer (router/switch/PC/server/cloud icons, trunk/access/redundant lines)
 ```
 
 ---
@@ -97,6 +105,8 @@ src/
 | `bookmarked_questions` | Bookmarks with reason, notes, full question snapshot |
 | `flagged_questions` | User-reported question issues |
 | `profiles` | User display name |
+| `lab_progress` | Completed lab steps per user (user_id, lab_set_id, lab_id, step_id, completed_at) |
+| `lab_notes` | Per-lab notes per user (user_id, lab_set_id, lab_id, notes, updated_at) |
 
 ---
 
@@ -217,6 +227,16 @@ src/
 - API route: `/api/chat` — simple multi-turn, system prompt tuned for cert study help
 - Session-only history (not persisted to DB)
 - Component: `src/components/FloatingChat.js`
+
+### Packet Tracer Labs
+- Landing page: all lab sets with cert badge, difficulty breakdown, estimated total time
+- Set overview: ordered list of labs with difficulty dots, step count, domain tags
+- Individual lab: topology SVG, collapsible step cards, IOS command blocks with copy button, verification commands, expected output, progressive hint reveal (one hint at a time), pro tips, notes textarea
+- Step completion persisted to `lab_progress` Supabase table per user
+- Notes persisted to `lab_notes` Supabase table per user
+- Prev/Next navigation between labs; "Complete Set" button on last lab
+- Data-driven: add a new lab set by creating one file in `src/data/labs/` and importing it in `index.js` — zero UI changes needed
+- `LabTopology.js` renders SVG topologies: router (circle + spokes), switch (rect + port lines), PC (monitor), server (rack units), cloud icons; trunk=blue, redundant=purple, access=grey lines with interface labels
 
 ## Cost Reference (Anthropic API)
 - ~$0.003–$0.005 per question generated

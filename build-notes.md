@@ -339,11 +339,24 @@ New features:
 | `flagged_questions` | User-reported question issues |
 | `profiles` | User display name |
 
+### Phase 17 - Complete
+Packet Tracer Labs section:
+- Labs landing page at `/study-hub/labs` — shows all lab sets with cert badge, difficulty breakdown, estimated time
+- Lab set overview at `/study-hub/labs/[setId]` — lists all labs with difficulty dots, step count, domain tags
+- Individual lab page at `/study-hub/labs/[setId]/[labId]` — topology diagram, step-by-step cards, hints, notes, progress tracking
+- SVG topology renderer (`LabTopology.js`) — router, switch, PC, server, cloud icons with trunk/access/redundant line styles
+- Steps are expandable cards with IOS command blocks (copy button), verification instructions, expected output, and progressive hint reveal
+- Notes section per lab saves to `lab_notes` Supabase table
+- Step completion toggles saved to `lab_progress` Supabase table (persisted per user)
+- Prev/Next lab navigation; "Complete Set" button on final lab
+- Data-driven architecture: each lab set is one JS file in `src/data/labs/` — zero UI changes needed to add new sets
+- First lab set: CCNA Fundamentals — 8 labs covering VLANs, DHCP, STP, ACLs, SSH hardening, OSPF, NAT/PAT, and a capstone
+- Sidebar updated with "Labs" section linking to `/study-hub/labs`
+
 ## Future Features (Study Hub)
 - More concept cards in Study Mode
-- Predicted readiness score per cert
-- Cross-cert overlap highlighting
 - Exam countdown timer with target date
+- New lab sets (Network+, Security+, advanced CCNA)
 - PWA conversion
 
 ## Future Features (Life Hub — not yet started)
