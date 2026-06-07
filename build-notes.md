@@ -133,73 +133,35 @@ Building this app is actively reinforcing cert concepts:
 ## Phase Log
 
 ### Phase 1 - Complete
-- Node.js v24.16.0 installed
-- NPM v11.13.0 installed
-- VS Code installed
-- GitHub account created
-- Supabase account created
-- Vercel account created
-- Anthropic API account created with $20 balance
+- Node.js v24.16.0 installed, NPM v11.13.0 installed, VS Code installed
+- GitHub, Supabase, Vercel, and Anthropic API accounts created
+- Anthropic API account funded with $20 balance
 
 ### Phase 2 - Complete
 - Project created at H:\cert-study-app
 - Next.js initialized with Tailwind, App Router, src/ directory
 - Project running locally at http://localhost:3000
-- build-notes.md created
-- Code pushed to GitHub — private repository
+- build-notes.md created, code pushed to private GitHub repository
 
 ### Phase 3 - Complete
-- Supabase project created (US West region, status healthy)
-- .env.local created with Supabase URL and anon key
-- .env.local confirmed in .gitignore — credentials are safe
-- Supabase package installed (@supabase/supabase-js)
-- src/lib/supabase.js created — connection established
-- App running locally with no errors
-- Changes pushed to GitHub
+- Supabase project created (US West region)
+- .env.local created with Supabase URL and anon key (confirmed in .gitignore)
+- Supabase package installed, connection established via src/lib/supabase.js
 
 ### Phase 4 - Complete
-- Villainous dark theme implemented
-- globals.css updated with full color palette
+- Villainous dark theme implemented via globals.css
 - Sidebar built with CSA logo, navigation links, user avatar
-- Sidebar extracted as client component to support interactivity
-- Dashboard built with cert readiness cards, stats row, recent activity, recommendations
-- Cert detail pages built for CCNA, Network+, Security+
-- Each cert page has overall readiness score, progress bar, stats, and topic buckets
-- Topic buckets — Strong, Average, Weak — color coded green, gold, red
-- All cert cards on dashboard are clickable and navigate to cert detail pages
-- All pages navigable and styled consistently
-- Changes pushed to GitHub
+- Dashboard with cert readiness cards, stats row, recent activity
+- Cert detail pages for CCNA, Network+, Security+ with domain topic buckets (Strong/Average/Weak)
 
 ### Phase 4.5 - Complete
-Complete the full architecture shell of the entire app before moving to authentication:
-
-**Study Hub — remaining shells**
-- Take a Test page — full layout with cert selector, topic selector, question count
-- Study Mode page — adaptive drill interface layout
-- Progress page — charts and heatmap structure
-- Results page — score breakdown, missed questions layout
-- Settings page — account and preferences layout
-
-**Home Page Restructure**
-- Convert current home page to two door morning brief page
-- Study Hub door leading to Study Hub landing page
-- Life Hub door leading to Life Hub landing page
-- Insights and patterns section placeholder
-
-**Life Hub — full shells**
-- Life Hub landing page
-- Health Dashboard page
-- Nutrition page
-- Workouts page
-- Sleep page
-
-**General**
-- General Chat page
+- Full architecture shell built before authentication
+- Study Hub shells: Take a Test, Study Mode, Progress, Results, Settings
+- Home page restructured as two-door morning brief (Study Hub / Life Hub)
+- Life Hub shells: landing, Health Dashboard, Nutrition, Workouts, Sleep
 
 ### Phase 5 - Complete
-Authentication — login, signup, protected routes, user sessions via Supabase Auth
-
-## Phase Log (continued)
+- Authentication: login, signup, protected routes, user sessions via Supabase Auth
 
 ### Phase 6 - Complete
 Core study features built and functional:
@@ -221,36 +183,10 @@ Template system and library management:
 - AI template generation with `{{placeholder}}` variables and `variable_sets`
 - Hybrid test generation: template pool first, AI supplements remainder
 - Template count bar in test header (e.g. "⚡ 8/10 from template pool")
-- ⚡ Template badge on individual template-sourced questions
-- Generate 5 templates per batch (JSON truncation recovery, dedup against existing)
+- Generate 5 templates per batch (locked at 5 — higher counts caused API/JSON truncation crashes)
 - Pre-made Templates page: Browse / Duplicates / Approved Similar / Retired tabs
 - Duplicate detection via Jaccard word-overlap ≥50% (client-side, same cert/domain/difficulty)
-- Approved duplicate pairs stored in localStorage
-- Retire/restore templates — `is_retired` flag in Supabase
-
-### Phase 11 - Complete
-Progress page fully built (was a placeholder):
-- Top stats row: total questions answered, average score, best score, day streak
-- Score Over Time SVG chart: color-coded lines per cert, 82.5% dashed threshold, all certs on one chart
-- Questions Per Day bar chart: last 30 days, green ≥30 (goal met), blue 1-29, grey 0, dashed 30q goal line
-- Domain Accuracy Heatmap: all domains across all certs, filterable by cert tab, sorted weakest→strongest, color-coded rows
-- Uses: `question_answers.answered_at`, `test_sessions`, `topic_performance`
-
-### Phase 10 - Complete
-Results page improvements:
-- Added mode badge (Practice / Simulation / Real Exam) to each result row
-- Mode is color-coded: blue = Practice, yellow = Simulation, red = Real Exam
-- `mode` column was already saved to `test_sessions` table, just needed to be selected and displayed
-
-### Phase 9 - Complete
-Pause/resume reliability fixes:
-- Navigate-away guard: sidebar intercepts link clicks during active test, shows confirm dialog
-- Auto-save via localStorage snapshot written on every state change during active test
-- Fixed race condition: snapshot was being deleted on component mount before loadMostRecent could read it
-- Fixed stale banner: loadMostRecent now clears mostRecentPaused to null before async checks
-- Fixed post-completion banner: localStorage cleared when done becomes true and on "Take Another Test"
-- beforeunload warning on browser refresh/close during active test
-- Manual pause (Pause button) continues to save to Supabase paused_tests as before
+- Approved duplicate pairs stored in localStorage; retire/restore via `is_retired` flag
 
 ### Phase 8 - Complete
 Progress, analytics, and study tools:
@@ -258,162 +194,162 @@ Progress, analytics, and study tools:
 - Per-domain score trend — SVG line chart, 80% threshold line, ▲/▼ trend indicator
 - Recommended Focus panel on each cert page (CCNA, Network+, Security+)
 - Study Mode — concept card review then per-domain practice question, bookmark support
-- Reference Sheets — subnetting tables, IOS commands, port numbers, OSI layers, attack types, encryption, compliance frameworks (practice mode only)
+- Reference Sheets — subnetting, IOS commands, port numbers, OSI layers, attack types, encryption, compliance frameworks
 - Bookmarks — save questions with reason (🔥/🤔/📢/⭐) and notes via modal
 - Bookmarks page — cert tabs, reason badges, expandable full question view with notes
 - Mobile responsive layout via `@media (max-width: 768px)`
 
-### Phase 16 - Complete
-Floating Claude chat bubble:
-- 💬 bubble fixed to bottom-right corner on every Study Hub page
-- Click to open a 360×520px chat panel above the bubble
-- Full conversation history within the session, Clear button to reset
-- Starter prompt suggestions shown when chat is empty
-- Light markdown rendering: bold, inline code, code blocks, bullet points
-- API route at `/api/chat` — system prompt tuned for cert study assistance
-- Chat history is session-only (not saved to DB)
+### Phase 9 - Complete
+Pause/resume reliability fixes:
+- Sidebar intercepts link clicks during active test — confirm dialog before leaving
+- Auto-save via localStorage snapshot written on every state change during active test
+- Fixed race condition: snapshot deleted on mount before loadMostRecent could read it
+- Fixed stale banner: loadMostRecent clears mostRecentPaused to null before async checks
+- Fixed post-completion banner: localStorage cleared when done=true and on "Take Another Test"
+- `beforeunload` warning on browser refresh/close during active test
+
+### Phase 10 - Complete
+Results page improvements:
+- Mode badge per result row: Practice (blue), Simulation (yellow), Real Exam (red)
+- `mode` column already in `test_sessions` — just added to select and display
+
+### Phase 11 - Complete
+Progress page fully built:
+- Top stats row: total questions answered, average score, best score, day streak
+- Score Over Time SVG chart: color-coded lines per cert, 82.5% dashed threshold
+- Questions Per Day bar chart: last 30 days, green ≥30 (goal met), blue 1–29, grey 0
+- Domain Accuracy Heatmap: all domains across all certs, filterable by cert tab, weakest→strongest
+- Data sources: `question_answers.answered_at`, `test_sessions`, `topic_performance`
+
+### Phase 12 - Complete
+- Total Study Time stat on Progress page — sums `duration_seconds` from `test_sessions`
+- Predicted Exam Score on each cert page — weighted average by official exam domain percentages, requires ≥5 questions per domain, shows color-coded domain breakdown chips
+- Fix My Weaknesses mode on Take a Test — auto-selects cert + domains with most <65% accuracy (≥5 seen)
+- Discard button on Return to Test banner — removes paused test without resuming
+- `duration_seconds` column added to `test_sessions` table
+
+### Phase 13 - Complete
+Flashcards feature:
+- Landing page with per-cert deck stats (mastered / learning / unlearned counts, mastery bar)
+- Generate Deck (60 cards) and Add 40 More Cards via `/api/generate-flashcards`
+- Per-cert study session pages via `StudySession.js` component
+- Mastery tracking: `flashcards` and `flashcard_progress` Supabase tables
+- Consecutive correct answer logic for mastery progression
+
+### Phase 14 - Complete
+Cert Guide page — 5-tab reference hub:
+- **Overview** — cert cards, domain weight bars, quick comparison table
+- **Overlap** — shared topic rows with per-cert depth and study tips, overlap % summary
+- **Exam Details** — full logistics per cert (questions, time, cost, passing score, retake policy)
+- **Career & Value** — job roles, salary ranges, DoD 8570/8140 compliance, employer value
+- **Study Roadmap** — 3 study paths, time estimates from zero, combined study strategy
+- "Cert Guide" sidebar section added between Practice and Settings
 
 ### Phase 15 - Complete
 Mixed — All Certs test mode:
-- New "Mixed — All Certs" option in the cert selector on Take a Test
-- Locks domains to the shared overlap topics across all 3 certs (Network Fundamentals, IP Connectivity, Security Fundamentals for CCNA; Networking Concepts, Network Security, Network Troubleshooting for N+; General Security, Threats & Mitigations, Security Architecture for S+)
-- Generates questions from all 3 certs in parallel, shuffles results together
-- Real Exam mode disabled for Mixed (greyed out with explanation)
-- Results saved as `cert = 'mixed'` — does NOT affect individual cert stats
-- Progress page and Results page updated to include Mixed as a 4th cert (green color)
-- Mixed test history shows in Results page under its own "Mixed — All Certs" group
+- "Mixed — All Certs" option in cert selector on Take a Test
+- Domains locked to shared overlap topics across all 3 certs
+- Generates questions from all 3 certs in parallel, shuffles together
+- Real Exam mode disabled for Mixed; saved as `cert = 'mixed'`
+- Progress page and Results page include Mixed as a 4th cert (green, `var(--success)`)
 
-### Phase 14 - Complete
-Cert Guide page built — a full reference hub for all three certifications:
-- **Overview tab** — cert cards with summaries, domain weight bars, quick stats, quick comparison table
-- **Overlap tab** — overlap percentages, expandable shared topic rows with per-cert depth descriptions and study tips, "study once counts for all three" callout
-- **Exam Details tab** — full logistics per cert (questions, time, cost, passing score, retake policy, registration), test day tips
-- **Career & Value tab** — job roles, salary ranges, DoD 8570/8140 compliance breakdown, employer value callouts, DoD 8570 explainer
-- **Study Roadmap tab** — 3 study paths with step-by-step progression, time estimates from zero, combined study strategy
-- Added "Cert Guide" sidebar section between Practice and Settings
+### Phase 16 - Complete
+Floating Claude chat bubble:
+- 💬 bubble fixed bottom-right on every Study Hub page (mounted in layout.js)
+- Opens 360×520px panel — full conversation history, Clear button, starter suggestions
+- Light markdown rendering: bold, inline code, code blocks, bullets
+- API route `/api/chat` — multi-turn, system prompt tuned for cert study help
+- Session-only history (not persisted to DB)
 
-### Generate Templates - Complete
-Template generation page confirmed fully built and working:
-- Cert, domain, and difficulty selectors
-- Generates 5 templates per batch (locked at 5 — higher counts caused API crashes during development)
-- Coverage table shows active/retired counts per cert/domain/difficulty combination
-- Results saved permanently to `question_templates` table, deduplicated against existing
-- Pre-made Templates page handles browsing, duplicates, approved similar, and retired tabs
+### Phase 17 - Complete
+Packet Tracer Labs section:
+- Labs landing page `/study-hub/labs` — all lab sets with cert badge, difficulty breakdown, estimated time
+- Lab set overview `/study-hub/labs/[setId]` — ordered labs with difficulty dots, step count, domain tags
+- Individual lab page `/study-hub/labs/[setId]/[labId]` — topology SVG, step cards, hints, notes, progress
+- SVG topology renderer (`LabTopology.js`) — router, switch, PC, server, cloud icons; trunk/access/redundant line styles
+- Expandable step cards: IOS command blocks with copy button, verification commands, progressive hint reveal
+- Notes saved to `lab_notes` table; step completion to `lab_progress` table
+- Prev/Next navigation; "Complete Set" button on final lab
+- Data-driven: one JS file per lab set in `src/data/labs/` — zero UI changes to add new sets
+- First lab set: CCNA Fundamentals — 8 labs (VLANs, DHCP, STP, ACLs, SSH, OSPF, NAT/PAT, Capstone)
+- Sidebar "Labs" section added
 
-### Phase 13 - Complete
-Flashcards feature confirmed fully built and working:
-- Flashcards landing page with per-cert deck stats (mastered / learning / unlearned)
-- Generate Deck button (60 cards) and Add More Cards button (40 cards) via `/api/generate-flashcards`
-- Per-cert study session pages (CCNA, Network+, Security+) via `StudySession.js` component
-- `flashcards` and `flashcard_progress` Supabase tables confirmed present
-- Mastery tracking with consecutive correct answer logic
+### Phase 18 - Complete
+Per-step documentation system + second lab set:
+- Every lab step has a `document` array — 2–3 prompts teaching real-world documentation habits
+- Lab page renders "📝 DOCUMENT YOUR WORK" section after hints; textarea auto-saves to localStorage on blur
+- Storage key: `lab_step_doc_${setId}_${labId}_${stepId}`
+- 49 steps in CCNA Fundamentals + 27 steps in Small Office Network Series = 76 total documented steps
+- Small Office Network Series: 5 escalating labs — VLANs → DHCP → STP redundancy → ACLs → Full Office Build capstone
+- Topology label improvements: dark pill backgrounds on interface labels, IP/DG in green (#2ECC71), labels at 33%/67% along lines with 20px perpendicular offset
+- Packet Tracer Tips & Tricks page at `/study-hub/labs/tips` — 50+ tips across 8 categories, expandable cards, category filter pills
 
-### Phase 12 - Complete
-New features:
-- Total Study Time stat on Progress page — sums `duration_seconds` from `test_sessions`, displayed as "Xh Ym" or "Xm", shown as 5th stat card
-- Predicted Exam Score on CCNA, Network+, and Security+ cert pages — weighted average of domain accuracy using official exam domain percentages, requires ≥5 questions per domain to include it, shows domain breakdown chips color-coded by score, appears once at least one domain has enough data
-- Fix My Weaknesses mode on Take a Test page — auto-selects cert and domains with most <65% accuracy (≥5 seen), sets practice mode, shows summary panel
-- Discard button on Return to Test banner — removes localStorage or Supabase paused test without resuming
-- `duration_seconds` column added to `test_sessions` table — measured from test start to submit
+### Phase 19 - Complete
+Multi-feature expansion — contextual panels, new lab sets, and smart study tools:
+
+**IOS Command Reference + Floating Panel**
+- New page `/study-hub/labs/commands` — ~90 commands across 10 categories, search, category filters, expandable cards with examples
+- Exports `IOS_COMMANDS` for reuse; "IOS Commands" link added to sidebar under Labs
+- `FloatingCommandPanel.js` — keyboard icon button on every individual lab page, searchable condensed panel
+
+**Floating Reference Panel**
+- `FloatingReferencePanel.js` — book icon on test page, practice mode only, cert-filtered
+- CCNA: subnetting + private IP ranges | Network+: ports + OSI | Security+: attacks + encryption
+
+**Flashcard Weak Domain Section**
+- Below cert cards on flashcards landing — up to 6 domains <65% accuracy (≥5 seen)
+- Accuracy bar, cert badge, direct link to that cert's flashcard session
+
+**Lab Progress Dashboard**
+- Labs landing now shows per-lab completion dots (green/yellow/grey) and completion count per set
+- Queries `lab_progress` on load
+
+**Weak Domain → Lab Connection**
+- Lab set overview highlights labs matching weak `topic_performance` domains with yellow border + "🎯 Weak Area" badge
+
+**New Lab Sets (2)**
+- Network+ Fundamentals: 5 labs — Topology Docs, VLAN + Inter-VLAN Routing, Wireless WPA2, Troubleshooting (OSI), Port Security
+- Security+ Network Labs: 4 labs — ACL Firewall, DMZ Three-Zone Design, Device Hardening (SSH v2/encrypted passwords/rate limiting/VTY ACL), Network Segmentation (VLANs by trust level, IoT isolation)
 
 ## Active Branch
 `claude/adoring-shannon-sTxW8`
 
 ## Session Rules
-- After every commit/push, always give the user the pull command:
-  `git pull origin claude/adoring-shannon-sTxW8`
-- Update both `CLAUDE.md` and `build-notes.md` at the end of every session or after any significant feature is completed.
-- After every change or fix, always provide a brief end-of-change summary covering:
-  1. **What the problem was** (or what was requested)
-  2. **What was changed** (files/logic updated)
-  3. **What to test** to confirm it works correctly
+- **After every commit/push:** give the user the pull command in a code block:
+  ```
+  git pull origin claude/adoring-shannon-sTxW8
+  ```
+- **Update both CLAUDE.md and build-notes.md** before every push — not just at end of session. If a feature was added, a section changed, or a new file created, the notes must reflect it in that same commit.
+- **After every change or fix, provide a brief summary covering:**
+  1. What the problem was (or what was requested)
+  2. What was changed (files/logic updated)
+  3. What to test to confirm it works correctly
 
 ## Database Tables
 | Table | Purpose |
 |-------|---------|
-| `question_answers` | Every answered question with cert, topic, correct flag, timestamp |
-| `topic_performance` | Aggregated accuracy per cert+topic for spaced repetition |
-| `paused_tests` | In-progress tests saved as JSON with full state |
-| `question_templates` | Template library with variable_sets, is_retired flag |
-| `bookmarked_questions` | Bookmarks with reason, notes, full question snapshot |
+| `question_answers` | Every answered question — cert, topic, correct flag, timestamp |
+| `topic_performance` | Aggregated accuracy per cert+topic — drives spaced repetition and weak domain features |
+| `test_sessions` | Completed test records — cert, mode, score_pct, correct, total_questions, duration_seconds, completed_at |
+| `paused_tests` | In-progress tests saved as JSON with full state for resume |
+| `question_templates` | Template library with variable_sets and is_retired flag |
+| `bookmarked_questions` | Bookmarks with reason, notes, and full question snapshot |
 | `flagged_questions` | User-reported question issues |
 | `profiles` | User display name |
 | `lab_progress` | Completed lab steps per user (user_id, lab_set_id, lab_id, step_id, completed_at) |
 | `lab_notes` | Per-lab freeform notes per user (user_id, lab_set_id, lab_id, notes, updated_at) |
-| `flashcards` | Generated flashcard decks saved permanently per cert |
+| `flashcards` | Generated flashcard decks — saved permanently per cert |
 | `flashcard_progress` | Per-card mastery state: mastered flag, consecutive_correct count |
-
-### Phase 18 - Complete
-Per-step documentation system for Packet Tracer Labs:
-- Every lab step now has a `document` array — 49 steps in CCNA Fundamentals, 27 steps in Small Office Network Series (76 total)
-- Lab page renders a "📝 DOCUMENT YOUR WORK" section after hints in each step card
-- Prompts mix factual recording (write down configs/IPs/outputs) with conceptual questions (explain why)
-- Textarea auto-saves to `localStorage` on blur; manual Save button with "✓ Saved" feedback
-- Storage key pattern: `lab_step_doc_${setId}_${labId}_${stepId}`
-- Second lab set added: Small Office Network Series — 5 escalating real-world labs building a small office from scratch (VLANs → DHCP → STP → ACLs → Full Build capstone)
-- Topology label improvements: interface labels in dark pill backgrounds, multi-line PC sublabels with IP/DG in green, labels at 33%/67% along lines with 20px perpendicular offset
-
-### Phase 17 - Complete
-Packet Tracer Labs section:
-- Labs landing page at `/study-hub/labs` — shows all lab sets with cert badge, difficulty breakdown, estimated time
-- Lab set overview at `/study-hub/labs/[setId]` — lists all labs with difficulty dots, step count, domain tags
-- Individual lab page at `/study-hub/labs/[setId]/[labId]` — topology diagram, step-by-step cards, hints, notes, progress tracking
-- SVG topology renderer (`LabTopology.js`) — router, switch, PC, server, cloud icons with trunk/access/redundant line styles
-- Steps are expandable cards with IOS command blocks (copy button), verification instructions, expected output, and progressive hint reveal
-- Notes section per lab saves to `lab_notes` Supabase table
-- Step completion toggles saved to `lab_progress` Supabase table (persisted per user)
-- Prev/Next lab navigation; "Complete Set" button on final lab
-- Data-driven architecture: each lab set is one JS file in `src/data/labs/` — zero UI changes needed to add new sets
-- First lab set: CCNA Fundamentals — 8 labs covering VLANs, DHCP, STP, ACLs, SSH hardening, OSPF, NAT/PAT, and a capstone
-- Sidebar updated with "Labs" section linking to `/study-hub/labs`
 
 ## Future Features (Study Hub)
 - More concept cards in Study Mode
 - Exam countdown timer with target date
-- Advanced CCNA lab set
-- PWA conversion
+- Advanced CCNA lab set (spanning tree deep dive, advanced OSPF, BGP intro)
+- PWA conversion (add to home screen, offline support)
 
 ## Future Features (Life Hub — not yet started)
 - Fitbit / Google Fit integration
-- Sleep, workout, nutrition logging
+- Sleep, workout, and nutrition logging
 - Supplement tracking and encyclopedia
 - Correlation engine (study performance vs health data)
 - Daily morning brief page
-- General purpose Claude chat section
-
-### Phase 19 - Complete
-Multi-feature expansion — contextual panels, new lab sets, and smart flashcards:
-
-**IOS Command Reference + Floating Panel**
-- New page `/study-hub/labs/commands` — full reference with ~90 commands across 10 categories (Basic Setup, Interfaces, VLANs/Trunking, STP, DHCP, Routing, OSPF, NAT/PAT, ACLs, Troubleshooting)
-- Exports `IOS_COMMANDS` array for reuse by the floating panel
-- Search bar, category filter pills, expandable cards with syntax-highlighted examples
-- `FloatingCommandPanel.js` — keyboard icon button (bottom-right) on individual lab pages, opens searchable condensed panel
-- "IOS Commands" link added to sidebar under Labs section
-
-**Floating Reference Panel**
-- `FloatingReferencePanel.js` — book icon button on test page, practice mode only (cert-filtered)
-- CCNA: subnetting quick ref + private IP ranges
-- Network+: port numbers table + OSI model
-- Security+: attack types + encryption algorithms
-- Togglable section pills within the panel
-
-**Flashcard Weak Domain Section**
-- Queries `topic_performance` for domains <65% accuracy (≥5 questions seen)
-- Shows up to 6 weak domain cards below the cert decks
-- Color-coded accuracy bars, cert badge, link to the right cert's flashcard study session
-
-**Lab Progress Dashboard**
-- Labs landing page now shows progress dots for each lab in a set (green=complete, yellow=partial, grey=not started)
-- Queries `lab_progress` Supabase table on load
-- Completion count summary shown per set
-
-**Weak Domain → Lab Connection**
-- Lab set overview queries `topic_performance` for weak domains (<65% accuracy) in that cert
-- Labs whose `domains` array overlaps with weak topics get a yellow "🎯 Weak Area" badge and yellow border
-- Helps the user focus lab practice on their weakest exam domains
-
-**New Lab Sets**
-- `network-plus-fundamentals.js`: 5 labs — Topology Documentation, VLAN Segmentation + Inter-VLAN Routing, Wireless AP Config (WPA2), Troubleshooting Methodology (OSI layers), Port Security (sticky MACs, violation modes)
-- `security-plus-labs.js`: 4 labs — ACL Firewall Rules (with DMZ), DMZ Three-Zone Architecture, Device Hardening (SSH v2, encrypted passwords, login rate limiting, VTY ACL restriction), Network Segmentation (VLANs per trust level with IoT isolation)
-- Both sets imported in `src/data/labs/index.js` — automatically appear in the labs landing page

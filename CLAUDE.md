@@ -285,13 +285,36 @@ Ctrl+C
 ```
 
 ## Session Rules
-- After every commit/push, always give the user the pull command:
-  `git pull origin claude/adoring-shannon-sTxW8`
-- Update both `CLAUDE.md` and `build-notes.md` at the end of every session or after any significant feature is completed.
-- After every change or fix, always provide a brief end-of-change summary covering:
-  1. **What the problem was** (or what was requested)
-  2. **What was changed** (files/logic updated)
-  3. **What to test** to confirm it works correctly
+
+### Pull Command (always give this after every push — as a code block so it's copyable)
+```
+git pull origin claude/adoring-shannon-sTxW8
+```
+
+### MD Notes — Required Before Every Push
+Both `CLAUDE.md` and `build-notes.md` must be updated in the **same commit** as any feature or fix. Do not push code without updating the notes first. Specifically:
+- **CLAUDE.md:** update directory structure if files were added/removed, update the relevant feature section, update lab set counts/step counts if labs changed
+- **build-notes.md:** add or update the phase entry, update the Database Tables section if schema changed, remove completed items from Future Features
+
+### After Every Change or Fix
+Always provide a brief summary covering:
+1. **What the problem was** (or what was requested)
+2. **What was changed** (files/logic updated)
+3. **What to test** to confirm it works correctly
+
+## Important Decisions & Constraints (Don't Re-Litigate These)
+These are deliberate decisions made for specific reasons. Don't change them without the user explicitly asking.
+
+| Decision | Reason |
+|----------|---------|
+| Template batch size locked at 5 | Higher counts caused Anthropic API JSON truncation and crashes |
+| Inline styles only — no Tailwind | Chosen early in project; Tailwind was removed. Switching now would touch every file |
+| `IOS_COMMANDS` exported from `commands/page.js` | Single source of truth — floating panel imports it instead of duplicating data |
+| `lab_step_doc_${setId}_${labId}_${stepId}` localStorage key | Pattern must stay consistent across all lab files or saved docs will be orphaned |
+| FloatingReferencePanel practice-mode only | Intentional — simulation and real exam should not have reference aids |
+| Mixed cert mode saves as `cert = 'mixed'` | Does NOT pollute individual cert `topic_performance` — required for accurate per-cert tracking |
+| 82.5% threshold line on Score Over Time chart | Mirrors typical passing score for all three certs |
+| Spaced repetition multipliers (<40% → 2.5×, etc.) | Tuned values — don't adjust without testing impact on question distribution |
 
 ## Token Efficiency Rules
 These rules exist because a previous session burned excessive tokens on avoidable mistakes:
