@@ -263,6 +263,15 @@ Progress, analytics, and study tools:
 - Bookmarks page — cert tabs, reason badges, expandable full question view with notes
 - Mobile responsive layout via `@media (max-width: 768px)`
 
+### Phase 14 - Complete
+Cert Guide page built — a full reference hub for all three certifications:
+- **Overview tab** — cert cards with summaries, domain weight bars, quick stats, quick comparison table
+- **Overlap tab** — overlap percentages, expandable shared topic rows with per-cert depth descriptions and study tips, "study once counts for all three" callout
+- **Exam Details tab** — full logistics per cert (questions, time, cost, passing score, retake policy, registration), test day tips
+- **Career & Value tab** — job roles, salary ranges, DoD 8570/8140 compliance breakdown, employer value callouts, DoD 8570 explainer
+- **Study Roadmap tab** — 3 study paths with step-by-step progression, time estimates from zero, combined study strategy
+- Added "Cert Guide" sidebar section between Practice and Settings
+
 ### Generate Templates - Complete
 Template generation page confirmed fully built and working:
 - Cert, domain, and difficulty selectors

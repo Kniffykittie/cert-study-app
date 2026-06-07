@@ -27,6 +27,12 @@ const SECTIONS = [
     ]
   },
   {
+    label: 'Cert Guide',
+    items: [
+      { label: 'Cert Guide', href: '/study-hub/cert-guide' },
+    ]
+  },
+  {
     label: 'Settings',
     items: [
       { label: 'Flagged Questions', href: '/study-hub/flagged' },

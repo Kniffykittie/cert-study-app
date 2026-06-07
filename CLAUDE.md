@@ -152,6 +152,15 @@ src/
 - Security+: attack types, encryption algorithms, MFA factors, 8 compliance frameworks
 - Available in practice mode only (not simulation or real exam)
 
+### Cert Guide (`cert-guide/page.js`)
+- 5-tab reference hub: Overview, Overlap, Exam Details, Career & Value, Study Roadmap
+- Overview: cert cards with domain weight bars, quick comparison table
+- Overlap: expandable shared topic rows with per-cert depth and study tips, overlap % summary
+- Exam Details: logistics (questions, time, cost, passing score, retake policy), test day tips
+- Career & Value: job roles, salary ranges, DoD 8570/8140 compliance levels, employer value
+- Study Roadmap: 3 study paths, time estimates from zero, combined study strategy
+- Sidebar section "Cert Guide" added between Practice and Settings
+
 ### Flashcards
 - Landing page shows per-cert deck stats: mastered / learning / unlearned counts, mastery progress bar
 - Generate Deck (60 cards) on first visit; Add 40 More Cards once a deck exists
