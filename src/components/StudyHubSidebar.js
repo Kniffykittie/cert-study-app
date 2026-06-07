@@ -36,6 +36,7 @@ const SECTIONS = [
 
 export default function StudyHubSidebar() {
   const [displayName, setDisplayName] = useState('')
+  const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
 
   // Auto-expand the section containing the active route; all open by default
@@ -56,14 +57,29 @@ export default function StudyHubSidebar() {
     fetchProfile()
   }, [])
 
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
+
   const initial = displayName ? displayName[0].toUpperCase() : '?'
 
   function toggle(label) {
     setOpen(prev => ({ ...prev, [label]: !prev[label] }))
   }
 
-  return (
+  const sidebarContent = (
     <aside style={{ width: '220px', minHeight: '100vh', backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '16px 12px', gap: '4px', flexShrink: 0 }}>
+      {/* Mobile close button */}
+      <button
+        className="sidebar-close-btn"
+        onClick={() => setMobileOpen(false)}
+        style={{ display: 'none', position: 'absolute', top: '12px', right: '12px', background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', lineHeight: 1, padding: '4px' }}
+        aria-label="Close sidebar"
+      >
+        ✕
+      </button>
+
       <div style={{ backgroundColor: '#0A0A0A', borderRadius: '8px', padding: '8px 12px', marginBottom: '8px', textAlign: 'center', fontWeight: '700', fontSize: '20px', color: 'var(--accent-blue)' }}>
         CSA
       </div>
@@ -115,5 +131,129 @@ export default function StudyHubSidebar() {
         </Link>
       </div>
     </aside>
+  )
+
+  return (
+    <>
+      <style>{`
+        /* Hamburger button — hidden on desktop, visible on mobile */
+        .sidebar-hamburger {
+          display: none;
+        }
+
+        /* Close button inside sidebar — hidden on desktop */
+        .sidebar-close-btn {
+          display: none !important;
+        }
+
+        /* Backdrop — hidden by default */
+        .sidebar-backdrop {
+          display: none;
+        }
+
+        @media (max-width: 768px) {
+          /* Show hamburger on mobile */
+          .sidebar-hamburger {
+            display: flex;
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 200;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            width: 40px;
+            height: 40px;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            cursor: pointer;
+            color: var(--text-primary);
+          }
+
+          /* Hide sidebar by default on mobile */
+          .sidebar-desktop {
+            display: none !important;
+          }
+
+          /* Show close button inside sidebar on mobile */
+          .sidebar-close-btn {
+            display: block !important;
+          }
+
+          /* Mobile overlay sidebar */
+          .sidebar-mobile-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            z-index: 300;
+            transform: translateX(-100%);
+            transition: transform 0.25s ease;
+          }
+
+          .sidebar-mobile-overlay.is-open {
+            transform: translateX(0);
+          }
+
+          /* Backdrop */
+          .sidebar-backdrop {
+            display: block;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 299;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+          }
+
+          .sidebar-backdrop.is-open {
+            opacity: 1;
+            pointer-events: auto;
+          }
+        }
+
+        /* On desktop, show the desktop sidebar and hide mobile elements */
+        @media (min-width: 769px) {
+          .sidebar-mobile-overlay {
+            display: none !important;
+          }
+          .sidebar-backdrop {
+            display: none !important;
+          }
+          .sidebar-hamburger {
+            display: none !important;
+          }
+        }
+      `}</style>
+
+      {/* Hamburger button — mobile only */}
+      <button
+        className="sidebar-hamburger"
+        onClick={() => setMobileOpen(true)}
+        aria-label="Open sidebar"
+      >
+        ☰
+      </button>
+
+      {/* Backdrop */}
+      <div
+        className={`sidebar-backdrop${mobileOpen ? ' is-open' : ''}`}
+        onClick={() => setMobileOpen(false)}
+      />
+
+      {/* Desktop sidebar (static in flow) */}
+      <div className="sidebar-desktop" style={{ position: 'relative' }}>
+        {sidebarContent}
+      </div>
+
+      {/* Mobile sidebar (overlay) */}
+      <div className={`sidebar-mobile-overlay${mobileOpen ? ' is-open' : ''}`} style={{ position: 'fixed' }}>
+        <div style={{ position: 'relative' }}>
+          {sidebarContent}
+        </div>
+      </div>
+    </>
   )
 }

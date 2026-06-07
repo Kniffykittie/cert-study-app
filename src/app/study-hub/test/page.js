@@ -519,6 +519,16 @@ export default function TestPage() {
     const modeLabel = mostRecentPaused ? { practice: 'Practice', simulation: 'Simulation', real: 'Real Exam' }[mostRecentPaused.mode] : null
     return (
       <div>
+        <style>{`
+          @media (max-width: 768px) {
+            .test-mode-grid {
+              grid-template-columns: 1fr !important;
+            }
+            .test-cert-count-grid {
+              grid-template-columns: 1fr !important;
+            }
+          }
+        `}</style>
         <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Take a Test</h1>
@@ -532,7 +542,7 @@ export default function TestPage() {
           )}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+        <div className="test-mode-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
           {[
             { key: 'practice', label: 'Practice Mode', desc: 'Immediate feedback + tutor chat after each answer' },
             { key: 'simulation', label: 'Simulation Mode', desc: 'Real exam conditions — no feedback until the end' },
@@ -564,7 +574,7 @@ export default function TestPage() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+        <div className="test-cert-count-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
             <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Certification</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
