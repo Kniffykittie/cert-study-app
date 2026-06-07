@@ -82,6 +82,14 @@ export default function PremadeTemplatesPage() {
     setRetiring(null)
   }
 
+  async function restore(id) {
+    setRetiring(id)
+    const supabase = createClient()
+    await supabase.from('question_templates').update({ is_retired: false }).eq('id', id)
+    setTemplates(prev => prev.map(t => t.id === id ? { ...t, is_retired: false } : t))
+    setRetiring(null)
+  }
+
   function scanDuplicates() {
     setDupPairs(findDuplicates(templates, getApproved()))
     setView('duplicates')
@@ -258,7 +266,10 @@ export default function PremadeTemplatesPage() {
                     <span style={{ color: CERT_COLORS[t.cert] ?? 'var(--accent-blue)', fontSize: '11px', fontWeight: '700' }}>{CERT_LABELS[t.cert]}</span>
                     <span style={{ color: diffColor[t.difficulty], fontSize: '11px', fontWeight: '600', textTransform: 'capitalize' }}>{t.difficulty}</span>
                     <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{t.domain}</span>
-                    <span style={{ color: 'var(--error)', fontSize: '11px', fontWeight: '600', marginLeft: 'auto' }}>RETIRED</span>
+                    <button onClick={() => restore(t.id)} disabled={retiring === t.id}
+                      style={{ marginLeft: 'auto', backgroundColor: 'rgba(0,128,255,0.08)', border: '1px solid var(--accent-blue)', borderRadius: '6px', padding: '3px 10px', fontSize: '11px', fontWeight: '600', color: 'var(--accent-blue)', cursor: retiring === t.id ? 'not-allowed' : 'pointer', opacity: retiring === t.id ? 0.5 : 1 }}>
+                      {retiring === t.id ? '...' : '↩ Restore'}
+                    </button>
                   </div>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5', margin: 0 }}>{t.question_template}</p>
                 </div>
