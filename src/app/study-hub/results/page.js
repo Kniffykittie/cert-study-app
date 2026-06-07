@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
 const CERT_COLORS = { ccna: 'var(--accent-blue)', 'network-plus': 'var(--accent-purple)', 'security-plus': 'var(--error)' }
 const CERT_ORDER = ['ccna', 'network-plus', 'security-plus']
+const MODE_LABELS = { practice: 'Practice', simulation: 'Simulation', real: 'Real Exam' }
+const MODE_COLORS = { practice: 'var(--accent-blue)', simulation: 'var(--warning)', real: 'var(--error)' }
 
 function scoreColor(pct) {
   if (pct >= 80) return 'var(--success)'
@@ -23,7 +25,7 @@ export default function ResultsPage() {
     const supabase = createClient()
     const { data } = await supabase
       .from('test_sessions')
-      .select('id, cert, score_pct, correct, total_questions, completed_at')
+      .select('id, cert, mode, score_pct, correct, total_questions, completed_at')
       .order('completed_at', { ascending: false })
     setSessions(data ?? [])
     setLoading(false)
@@ -102,9 +104,14 @@ export default function ResultsPage() {
                     const date = new Date(s.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
                     return (
                       <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', backgroundColor: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)', borderBottom: i < certSessions.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                        <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                           <span style={{ color: '#E8E8E8', fontSize: '14px', fontWeight: '500' }}>{s.correct} / {s.total_questions} correct</span>
-                          <span style={{ color: 'var(--text-secondary)', fontSize: '12px', marginLeft: '12px' }}>{date}</span>
+                          {s.mode && (
+                            <span style={{ fontSize: '11px', fontWeight: '600', color: MODE_COLORS[s.mode], backgroundColor: 'var(--background)', border: `1px solid ${MODE_COLORS[s.mode]}`, borderRadius: '4px', padding: '2px 7px', opacity: 0.85 }}>
+                              {MODE_LABELS[s.mode] ?? s.mode}
+                            </span>
+                          )}
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{date}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                           <span style={{ color: scoreColor(s.score_pct), fontSize: '18px', fontWeight: '700', minWidth: '48px', textAlign: 'right' }}>{s.score_pct}%</span>

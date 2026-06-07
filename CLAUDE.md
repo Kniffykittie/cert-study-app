@@ -73,6 +73,12 @@ src/
 
 ---
 
+### Results Page (`results/page.js`)
+- Grouped by cert (CCNA / Network+ / Security+)
+- Each row shows: correct/total, **mode badge** (Practice=blue, Simulation=yellow, Real Exam=red), date, score %, Discard button
+- Summary row: total tests taken, average score, certs studied
+- `test_sessions` table columns used: `id, cert, mode, score_pct, correct, total_questions, completed_at`
+
 ## Database Tables (Supabase)
 | Table | Purpose |
 |-------|---------|

@@ -228,6 +228,12 @@ Template system and library management:
 - Approved duplicate pairs stored in localStorage
 - Retire/restore templates — `is_retired` flag in Supabase
 
+### Phase 10 - Complete
+Results page improvements:
+- Added mode badge (Practice / Simulation / Real Exam) to each result row
+- Mode is color-coded: blue = Practice, yellow = Simulation, red = Real Exam
+- `mode` column was already saved to `test_sessions` table, just needed to be selected and displayed
+
 ### Phase 9 - Complete
 Pause/resume reliability fixes:
 - Navigate-away guard: sidebar intercepts link clicks during active test, shows confirm dialog
