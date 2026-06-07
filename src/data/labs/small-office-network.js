@@ -68,6 +68,10 @@ const set = {
             'Switch-to-switch and switch-to-router links all use straight-through cables in Packet Tracer.',
             'Label your devices as you place them — right-click → Properties → Display Name. You\'ll thank yourself later.',
           ],
+          document: [
+            'Sketch your topology — label all 13 devices, connection types, and which interface connects to what',
+            'Record the port assignments: which switch port number connects to which PC or uplink',
+          ],
         },
         {
           id: 'step-2',
@@ -89,6 +93,11 @@ const set = {
           hints: [
             'You must create VLANs on every switch — VLANs are local to each switch and do not automatically propagate in Packet Tracer (VTP is disabled by default).',
             'The VLAN name command is optional but is professional practice and may appear on the CCNA exam.',
+          ],
+          document: [
+            'Record every VLAN: ID, name, and which switches you created it on',
+            'Paste or describe "show vlan brief" — what does an active VLAN without ports look like?',
+            'In your own words: why must all three switches have all three VLANs, not just their own?',
           ],
         },
         {
@@ -114,6 +123,10 @@ const set = {
             '"interface range" lets you configure multiple ports at once — a huge time saver.',
             'switchport mode access must come before switchport access vlan or the assignment may be silently ignored.',
           ],
+          document: [
+            'Build a table: switch → port → VLAN (e.g., SW1 Fa0/1 → VLAN 10)',
+            'Which command confirmed the VLAN assignment was correct?',
+          ],
         },
         {
           id: 'step-4',
@@ -137,6 +150,11 @@ const set = {
           hints: [
             'If a trunk port shows as "not-trunking", the other end may still be in access mode. Check both sides.',
             'Allowing specific VLANs (vlan 10,20,30) rather than "all" is best practice — it prevents unintended VLAN leakage.',
+          ],
+          document: [
+            'List every trunk port: device, interface, and allowed VLANs',
+            'In your own words: what is a trunk port and why do switch-to-switch links need one?',
+            'What show command confirms a trunk is active and what column do you look at?',
           ],
         },
         {
@@ -166,6 +184,11 @@ const set = {
             'The VLAN number in encapsulation dot1Q must exactly match the VLAN number on the switch trunk.',
             'Subinterfaces do NOT need "no shutdown" commands — they come up automatically when the physical interface is up.',
           ],
+          document: [
+            'Record every subinterface: name, VLAN tag, IP/mask (this is your routing table seed)',
+            'Why is this design called "Router-on-a-Stick"? What is the "stick"?',
+            'What command on R1 confirms all subinterfaces are up/up with correct IPs?',
+          ],
         },
         {
           id: 'step-6',
@@ -188,6 +211,10 @@ const set = {
             'If intra-VLAN pings fail, check that the PC is on the correct switch port VLAN (show vlan brief).',
             'If inter-VLAN pings fail, check that the subinterfaces are up/up and the PC\'s default gateway matches the subinterface IP exactly.',
           ],
+          document: [
+            'Build an address table: PC name → IP → mask → gateway',
+            'Where does the default gateway IP physically reside in this topology?',
+          ],
         },
         {
           id: 'step-7',
@@ -209,6 +236,10 @@ const set = {
             'All four pings from HR-1 should succeed at this point — ACL-based isolation comes in Lab 4.',
             'If cross-VLAN pings fail but same-VLAN pings work, the issue is in the router subinterfaces or PC default gateways.',
             'Use "show ip interface brief" on R1 to quickly confirm all subinterfaces are up/up.',
+          ],
+          document: [
+            'Record all inter-VLAN ping results: HR→Sales, HR→IT, Sales→IT, each PC→gateway',
+            'Describe the route table from "show ip route" — what type of routes appear and what does C mean?',
           ],
         },
       ],
@@ -268,6 +299,10 @@ const set = {
             'Always configure exclusions BEFORE creating pools — otherwise a PC might grab an excluded address before you exclude it.',
             'The exclusion range is inclusive on both ends: 192.168.10.1–.10 means .1 through .10 are all excluded.',
           ],
+          document: [
+            'Record the three exclusion range commands you ran and why those specific addresses are reserved',
+            'What would break if a DHCP client claimed the .1 gateway address?',
+          ],
         },
         {
           id: 'step-2',
@@ -295,6 +330,10 @@ const set = {
             'The pool name is local only — use descriptive names like VLAN10-HR so you can identify them quickly.',
             'The "network" command defines the whole subnet the pool serves. The router won\'t assign the excluded addresses or the broadcast address.',
           ],
+          document: [
+            'Record each pool: name, network, default-router, dns-server',
+            'How does R1 automatically match the right pool to the right VLAN without you telling it explicitly?',
+          ],
         },
         {
           id: 'step-3',
@@ -311,6 +350,10 @@ const set = {
             'In Packet Tracer you may need to click "Fast Forward" (double arrow) to speed up the DHCP exchange.',
             'DHCP works across VLANs here because R1 is directly connected to each subnet via its subinterfaces — it acts as a DHCP relay automatically for directly connected networks.',
           ],
+          document: [
+            'Record the IP, gateway, and DNS each PC received and confirm it came from the right pool',
+            'Why do leases start at .11 instead of .1?',
+          ],
         },
         {
           id: 'step-4',
@@ -326,6 +369,10 @@ const set = {
           hints: [
             'If fewer than 9 entries appear, go back to the PCs that are missing and manually trigger DHCP (switch to static then back to DHCP).',
             '"show ip dhcp conflict" is a great troubleshooting command — any conflict means two devices tried to claim the same IP.',
+          ],
+          document: [
+            'Describe the "show ip dhcp binding" output — how many entries, what columns?',
+            'What is a DHCP conflict and how would you detect and fix one?',
           ],
         },
         {
@@ -345,6 +392,10 @@ const set = {
           hints: [
             'Note the IPs assigned by DHCP — they start at .11 because you excluded .1–.10.',
             'If pings fail after switching to DHCP, confirm the default-router line in the pool matches the subinterface IP exactly.',
+          ],
+          document: [
+            'Record post-DHCP ping test results — compare them to Lab 1 static IP results',
+            'What is ip helper-address and when is it required instead of a directly connected DHCP pool?',
           ],
         },
       ],
@@ -397,6 +448,10 @@ const set = {
             'Watch the port status LEDs in Packet Tracer after connecting the cable — one port will go amber (blocking) instead of green (forwarding). That\'s STP doing its job.',
             'If you see all ports go amber briefly then one stays amber, that\'s normal STP convergence.',
           ],
+          document: [
+            'Record which specific port went blocking after you added the SW2↔SW3 cable — switch, interface, and why',
+            'Describe a broadcast storm in your own words: what happens to a frame without STP?',
+          ],
         },
         {
           id: 'step-2',
@@ -413,6 +468,11 @@ const set = {
             'STP elects the root bridge by lowest bridge ID. Default priority is 32768, so the switch with the lowest MAC address wins — which is random in your topology.',
             'Look for "Desg FWD" (designated forwarding) on root bridge ports. Look for "Altn BLK" (alternate blocking) on the redundant path.',
             'The port that blocks is on the switch that is furthest from the root, on the path with the highest cost.',
+          ],
+          document: [
+            'Record the elected root bridge: switch name, priority, and MAC (lowest MAC wins ties)',
+            'List all port roles across all three switches with interface names: Root Port, Designated Port, Alternate Port',
+            'Which link is blocked and on which end?',
           ],
         },
         {
@@ -435,6 +495,10 @@ const set = {
             'STP priority must be a multiple of 4096. Common values: 4096 (very low/high priority), 8192, 24576, 32768 (default).',
             'After changing the root, STP reconverges — you\'ll see topology change notifications and ports may briefly go through listening and learning states.',
           ],
+          document: [
+            'Record the command used and the resulting priority value set on SW1',
+            'After forcing SW1 as root: which port is now blocking and on which switch? Did it move from before?',
+          ],
         },
         {
           id: 'step-4',
@@ -455,6 +519,10 @@ const set = {
             'STP convergence with classic 802.1D takes 30–50 seconds by default (listening 15s + learning 15s). This delay is exactly why Rapid PVST+ (802.1w) was invented.',
             'If pings fail during convergence, just wait — they\'ll resume when STP finishes converging.',
             'Reconnect the cable when done to restore the full topology for Lab 4.',
+          ],
+          document: [
+            'Record which link you disconnected and how long reconvergence took',
+            'What is Rapid PVST+ (802.1w)? How does its ~2 second convergence compare to classic STP\'s 30–50 seconds?',
           ],
         },
       ],
@@ -498,6 +566,10 @@ const set = {
             '"transport input telnet" is required on modern IOS — by default only SSH is allowed.',
             'Telnet sends passwords in plain text. We\'re using it here to practice ACLs. In production, always use SSH.',
           ],
+          document: [
+            'Record the vty configuration you applied (line range, password, transport)',
+            'Why is Telnet considered insecure? What does it expose that SSH does not?',
+          ],
         },
         {
           id: 'step-2',
@@ -517,6 +589,10 @@ const set = {
             'Better placement: apply ACL 10 OUTBOUND on G0/0.10 (HR interface). This way Sales traffic is only blocked when leaving toward HR, not when going anywhere else.',
             'Try moving the ACL: remove "ip access-group 10 in" on G0/0.20, then apply "ip access-group 10 out" on G0/0.10.',
           ],
+          document: [
+            'Record what broke when you applied ACL 10 inbound on G0/0.20',
+            'Why did the wrong placement block more than just Sales→HR traffic?',
+          ],
         },
         {
           id: 'step-3',
@@ -534,6 +610,10 @@ const set = {
           hints: [
             'This is the classic ACL placement lesson: standard ACLs = close to destination. Extended ACLs = close to source.',
             '"no ip access-group 10 in" removes the ACL binding — the ACL itself (access-list 10) still exists in config.',
+          ],
+          document: [
+            'Record final ACL 10: the ACL content and where it is applied (interface + direction)',
+            'Write the standard ACL placement rule as a single memorable sentence',
           ],
         },
         {
@@ -556,6 +636,10 @@ const set = {
             'Extended ACLs placed inbound close to the source minimize wasted bandwidth — the traffic is dropped before it even crosses the network.',
             'There is an implicit "deny any any" at the end of every ACL. The final "permit ip ... any" is critical or ALL IT traffic would be blocked.',
           ],
+          document: [
+            'Write each line of ACL 110 with a plain-English translation of what it matches',
+            'What is a wildcard mask? Convert 255.255.255.0 to its wildcard equivalent and explain the conversion',
+          ],
         },
         {
           id: 'step-5',
@@ -576,6 +660,10 @@ const set = {
           hints: [
             'Hit counters are your best friend for ACL troubleshooting — if a rule has 0 matches, your traffic isn\'t reaching it (either a prior rule matched first, or the traffic never arrived).',
             '"clear ip access-list counters" resets all hit counts so you can run clean tests.',
+          ],
+          document: [
+            'Build a verification table: test description → expected → actual result for every goal',
+            'If an ACL rule shows 0 matches, what does that tell you and how would you investigate?',
           ],
         },
       ],
@@ -658,6 +746,10 @@ const set = {
             'Plan before you configure — draw the topology on paper with port assignments and IP addresses. This is what you\'d do in a real job.',
             'Label each device with its hostname before configuring. Use the hostname command in IOS: DSW(config)# hostname DSW',
           ],
+          document: [
+            'Write out your full addressing plan before touching any CLI: device, VLAN, subnet, IP range, gateway',
+            'Record the physical port plan: which switch port connects to which device',
+          ],
         },
         {
           id: 'step-2',
@@ -709,6 +801,10 @@ const set = {
             'VLAN 99 must be allowed on ALL trunks — your management traffic needs to reach every switch.',
             'After STP converges, one of the two DSW↔ASW1 links and one of the two DSW↔ASW2 links will be blocking. This is expected behavior.',
           ],
+          document: [
+            'Build a complete port-to-VLAN table for all three switches',
+            'List all trunk ports and which VLANs they carry — confirm with show interfaces trunk',
+          ],
         },
         {
           id: 'step-3',
@@ -759,6 +855,10 @@ const set = {
             'Don\'t forget VLAN 99 subinterface — switches need to reach this IP to send traffic (SSH, SNMP, syslog) to R1.',
             'Servers (VLAN 40) should be configured with static IPs manually: SRV-1 = 192.168.40.10/24 gateway 192.168.40.1.',
           ],
+          document: [
+            'Record every subinterface: name, VLAN, IP — this is your master routing table',
+            'Record each DHCP pool and why VLAN 40 (Servers) is excluded from DHCP',
+          ],
         },
         {
           id: 'step-4',
@@ -790,6 +890,10 @@ const set = {
             'Switches don\'t run IP routing — they need a default gateway even though routers don\'t.',
             '"transport input ssh" disables Telnet on the vty lines. This is a security best practice.',
           ],
+          document: [
+            'Record the management IP, default gateway, and SSH config for each switch',
+            'Why does a switch need a "ip default-gateway" command even though routers do not?',
+          ],
         },
         {
           id: 'step-5',
@@ -811,6 +915,10 @@ const set = {
           hints: [
             'On modern Packet Tracer with RSTP, convergence after a link failure is 1–2 seconds instead of 30.',
             'Use "show spanning-tree detail" to see port cost and priority values that determine which port blocks.',
+          ],
+          document: [
+            'Record DSW\'s priority value and confirm it shows as root in show spanning-tree',
+            'Record which redundant ports are blocking on each access switch and why',
           ],
         },
         {
@@ -844,6 +952,11 @@ const set = {
             'Test Guest isolation last — it\'s easy to accidentally block your own management traffic if you apply ACLs incorrectly.',
             'If Guest-1 can still reach other VLANs, check that the access-group is applied INBOUND on g0/0.30, not outbound.',
             'Congratulations — this is exactly the kind of practical lab that shows up in entry-level network engineer interviews.',
+          ],
+          document: [
+            'Write out every line of ACL 130 with plain-English explanation of what it blocks',
+            'Record every checklist test result: what was verified and the actual outcome',
+            'Write a one-paragraph summary of the network you built — describe it as you would in a real job handoff document',
           ],
         },
       ],

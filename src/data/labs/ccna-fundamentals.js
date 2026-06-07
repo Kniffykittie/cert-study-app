@@ -51,6 +51,10 @@ const set = {
             'Use Copper Straight-Through cables for all connections in this lab.',
             'In Packet Tracer, switch ports auto-negotiate — you don\'t need crossover cables between switch and PC.',
           ],
+          document: [
+            'Sketch your topology — label each device, the cable type used, and which interface connects to what',
+            'Record the exact interface names for every connection (e.g., R1 G0/0 → SW1 G0/1)',
+          ],
         },
         {
           id: 'step-2',
@@ -72,6 +76,11 @@ const set = {
             'Enter global config mode with conf t before issuing vlan commands.',
             'You must save VLANs with end or exit after creating them or they may not persist.',
             'The name command is optional but a real-world best practice — examiners sometimes test it.',
+          ],
+          document: [
+            'List every VLAN created: ID, name, and which switches you ran this on',
+            'Paste or describe the output of "show vlan brief" from SW1',
+            'In your own words: why must every switch in this network have all three VLANs, not just its own?',
           ],
         },
         {
@@ -95,6 +104,10 @@ const set = {
             'switchport mode access must be set before switchport access vlan — otherwise the port may not accept the VLAN assignment.',
             'You can use "interface range fa0/1 - 3" to configure multiple ports, but you\'d need separate commands per VLAN so doing them individually is cleaner here.',
           ],
+          document: [
+            'Record the access port table: SW1 Fa0/1 → VLAN ?, etc.',
+            'Which show command confirmed the assignment was correct and what did you look for?',
+          ],
         },
         {
           id: 'step-4',
@@ -110,6 +123,11 @@ const set = {
           hints: [
             'On a real 2960, you may need "switchport trunk encapsulation dot1q" before setting trunk mode. Packet Tracer handles this automatically.',
             'If the trunk does not come up, check that the router interface is enabled — it defaults to shutdown.',
+          ],
+          document: [
+            'List every trunk port configured, which switch it is on, and which VLANs it carries',
+            'In your own words: what is a trunk port and why does it exist?',
+            'What is the Native VLAN and what traffic travels on it untagged?',
           ],
         },
         {
@@ -136,6 +154,11 @@ const set = {
             'encapsulation dot1Q must come before the ip address command on each subinterface.',
             'The VLAN number in "encapsulation dot1Q 10" must exactly match the VLAN on the switch.',
           ],
+          document: [
+            'Record every subinterface: name, VLAN tag, IP address/mask (e.g., G0/0.10, dot1Q 10, 10.1.10.1/24)',
+            'What does the "encapsulation dot1Q" command actually do to a frame when it leaves the router?',
+            'Why does only one physical cable connect the router to the switch even though three VLANs route through it?',
+          ],
         },
         {
           id: 'step-6',
@@ -152,6 +175,10 @@ const set = {
             'In Packet Tracer, click the PC → Desktop tab → IP Configuration to set addresses manually.',
             'The gateway must be the subinterface IP on R1 for that VLAN — not the physical interface.',
           ],
+          document: [
+            'Record the IP, mask, and default gateway for every PC',
+            'Where does the default gateway IP physically live in this topology?',
+          ],
         },
         {
           id: 'step-7',
@@ -167,6 +194,10 @@ const set = {
             'If pings fail, first ping within the same VLAN (PC1 to 10.1.10.1 gateway) to isolate the problem.',
             'Check the trunk — run "show interfaces trunk" on SW1 and confirm G0/1 is active.',
             'Verify the encapsulation dot1Q numbers match the VLAN IDs exactly.',
+          ],
+          document: [
+            'Record all ping test results in a table: source IP → destination IP → result',
+            'Describe the route table output from "show ip route" — what type (C/L) of routes appear and what do C and L mean?',
           ],
         },
       ],
@@ -219,6 +250,10 @@ const set = {
           hints: [
             'If you don\'t have a Lab 1 file, redo the topology and subinterface config from Lab 1 before continuing.',
           ],
+          document: [
+            'Confirm your Lab 1 topology is intact — list every device, every interface, and whether it is up/up',
+            'Why does changing a PC from Static to DHCP cause it to lose its IP address before the server responds?',
+          ],
         },
         {
           id: 'step-2',
@@ -234,6 +269,10 @@ const set = {
           hints: [
             'Always exclude your router gateway IPs first — if a PC accidentally got 10.1.10.1 it would conflict with the router subinterface.',
             'Excluded ranges are inclusive on both ends.',
+          ],
+          document: [
+            'Record the exclusion ranges you configured and state why those specific addresses are excluded',
+            'What would happen if you skipped the exclusion step and a PC accidentally claimed the gateway IP via DHCP?',
           ],
         },
         {
@@ -260,6 +299,10 @@ const set = {
             'The pool name (VLAN10, VLAN20, VLAN30) is local only — it doesn\'t need to match anything on the switch.',
             'default-router must match the subinterface IP on R1 for that VLAN.',
           ],
+          document: [
+            'Record each pool: name, network, default-router, dns-server',
+            'How does R1 know which DHCP pool to use for a PC in VLAN 10 versus VLAN 20?',
+          ],
         },
         {
           id: 'step-4',
@@ -273,6 +316,10 @@ const set = {
           hints: [
             'If a PC still shows 0.0.0.0, click "Fast Forward" in Packet Tracer to skip the DHCP negotiation timer.',
             'Run "show ip dhcp binding" on R1 to see all active leases.',
+          ],
+          document: [
+            'Record the IP, gateway, and DNS each PC received — note which pool range they came from',
+            'Why do DHCP leases start at .11 instead of .1 in this lab?',
           ],
         },
         {
@@ -288,6 +335,10 @@ const set = {
           hints: [
             '"show ip dhcp conflict" is useful if a PC can\'t get an address — it shows IPs that caused conflicts.',
           ],
+          document: [
+            'Describe what you saw in "show ip dhcp binding" — how many entries, what format?',
+            'What is a DHCP conflict and what causes one?',
+          ],
         },
         {
           id: 'step-6',
@@ -301,6 +352,10 @@ const set = {
           expectedOutput: '4/4 replies from both PCs.',
           hints: [
             'DHCP addresses are dynamic — look up PC2 and PC3\'s current IPs before pinging.',
+          ],
+          document: [
+            'Record post-DHCP ping test results — same as Lab 1 or different?',
+            'What is ip helper-address, and when would you need it instead of a directly connected DHCP pool?',
           ],
         },
       ],
@@ -358,6 +413,10 @@ const set = {
             'Use the same VLAN and trunk config from Lab 1 on SW2.',
             'R1 needs subinterfaces for VLAN 10 and 20 on G0/1 as well — or use a Layer 3 switch approach. For simplicity, add G0/1.10 and G0/1.20 subinterfaces to R1.',
           ],
+          document: [
+            'Record which port went to blocking (amber) immediately after adding the cable — switch name, port, and why that specific port',
+            'In your own words: describe what a broadcast storm is and what would happen if STP did not exist',
+          ],
         },
         {
           id: 'step-2',
@@ -369,6 +428,10 @@ const set = {
           hints: [
             'Use Packet Tracer\'s Simulation mode (bottom right) to slow down packet flow and actually watch the broadcast frames multiply.',
             'STP convergence takes 30–50 seconds by default. Be patient.',
+          ],
+          document: [
+            'Describe what you observed when the redundant link was added — what happened to the link lights and any active pings?',
+            'In your own words: what is a broadcast storm and why does a Layer 2 loop cause one?',
           ],
         },
         {
@@ -385,6 +448,11 @@ const set = {
             'The switch with the lowest Bridge ID (priority + MAC) becomes root. With default settings that\'s usually the switch with the lowest MAC address.',
             'Port states: BLK = blocking (not forwarding data), LIS = listening, LRN = learning, FWD = forwarding.',
           ],
+          document: [
+            'Record the elected root bridge: which switch won, its priority value, and its MAC address',
+            'List every port role you observed across all three switches: Root Port, Designated Port, Alternate Port — with port numbers',
+            'Which link is currently blocking and on which switch?',
+          ],
         },
         {
           id: 'step-4',
@@ -399,6 +467,10 @@ const set = {
           hints: [
             'STP priorities must be multiples of 4096. Valid values: 0, 4096, 8192, 12288... 61440.',
             'You can also use "spanning-tree vlan 10 root primary" as a shortcut — it automatically sets an appropriate lower priority.',
+          ],
+          document: [
+            'Record the priority value set on SW1 and the command used',
+            'After the root changed, which port is now blocking? Did the blocking port move to a different switch?',
           ],
         },
         {
@@ -418,6 +490,10 @@ const set = {
           hints: [
             'PortFast should ONLY be used on ports connected to end devices (PCs, servers, printers) — never on ports facing other switches.',
             'BPDU Guard automatically puts the port into err-disabled state if it receives a BPDU (meaning a switch was connected). Recover with "shutdown" then "no shutdown".',
+          ],
+          document: [
+            'Describe what happened when you disconnected the link — how long did reconvergence take?',
+            'What is Rapid PVST+ (802.1w) and how does its convergence time compare to classic 802.1D STP?',
           ],
         },
       ],
@@ -479,6 +555,10 @@ const set = {
           verify: 'Ping from PC1 to 10.1.40.2 — should succeed before any ACLs are applied',
           expectedOutput: 'All PCs can reach the server at 10.1.40.2.',
           hints: ['Click the Server → Services tab → enable HTTP and FTP.'],
+          document: [
+            'Record the vty line configuration you applied (line range, password, transport input)',
+            'Why is Telnet considered insecure and what should be used in production instead?',
+          ],
         },
         {
           id: 'step-2',
@@ -497,6 +577,10 @@ const set = {
             'Standard ACLs should be placed CLOSE TO THE DESTINATION. If placed close to source, it could block legitimate traffic to other destinations.',
             'There is an implicit "deny any" at the end of every ACL — without the "permit any" line, all other traffic would be blocked too.',
           ],
+          document: [
+            'Record ACL 10 and where you initially applied it',
+            'What unintended traffic did the wrong placement block? Why did it break more than intended?',
+          ],
         },
         {
           id: 'step-3',
@@ -512,6 +596,10 @@ const set = {
           hints: [
             'If PC1 can still reach the server, check that the ACL is applied outbound ("out") on G0/0.40, not inbound.',
             'Run "show ip access-lists" and check if the deny entry match count is increasing.',
+          ],
+          document: [
+            'Record the final placement: interface name and direction (in/out)',
+            'In your own words: state the standard ACL placement rule and explain why "close to destination" is correct',
           ],
         },
         {
@@ -533,6 +621,11 @@ const set = {
             'Extended ACLs go CLOSE TO THE SOURCE to stop unwanted traffic early and save bandwidth.',
             '"eq 80" means port 80 (HTTP). Use "eq 443" for HTTPS, "eq 21" for FTP.',
           ],
+          document: [
+            'Write out ACL 110 line by line with a plain-English explanation of what each line does',
+            'What is a wildcard mask? How does 0.0.0.255 relate to the subnet mask 255.255.255.0?',
+            'Why must the broad "permit ip any" line come LAST in ACL 110?',
+          ],
         },
         {
           id: 'step-5',
@@ -548,6 +641,10 @@ const set = {
           hints: [
             'In Packet Tracer, the Web Browser app sends HTTP traffic. The FTP app in Desktop is the easiest way to test FTP blocking.',
             'If everything is blocked from PC2, check the "permit ip any any" line is present — the implicit deny at the end will drop everything otherwise.',
+          ],
+          document: [
+            'Record all test results in a table: source → destination → expected result → actual result',
+            'What does a match count of 0 on an ACL rule tell you when troubleshooting?',
           ],
         },
       ],
@@ -601,6 +698,10 @@ const set = {
           hints: [
             'The hostname + domain name are concatenated to create the FQDN used for the RSA key. Without both, "crypto key generate rsa" will fail.',
           ],
+          document: [
+            'Record the hostname and domain name you set on R1',
+            'Why does SSH require both a hostname AND a domain name before you can generate keys?',
+          ],
         },
         {
           id: 'step-2',
@@ -615,6 +716,10 @@ const set = {
           hints: [
             'Use at least 2048-bit keys — 1024-bit is considered weak and some modern SSH clients refuse to connect.',
             'This is the step most people forget in the exam simulation. No RSA key = no SSH.',
+          ],
+          document: [
+            'Record the modulus size used and why 2048 bits is recommended over 1024',
+            'What role does RSA encryption play in the SSH handshake?',
           ],
         },
         {
@@ -632,6 +737,10 @@ const set = {
             '"enable secret" always encrypts. "enable password" does NOT encrypt unless you add "service password-encryption".',
             '"service password-encryption" uses weak type 7 encryption — it prevents shoulder-surfing but is easily reversed. Use "secret" wherever possible.',
             'privilege 15 gives the user full access without needing to type "enable".',
+          ],
+          document: [
+            'Record the username and privilege level configured',
+            'What does privilege level 15 grant and how does it differ from privilege level 1?',
           ],
         },
         {
@@ -651,6 +760,10 @@ const set = {
             '"login local" tells IOS to use the local username database you created in the previous step.',
             'exec-timeout 10 0 = 10 minutes 0 seconds before idle session is disconnected.',
           ],
+          document: [
+            'Record the full vty line configuration: login method, transport input, ip ssh version',
+            'What is the difference between "login" and "login local" on a vty line?',
+          ],
         },
         {
           id: 'step-5',
@@ -668,6 +781,10 @@ const set = {
             'The delimiter character (# in this example) can be any character that doesn\'t appear in your banner text.',
             'Cisco recommends AGAINST saying "Welcome" in banners — it implies you\'re inviting access.',
           ],
+          document: [
+            'Record the IP address you SSH\'d to and the result',
+            'What command on R1 shows active SSH sessions and what information does it display?',
+          ],
         },
         {
           id: 'step-6',
@@ -682,6 +799,10 @@ const set = {
           hints: [
             'In Packet Tracer, use Desktop → Terminal or Command Prompt → ssh -l username IP.',
             'If SSH fails, double check: hostname set, domain set, RSA keys generated, line vty configured with "login local" and "transport input ssh".',
+          ],
+          document: [
+            'Record what happened when you attempted Telnet after configuring SSH',
+            'In your own words: why is "transport input ssh" more secure than "transport input all"?',
           ],
         },
         {
@@ -700,6 +821,10 @@ const set = {
             'Switches need an SVI (switched virtual interface) to have an IP address for management. "interface vlan X" creates one.',
             '"ip default-gateway" on a switch is needed for it to communicate outside its local subnet — it doesn\'t run IP routing by default.',
             'VLAN 99 is a common management VLAN naming convention — separates management traffic from data VLANs.',
+          ],
+          document: [
+            'Record the management IP assigned to SW1, the VLAN it lives on, and the default gateway configured',
+            'Why does a Layer 2 switch need a default gateway when a router does not?',
           ],
         },
       ],
@@ -769,6 +894,10 @@ const set = {
             '/30 subnets (255.255.255.252) are used for point-to-point router links — they only allow 2 host addresses which is exactly what you need.',
             'Configure all three routers before moving to OSPF.',
           ],
+          document: [
+            'Record every router: interface IPs configured and the OSPF network statements used',
+            'What is an OSPF Router ID and how is it determined if not manually set?',
+          ],
         },
         {
           id: 'step-2',
@@ -788,6 +917,10 @@ const set = {
             'Router IDs should be unique across all routers in the domain.',
             'Wildcard masks in OSPF network statements work the same as in ACLs.',
           ],
+          document: [
+            'Record the neighbor adjacency table from each router — which routers formed adjacencies with which?',
+            'What is a DR/BDR election and why does it only happen on broadcast (not point-to-point) networks?',
+          ],
         },
         {
           id: 'step-3',
@@ -806,6 +939,10 @@ const set = {
             'OSPF neighbors must agree on: area number, subnet, hello/dead timers, authentication. If neighbors don\'t form, check these first.',
             'FULL state means the adjacency is fully established and routing info is being exchanged.',
           ],
+          document: [
+            'Paste or describe the OSPF route entries on R1 — how are OSPF routes marked in the table?',
+            'What does the cost value in [110/cost] mean and how is it calculated?',
+          ],
         },
         {
           id: 'step-4',
@@ -823,6 +960,10 @@ const set = {
             'Passive interface prevents OSPF hellos from being sent out a port — reduces unnecessary traffic and prevents rogue OSPF neighbor formation from PCs.',
             'The network is still advertised into OSPF — you\'re just not forming neighbors on that segment.',
           ],
+          document: [
+            'Record ping test results: every router to every other router and to the PCs',
+            'What is the difference between OSPF cost and hop count as a routing metric?',
+          ],
         },
         {
           id: 'step-5',
@@ -837,6 +978,10 @@ const set = {
           hints: [
             '"O" in the routing table = OSPF route. "O IA" = inter-area OSPF (not applicable in single-area but you\'ll see it in multi-area).',
             'If routes are missing, check "show ip ospf neighbor" — no neighbor usually means no routes.',
+          ],
+          document: [
+            'Paste or summarize the routing table of R1 — list every route, its source (C/O/S), and next-hop',
+            'Record end-to-end ping results between every PC pair in your topology',
           ],
         },
       ],
@@ -896,6 +1041,10 @@ const set = {
           verify: 'Ping from R1 to 203.0.113.2 — should succeed (direct connection)',
           expectedOutput: 'R1 can reach ISP. PCs cannot yet reach ISP (no NAT, no route).',
           hints: ['Add a default route on R1 pointing to the ISP: "ip route 0.0.0.0 0.0.0.0 203.0.113.2"'],
+          document: [
+            'Record which interfaces are designated inside and which are outside',
+            'In your own words: what does "ip nat inside" tell the router to do with traffic on that interface?',
+          ],
         },
         {
           id: 'step-2',
@@ -912,6 +1061,10 @@ const set = {
           hints: [
             'Forgetting to mark inside/outside is the #1 NAT config mistake. Nothing will translate without this.',
           ],
+          document: [
+            'Record the exact NAT overload configuration you applied',
+            'What is the difference between static NAT, dynamic NAT, and PAT (NAT overload)?',
+          ],
         },
         {
           id: 'step-3',
@@ -925,6 +1078,10 @@ const set = {
           hints: [
             'Static NAT is a 1:1 permanent mapping. It\'s used for servers that need to be reachable from outside at a predictable address.',
             'This uses a second public IP (203.0.113.10) — in a real environment you\'d need your ISP to assign this to you.',
+          ],
+          document: [
+            'Describe the "show ip nat translations" output after generating traffic — what are the four address columns?',
+            'What do "inside local," "inside global," "outside local," and "outside global" each mean?',
           ],
         },
         {
@@ -942,6 +1099,10 @@ const set = {
             'The ACL defines which inside hosts are eligible for translation. The access-list must permit the inside subnet.',
             'Dynamic PAT entries appear only when traffic is flowing — they time out after idle periods.',
           ],
+          document: [
+            'Record ping results from internal PCs to the ISP address',
+            'How does the router know to forward return packets to the correct inside host even though it changed the source IP?',
+          ],
         },
         {
           id: 'step-5',
@@ -958,6 +1119,10 @@ const set = {
           hints: [
             '"show ip nat translations verbose" shows more detail including hit counts.',
             '"clear ip nat translation *" clears all dynamic entries — useful for troubleshooting.',
+          ],
+          document: [
+            'Record ping results from internal PCs to the ISP address',
+            'How does the router know to forward return packets to the correct inside host even though it changed the source IP?',
           ],
         },
       ],
@@ -1019,6 +1184,10 @@ const set = {
             'Suggested: VLAN 10 = 10.1.10.0/24, VLAN 20 = 10.1.20.0/24, VLAN 99 (Mgmt) = 10.1.99.0/24',
             'Plan before you build — spending 5 minutes on this saves 30 minutes of re-addressing later.',
           ],
+          document: [
+            'Record every device placed, its hostname, and the IP addressing scheme you chose for each subnet',
+            'List all physical connections: device → interface → device → interface',
+          ],
         },
         {
           id: 'step-2',
@@ -1028,6 +1197,10 @@ const set = {
           verify: 'All cables connected, no link lights red',
           expectedOutput: 'Complete physical topology with all devices placed and cabled.',
           hints: ['Use straight-through cables for all connections (Packet Tracer handles auto-MDI/X).'],
+          document: [
+            'Record every device placed, its hostname, and the IP addressing scheme you chose for each subnet',
+            'List all physical connections: device → interface → device → interface',
+          ],
         },
         {
           id: 'step-3',
@@ -1037,6 +1210,10 @@ const set = {
           verify: 'show vlan brief on both switches, show interfaces trunk',
           expectedOutput: 'VLANs active on both switches. Trunks carrying VLANs 10, 20, 99.',
           hints: ['Review your Lab 1 notes for the exact commands.'],
+          document: [
+            'Record the full port-to-VLAN mapping for both switches',
+            'List every trunk port and which VLANs it carries',
+          ],
         },
         {
           id: 'step-4',
@@ -1046,6 +1223,10 @@ const set = {
           verify: 'show ip interface brief on R1, show ip dhcp pool',
           expectedOutput: 'Subinterfaces up. DHCP pools visible. PCs in VLAN 10 and 20 receive addresses.',
           hints: ['Review your Lab 2 notes for DHCP pool syntax.'],
+          document: [
+            'Record each DHCP pool: name, network, gateway, DNS, exclusion range',
+            'Record the IPs assigned to each PC — which pool did each come from?',
+          ],
         },
         {
           id: 'step-5',
@@ -1062,6 +1243,10 @@ const set = {
             '"default-information originate" tells OSPF to advertise the default route to all neighbors.',
             'Without this, R1 has no path to the internet even after OSPF is up.',
           ],
+          document: [
+            'Record every OSPF network statement on every router',
+            'Record all neighbor adjacencies that formed — which router pairs became neighbors?',
+          ],
         },
         {
           id: 'step-6',
@@ -1071,6 +1256,10 @@ const set = {
           verify: 'PC1> ping 203.0.113.2 — then show ip nat translations on R2',
           expectedOutput: 'PC1 can reach ISP. NAT translation table shows dynamic entries.',
           hints: ['Review your Lab 7 notes. Don\'t forget ip nat inside/outside on the interfaces.'],
+          document: [
+            'Write out every ACL rule with plain-English explanation',
+            'Record all verification test results: what was permitted, what was denied',
+          ],
         },
         {
           id: 'step-7',
@@ -1080,6 +1269,10 @@ const set = {
           verify: 'PC2 (VLAN 20) cannot ping PC1 (VLAN 10). PC1 can ping PC2.',
           expectedOutput: 'One-directional block — VLAN 20 to VLAN 10 is denied. VLAN 10 to VLAN 20 is allowed.',
           hints: ['Apply the ACL inbound on R1\'s VLAN 20 subinterface. Review Lab 4 for extended ACL syntax.'],
+          document: [
+            'Write out every ACL rule with plain-English explanation',
+            'Record all verification test results: what was permitted, what was denied',
+          ],
         },
         {
           id: 'step-8',
@@ -1089,6 +1282,10 @@ const set = {
           verify: 'SSH into each device from SRV (management VLAN). Telnet should be refused.',
           expectedOutput: 'SSH works on all four devices. Telnet is blocked.',
           hints: ['Review Lab 5. Each device needs its own hostname, domain name, and RSA key.'],
+          document: [
+            'Record the SSH configuration applied to each device',
+            'Record successful SSH test results: which PC connected to which device',
+          ],
         },
         {
           id: 'step-9',
@@ -1107,6 +1304,10 @@ const set = {
           hints: [
             'Work through failures methodically: Layer 1 (cabling) → Layer 2 (VLANs/trunks) → Layer 3 (routing/NAT) → Layer 4+ (ACLs/SSH).',
             'If something doesn\'t work, compare your config against the relevant earlier lab.',
+          ],
+          document: [
+            'List every show command you ran and summarize what it confirmed',
+            'Write a one-paragraph summary of the full network you built — describe it as if handing it off to a colleague',
           ],
         },
       ],

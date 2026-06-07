@@ -37,9 +37,24 @@ function CommandBlock({ commands }) {
   )
 }
 
-function StepCard({ step, index, completed, onToggle, isActive, onClick }) {
+function StepCard({ step, index, completed, onToggle, isActive, onClick, docKey }) {
   const [showHints, setShowHints] = useState(false)
   const [revealedHints, setRevealedHints] = useState(0)
+  const [stepDoc, setStepDoc] = useState('')
+  const [docSaved, setDocSaved] = useState(false)
+
+  useEffect(() => {
+    if (docKey && typeof window !== 'undefined') {
+      setStepDoc(localStorage.getItem(docKey) ?? '')
+    }
+  }, [docKey])
+
+  function saveStepDoc() {
+    if (!docKey) return
+    localStorage.setItem(docKey, stepDoc)
+    setDocSaved(true)
+    setTimeout(() => setDocSaved(false), 1500)
+  }
 
   return (
     <div
@@ -109,6 +124,36 @@ function StepCard({ step, index, completed, onToggle, isActive, onClick }) {
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {step.document?.length > 0 && (
+            <div style={{ marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ color: 'var(--accent-purple)', fontSize: '11px', fontWeight: '700', letterSpacing: '0.06em' }}>📝 DOCUMENT YOUR WORK</div>
+                <button
+                  onClick={saveStepDoc}
+                  disabled={!stepDoc}
+                  style={{ backgroundColor: docSaved ? 'var(--success)' : 'var(--accent-purple)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 12px', fontSize: '11px', fontWeight: '600', cursor: stepDoc ? 'pointer' : 'not-allowed', opacity: stepDoc ? 1 : 0.4, transition: 'background-color 0.2s' }}
+                >
+                  {docSaved ? '✓ Saved' : 'Save'}
+                </button>
+              </div>
+              <div style={{ marginBottom: '10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                {step.document.map((prompt, pi) => (
+                  <div key={pi} style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', gap: '8px', lineHeight: '1.6' }}>
+                    <span style={{ color: 'var(--accent-purple)', flexShrink: 0, marginTop: '2px' }}>▸</span>
+                    <span>{prompt}</span>
+                  </div>
+                ))}
+              </div>
+              <textarea
+                value={stepDoc}
+                onChange={e => setStepDoc(e.target.value)}
+                onBlur={saveStepDoc}
+                placeholder="Answer the prompts above. Treat this like a real network admin documenting their work — your future self will thank you."
+                style={{ width: '100%', minHeight: '120px', backgroundColor: 'var(--background)', border: '1px solid #3A2A5A', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '13px', fontFamily: 'inherit', lineHeight: '1.6', resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+              />
             </div>
           )}
         </div>
@@ -269,6 +314,7 @@ export default function LabPage() {
             onToggle={() => toggleStep(step.id)}
             isActive={activeStep === step.id}
             onClick={() => setActiveStep(a => a === step.id ? null : step.id)}
+            docKey={`lab_step_doc_${setId}_${labId}_${step.id}`}
           />
         ))}
       </div>
