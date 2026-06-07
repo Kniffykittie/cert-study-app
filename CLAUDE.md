@@ -69,7 +69,8 @@ src/
   data/
     labs/
       index.js                    Exports LAB_SETS, getLabSet(), getLab() helpers
-      ccna-fundamentals.js        CCNA lab set — 8 labs (VLANs, DHCP, STP, ACLs, SSH, OSPF, NAT, Capstone)
+      ccna-fundamentals.js        CCNA lab set — 8 labs, 49 steps — all steps have document arrays
+      small-office-network.js     Small Office series — 5 labs, 27 steps — all steps have document arrays
   components/
     StudyHubSidebar.js            Nav sidebar with test-in-progress guard
     BookmarkModal.js              Bookmark reason + notes modal
@@ -237,6 +238,19 @@ src/
 - Prev/Next navigation between labs; "Complete Set" button on last lab
 - Data-driven: add a new lab set by creating one file in `src/data/labs/` and importing it in `index.js` — zero UI changes needed
 - `LabTopology.js` renders SVG topologies: router (circle + spokes), switch (rect + port lines), PC (monitor), server (rack units), cloud icons; trunk=blue, redundant=purple, access=grey lines with interface labels
+- Interface labels use dark pill backgrounds (`ConnLabel`), multi-line sublabels via `NodeSublabel` (split on `\n`), IP/DG lines in green (#2ECC71), labels at 33%/67% along lines with 20px perpendicular offset
+
+### Per-Step Documentation
+- Every step has a `document` array — 2–3 prompts that teach the user to document their work like a real network admin
+- Prompts mix factual recording ("record every interface and IP") with conceptual questions ("explain in your own words why…")
+- The `StepCard` component renders a "📝 DOCUMENT YOUR WORK" section after hints when `step.document` exists
+- Textarea auto-saves to `localStorage` on blur; manual Save button turns "✓ Saved" briefly
+- Storage key pattern: `lab_step_doc_${setId}_${labId}_${stepId}`
+- **All 49 steps in ccna-fundamentals.js and all 27 steps in small-office-network.js have document arrays — do NOT add a new lab step without including a document array**
+
+### Lab Sets
+- **CCNA Fundamentals** (`ccna-fundamentals.js`): 8 labs — VLANs/Router-on-a-Stick, DHCP, STP, ACLs, SSH hardening, OSPF, NAT/PAT, Capstone
+- **Small Office Network Series** (`small-office-network.js`): 5 labs — Labs 1–4 share a base topology (1 router, 3 switches, 9 PCs) building VLANs → DHCP → STP redundancy → ACLs; Lab 5 is a standalone full-office build challenge with distribution/access switch hierarchy, 4 VLANs + VLAN 99, redundant uplinks, DHCP, SSH, STP root, and guest isolation ACL
 
 ## Cost Reference (Anthropic API)
 - ~$0.003–$0.005 per question generated
@@ -266,3 +280,18 @@ Ctrl+C
   1. **What the problem was** (or what was requested)
   2. **What was changed** (files/logic updated)
   3. **What to test** to confirm it works correctly
+
+## Token Efficiency Rules
+These rules exist because a previous session burned excessive tokens on avoidable mistakes:
+
+1. **Never use a background agent to edit a single large file.** Background agents edit one step at a time, read the file repeatedly, and conflict with main-thread edits. For bulk data edits (e.g. adding a field to all lab steps), do it directly with batched Edit calls in the main thread.
+
+2. **Batch large data edits — don't do one Edit per item.** When adding the same field to 76 lab steps across 2 files, read each file once and make edits in groups, not one step at a time.
+
+3. **Do not spawn a background agent and then also work on the same files.** When an agent and the main thread both edit the same file, every Edit call fails with "file modified since read" — doubling the reads needed.
+
+4. **Lab data files are large (~1300+ lines each).** When reading them, use `offset` and `limit` to read only the section you need. Only do a full file read when you genuinely need the whole structure.
+
+5. **At context compaction boundaries, large file contents are dropped from context.** The summary captures structure and key facts but not exact file contents — plan for a re-read after compaction rather than assuming the content is still loaded.
+
+6. **For new lab steps, always include a `document` array.** Both existing lab files have complete coverage — don't create a step without one or it will render with no documentation section.

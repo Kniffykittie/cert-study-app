@@ -339,6 +339,16 @@ New features:
 | `flagged_questions` | User-reported question issues |
 | `profiles` | User display name |
 
+### Phase 18 - Complete
+Per-step documentation system for Packet Tracer Labs:
+- Every lab step now has a `document` array — 49 steps in CCNA Fundamentals, 27 steps in Small Office Network Series (76 total)
+- Lab page renders a "📝 DOCUMENT YOUR WORK" section after hints in each step card
+- Prompts mix factual recording (write down configs/IPs/outputs) with conceptual questions (explain why)
+- Textarea auto-saves to `localStorage` on blur; manual Save button with "✓ Saved" feedback
+- Storage key pattern: `lab_step_doc_${setId}_${labId}_${stepId}`
+- Second lab set added: Small Office Network Series — 5 escalating real-world labs building a small office from scratch (VLANs → DHCP → STP → ACLs → Full Build capstone)
+- Topology label improvements: interface labels in dark pill backgrounds, multi-line PC sublabels with IP/DG in green, labels at 33%/67% along lines with 20px perpendicular offset
+
 ### Phase 17 - Complete
 Packet Tracer Labs section:
 - Labs landing page at `/study-hub/labs` — shows all lab sets with cert badge, difficulty breakdown, estimated time
