@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import BookmarkModal from '@/components/BookmarkModal'
 
 const DOMAINS = {
   ccna: [
@@ -226,6 +227,7 @@ export default function TestPage() {
   const [flagFeedbackText, setFlagFeedbackText] = useState('')
   const [flagSubmitting, setFlagSubmitting] = useState(false)
   const [bookmarked, setBookmarked] = useState({})
+  const [bookmarkPending, setBookmarkPending] = useState(null) // idx waiting for modal
   const searchParams = useSearchParams()
 
   // Auto-resume if ?resume=id is in the URL
@@ -382,18 +384,25 @@ export default function TestPage() {
   }
 
   async function toggleBookmark(idx) {
-    const q = questions[idx]
     if (bookmarked[idx]) {
       await fetch('/api/bookmarks', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: bookmarked[idx] }) })
       setBookmarked(prev => { const n = { ...prev }; delete n[idx]; return n })
     } else {
-      const res = await fetch('/api/bookmarks', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cert, topic: q.topic, question_text: q.question, options: q.options, correct_answer: q.correct, explanations: q.explanations ?? {}, difficulty })
-      })
-      const data = await res.json()
-      if (data.id) setBookmarked(prev => ({ ...prev, [idx]: data.id }))
+      setBookmarkPending(idx)
     }
+  }
+
+  async function saveBookmark({ reason, notes }) {
+    const idx = bookmarkPending
+    setBookmarkPending(null)
+    if (idx === null) return
+    const q = questions[idx]
+    const res = await fetch('/api/bookmarks', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cert, topic: q.topic, question_text: q.question, options: q.options, correct_answer: q.correct, explanations: q.explanations ?? {}, difficulty, reason, notes })
+    })
+    const data = await res.json()
+    if (data.id) setBookmarked(prev => ({ ...prev, [idx]: data.id }))
   }
 
   async function generateTest() {
@@ -896,6 +905,7 @@ export default function TestPage() {
         </div>
         {pauseModal}
         {flagModalEl}
+        {bookmarkPending !== null && <BookmarkModal onSave={saveBookmark} onCancel={() => setBookmarkPending(null)} />}
       </>
     )
   }
@@ -981,6 +991,7 @@ export default function TestPage() {
       </div>
       {pauseModal}
       {flagModalEl}
+      {bookmarkPending !== null && <BookmarkModal onSave={saveBookmark} onCancel={() => setBookmarkPending(null)} />}
     </>
   )
 }

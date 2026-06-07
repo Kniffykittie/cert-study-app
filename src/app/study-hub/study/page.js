@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import BookmarkModal from '@/components/BookmarkModal'
 
 const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
 const letters = ['A', 'B', 'C', 'D']
@@ -44,6 +45,7 @@ export default function StudyModePage() {
   const [selectedAnswer, setSelectedAnswer] = useState(null)
   const [sessionCount, setSessionCount] = useState(0)
   const [bookmarked, setBookmarked] = useState({})
+  const [bookmarkPending, setBookmarkPending] = useState(false)
 
   const concepts = cert ? CONCEPTS[cert] : []
   const concept = concepts[conceptIndex % concepts.length]
@@ -65,20 +67,26 @@ export default function StudyModePage() {
     setLoadingQ(false)
   }
 
-  async function bookmarkCurrent() {
+  function bookmarkCurrent() {
     if (!question) return
     const key = conceptIndex
     if (bookmarked[key]) {
-      await fetch('/api/bookmarks', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: bookmarked[key] }) })
+      fetch('/api/bookmarks', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: bookmarked[key] }) })
       setBookmarked(prev => { const n = { ...prev }; delete n[key]; return n })
     } else {
-      const res = await fetch('/api/bookmarks', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cert, topic: question.topic, question_text: question.question, options: question.options, correct_answer: question.correct, explanations: question.explanations ?? {}, difficulty: 'medium' })
-      })
-      const data = await res.json()
-      if (data.id) setBookmarked(prev => ({ ...prev, [key]: data.id }))
+      setBookmarkPending(true)
     }
+  }
+
+  async function saveBookmark({ reason, notes }) {
+    setBookmarkPending(false)
+    const key = conceptIndex
+    const res = await fetch('/api/bookmarks', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cert, topic: question.topic, question_text: question.question, options: question.options, correct_answer: question.correct, explanations: question.explanations ?? {}, difficulty: 'medium', reason, notes })
+    })
+    const data = await res.json()
+    if (data.id) setBookmarked(prev => ({ ...prev, [key]: data.id }))
   }
 
   function next() {
@@ -212,6 +220,7 @@ export default function StudyModePage() {
           )}
         </div>
       )}
+      {bookmarkPending && <BookmarkModal onSave={saveBookmark} onCancel={() => setBookmarkPending(false)} />}
     </div>
   )
 }

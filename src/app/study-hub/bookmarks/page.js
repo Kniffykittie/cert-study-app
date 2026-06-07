@@ -4,12 +4,19 @@ import { useState, useEffect } from 'react'
 const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
 const letters = ['A', 'B', 'C', 'D']
 
+const REASONS = {
+  hard:      { label: 'Super Hard',   icon: '🔥', color: 'var(--error)' },
+  confusing: { label: 'Confusing',    icon: '🤔', color: 'var(--warning)' },
+  share:     { label: 'Show Others',  icon: '📢', color: 'var(--accent-blue)' },
+  important: { label: 'Important',    icon: '⭐', color: 'var(--accent-purple, #a78bfa)' },
+}
+
 export default function BookmarksPage() {
   const [bookmarks, setBookmarks] = useState([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(null)
   const [removing, setRemoving] = useState(null)
-  const [filterCert, setFilterCert] = useState('all')
+  const [activeCert, setActiveCert] = useState('all')
 
   useEffect(() => { load() }, [])
 
@@ -28,8 +35,12 @@ export default function BookmarksPage() {
     setRemoving(null)
   }
 
-  const filtered = bookmarks.filter(b => filterCert === 'all' || b.cert === filterCert)
-  const diffColor = { easy: 'var(--success)', medium: 'var(--warning)', hard: 'var(--error)' }
+  const certs = ['all', ...Object.keys(CERT_LABELS).filter(c => bookmarks.some(b => b.cert === c))]
+  const filtered = bookmarks.filter(b => activeCert === 'all' || b.cert === activeCert)
+
+  const countByCert = Object.fromEntries(
+    Object.keys(CERT_LABELS).map(c => [c, bookmarks.filter(b => b.cert === c).length])
+  )
 
   return (
     <div>
@@ -38,17 +49,19 @@ export default function BookmarksPage() {
         <p style={{ color: 'var(--text-secondary)' }}>Questions you saved for later review.</p>
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', alignItems: 'center' }}>
-        {['all', 'ccna', 'network-plus', 'security-plus'].map(c => (
-          <div key={c} onClick={() => setFilterCert(c)}
-            style={{ padding: '5px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', backgroundColor: filterCert === c ? 'rgba(0,128,255,0.12)' : 'var(--surface)', border: `1px solid ${filterCert === c ? 'var(--accent-blue)' : 'var(--border)'}`, color: filterCert === c ? 'var(--accent-blue)' : 'var(--text-secondary)', fontWeight: filterCert === c ? '600' : '400' }}>
-            {c === 'all' ? 'All' : CERT_LABELS[c]}
-          </div>
-        ))}
-        <span style={{ marginLeft: 'auto', color: 'var(--text-secondary)', fontSize: '12px' }}>
-          {loading ? '' : `${filtered.length} bookmark${filtered.length !== 1 ? 's' : ''}`}
-        </span>
+      {/* Cert tabs */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid var(--border)', paddingBottom: '0' }}>
+        {certs.map(c => {
+          const count = c === 'all' ? bookmarks.length : countByCert[c] ?? 0
+          const active = activeCert === c
+          return (
+            <div key={c} onClick={() => setActiveCert(c)}
+              style={{ padding: '8px 16px', cursor: 'pointer', fontSize: '13px', fontWeight: active ? '600' : '400', color: active ? 'var(--accent-blue)' : 'var(--text-secondary)', borderBottom: active ? '2px solid var(--accent-blue)' : '2px solid transparent', marginBottom: '-1px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {c === 'all' ? 'All' : CERT_LABELS[c]}
+              <span style={{ backgroundColor: active ? 'rgba(0,128,255,0.15)' : 'var(--surface)', color: active ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', padding: '1px 6px', borderRadius: '10px', border: '1px solid var(--border)' }}>{count}</span>
+            </div>
+          )
+        })}
       </div>
 
       {loading ? (
@@ -63,15 +76,27 @@ export default function BookmarksPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.map(b => {
             const isOpen = expanded === b.id
+            const reason = b.reason ? REASONS[b.reason] : null
             return (
               <div key={b.id} style={{ backgroundColor: 'var(--surface)', border: `1px solid ${isOpen ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '10px', overflow: 'hidden' }}>
                 {/* Header row */}
                 <div onClick={() => setExpanded(isOpen ? null : b.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', cursor: 'pointer' }}>
-                  <span style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '700', minWidth: '56px' }}>{CERT_LABELS[b.cert]}</span>
-                  {b.difficulty && <span style={{ color: diffColor[b.difficulty] ?? 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', textTransform: 'capitalize', minWidth: '44px' }}>{b.difficulty}</span>}
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px', minWidth: '160px', flexShrink: 0 }}>{b.topic}</span>
+                  {/* Cert badge */}
+                  <span style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '700', minWidth: '56px', flexShrink: 0 }}>{CERT_LABELS[b.cert]}</span>
+                  {/* Reason badge */}
+                  {reason ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'var(--background)', border: `1px solid var(--border)`, borderRadius: '20px', padding: '2px 8px', fontSize: '11px', fontWeight: '600', color: reason.color, flexShrink: 0 }}>
+                      {reason.icon} {reason.label}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', flexShrink: 0, minWidth: '80px' }}>🔖 Saved</span>
+                  )}
+                  {/* Topic */}
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px', flexShrink: 0, minWidth: '140px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.topic}</span>
+                  {/* Question preview */}
                   <span style={{ color: 'var(--text-primary)', fontSize: '13px', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.question_text}</span>
+                  {/* Date */}
                   <span style={{ color: 'var(--text-secondary)', fontSize: '11px', flexShrink: 0 }}>
                     {new Date(b.bookmarked_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
@@ -80,7 +105,22 @@ export default function BookmarksPage() {
 
                 {/* Expanded */}
                 {isOpen && (
-                  <div style={{ borderTop: '1px solid var(--border)', padding: '16px', backgroundColor: 'var(--background)' }}>
+                  <div style={{ borderTop: '1px solid var(--border)', padding: '20px', backgroundColor: 'var(--background)' }}>
+                    {/* Reason + notes banner */}
+                    {(reason || b.notes) && (
+                      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                        {reason && (
+                          <div style={{ flexShrink: 0 }}>
+                            <span style={{ fontSize: '20px' }}>{reason.icon}</span>
+                          </div>
+                        )}
+                        <div>
+                          {reason && <div style={{ color: reason.color, fontSize: '12px', fontWeight: '700', marginBottom: b.notes ? '4px' : 0 }}>{reason.label}</div>}
+                          {b.notes && <div style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5' }}>{b.notes}</div>}
+                        </div>
+                      </div>
+                    )}
+
                     <p style={{ color: 'var(--text-primary)', fontSize: '15px', lineHeight: '1.6', marginBottom: '16px', whiteSpace: 'pre-wrap' }}>{b.question_text}</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                       {(b.options ?? []).map((opt, i) => {
