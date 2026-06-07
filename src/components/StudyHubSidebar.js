@@ -28,7 +28,8 @@ const SECTIONS = [
     label: 'Settings',
     items: [
       { label: 'Flagged Questions', href: '/study-hub/flagged' },
-      { label: 'Templates', href: '/study-hub/templates' },
+      { label: 'Generate Templates', href: '/study-hub/templates' },
+      { label: 'Pre-made Templates', href: '/study-hub/premade-templates' },
     ]
   },
 ]
