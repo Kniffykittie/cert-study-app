@@ -13,8 +13,9 @@ export default function FlashcardsPage() {
   const [stats, setStats] = useState({})
   const [generating, setGenerating] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [weakDomains, setWeakDomains] = useState([])
 
-  useEffect(() => { loadStats() }, [])
+  useEffect(() => { loadStats(); loadWeakDomains() }, [])
 
   async function loadStats() {
     const supabase = createClient()
@@ -37,6 +38,18 @@ export default function FlashcardsPage() {
     }
     setStats(s)
     setLoading(false)
+  }
+
+  async function loadWeakDomains() {
+    const supabase = createClient()
+    const { data } = await supabase.from('topic_performance').select('cert, topic, correct_count, total_count').gte('total_count', 5)
+    if (!data) return
+    const weak = data
+      .map(d => ({ cert: d.cert, topic: d.topic, accuracy: Math.round((d.correct_count / d.total_count) * 100) }))
+      .filter(d => d.accuracy < 65)
+      .sort((a, b) => a.accuracy - b.accuracy)
+      .slice(0, 6)
+    setWeakDomains(weak)
   }
 
   async function addMoreCards(cert) {
@@ -131,6 +144,45 @@ export default function FlashcardsPage() {
           )
         })}
       </div>
+
+      {weakDomains.length > 0 && (
+        <div style={{ marginTop: '40px' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <h2 style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700', margin: '0 0 4px' }}>🎯 Weak Domain Study</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>
+              Domains where you're scoring below 65% — focus your flashcard sessions here for the biggest gains.
+            </p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
+            {weakDomains.map((d, i) => {
+              const certInfo = CERTS.find(c => c.key === d.cert)
+              return (
+                <Link key={i} href={certInfo?.href || '/study-hub/flashcards'} style={{ textDecoration: 'none' }}>
+                  <div style={{ backgroundColor: 'var(--surface)', border: `1px solid ${certInfo?.color ?? 'var(--border)'}33`, borderRadius: '10px', padding: '16px', cursor: 'pointer', transition: 'border-color 0.15s' }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = certInfo?.color ?? 'var(--accent-blue)'}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = `${certInfo?.color ?? 'var(--border)'}33`}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: certInfo?.color ?? 'var(--text-secondary)', backgroundColor: `${certInfo?.color ?? 'var(--border)'}18`, padding: '2px 8px', borderRadius: '20px' }}>
+                        {certInfo?.label ?? d.cert}
+                      </span>
+                      <span style={{ fontSize: '18px', fontWeight: '700', color: d.accuracy < 40 ? 'var(--error)' : d.accuracy < 55 ? 'var(--warning)' : 'var(--text-secondary)' }}>
+                        {d.accuracy}%
+                      </span>
+                    </div>
+                    <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>{d.topic}</div>
+                    <div style={{ height: '4px', backgroundColor: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${d.accuracy}%`, backgroundColor: d.accuracy < 40 ? 'var(--error)' : d.accuracy < 55 ? 'var(--warning)' : 'var(--accent-blue)', borderRadius: '2px' }} />
+                    </div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '8px' }}>
+                      Study {certInfo?.label} flashcards to improve →
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

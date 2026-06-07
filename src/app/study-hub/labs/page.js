@@ -1,11 +1,30 @@
 'use client'
 import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { LAB_SETS } from '@/data/labs/index'
+import { createClient } from '@/lib/supabase/client'
 
 const DIFF_COLOR = { beginner: 'var(--success)', intermediate: 'var(--warning)', advanced: 'var(--error)' }
 
 export default function LabsPage() {
   const router = useRouter()
+  const [progress, setProgress] = useState({})
+
+  useEffect(() => {
+    async function loadProgress() {
+      const supabase = createClient()
+      const { data } = await supabase.from('lab_progress').select('lab_set_id, lab_id, step_id')
+      if (!data) return
+      const p = {}
+      for (const row of data) {
+        const key = `${row.lab_set_id}/${row.lab_id}`
+        if (!p[key]) p[key] = new Set()
+        p[key].add(row.step_id)
+      }
+      setProgress(p)
+    }
+    loadProgress()
+  }, [])
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto' }}>
@@ -23,6 +42,10 @@ export default function LabsPage() {
             const m = lab.duration.match(/(\d+)/)
             return sum + (m ? parseInt(m[1]) : 30)
           }, 0)
+          const completedLabs = set.labs.filter(lab => {
+            const done = progress[`${set.id}/${lab.id}`]
+            return done && done.size >= lab.steps.length
+          }).length
 
           return (
             <div
@@ -68,6 +91,22 @@ export default function LabsPage() {
                   <span>{set.tip}</span>
                 </div>
               )}
+              <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>Progress:</span>
+                {set.labs.map(lab => {
+                  const done = progress[`${set.id}/${lab.id}`]
+                  const stepsDone = done ? done.size : 0
+                  const full = stepsDone >= lab.steps.length
+                  const partial = stepsDone > 0 && !full
+                  return (
+                    <div key={lab.id} title={`${lab.title}: ${stepsDone}/${lab.steps.length} steps`}
+                      style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: full ? 'var(--success)' : partial ? 'var(--warning)' : 'var(--border)', flexShrink: 0 }} />
+                  )
+                })}
+                <span style={{ fontSize: '11px', color: completedLabs === set.labs.length ? 'var(--success)' : 'var(--text-secondary)' }}>
+                  {completedLabs}/{set.labs.length} complete
+                </span>
+              </div>
             </div>
           )
         })}

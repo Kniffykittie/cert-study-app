@@ -36,6 +36,7 @@ const SECTIONS = [
     label: 'Labs',
     items: [
       { label: 'Packet Tracer Labs', href: '/study-hub/labs' },
+      { label: 'IOS Commands', href: '/study-hub/labs/commands' },
       { label: 'Tips & Tricks', href: '/study-hub/labs/tips' },
     ]
   },

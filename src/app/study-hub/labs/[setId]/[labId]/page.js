@@ -3,6 +3,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback } from 'react'
 import { getLabSet, getLab } from '@/data/labs/index'
 import LabTopology from '@/components/LabTopology'
+import FloatingCommandPanel from '@/components/FloatingCommandPanel'
 import { createClient } from '@/lib/supabase/client'
 
 const DIFF_COLOR = { beginner: 'var(--success)', intermediate: 'var(--warning)', advanced: 'var(--error)' }
@@ -375,6 +376,8 @@ export default function LabPage() {
       </div>
 
     </div>
+
+    <FloatingCommandPanel />
   )
 }
 

@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import BookmarkModal from '@/components/BookmarkModal'
+import FloatingReferencePanel from '@/components/FloatingReferencePanel'
 
 const DOMAINS = {
   ccna: [
@@ -1243,6 +1244,7 @@ export default function TestPage() {
       {pauseModal}
       {flagModalEl}
       {bookmarkPending !== null && <BookmarkModal onSave={saveBookmark} onCancel={() => setBookmarkPending(null)} />}
+      {isPractice && <FloatingReferencePanel cert={cert} />}
     </>
   )
 }
