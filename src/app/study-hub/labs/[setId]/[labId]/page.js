@@ -249,6 +249,7 @@ export default function LabPage() {
   const nextLab = labIndex < set.labs.length - 1 ? set.labs[labIndex + 1] : null
 
   return (
+    <>
     <div style={{ maxWidth: '860px', margin: '0 auto' }}>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button onClick={() => router.push('/study-hub/labs')} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', padding: 0 }}>Labs</button>
@@ -378,6 +379,7 @@ export default function LabPage() {
     </div>
 
     <FloatingCommandPanel />
+    </>
   )
 }
 
