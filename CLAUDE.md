@@ -73,6 +73,14 @@ src/
 
 ---
 
+### Progress Page (`progress/page.js`)
+- **Unique purpose:** cross-cert roll-up — nothing else shows all certs together
+- Top stats: total questions answered, avg score, best score, day streak (≥30q/day)
+- Score Over Time: SVG multi-line chart, one color-coded line per cert, 82.5% dashed threshold
+- Questions Per Day: SVG bar chart, last 30 days, green=goal met, blue=partial, grey=none
+- Domain Heatmap: all domains across all certs, filterable by cert tab, sorted weakest→strongest
+- Data sources: `question_answers.answered_at`, `test_sessions`, `topic_performance`
+
 ### Results Page (`results/page.js`)
 - Grouped by cert (CCNA / Network+ / Security+)
 - Each row shows: correct/total, **mode badge** (Practice=blue, Simulation=yellow, Real Exam=red), date, score %, Discard button

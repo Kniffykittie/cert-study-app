@@ -228,6 +228,14 @@ Template system and library management:
 - Approved duplicate pairs stored in localStorage
 - Retire/restore templates — `is_retired` flag in Supabase
 
+### Phase 11 - Complete
+Progress page fully built (was a placeholder):
+- Top stats row: total questions answered, average score, best score, day streak
+- Score Over Time SVG chart: color-coded lines per cert, 82.5% dashed threshold, all certs on one chart
+- Questions Per Day bar chart: last 30 days, green ≥30 (goal met), blue 1-29, grey 0, dashed 30q goal line
+- Domain Accuracy Heatmap: all domains across all certs, filterable by cert tab, sorted weakest→strongest, color-coded rows
+- Uses: `question_answers.answered_at`, `test_sessions`, `topic_performance`
+
 ### Phase 10 - Complete
 Results page improvements:
 - Added mode badge (Practice / Simulation / Real Exam) to each result row
