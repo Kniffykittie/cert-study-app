@@ -139,6 +139,7 @@ function RealExam({ cert, questions, answers, setAnswers, current, setCurrent, s
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Question {current + 1} of {questions.length}</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {templateBar}
           <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', maxWidth: '220px' }}>
             {questions.map((_, i) => (
               <div key={i} onClick={() => setCurrent(i)} style={{ width: '16px', height: '16px', borderRadius: '3px', backgroundColor: i === current ? 'var(--accent-blue)' : answers[i] !== undefined ? 'var(--accent-blue)' : 'var(--border)', opacity: answers[i] !== undefined || i === current ? 1 : 0.3, cursor: 'pointer' }} />
@@ -155,6 +156,7 @@ function RealExam({ cert, questions, answers, setAnswers, current, setCurrent, s
       </div>
 
       <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
+        {q.from_template && <div style={{ marginBottom: '10px' }}><span style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600', opacity: 0.7 }}>⚡ Template</span></div>}
         <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {q.options.map((opt, i) => {
@@ -778,6 +780,13 @@ export default function TestPage() {
   const q = questions[current]
   const isLast = current === questions.length - 1
   const isPractice = mode === 'practice'
+  const templateCount = questions.filter(q => q.from_template).length
+  const templateBar = templateCount > 0 && (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', backgroundColor: 'rgba(0,128,255,0.06)', border: '1px solid rgba(0,128,255,0.2)', borderRadius: '6px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+      <span style={{ color: 'var(--accent-blue)', fontWeight: '700' }}>⚡</span>
+      <span><span style={{ color: 'var(--accent-blue)', fontWeight: '600' }}>{templateCount}/{questions.length}</span> from template pool</span>
+    </div>
+  )
 
   const progressBar = (
     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -813,12 +822,14 @@ export default function TestPage() {
               <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Question {current + 1} of {questions.length}</p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {templateBar}
               {progressBar}
               <button onClick={() => triggerPause(null)} style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer' }}>⏸ Pause</button>
             </div>
           </div>
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+              {q.from_template && <span style={{ marginRight: 'auto', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600' }}>⚡ Template</span>}
               <button onClick={() => setFlagModal({ questionIndex: current })}
                 style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-secondary)', fontSize: '11px', padding: '2px 8px', cursor: 'pointer' }}>⚑ Flag</button>
             </div>
@@ -873,13 +884,17 @@ export default function TestPage() {
               <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Question {current + 1} of {questions.length}</p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {templateBar}
               {progressBar}
               <button onClick={() => triggerPause(null)} style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer' }}>⏸ Pause</button>
             </div>
           </div>
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <div style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{q.topic}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{q.topic}</div>
+                {q.from_template && <span style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '600', opacity: 0.7 }}>⚡ Template</span>}
+              </div>
               <button onClick={() => setFlagModal({ questionIndex: current })}
                 style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-secondary)', fontSize: '11px', padding: '2px 8px', cursor: 'pointer' }}>⚑ Flag</button>
             </div>
