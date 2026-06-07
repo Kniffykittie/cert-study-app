@@ -86,6 +86,19 @@ function getNodeCenter(node) {
   return { cx: node.x + ICON_SIZE / 2, cy: node.y + ICON_SIZE / 2 }
 }
 
+// Label pill with dark background for readability
+function ConnLabel({ x, y, text, color }) {
+  if (!text) return null
+  const charWidth = 5.5
+  const w = text.length * charWidth + 8
+  return (
+    <g>
+      <rect x={x - w / 2} y={y - 7} width={w} height={13} rx="3" fill="#0D0D0D" opacity="0.85" />
+      <text x={x} y={y + 3} fontSize="9" fill={color} textAnchor="middle" fontFamily="monospace">{text}</text>
+    </g>
+  )
+}
+
 function ConnectionLine({ from, to, fromLabel, toLabel, style: connStyle, nodes }) {
   const fromNode = nodes.find(n => n.id === from)
   const toNode = nodes.find(n => n.id === to)
@@ -94,31 +107,60 @@ function ConnectionLine({ from, to, fromLabel, toLabel, style: connStyle, nodes 
   const { cx: x1, cy: y1 } = getNodeCenter(fromNode)
   const { cx: x2, cy: y2 } = getNodeCenter(toNode)
 
-  const color = connStyle === 'trunk' ? '#0080FF' : connStyle === 'redundant' ? '#7B2FBE' : '#444'
+  const color = connStyle === 'trunk' ? '#0080FF' : connStyle === 'redundant' ? '#7B2FBE' : '#555'
   const dash = connStyle === 'redundant' ? '6 3' : undefined
 
-  const mx = (x1 + x2) / 2
-  const my = (y1 + y2) / 2
   const angle = Math.atan2(y2 - y1, x2 - x1)
-  const labelOffset = 12
+  const perpX = Math.cos(angle + Math.PI / 2)
+  const perpY = Math.sin(angle + Math.PI / 2)
 
-  const flx = x1 + Math.cos(angle) * 22
-  const fly = y1 + Math.sin(angle) * 22
-  const tlx = x2 - Math.cos(angle) * 22
-  const tly = y2 - Math.sin(angle) * 22
+  // Pull endpoints back from the icon centers so lines don't overlap icons
+  const gap = 22
+  const flx = x1 + Math.cos(angle) * gap
+  const fly = y1 + Math.sin(angle) * gap
+  const tlx = x2 - Math.cos(angle) * gap
+  const tly = y2 - Math.sin(angle) * gap
+
+  // Place labels ~25% and ~75% along the line, offset perpendicularly
+  const offset = 14
+  const flLabelX = flx + (tlx - flx) * 0.18 + perpX * offset
+  const flLabelY = fly + (tly - fly) * 0.18 + perpY * offset
+  const tlLabelX = flx + (tlx - flx) * 0.82 + perpX * offset
+  const tlLabelY = fly + (tly - fly) * 0.82 + perpY * offset
 
   return (
     <g>
       <line x1={flx} y1={fly} x2={tlx} y2={tly} stroke={color} strokeWidth="1.5" strokeDasharray={dash} opacity="0.7" />
-      {fromLabel && (
-        <text x={flx + Math.cos(angle + Math.PI / 2) * labelOffset} y={fly + Math.sin(angle + Math.PI / 2) * labelOffset}
-          fontSize="9" fill="#888" textAnchor="middle" dominantBaseline="middle">{fromLabel}</text>
-      )}
-      {toLabel && (
-        <text x={tlx + Math.cos(angle + Math.PI / 2) * labelOffset} y={tly + Math.sin(angle + Math.PI / 2) * labelOffset}
-          fontSize="9" fill="#888" textAnchor="middle" dominantBaseline="middle">{toLabel}</text>
-      )}
+      {fromLabel && <ConnLabel x={flLabelX} y={flLabelY} text={fromLabel} color={color} />}
+      {toLabel && <ConnLabel x={tlLabelX} y={tlLabelY} text={toLabel} color={color} />}
     </g>
+  )
+}
+
+// Renders a node's sublabel as multiple lines split on \n
+// Lines that look like IPs or DG entries get a distinct color
+function NodeSublabel({ sublabel, cx, baseY }) {
+  if (!sublabel) return null
+  const lines = sublabel.split('\n').filter(Boolean)
+  return (
+    <>
+      {lines.map((line, i) => {
+        const isIP = /^\d+\.\d+/.test(line) || line.startsWith('DG:') || line.startsWith('DHCP')
+        return (
+          <text
+            key={i}
+            x={cx}
+            y={baseY + i * 11}
+            fontSize="9"
+            fill={isIP ? '#2ECC71' : '#888'}
+            textAnchor="middle"
+            fontFamily="monospace"
+          >
+            {line}
+          </text>
+        )
+      })}
+    </>
   )
 }
 
@@ -132,31 +174,36 @@ export default function LabTopology({ topology }) {
         {connections.map((conn, i) => (
           <ConnectionLine key={i} {...conn} nodes={nodes} />
         ))}
-        {nodes.map(node => (
-          <g key={node.id}>
-            <NodeIcon type={node.type} x={node.x} y={node.y} />
-            <text x={node.x + ICON_SIZE / 2} y={node.y + ICON_SIZE + 12} fontSize="11" fill="#E8E8E8" textAnchor="middle" fontWeight="600">
-              {node.label}
-            </text>
-            {node.sublabel && (
-              <text x={node.x + ICON_SIZE / 2} y={node.y + ICON_SIZE + 22} fontSize="9" fill="#888" textAnchor="middle">
-                {node.sublabel}
+        {nodes.map(node => {
+          const cx = node.x + ICON_SIZE / 2
+          const labelY = node.y + ICON_SIZE + 13
+          const sublabelY = node.y + ICON_SIZE + 24
+          return (
+            <g key={node.id}>
+              <NodeIcon type={node.type} x={node.x} y={node.y} />
+              <text x={cx} y={labelY} fontSize="11" fill="#E8E8E8" textAnchor="middle" fontWeight="600">
+                {node.label}
               </text>
-            )}
-          </g>
-        ))}
+              <NodeSublabel sublabel={node.sublabel} cx={cx} baseY={sublabelY} />
+            </g>
+          )
+        })}
       </svg>
       <div style={{ display: 'flex', gap: '16px', padding: '6px 4px 2px', flexWrap: 'wrap' }}>
         {[
-          { color: '#0080FF', label: 'Trunk link', dash: false },
+          { color: '#0080FF', label: 'Trunk / routed link', dash: false },
           { color: '#7B2FBE', label: 'Redundant link', dash: true },
-          { color: '#444', label: 'Access link', dash: false },
+          { color: '#555', label: 'Access link', dash: false },
         ].map(item => (
           <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             <svg width="20" height="8"><line x1="0" y1="4" x2="20" y2="4" stroke={item.color} strokeWidth="1.5" strokeDasharray={item.dash ? '4 2' : undefined} /></svg>
             <span style={{ fontSize: '10px', color: '#888' }}>{item.label}</span>
           </div>
         ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <span style={{ fontSize: '9px', color: '#2ECC71', fontFamily: 'monospace' }}>10.x.x.x</span>
+          <span style={{ fontSize: '10px', color: '#888' }}>= IP / DG</span>
+        </div>
       </div>
     </div>
   )
