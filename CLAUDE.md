@@ -249,6 +249,7 @@ src/
 - Data-driven: add a new lab set by creating one file in `src/data/labs/` and importing it in `index.js` — zero UI changes needed
 - `LabTopology.js` renders SVG topologies: router (circle + spokes), switch (rect + port lines), PC (monitor), server (rack units), cloud icons; trunk=blue, redundant=purple, access=grey lines with interface labels
 - Interface labels use dark pill backgrounds (`ConnLabel`), multi-line sublabels via `NodeSublabel` (split on `\n`), IP/DG lines in green (#2ECC71), labels at 33%/67% along lines with 20px perpendicular offset
+- Accepts two topology formats: old (`connections` array with `fromLabel`/`toLabel`) and new (`links` array with single `label` split on `\n`). Auto-computes `viewBox` from node positions if not provided.
 
 ### Per-Step Documentation
 - Every step has a `document` array — 2–3 prompts that teach the user to document their work like a real network admin
@@ -261,7 +262,7 @@ src/
 ### Lab Sets
 - **CCNA Fundamentals** (`ccna-fundamentals.js`): 8 labs — VLANs/Router-on-a-Stick, DHCP, STP, ACLs, SSH hardening, OSPF, NAT/PAT, Capstone
 - **Small Office Network Series** (`small-office-network.js`): 5 labs — Labs 1–4 share a base topology (1 router, 3 switches, 9 PCs) building VLANs → DHCP → STP redundancy → ACLs; Lab 5 is a standalone full-office build challenge with distribution/access switch hierarchy, 4 VLANs + VLAN 99, redundant uplinks, DHCP, SSH, STP root, and guest isolation ACL
-- **Network+ Fundamentals** (`network-plus-fundamentals.js`): 5 labs — Topology documentation, VLAN segmentation + inter-VLAN routing, wireless AP config (WPA2), troubleshooting methodology (OSI layers), port security with sticky MACs and violation modes
+- **Network+ Fundamentals** (`network-plus-fundamentals.js`): 5 labs — Topology documentation, VLAN segmentation + inter-VLAN routing, wireless AP config (WPA2), troubleshooting methodology (explicit build-then-break-then-fix format, 7 steps), port security with sticky MACs and violation modes
 - **Security+ Network Labs** (`security-plus-labs.js`): 4 labs — ACL-based firewall rules with DMZ, DMZ network design (three-zone architecture), device hardening (SSH v2, encrypted passwords, login rate limiting), network segmentation (VLANs per trust level with IoT isolation)
 
 ## Cost Reference (Anthropic API)

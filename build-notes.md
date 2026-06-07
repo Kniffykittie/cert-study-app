@@ -353,3 +353,27 @@ Multi-feature expansion — contextual panels, new lab sets, and smart study too
 - Supplement tracking and encyclopedia
 - Correlation engine (study performance vs health data)
 - Daily morning brief page
+
+### Phase 19b - Complete
+Bug fixes and lab improvements:
+
+**Topology rendering (LabTopology.js)**
+- Accepts both old format (`connections` with `fromLabel`/`toLabel`) and new format (`links` with single `label` split on `\n`)
+- Auto-computes `viewBox` from node positions when not provided — new lab files no longer need to define it
+- Node `label` with `\n` now correctly splits into main label + sublabel; old `sublabel` field still works
+- All Network+ and Security+ lab topologies now render fully with connections
+
+**Lab set overview — domain strength indicators**
+- Domain tags now show accuracy % and color-coded strength: ▼ red = weak (<65%), ◆ yellow = avg (65–80%), ▲ green = strong (≥80%)
+- Red border + "🎯 Needs Practice" badge when any domain is weak
+- "No test data yet" shown in italic when topic_performance has no data for that cert
+- Threshold lowered from 5 to 3 questions seen
+
+**Flashcard weak domain section**
+- Always visible now — shows "take some practice tests" message when no data (was hidden entirely)
+- Threshold lowered from 5 to 3 questions seen
+
+**Network+ Lab 4 rewrite (Troubleshooting Methodology)**
+- Previous version was vague about how to build the network and didn't give explicit break instructions
+- Rewritten as 7 explicit steps: place & cable all devices → configure IPs → verify baseline → Fault 1 (shutdown interface) → Fault 2 (wrong subnet mask) → Fault 3 (missing gateway) → write incident reports
+- Each fault step has an explicit INTRODUCE section (exact what to change), DIAGNOSE section (which commands and what to look for), and FIX section
