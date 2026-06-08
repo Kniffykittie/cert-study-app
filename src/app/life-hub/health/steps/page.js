@@ -18,20 +18,32 @@ export default function StepTrackerPage() {
 
   const handleMouseMove = useCallback((e) => setMousePos({ x: e.clientX, y: e.clientY }), [])
 
+  function cacheKey(r) { return `health_steps_${r}` }
+
   async function fetchData(r) {
-    const statusRes = await fetch('/api/health/status')
-    const status = await statusRes.json()
-    if (!status.connected) { setLoading(false); return }
+    // Show cached data instantly, no loading spinner
+    const cached = localStorage.getItem(cacheKey(r))
+    if (cached) { setData(JSON.parse(cached)); setLoading(false) }
+
     const res = await fetch(`/api/health/sync?range=${r}`)
     const json = await res.json()
-    if (!json.error) setData(json)
-    setLoading(false)
+    if (json.error === 'Not connected') { setLoading(false); return }
+    if (!json.error) {
+      setData(json)
+      setLoading(false)
+      localStorage.setItem(cacheKey(r), JSON.stringify(json))
+    }
     // Background sync if never synced or stale (>15 min)
-    if (json.neverSynced || !json.lastSyncedAt || Date.now() - new Date(json.lastSyncedAt).getTime() > 15 * 60 * 1000) {
+    if (!json.error && (json.neverSynced || !json.lastSyncedAt || Date.now() - new Date(json.lastSyncedAt).getTime() > 15 * 60 * 1000)) {
       fetch('/api/health/sync', { method: 'POST' })
         .then(() => fetch(`/api/health/sync?range=${r}`))
         .then(r2 => r2.json())
-        .then(fresh => { if (!fresh.error) setData(fresh) })
+        .then(fresh => {
+          if (!fresh.error) {
+            setData(fresh)
+            localStorage.setItem(cacheKey(r), JSON.stringify(fresh))
+          }
+        })
         .catch(() => {})
     }
   }
@@ -43,15 +55,19 @@ export default function StepTrackerPage() {
     await fetch('/api/health/sync', { method: 'POST' })
     const res = await fetch(`/api/health/sync?range=${range}`)
     const json = await res.json()
-    if (!json.error) setData(json)
+    if (!json.error) {
+      setData(json)
+      localStorage.setItem(cacheKey(range), JSON.stringify(json))
+    }
     setSyncing(false)
   }
 
   function handleRangeChange(r) {
     setRange(r)
     setTooltip(null)
-    setData(null)
-    setLoading(true)
+    const cached = localStorage.getItem(cacheKey(r))
+    if (cached) { setData(JSON.parse(cached)); setLoading(false) }
+    else { setData(null); setLoading(true) }
     fetchData(r)
   }
 

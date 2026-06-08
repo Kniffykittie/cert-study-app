@@ -10,23 +10,29 @@ export default function HealthPage() {
 
   useEffect(() => {
     async function load() {
-      const statusRes = await fetch('/api/health/status')
-      const status = await statusRes.json()
-      setConnected(status.connected)
-      if (status.connected) {
-        const syncRes = await fetch('/api/health/sync')
-        const syncData = await syncRes.json()
-        if (!syncData.error) setData(syncData)
+      const cached = localStorage.getItem('health_overview')
+      if (cached) { setData(JSON.parse(cached)); setConnected(true); setLoading(false) }
+
+      const syncRes = await fetch('/api/health/sync')
+      const syncData = await syncRes.json()
+      if (syncData.error === 'Not connected') { setConnected(false); setLoading(false); return }
+      if (!syncData.error) {
+        setConnected(true)
+        setData(syncData)
         setLoading(false)
-        if (syncData.neverSynced || !syncData.lastSyncedAt || Date.now() - new Date(syncData.lastSyncedAt).getTime() > 15 * 60 * 1000) {
-          fetch('/api/health/sync', { method: 'POST' })
-            .then(() => fetch('/api/health/sync'))
-            .then(r => r.json())
-            .then(fresh => { if (!fresh.error) setData(fresh) })
-            .catch(() => {})
-        }
-      } else {
-        setLoading(false)
+        localStorage.setItem('health_overview', JSON.stringify(syncData))
+      }
+      if (!syncData.error && (syncData.neverSynced || !syncData.lastSyncedAt || Date.now() - new Date(syncData.lastSyncedAt).getTime() > 15 * 60 * 1000)) {
+        fetch('/api/health/sync', { method: 'POST' })
+          .then(() => fetch('/api/health/sync'))
+          .then(r => r.json())
+          .then(fresh => {
+            if (!fresh.error) {
+              setData(fresh)
+              localStorage.setItem('health_overview', JSON.stringify(fresh))
+            }
+          })
+          .catch(() => {})
       }
     }
     load()
@@ -37,7 +43,10 @@ export default function HealthPage() {
     await fetch('/api/health/sync', { method: 'POST' })
     const res = await fetch('/api/health/sync')
     const syncData = await res.json()
-    if (!syncData.error) setData(syncData)
+    if (!syncData.error) {
+      setData(syncData)
+      localStorage.setItem('health_overview', JSON.stringify(syncData))
+    }
     setSyncing(false)
   }
 

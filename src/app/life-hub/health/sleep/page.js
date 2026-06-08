@@ -25,18 +25,27 @@ export default function SleepTrackerPage() {
   const handleMouseMove = useCallback((e) => setMousePos({ x: e.clientX, y: e.clientY }), [])
 
   async function load() {
-    const statusRes = await fetch('/api/health/status')
-    const status = await statusRes.json()
-    if (!status.connected) { setLoading(false); return }
+    const cached = localStorage.getItem('health_sleep')
+    if (cached) { setData(JSON.parse(cached)); setLoading(false) }
+
     const res = await fetch('/api/health/sync')
     const json = await res.json()
-    if (!json.error) setData(json)
-    setLoading(false)
-    if (json.neverSynced || !json.lastSyncedAt || Date.now() - new Date(json.lastSyncedAt).getTime() > 15 * 60 * 1000) {
+    if (json.error === 'Not connected') { setLoading(false); return }
+    if (!json.error) {
+      setData(json)
+      setLoading(false)
+      localStorage.setItem('health_sleep', JSON.stringify(json))
+    }
+    if (!json.error && (json.neverSynced || !json.lastSyncedAt || Date.now() - new Date(json.lastSyncedAt).getTime() > 15 * 60 * 1000)) {
       fetch('/api/health/sync', { method: 'POST' })
         .then(() => fetch('/api/health/sync'))
         .then(r => r.json())
-        .then(fresh => { if (!fresh.error) setData(fresh) })
+        .then(fresh => {
+          if (!fresh.error) {
+            setData(fresh)
+            localStorage.setItem('health_sleep', JSON.stringify(fresh))
+          }
+        })
         .catch(() => {})
     }
   }
@@ -48,7 +57,10 @@ export default function SleepTrackerPage() {
     await fetch('/api/health/sync', { method: 'POST' })
     const res = await fetch('/api/health/sync')
     const json = await res.json()
-    if (!json.error) setData(json)
+    if (!json.error) {
+      setData(json)
+      localStorage.setItem('health_sleep', JSON.stringify(json))
+    }
     setSyncing(false)
   }
 
