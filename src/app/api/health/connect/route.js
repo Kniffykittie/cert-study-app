@@ -4,9 +4,9 @@ import { redirect } from 'next/navigation'
 const ALLOWED_EMAIL = 'Sethproper40@yahoo.com'
 
 const SCOPES = [
-  'https://www.googleapis.com/auth/health.activity',
-  'https://www.googleapis.com/auth/health.sleep',
-  'https://www.googleapis.com/auth/health.heart_rate',
+  'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
+  'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
+  'https://www.googleapis.com/auth/googlehealth.sleep.readonly',
 ].join(' ')
 
 export async function GET() {
