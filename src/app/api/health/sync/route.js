@@ -30,14 +30,13 @@ async function refreshTokenIfNeeded(supabase, userId, tokenRow) {
   return data.access_token
 }
 
-async function listDataPoints(accessToken, dataType, filter = null) {
-  const url = filter
-    ? `${BASE}/users/-/dataTypes/${dataType}/dataPoints?filter=${encodeURIComponent(filter)}`
-    : `${BASE}/users/-/dataTypes/${dataType}/dataPoints`
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
+async function fetchDataType(accessToken, dataType) {
+  const res = await fetch(`${BASE}/users/me/dataTypes/${dataType}/dataPoints`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  })
+  if (!res.ok) return []
   const json = await res.json()
-  if (!res.ok) return { _error: json, _status: res.status, _type: dataType }
-  return json
+  return json.dataPoints ?? []
 }
 
 export async function GET() {
@@ -56,18 +55,43 @@ export async function GET() {
   const accessToken = await refreshTokenIfNeeded(supabase, user.id, tokenRow)
   if (!accessToken) return NextResponse.json({ error: 'Token refresh failed' }, { status: 401 })
 
-  const today = new Date().toISOString().split('T')[0]
+  const todayUTC = new Date().toISOString().split('T')[0]
+  const yesterdayUTC = new Date(Date.now() - 86400000).toISOString().split('T')[0]
 
-  // Get user identity first to get healthUserId
-  const identityRes = await fetch(`${BASE}/users/-/identity`, { headers: { Authorization: `Bearer ${accessToken}` } })
-  const identity = await identityRes.json()
-  const userId = identity.healthUserId ?? '-'
-
-  const [stepsMe, stepsId, stepsFilter] = await Promise.all([
-    fetch(`${BASE}/users/me/dataTypes/steps/dataPoints`, { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.json()),
-    fetch(`${BASE}/users/${userId}/dataTypes/steps/dataPoints`, { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.json()),
-    fetch(`${BASE}/users/${userId}/dataTypes/steps/dataPoints?filter=${encodeURIComponent(`date="${today}"`)}`, { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.json()),
+  const [stepsPoints, heartPoints, sleepPoints] = await Promise.all([
+    fetchDataType(accessToken, 'steps'),
+    fetchDataType(accessToken, 'heart-rate'),
+    fetchDataType(accessToken, 'sleep'),
   ])
 
-  return NextResponse.json({ _debug: { userId, stepsMe, stepsId, stepsFilter } })
+  // Filter to today's data and sum steps
+  const todaySteps = stepsPoints
+    .filter(p => p.steps?.interval?.startTime?.startsWith(todayUTC))
+  const steps = todaySteps.length > 0
+    ? todaySteps.reduce((sum, p) => sum + parseInt(p.steps?.count ?? 0), 0)
+    : null
+
+  // Today's heart rate average
+  const todayHr = heartPoints
+    .filter(p => p.heartRate?.sampleTime?.physicalTime?.startsWith(todayUTC))
+    .map(p => p.heartRate?.beatsPerMinute)
+    .filter(Boolean)
+  const heartRate = todayHr.length > 0
+    ? Math.round(todayHr.reduce((a, b) => a + b, 0) / todayHr.length)
+    : null
+
+  // Sleep from last night (yesterday evening to this morning)
+  const lastNightSleep = sleepPoints.filter(p => {
+    const start = p.sleep?.interval?.startTime ?? ''
+    return start.startsWith(yesterdayUTC) || start.startsWith(todayUTC)
+  })
+  const sleepMs = lastNightSleep.reduce((sum, p) => {
+    const start = p.sleep?.interval?.startTime
+    const end = p.sleep?.interval?.endTime
+    if (!start || !end) return sum
+    return sum + (new Date(end) - new Date(start))
+  }, 0)
+  const sleepHours = sleepMs > 0 ? Math.round((sleepMs / 3600000) * 10) / 10 : null
+
+  return NextResponse.json({ steps, heartRate, sleepHours })
 }
