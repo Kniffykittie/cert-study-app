@@ -1,8 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+
+const ALLOWED_HEALTH_EMAIL = 'sethproper40@yahoo.com'
 
 const CERTS = [
   { key: 'ccna', label: 'CCNA', color: 'var(--accent-blue)' },
@@ -24,6 +26,12 @@ export default function SettingsPage() {
   const [defaultCert, setDefaultCert] = useState('')
   const [prefSaving, setPrefSaving] = useState(false)
   const [prefSaveMsg, setPrefSaveMsg] = useState('')
+  const [healthConnected, setHealthConnected] = useState(false)
+  const [healthConnectedAt, setHealthConnectedAt] = useState(null)
+  const [healthDisconnecting, setHealthDisconnecting] = useState(false)
+  const [showHealthSection, setShowHealthSection] = useState(false)
+
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     async function fetchProfile() {
@@ -37,6 +45,14 @@ export default function SettingsPage() {
         if (data.exam_dates) setExamDates({ ccna: '', 'network-plus': '', 'security-plus': '', ...data.exam_dates })
         if (data.daily_goal) setDailyGoal(data.daily_goal)
         if (data.default_cert) setDefaultCert(data.default_cert)
+      }
+
+      if (user.email.toLowerCase() === ALLOWED_HEALTH_EMAIL) {
+        setShowHealthSection(true)
+        const statusRes = await fetch('/api/health/status')
+        const status = await statusRes.json()
+        setHealthConnected(status.connected)
+        if (status.connectedAt) setHealthConnectedAt(new Date(status.connectedAt).toLocaleDateString())
       }
     }
     fetchProfile()
@@ -66,6 +82,14 @@ export default function SettingsPage() {
     })
     if (error) { setPrefSaveMsg('Failed to save.') } else { setPrefSaveMsg('Saved!'); setTimeout(() => setPrefSaveMsg(''), 2000) }
     setPrefSaving(false)
+  }
+
+  async function handleDisconnectHealth() {
+    setHealthDisconnecting(true)
+    await fetch('/api/health/disconnect', { method: 'POST' })
+    setHealthConnected(false)
+    setHealthConnectedAt(null)
+    setHealthDisconnecting(false)
   }
 
   async function handleLogout() {
@@ -221,6 +245,45 @@ export default function SettingsPage() {
             </button>
           </div>
         </div>
+
+        {/* Connected Apps */}
+        {showHealthSection && (
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '16px' }}>
+            <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Connected Apps</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>❤️</div>
+                <div>
+                  <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>Google Health</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+                    {healthConnected ? `Connected ${healthConnectedAt ? `· since ${healthConnectedAt}` : ''}` : 'Steps, sleep, heart rate'}
+                  </div>
+                </div>
+              </div>
+              {healthConnected ? (
+                <button
+                  onClick={handleDisconnectHealth}
+                  disabled={healthDisconnecting}
+                  style={{ backgroundColor: 'var(--error-border)', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: healthDisconnecting ? 'not-allowed' : 'pointer', opacity: healthDisconnecting ? 0.5 : 1 }}
+                >
+                  {healthDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                </button>
+              ) : (
+                <a href="/api/health/connect"
+                  style={{ backgroundColor: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.4)', color: '#4285F4', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}
+                >
+                  Connect
+                </a>
+              )}
+            </div>
+            {searchParams.get('health') === 'connected' && (
+              <p style={{ color: 'var(--success)', fontSize: '12px', marginTop: '12px' }}>✓ Google Health connected successfully.</p>
+            )}
+            {searchParams.get('health') === 'error' && (
+              <p style={{ color: 'var(--error)', fontSize: '12px', marginTop: '12px' }}>Failed to connect. Please try again.</p>
+            )}
+          </div>
+        )}
 
         {/* Security */}
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
