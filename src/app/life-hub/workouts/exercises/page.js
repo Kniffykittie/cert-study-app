@@ -113,7 +113,10 @@ export default function ExerciseLibraryPage() {
                 onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-blue)'}
                 onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
               >
-                <img src={ex.gif_url} alt={ex.name} style={{ width: '100%', height: '160px', objectFit: 'cover', backgroundColor: '#111' }} loading="lazy" />
+                {ex.gif_url
+                  ? <img src={ex.gif_url} alt={ex.name} style={{ width: '100%', height: '160px', objectFit: 'cover', backgroundColor: '#111' }} loading="lazy" />
+                  : <div style={{ width: '100%', height: '160px', backgroundColor: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '28px' }}>🏋️</div>
+                }
                 <div style={{ padding: '12px' }}>
                   <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', marginBottom: '4px', textTransform: 'capitalize' }}>{ex.name}</div>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -138,7 +141,10 @@ export default function ExerciseLibraryPage() {
               <button onClick={() => setSelected(null)}
                 style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>✕</button>
             </div>
-            <img src={selected.gif_url} alt={selected.name} style={{ width: '100%', maxHeight: '300px', objectFit: 'contain', backgroundColor: '#111', margin: '16px 0' }} />
+            {selected.gif_url
+              ? <img src={selected.gif_url} alt={selected.name} style={{ width: '100%', maxHeight: '300px', objectFit: 'contain', backgroundColor: '#111', margin: '16px 0' }} />
+              : <div style={{ width: '100%', height: '200px', backgroundColor: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '48px', margin: '16px 0' }}>🏋️</div>
+            }
             <div style={{ padding: '0 20px 20px' }}>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
                 {[
