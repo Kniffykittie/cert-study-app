@@ -56,27 +56,12 @@ export async function GET() {
   const accessToken = await refreshTokenIfNeeded(supabase, user.id, tokenRow)
   if (!accessToken) return NextResponse.json({ error: 'Token refresh failed' }, { status: 401 })
 
-  const today = new Date().toISOString().split('T')[0]
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
-
-  const stepsFilter = `interval.start_time >= "${today}T00:00:00Z" AND interval.start_time < "${today}T23:59:59Z"`
-  const hrFilter = `sample_time.physical_time >= "${today}T00:00:00Z" AND sample_time.physical_time < "${today}T23:59:59Z"`
-  const sleepFilter = `interval.end_time >= "${yesterday}T18:00:00Z" AND interval.end_time < "${today}T12:00:00Z"`
-
-  const [stepsData, heartData, sleepData] = await Promise.all([
-    listDataPoints(accessToken, 'steps'),
-    listDataPoints(accessToken, 'heart-rate'),
-    listDataPoints(accessToken, 'sleep'),
+  // Test: get user identity and list available data types
+  const [identityRes, stepsData, heartData] = await Promise.all([
+    fetch(`${BASE}/users/-/identity`, { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.json()),
+    fetch(`${BASE}/users/-/dataTypes/steps/dataPoints`, { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.json()),
+    fetch(`${BASE}/users/-/dataTypes/com.google.step_count.delta/dataPoints`, { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.json()),
   ])
 
-  const steps = stepsData?.dataPoints?.reduce((sum, p) => sum + (p.value ?? 0), 0) ?? null
-  const heartRates = heartData?.dataPoints?.map(p => p.value).filter(Boolean) ?? []
-  const avgHr = heartRates.length ? Math.round(heartRates.reduce((a, b) => a + b, 0) / heartRates.length) : null
-  const sleepMs = sleepData?.dataPoints?.reduce((sum, p) => {
-    if (!p.startTime || !p.endTime) return sum
-    return sum + (new Date(p.endTime) - new Date(p.startTime))
-  }, 0) ?? 0
-  const sleepHours = sleepMs > 0 ? Math.round((sleepMs / 3600000) * 10) / 10 : null
-
-  return NextResponse.json({ steps, heartRate: avgHr, sleepHours, _debug: { stepsData, heartData, sleepData } })
+  return NextResponse.json({ _debug: { identityRes, stepsData, heartData } })
 }
