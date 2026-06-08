@@ -40,7 +40,14 @@ async function refreshTokenIfNeeded(supabase, userId, tokenRow) {
   return data.access_token
 }
 
-async function fetchDataType(accessToken, dataType) {
+function pointTime(p) {
+  return p.steps?.interval?.startTime
+    ?? p.heartRate?.sampleTime?.physicalTime
+    ?? p.sleep?.interval?.startTime
+    ?? null
+}
+
+async function fetchDataType(accessToken, dataType, since) {
   let allPoints = []
   let pageToken = null
   do {
@@ -50,8 +57,15 @@ async function fetchDataType(accessToken, dataType) {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
     if (!res.ok) break
     const json = await res.json()
-    allPoints = allPoints.concat(json.dataPoints ?? [])
+    const points = json.dataPoints ?? []
+    if (points.length === 0) break
+    allPoints = allPoints.concat(points)
     pageToken = json.nextPageToken ?? null
+    // Stop paginating once we've reached data older than our cutoff
+    if (since) {
+      const oldest = pointTime(points[points.length - 1])
+      if (oldest && oldest < since) break
+    }
   } while (pageToken)
   return allPoints
 }
@@ -90,10 +104,16 @@ export async function GET(req) {
   const todayUTC = new Date().toISOString().split('T')[0]
   const yesterdayUTC = new Date(Date.now() - 86400000).toISOString().split('T')[0]
 
+  const stepsSince = range === 'week'
+    ? new Date(Date.now() - 8 * 86400000).toISOString()
+    : new Date(Date.now() - 2 * 86400000).toISOString()
+  const sleepSince = new Date(Date.now() - 8 * 86400000).toISOString()
+  const hrSince = new Date(Date.now() - 2 * 86400000).toISOString()
+
   const [stepsPoints, heartPoints, sleepPoints] = await Promise.all([
-    fetchDataType(accessToken, 'steps'),
-    fetchDataType(accessToken, 'heart-rate'),
-    fetchDataType(accessToken, 'sleep'),
+    fetchDataType(accessToken, 'steps', stepsSince),
+    fetchDataType(accessToken, 'heart-rate', hrSince),
+    fetchDataType(accessToken, 'sleep', sleepSince),
   ])
 
   // --- STEPS ---
