@@ -183,5 +183,14 @@ export async function GET(req) {
     }))
     .sort((a, b) => new Date(a.start) - new Date(b.start))
 
-  return NextResponse.json({ range, steps, heartRate, sleepHours, hourlySteps, sleepStages, sleepTimeline })
+  return NextResponse.json({ range, steps, heartRate, sleepHours, hourlySteps, sleepStages, sleepTimeline,
+    _debug: {
+      stepsTotal: stepsPoints.length,
+      stepsSample: stepsPoints.slice(0, 3),
+      sleepTotal: sleepPoints.length,
+      sleepSample: sleepPoints.slice(0, 3),
+      dayStepsCount: daySteps.length,
+      lastNightSleepCount: lastNightSleep.length,
+    }
+  })
 }
