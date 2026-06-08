@@ -71,14 +71,9 @@ export async function GET() {
     ? todaySteps.reduce((sum, p) => sum + parseInt(p.steps?.count ?? 0), 0)
     : null
 
-  // Today's heart rate average
-  const todayHr = heartPoints
-    .filter(p => p.heartRate?.sampleTime?.physicalTime?.startsWith(todayUTC))
-    .map(p => p.heartRate?.beatsPerMinute)
-    .filter(Boolean)
-  const heartRate = todayHr.length > 0
-    ? Math.round(todayHr.reduce((a, b) => a + b, 0) / todayHr.length)
-    : null
+  // Today's heart rate average — log first point to inspect shape
+  const todayHr = heartPoints.slice(0, 3)
+  const heartRate = todayHr.length > 0 ? { _sample: todayHr } : null
 
   // Sleep from last night (yesterday evening to this morning)
   const lastNightSleep = sleepPoints.filter(p => {
