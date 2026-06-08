@@ -357,11 +357,50 @@ Multi-feature expansion — contextual panels, new lab sets, and smart study too
 - PWA conversion (add to home screen, offline support)
 
 ## Future Features (Life Hub)
-- Workout and nutrition logging
-- Supplement tracking and encyclopedia
-- Correlation engine (study performance vs health data)
-- Daily morning brief page
-- Wire Life Hub landing page cards with real health data
+
+### Health — Google Health / Pixel Watch
+- **Heart Rate Tracker page** — hourly HR chart, resting HR, peak HR, zone breakdown (Rest/Fat Burn/Cardio/Peak)
+- **Vercel Cron Job auto-sync** — server-side scheduled job (every 30-60 min) that calls Google Health API and writes to cache tables without user loading the website; ensures HR/steps/sleep always fresh in Supabase
+- **Health Overview wiring** — connect landing page cards with live Supabase data (steps today, avg HR, sleep last night)
+- **Weekly/monthly sleep trends** — avg sleep per night over 7/30 days, trend line, goal line (8h)
+
+### Nutrition
+- **Food logging** — log meals with calories, macros (protein/carbs/fat), meal type (breakfast/lunch/dinner/snack); ultra-specific micronutrients (vitamin B12, magnesium, potassium, vitamin D, iron, zinc, calcium, omega-3, fiber, sodium, etc.) tracked against daily recommended values (RDVs)
+- **Barcode scanner** — scan food packaging via phone camera, auto-populate from Open Food Facts or Nutritionix API; shows full nutrition preview before saving so user can manually add or edit any missing fields before confirming
+- **Manual food entry** — full nutrition fields form (all macros + micronutrients) when no barcode available
+- **My Foods library** — personal library of frequently eaten foods, organized by category, one-tap logging; full edit/remove capability per food, update nutrition facts at any time
+- **Daily nutrition dashboard** — calories in vs goal, macro ring charts, meal history by day, micronutrient progress bars vs RDV
+- **Nutrition history** — past days/weeks view, average macros and micros, trend charts
+
+### Supplements & Vitamins
+- **Supplement tracker** — log daily supplements (vitamin D, magnesium, etc.), mark taken/skipped per day
+- **Consistency tracking** — streak and calendar heatmap per supplement
+- **Supplement encyclopedia** — AI-generated profiles: benefits, optimal dose, timing, interactions, food sources
+- **Vitamin/nutrient encyclopedia** — searchable reference with AI-generated explanations per nutrient
+
+### Workouts
+- **Workout logging** — log exercises with sets/reps/weight or duration, workout type (strength/cardio/flexibility)
+- **Workout history** — past sessions, volume over time, PRs per exercise
+- **Workout templates** — save common routines for quick logging
+- **AI workout plan generator** — dumbbell and bodyweight only (no bench), generates a full 7-day weekly plan; updates day by day but always shows the full week ahead; each day's plan includes exercise photos and form tips
+- **Exercise library** — dumbbell and bodyweight exercises with photos showing how to perform them, organized by muscle group (Arms / Legs / Core / Shoulders / Back / Chest); click any exercise to open a detail popup with photo, form tips, common mistakes, and variations
+- **Yoga & stretching planner** — AI-generated weekly yoga/stretching plan (one session per day); each session shows poses/stretches with photos and correct form tips; plan generated a full week in advance and updated day by day
+- **Stretching library** — all stretches organized by muscle being stretched; click any stretch to open a popup with photo, hold duration, form tips, and what it targets
+
+### Goals & Body Metrics
+- **Goals page** — input personal goals (lose weight / gain muscle / improve sleep / be healthier / etc.); AI provides guidance, an overview of the goal, and actionable recommendations based on what was entered
+- **Body metrics profile** — height, weight, sex, body type/build, age; used by AI to calculate personalized calorie targets, macro ratios, nutrient needs, and track progress toward goals over time
+- **Goal progress tracking** — track body weight over time, compare against goal, show trend
+
+### Correlation Engine
+- **Daily snapshots** — background job saves daily snapshot combining study score, steps, sleep hours, avg HR, calorie/macro totals to a Supabase table
+- **AI insights** — Claude analyzes patterns and surfaces observations (e.g. "your test scores are 12% higher after 7+ hours of sleep", "your energy is lower on days with <100g protein")
+- **Correlation charts** — scatter plots / trend lines showing study score vs sleep, steps, protein, HR
+- **Morning brief page** — daily summary card: yesterday's health snapshot + today's study recommendation based on patterns
+
+### Life Hub Landing Page
+- **Wire overview cards** — connect cards with live Supabase data from all connected sources
+- **Daily readiness score** — composite score from sleep quality, steps, HR, nutrition completeness
 
 ### Phase 23 - Complete
 Google Health API integration (Life Hub):
