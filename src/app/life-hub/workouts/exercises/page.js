@@ -162,16 +162,35 @@ export default function ExerciseLibraryPage() {
                   </div>
                 </div>
               )}
-              {selected.instructions?.length > 0 && (
-                <div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '10px' }}>Instructions</div>
-                  <ol style={{ margin: 0, padding: '0 0 0 18px' }}>
-                    {selected.instructions.map((step, i) => (
-                      <li key={i} style={{ color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6', marginBottom: '8px' }}>{step}</li>
-                    ))}
-                  </ol>
-                </div>
-              )}
+              {selected.instructions?.length > 0 && (() => {
+                const steps = selected.instructions.filter(s => !s.startsWith('You should feel') && !s.startsWith('Do NOT'))
+                const feel = selected.instructions.find(s => s.startsWith('You should feel'))
+                const doNot = selected.instructions.find(s => s.startsWith('Do NOT'))
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '10px' }}>Instructions</div>
+                      <ol style={{ margin: 0, padding: '0 0 0 18px' }}>
+                        {steps.map((step, i) => (
+                          <li key={i} style={{ color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6', marginBottom: '8px' }}>{step}</li>
+                        ))}
+                      </ol>
+                    </div>
+                    {feel && (
+                      <div style={{ backgroundColor: 'rgba(0,200,100,0.08)', border: '1px solid rgba(0,200,100,0.25)', borderRadius: '8px', padding: '10px 14px' }}>
+                        <span style={{ color: 'var(--success)', fontSize: '12px', fontWeight: '600' }}>WHERE YOU SHOULD FEEL IT  </span>
+                        <span style={{ color: 'var(--text-primary)', fontSize: '13px' }}>{feel.replace('You should feel it: ', '')}</span>
+                      </div>
+                    )}
+                    {doNot && (
+                      <div style={{ backgroundColor: 'rgba(255,60,60,0.08)', border: '1px solid rgba(255,60,60,0.25)', borderRadius: '8px', padding: '10px 14px' }}>
+                        <span style={{ color: 'var(--error)', fontSize: '12px', fontWeight: '600' }}>DO NOT  </span>
+                        <span style={{ color: 'var(--text-primary)', fontSize: '13px' }}>{doNot.replace('Do NOT: ', '')}</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           </div>
         </div>
