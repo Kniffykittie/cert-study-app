@@ -41,12 +41,19 @@ async function refreshTokenIfNeeded(supabase, userId, tokenRow) {
 }
 
 async function fetchDataType(accessToken, dataType) {
-  const res = await fetch(`${BASE}/users/me/dataTypes/${dataType}/dataPoints`, {
-    headers: { Authorization: `Bearer ${accessToken}` }
-  })
-  if (!res.ok) return []
-  const json = await res.json()
-  return json.dataPoints ?? []
+  let allPoints = []
+  let pageToken = null
+  do {
+    const url = pageToken
+      ? `${BASE}/users/me/dataTypes/${dataType}/dataPoints?pageToken=${encodeURIComponent(pageToken)}`
+      : `${BASE}/users/me/dataTypes/${dataType}/dataPoints`
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
+    if (!res.ok) break
+    const json = await res.json()
+    allPoints = allPoints.concat(json.dataPoints ?? [])
+    pageToken = json.nextPageToken ?? null
+  } while (pageToken)
+  return allPoints
 }
 
 function getEstHour(isoString) {
@@ -157,40 +164,33 @@ export async function GET(req) {
     const start = p.sleep?.interval?.startTime ?? ''
     return start.startsWith(yesterdayUTC) || start.startsWith(todayUTC)
   })
-  const sleepMs = lastNightSleep.reduce((sum, p) => {
-    const start = p.sleep?.interval?.startTime
-    const end = p.sleep?.interval?.endTime
-    if (!start || !end) return sum
-    return sum + (new Date(end) - new Date(start))
-  }, 0)
-  const sleepHours = sleepMs > 0 ? Math.round((sleepMs / 3600000) * 10) / 10 : null
+
+  // Pick the longest sleep session (main sleep vs naps)
+  const mainSleep = lastNightSleep.reduce((best, p) => {
+    const mins = parseInt(p.sleep?.summary?.minutesInSleepPeriod ?? 0)
+    return mins > (parseInt(best?.sleep?.summary?.minutesInSleepPeriod ?? 0)) ? p : best
+  }, null)
+
+  const sleepMinsAsleep = mainSleep ? parseInt(mainSleep.sleep?.summary?.minutesAsleep ?? 0) : 0
+  const sleepHours = sleepMinsAsleep > 0 ? Math.round((sleepMinsAsleep / 60) * 10) / 10 : null
 
   const sleepStages = {}
-  lastNightSleep.forEach(p => {
-    const label = SLEEP_STAGES[p.sleep?.stage ?? 'UNKNOWN'] ?? 'Unknown'
-    const start = p.sleep?.interval?.startTime
-    const end = p.sleep?.interval?.endTime
-    if (!start || !end) return
-    sleepStages[label] = (sleepStages[label] ?? 0) + Math.round((new Date(end) - new Date(start)) / 60000)
-  })
-  const sleepTimeline = lastNightSleep
-    .filter(p => p.sleep?.interval?.startTime && p.sleep?.interval?.endTime)
-    .map(p => ({
-      stage: SLEEP_STAGES[p.sleep.stage] ?? 'Unknown',
-      start: p.sleep.interval.startTime,
-      end: p.sleep.interval.endTime,
-      mins: Math.round((new Date(p.sleep.interval.endTime) - new Date(p.sleep.interval.startTime)) / 60000),
+  if (mainSleep) {
+    mainSleep.sleep?.summary?.stagesSummary?.forEach(s => {
+      const label = SLEEP_STAGES[s.type] ?? 'Unknown'
+      sleepStages[label] = (sleepStages[label] ?? 0) + parseInt(s.minutes ?? 0)
+    })
+  }
+
+  const sleepTimeline = (mainSleep?.sleep?.stages ?? [])
+    .filter(s => s.startTime && s.endTime)
+    .map(s => ({
+      stage: SLEEP_STAGES[s.type] ?? 'Unknown',
+      start: s.startTime,
+      end: s.endTime,
+      mins: Math.round((new Date(s.endTime) - new Date(s.startTime)) / 60000),
     }))
     .sort((a, b) => new Date(a.start) - new Date(b.start))
 
-  return NextResponse.json({ range, steps, heartRate, sleepHours, hourlySteps, sleepStages, sleepTimeline,
-    _debug: {
-      stepsTotal: stepsPoints.length,
-      stepsSample: stepsPoints.slice(0, 3),
-      sleepTotal: sleepPoints.length,
-      sleepSample: sleepPoints.slice(0, 3),
-      dayStepsCount: daySteps.length,
-      lastNightSleepCount: lastNightSleep.length,
-    }
-  })
+  return NextResponse.json({ range, steps, heartRate, sleepHours, hourlySteps, sleepStages, sleepTimeline })
 }
