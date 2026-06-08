@@ -40,7 +40,7 @@ export default function StepTrackerPage() {
   const totalSteps = data.steps ?? 0
   const maxSteps = Math.max(...hourlySteps.map(h => h.steps), 1)
   const peakHour = hourlySteps.reduce((best, h) => h.steps > best.steps ? h : best, { hour: 0, steps: 0 })
-  const now = new Date().getUTCHours()
+  const now = parseInt(new Date().toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false })) % 24
   const goal = 10000
 
   function fmtHour(h) {
@@ -118,7 +118,7 @@ export default function StepTrackerPage() {
           ))}
         </div>
         <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '8px' }}>
-          Green bar = peak hour · Blue = past hours · Times are UTC
+          Green bar = peak hour · Blue = past hours · Times are Eastern
         </p>
       </div>
     </div>

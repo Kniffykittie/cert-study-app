@@ -55,8 +55,13 @@ export async function GET() {
   const accessToken = await refreshTokenIfNeeded(supabase, user.id, tokenRow)
   if (!accessToken) return NextResponse.json({ error: 'Token refresh failed' }, { status: 401 })
 
+  const todayEST = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-').replace(/(\d+)-(\d+)-(\d+)/, '$1-$3-$2').slice(0, 10)
   const todayUTC = new Date().toISOString().split('T')[0]
   const yesterdayUTC = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+
+  // EST today start/end in UTC for filtering
+  const estTodayStart = new Date(`${todayEST}T00:00:00-05:00`).toISOString()
+  const estTodayEnd = new Date(`${todayEST}T23:59:59-05:00`).toISOString()
 
   const [stepsPoints, heartPoints, sleepPoints] = await Promise.all([
     fetchDataType(accessToken, 'steps'),
@@ -64,8 +69,11 @@ export async function GET() {
     fetchDataType(accessToken, 'sleep'),
   ])
 
-  // Filter to today's steps and build hourly breakdown
-  const todaySteps = stepsPoints.filter(p => p.steps?.interval?.startTime?.startsWith(todayUTC))
+  // Filter to today's steps (EST) and build hourly breakdown
+  const todaySteps = stepsPoints.filter(p => {
+    const t = p.steps?.interval?.startTime
+    return t && t >= estTodayStart && t <= estTodayEnd
+  })
   const steps = todaySteps.length > 0
     ? todaySteps.reduce((sum, p) => sum + parseInt(p.steps?.count ?? 0), 0)
     : null
@@ -73,14 +81,15 @@ export async function GET() {
   const stepsByHour = {}
   for (let h = 0; h < 24; h++) stepsByHour[h] = 0
   todaySteps.forEach(p => {
-    const hour = new Date(p.steps.interval.startTime).getUTCHours()
+    const hourStr = new Date(p.steps.interval.startTime).toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false })
+    const hour = parseInt(hourStr) % 24
     stepsByHour[hour] += parseInt(p.steps?.count ?? 0)
   })
   const hourlySteps = Array.from({ length: 24 }, (_, h) => ({ hour: h, steps: stepsByHour[h] }))
 
   // Today's heart rate
   const todayHr = heartPoints
-    .filter(p => p.heartRate?.sampleTime?.physicalTime?.startsWith(todayUTC))
+    .filter(p => { const t = p.heartRate?.sampleTime?.physicalTime; return t && t >= estTodayStart && t <= estTodayEnd })
     .map(p => parseInt(p.heartRate?.beatsPerMinute))
     .filter(Boolean)
   const heartRate = todayHr.length > 0
