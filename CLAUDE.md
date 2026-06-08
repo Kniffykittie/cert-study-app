@@ -52,8 +52,15 @@ src/
         connect/route.js           Initiates Google Health OAuth (owner account only)
         callback/route.js          Handles OAuth callback, saves tokens
         status/route.js            Checks if Google Health is connected
-        sync/route.js              Fetches steps/heart rate/sleep from Google Health API v4
+        sync/route.js              Fetches steps/heart rate/sleep from Google Health API v4 (?range=today|yesterday|week)
         disconnect/route.js        Removes stored tokens
+    life-hub/
+      layout.js                   Life Hub layout with LifeHubSidebar
+      page.js                     Life Hub landing
+      health/
+        page.js                   Health Overview — steps today, avg heart rate, sleep last night
+        steps/page.js             Step Tracker — hourly/weekly bar charts, goal progress, fixed tooltip
+        sleep/page.js             Sleep Tracker — stage breakdown bar, timeline chart, no-data state
     study-hub/
       page.js                     Overview (DailyStreak component)
       ccna/page.js                CCNA cert page (DomainTrend + Recommended Focus)
@@ -96,6 +103,7 @@ src/
     LabTimer.js                   Per-lab persistent timer — Start/Pause/Reset, survives navigation via Supabase lab_timers table
     FloatingReferencePanel.js     Fixed button on test page (practice mode only) — cert-filtered quick reference (subnetting, ports, OSI, attacks, encryption)
     FloatingChat.js               Fixed chat bubble on all Study Hub pages — session-only tutor chat via /api/chat
+    LifeHubSidebar.js             Life Hub nav sidebar — Health dropdown (Overview/Step Tracker/Sleep Tracker), auto-opens on health routes
 ```
 
 ---
@@ -311,6 +319,27 @@ src/
 - **Small Office Network Series** (`small-office-network.js`): 5 labs — Labs 1–4 share a base topology (1 router, 3 switches, 9 PCs) building VLANs → DHCP → STP redundancy → ACLs; Lab 5 is a standalone full-office build challenge with distribution/access switch hierarchy, 4 VLANs + VLAN 99, redundant uplinks, DHCP, SSH, STP root, and guest isolation ACL
 - **Network+ Fundamentals** (`network-plus-fundamentals.js`): 5 labs — Topology documentation, VLAN segmentation + inter-VLAN routing, wireless AP config (WPA2), troubleshooting methodology (explicit build-then-break-then-fix format, 7 steps), port security with sticky MACs and violation modes
 - **Security+ Network Labs** (`security-plus-labs.js`): 4 labs — ACL-based firewall rules with DMZ, DMZ network design (three-zone architecture), device hardening (SSH v2, encrypted passwords, login rate limiting), network segmentation (VLANs per trust level with IoT isolation)
+
+### Google Health Integration
+- OAuth flow restricted to owner account only (`sethproper40@yahoo.com`) — 403 for all other accounts
+- Scopes: `googlehealth.activity_and_fitness.readonly`, `googlehealth.health_metrics_and_measurements.readonly`, `googlehealth.sleep.readonly`
+- Token refresh handled automatically in `sync/route.js` — checks `expires_at`, refreshes via `oauth2.googleapis.com/token`
+- API endpoint: `health.googleapis.com/v4/users/me/dataTypes/{type}/dataPoints` — `users/me` only, NOT `users/-`
+- Civil date filtering used for EST-safe day boundaries (not UTC time ranges) via `civilStartTime.date` object
+
+### Step Tracker (`/life-hub/health/steps`)
+- Today / Yesterday / Week tabs + Refresh button (Header sub-component)
+- Hourly view: 24-bar chart in Eastern time, goal progress bar (0–10k scale), Summary cards: Total Steps, Peak Hour, Progress %
+- Peak hour bar shown in green; past hours blue; future hours grey (dimmed)
+- Week view: 7-day bar chart, Total / Daily Avg / Goal Days cards; green = goal met, blue = today, purple = other days
+- Hover tooltips: `position: fixed` overlay following mouse cursor with `pointerEvents: none` — no chart layout shift
+- Goal: 10,000 steps/day
+
+### Sleep Tracker (`/life-hub/health/sleep`)
+- Summary cards: Total Sleep, Deep Sleep, REM, Light
+- Stage breakdown proportional bar (Deep=accent-blue, REM=accent-purple, Light=success, Awake=warning)
+- Full sleep timeline with proportional segments across total sleep duration
+- "No sleep data" state (😴) shown correctly when watch not worn
 
 ## Cost Reference (Anthropic API)
 - ~$0.003–$0.005 per question generated
