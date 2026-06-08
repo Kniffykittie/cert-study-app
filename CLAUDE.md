@@ -117,7 +117,7 @@ src/
 | `question_templates` | Template library with `{{placeholder}}` variables, `is_retired` flag |
 | `bookmarked_questions` | Bookmarks with reason, notes, full question snapshot |
 | `flagged_questions` | User-reported question issues |
-| `profiles` | User display name |
+| `profiles` | User display name, exam_dates JSONB, daily_goal INT, default_cert TEXT |
 | `lab_progress` | Completed lab steps per user (user_id, lab_set_id, lab_id, step_id, completed_at) |
 | `lab_notes` | Per-lab notes per user (user_id, lab_set_id, lab_id, notes, updated_at) |
 | `lab_timers` | Per-lab timer state (user_id, lab_set_id, lab_id, elapsed_seconds, is_running, last_started_at) — unique per user+lab |

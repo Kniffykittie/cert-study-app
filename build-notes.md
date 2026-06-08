@@ -342,6 +342,10 @@ Multi-feature expansion — contextual panels, new lab sets, and smart study too
 | `flashcard_progress` | Per-card mastery state: mastered flag, consecutive_correct count |
 | `lab_timers` | Per-lab timer state — elapsed_seconds, is_running, last_started_at; unique per user+lab |
 
+## Future Features (Security)
+- Two-factor authentication (placeholder exists in Settings → Security section)
+- Password change from within the app
+
 ## Future Features (Study Hub)
 - More concept cards in Study Mode
 - Exam countdown timer with target date
@@ -354,6 +358,26 @@ Multi-feature expansion — contextual panels, new lab sets, and smart study too
 - Supplement tracking and encyclopedia
 - Correlation engine (study performance vs health data)
 - Daily morning brief page
+
+### Phase 22 - Complete
+Settings page Study Preferences + live home page:
+
+**Settings — Study Preferences**
+- Target exam date per cert (CCNA, Network+, Security+) — date picker with live days-remaining preview (red <14d, yellow <30d, green otherwise)
+- Daily question goal selector — 10 / 20 / 30 / 50 per day; drives streak tracker threshold
+- Default cert selector — pre-selects cert on Take a Test
+- All saved to `profiles` table (new columns: `exam_dates JSONB`, `daily_goal INT`, `default_cert TEXT`)
+- Single "Save Preferences" button saves all three fields together
+
+**Home page — live data**
+- Cert score cards now pull real predicted scores from `topic_performance` (same weighted formula as cert pages); show `—` until enough data
+- Exam countdown chips appear below greeting when dates are set — color-coded by urgency
+- Today's question count chip shows alongside countdowns when you've answered questions today
+- Hardcoded placeholder scores removed
+
+**Future Features (Security section):**
+- Two-factor authentication
+- Password change
 
 ### Phase 21 - Complete
 Mark as Learned, Lab Completion Summary, and AI Doc Feedback:

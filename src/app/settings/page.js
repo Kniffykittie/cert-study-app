@@ -4,6 +4,19 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
+const CERTS = [
+  { key: 'ccna', label: 'CCNA', color: 'var(--accent-blue)' },
+  { key: 'network-plus', label: 'Network+', color: 'var(--accent-purple)' },
+  { key: 'security-plus', label: 'Security+', color: 'var(--error)' },
+]
+
+const GOAL_OPTIONS = [
+  { value: 10, label: '10 / day', desc: 'Light — quick daily check-in' },
+  { value: 20, label: '20 / day', desc: 'Moderate — steady progress' },
+  { value: 30, label: '30 / day', desc: 'Standard — recommended' },
+  { value: 50, label: '50 / day', desc: 'Intensive — exam crunch mode' },
+]
+
 export default function SettingsPage() {
   const router = useRouter()
   const [displayName, setDisplayName] = useState('')
@@ -12,16 +25,24 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
 
+  const [examDates, setExamDates] = useState({ ccna: '', 'network-plus': '', 'security-plus': '' })
+  const [dailyGoal, setDailyGoal] = useState(30)
+  const [defaultCert, setDefaultCert] = useState('')
+  const [prefSaving, setPrefSaving] = useState(false)
+  const [prefSaveMsg, setPrefSaveMsg] = useState('')
+
   useEffect(() => {
     async function fetchProfile() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       setEmail(user.email)
-      const { data } = await supabase.from('profiles').select('display_name').eq('id', user.id).single()
-      if (data?.display_name) {
-        setDisplayName(data.display_name)
-        setSavedName(data.display_name)
+      const { data } = await supabase.from('profiles').select('display_name, exam_dates, daily_goal, default_cert').eq('id', user.id).single()
+      if (data) {
+        if (data.display_name) { setDisplayName(data.display_name); setSavedName(data.display_name) }
+        if (data.exam_dates) setExamDates({ ccna: '', 'network-plus': '', 'security-plus': '', ...data.exam_dates })
+        if (data.daily_goal) setDailyGoal(data.daily_goal)
+        if (data.default_cert) setDefaultCert(data.default_cert)
       }
     }
     fetchProfile()
@@ -33,14 +54,24 @@ export default function SettingsPage() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     const { error } = await supabase.from('profiles').upsert({ id: user.id, display_name: displayName, updated_at: new Date().toISOString() })
-    if (error) {
-      setSaveMsg('Failed to save.')
-    } else {
-      setSavedName(displayName)
-      setSaveMsg('Saved!')
-      setTimeout(() => setSaveMsg(''), 2000)
-    }
+    if (error) { setSaveMsg('Failed to save.') } else { setSavedName(displayName); setSaveMsg('Saved!'); setTimeout(() => setSaveMsg(''), 2000) }
     setSaving(false)
+  }
+
+  async function handleSavePrefs() {
+    setPrefSaving(true)
+    setPrefSaveMsg('')
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error } = await supabase.from('profiles').upsert({
+      id: user.id,
+      exam_dates: examDates,
+      daily_goal: dailyGoal,
+      default_cert: defaultCert || null,
+      updated_at: new Date().toISOString(),
+    })
+    if (error) { setPrefSaveMsg('Failed to save.') } else { setPrefSaveMsg('Saved!'); setTimeout(() => setPrefSaveMsg(''), 2000) }
+    setPrefSaving(false)
   }
 
   async function handleLogout() {
@@ -48,6 +79,12 @@ export default function SettingsPage() {
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
+  }
+
+  function daysUntil(dateStr) {
+    if (!dateStr) return null
+    const diff = new Date(dateStr) - new Date()
+    return Math.ceil(diff / (1000 * 60 * 60 * 24))
   }
 
   return (
@@ -97,14 +134,84 @@ export default function SettingsPage() {
 
         {/* Study Preferences */}
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '16px' }}>
-          <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Study Preferences</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Study preference settings coming in a later phase.</p>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '20px' }}>Study Preferences</h2>
+
+          {/* Exam target dates */}
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.05em', marginBottom: '12px' }}>TARGET EXAM DATES</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {CERTS.map(cert => {
+                const days = daysUntil(examDates[cert.key])
+                return (
+                  <div key={cert.key} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ color: cert.color, fontSize: '13px', fontWeight: '600', width: '90px', flexShrink: 0 }}>{cert.label}</span>
+                    <input
+                      type="date"
+                      value={examDates[cert.key] || ''}
+                      onChange={e => setExamDates(prev => ({ ...prev, [cert.key]: e.target.value }))}
+                      style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', colorScheme: 'dark' }}
+                    />
+                    {days !== null && (
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: days < 14 ? 'var(--error)' : days < 30 ? 'var(--warning)' : 'var(--success)', flexShrink: 0, minWidth: '70px', textAlign: 'right' }}>
+                        {days < 0 ? 'Past' : days === 0 ? 'Today!' : `${days}d away`}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Exam countdowns appear on your home screen and cert pages.</p>
+          </div>
+
+          {/* Daily goal */}
+          <div style={{ marginBottom: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.05em', marginBottom: '12px' }}>DAILY QUESTION GOAL</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              {GOAL_OPTIONS.map(opt => (
+                <div key={opt.value} onClick={() => setDailyGoal(opt.value)}
+                  style={{ padding: '12px 14px', backgroundColor: dailyGoal === opt.value ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `1px solid ${dailyGoal === opt.value ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '8px', cursor: 'pointer' }}>
+                  <div style={{ color: dailyGoal === opt.value ? 'var(--accent-blue)' : 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>{opt.label}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>{opt.desc}</div>
+                </div>
+              ))}
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Your streak tracker counts a day complete when you hit this goal.</p>
+          </div>
+
+          {/* Default cert */}
+          <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.05em', marginBottom: '12px' }}>DEFAULT CERTIFICATION</div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <div onClick={() => setDefaultCert('')}
+                style={{ padding: '8px 16px', backgroundColor: !defaultCert ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `1px solid ${!defaultCert ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '8px', color: !defaultCert ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontWeight: !defaultCert ? '600' : '400' }}>
+                No preference
+              </div>
+              {CERTS.map(cert => (
+                <div key={cert.key} onClick={() => setDefaultCert(cert.key)}
+                  style={{ padding: '8px 16px', backgroundColor: defaultCert === cert.key ? `${cert.color}18` : 'var(--background)', border: `1px solid ${defaultCert === cert.key ? cert.color : 'var(--border)'}`, borderRadius: '8px', color: defaultCert === cert.key ? cert.color : 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontWeight: defaultCert === cert.key ? '600' : '400' }}>
+                  {cert.label}
+                </div>
+              ))}
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Pre-selects this cert when you open Take a Test.</p>
+          </div>
+
+          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
+            {prefSaveMsg && <span style={{ color: prefSaveMsg === 'Saved!' ? 'var(--success)' : 'var(--error)', fontSize: '13px' }}>{prefSaveMsg}</span>}
+            <button
+              onClick={handleSavePrefs}
+              disabled={prefSaving}
+              style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '13px', fontWeight: '600', cursor: prefSaving ? 'not-allowed' : 'pointer', opacity: prefSaving ? 0.5 : 1 }}
+            >
+              {prefSaving ? 'Saving...' : 'Save Preferences'}
+            </button>
+          </div>
         </div>
 
         {/* Security */}
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
           <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Security</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>2FA and password change coming in a later phase.</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>Two-factor authentication and password change coming in a later phase.</p>
           <button
             onClick={handleLogout}
             style={{ backgroundColor: 'var(--error-border)', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
