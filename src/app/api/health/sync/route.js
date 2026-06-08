@@ -30,25 +30,11 @@ async function refreshTokenIfNeeded(supabase, userId, tokenRow) {
   return data.access_token
 }
 
-async function listDataPoints(accessToken, dataType, startTime, endTime) {
-  const params = new URLSearchParams({ startTime, endTime })
+async function listDataPoints(accessToken, dataType, filter) {
+  const params = new URLSearchParams({ filter })
   const res = await fetch(
     `${BASE}/users/-/dataTypes/${dataType}/dataPoints?${params}`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
-  )
-  const json = await res.json()
-  if (!res.ok) return { _error: json, _status: res.status, _type: dataType }
-  return json
-}
-
-async function dailyRollUp(accessToken, dataType, date) {
-  const res = await fetch(
-    `${BASE}/users/-/dataTypes/${dataType}/dataPoints:dailyRollUp`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dates: [date] }),
-    }
   )
   const json = await res.json()
   if (!res.ok) return { _error: json, _status: res.status, _type: dataType }
@@ -72,17 +58,19 @@ export async function GET() {
   if (!accessToken) return NextResponse.json({ error: 'Token refresh failed' }, { status: 401 })
 
   const today = new Date().toISOString().split('T')[0]
-  const startOfDay = `${today}T00:00:00Z`
-  const endOfDay = `${today}T23:59:59Z`
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
 
-  const [stepsRollup, heartData, sleepData] = await Promise.all([
-    dailyRollUp(accessToken, 'steps', today),
-    listDataPoints(accessToken, 'heart-rate', startOfDay, endOfDay),
-    listDataPoints(accessToken, 'sleep', `${yesterday}T18:00:00Z`, `${today}T12:00:00Z`),
+  const stepsFilter = `interval.start_time >= "${today}T00:00:00Z" AND interval.start_time < "${today}T23:59:59Z"`
+  const hrFilter = `sample_time.physical_time >= "${today}T00:00:00Z" AND sample_time.physical_time < "${today}T23:59:59Z"`
+  const sleepFilter = `interval.end_time >= "${yesterday}T18:00:00Z" AND interval.end_time < "${today}T12:00:00Z"`
+
+  const [stepsData, heartData, sleepData] = await Promise.all([
+    listDataPoints(accessToken, 'steps', stepsFilter),
+    listDataPoints(accessToken, 'heart-rate', hrFilter),
+    listDataPoints(accessToken, 'sleep', sleepFilter),
   ])
 
-  const steps = stepsRollup?.dataPoints?.[0]?.value ?? null
+  const steps = stepsData?.dataPoints?.reduce((sum, p) => sum + (p.value ?? 0), 0) ?? null
   const heartRates = heartData?.dataPoints?.map(p => p.value).filter(Boolean) ?? []
   const avgHr = heartRates.length ? Math.round(heartRates.reduce((a, b) => a + b, 0) / heartRates.length) : null
   const sleepMs = sleepData?.dataPoints?.reduce((sum, p) => {
@@ -91,5 +79,5 @@ export async function GET() {
   }, 0) ?? 0
   const sleepHours = sleepMs > 0 ? Math.round((sleepMs / 3600000) * 10) / 10 : null
 
-  return NextResponse.json({ steps, heartRate: avgHr, sleepHours, _debug: { stepsRollup, heartData, sleepData } })
+  return NextResponse.json({ steps, heartRate: avgHr, sleepHours, _debug: { stepsData, heartData, sleepData } })
 }
