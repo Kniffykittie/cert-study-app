@@ -10,12 +10,6 @@ const CERTS = [
   { key: 'security-plus', label: 'Security+', color: 'var(--error)' },
 ]
 
-const GOAL_OPTIONS = [
-  { value: 10, label: '10 / day', desc: 'Light — quick daily check-in' },
-  { value: 20, label: '20 / day', desc: 'Moderate — steady progress' },
-  { value: 30, label: '30 / day', desc: 'Standard — recommended' },
-  { value: 50, label: '50 / day', desc: 'Intensive — exam crunch mode' },
-]
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -165,15 +159,35 @@ export default function SettingsPage() {
 
           {/* Daily goal */}
           <div style={{ marginBottom: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.05em', marginBottom: '12px' }}>DAILY QUESTION GOAL</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {GOAL_OPTIONS.map(opt => (
-                <div key={opt.value} onClick={() => setDailyGoal(opt.value)}
-                  style={{ padding: '12px 14px', backgroundColor: dailyGoal === opt.value ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `1px solid ${dailyGoal === opt.value ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '8px', cursor: 'pointer' }}>
-                  <div style={{ color: dailyGoal === opt.value ? 'var(--accent-blue)' : 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>{opt.label}</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>{opt.desc}</div>
-                </div>
-              ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.05em' }}>DAILY QUESTION GOAL</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="number"
+                  min={20}
+                  max={200}
+                  value={dailyGoal}
+                  onChange={e => setDailyGoal(Math.min(200, Math.max(20, parseInt(e.target.value) || 20)))}
+                  style={{ width: '64px', backgroundColor: 'var(--background)', border: '1px solid var(--accent-blue)', borderRadius: '6px', padding: '4px 8px', color: 'var(--accent-blue)', fontSize: '16px', fontWeight: '700', outline: 'none', textAlign: 'center' }}
+                />
+                <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>/ day</span>
+              </div>
+            </div>
+            <input
+              type="range"
+              min={20}
+              max={200}
+              step={5}
+              value={dailyGoal}
+              onChange={e => setDailyGoal(parseInt(e.target.value))}
+              style={{ width: '100%', accentColor: 'var(--accent-blue)', cursor: 'pointer' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>20 — minimum</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                {dailyGoal <= 30 ? 'Light & steady' : dailyGoal <= 60 ? 'Solid daily habit' : dailyGoal <= 100 ? 'Serious grind' : 'Full exam crunch'}
+              </span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>200 — maximum</span>
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Your streak tracker counts a day complete when you hit this goal.</p>
           </div>
