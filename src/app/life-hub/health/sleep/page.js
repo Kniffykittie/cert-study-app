@@ -23,12 +23,20 @@ export default function SleepTrackerPage() {
     const json = await res.json()
     if (!json.error) setData(json)
     setLoading(false)
+    if (json.neverSynced || !json.lastSyncedAt || Date.now() - new Date(json.lastSyncedAt).getTime() > 15 * 60 * 1000) {
+      fetch('/api/health/sync', { method: 'POST' })
+        .then(() => fetch('/api/health/sync'))
+        .then(r => r.json())
+        .then(fresh => { if (!fresh.error) setData(fresh) })
+        .catch(() => {})
+    }
   }
 
   useEffect(() => { load() }, [])
 
   async function handleSync() {
     setSyncing(true)
+    await fetch('/api/health/sync', { method: 'POST' })
     const res = await fetch('/api/health/sync')
     const json = await res.json()
     if (!json.error) setData(json)

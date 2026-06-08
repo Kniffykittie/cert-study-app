@@ -19,18 +19,33 @@ export default function StepTrackerPage() {
   const handleMouseMove = useCallback((e) => setMousePos({ x: e.clientX, y: e.clientY }), [])
 
   async function fetchData(r) {
-    setSyncing(true)
     const statusRes = await fetch('/api/health/status')
     const status = await statusRes.json()
-    if (!status.connected) { setLoading(false); setSyncing(false); return }
+    if (!status.connected) { setLoading(false); return }
     const res = await fetch(`/api/health/sync?range=${r}`)
     const json = await res.json()
     if (!json.error) setData(json)
     setLoading(false)
-    setSyncing(false)
+    // Background sync if never synced or stale (>15 min)
+    if (json.neverSynced || !json.lastSyncedAt || Date.now() - new Date(json.lastSyncedAt).getTime() > 15 * 60 * 1000) {
+      fetch('/api/health/sync', { method: 'POST' })
+        .then(() => fetch(`/api/health/sync?range=${r}`))
+        .then(r2 => r2.json())
+        .then(fresh => { if (!fresh.error) setData(fresh) })
+        .catch(() => {})
+    }
   }
 
   useEffect(() => { fetchData('today') }, [])
+
+  async function handleRefresh() {
+    setSyncing(true)
+    await fetch('/api/health/sync', { method: 'POST' })
+    const res = await fetch(`/api/health/sync?range=${range}`)
+    const json = await res.json()
+    if (!json.error) setData(json)
+    setSyncing(false)
+  }
 
   function handleRangeChange(r) {
     setRange(r)
@@ -69,7 +84,7 @@ export default function StepTrackerPage() {
     return (
       <>
         <div>
-          <Header range={range} onRange={handleRangeChange} onRefresh={() => fetchData(range)} syncing={syncing} />
+          <Header range={range} onRange={handleRangeChange} onRefresh={handleRefresh} syncing={syncing} />
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
             {[
@@ -127,7 +142,7 @@ export default function StepTrackerPage() {
 
   return (
     <div>
-      <Header range={range} onRange={handleRangeChange} onRefresh={() => fetchData(range)} syncing={syncing} />
+      <Header range={range} onRange={handleRangeChange} onRefresh={handleRefresh} syncing={syncing} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
         {[

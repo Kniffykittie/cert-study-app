@@ -341,7 +341,10 @@ Multi-feature expansion — contextual panels, new lab sets, and smart study too
 | `flashcards` | Generated flashcard decks — saved permanently per cert |
 | `flashcard_progress` | Per-card mastery state: mastered flag, consecutive_correct count |
 | `lab_timers` | Per-lab timer state — elapsed_seconds, is_running, last_started_at; unique per user+lab |
-| `google_health_tokens` | OAuth tokens for Google Health API — access_token, refresh_token, expires_at; one row per user |
+| `google_health_tokens` | OAuth tokens for Google Health API — access_token, refresh_token, expires_at, last_synced_at; one row per user |
+| `health_steps_hourly` | Cached step counts — one row per user/date/hour (EST) |
+| `health_heart_rate_daily` | Cached daily HR — avg_bpm, min_bpm, max_bpm per user/date |
+| `health_sleep_sessions` | Cached sleep sessions — stages JSONB, timeline JSONB, is_nap; keyed by Google session_id |
 
 ## Future Features (Security)
 - Two-factor authentication (placeholder exists in Settings → Security section)
@@ -383,6 +386,18 @@ Google Health API integration (Life Hub):
 - Refresh button re-fetches on demand
 - Data from Google Pixel Watch 4 via Google Health API v4 (`users/me` endpoint)
 - Sleep shows `—` correctly when watch not worn
+
+### Phase 25 - Complete
+Google Health data caching layer:
+
+- 3 new Supabase tables: `health_steps_hourly`, `health_heart_rate_daily`, `health_sleep_sessions`
+- `last_synced_at` added to `google_health_tokens`
+- `GET /api/health/sync` now reads from Supabase cache only — sub-100ms page loads
+- `POST /api/health/sync` fetches from Google API and writes to cache (incremental: only since last sync - 1hr overlap; first sync = 30 days back)
+- All three health pages load cache instantly on mount, then auto-background-sync if data is >15 min stale
+- Refresh button calls POST then re-fetches GET — user-initiated full sync
+- Sleep stages parsed from `sleep.stages[]` array and `sleep.summary.stagesSummary`; longest session selected as main sleep
+- Steps pagination fixed: early-exit once data older than needed range
 
 ### Phase 24 - Complete
 Step Tracker and Sleep Tracker pages:

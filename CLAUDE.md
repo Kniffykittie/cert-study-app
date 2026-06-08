@@ -135,7 +135,10 @@ src/
 | `lab_progress` | Completed lab steps per user (user_id, lab_set_id, lab_id, step_id, completed_at) |
 | `lab_notes` | Per-lab notes per user (user_id, lab_set_id, lab_id, notes, updated_at) |
 | `lab_timers` | Per-lab timer state (user_id, lab_set_id, lab_id, elapsed_seconds, is_running, last_started_at) — unique per user+lab |
-| `google_health_tokens` | Google Health OAuth tokens per user (access_token, refresh_token, expires_at) — one row per user, RLS enforced |
+| `google_health_tokens` | Google Health OAuth tokens per user (access_token, refresh_token, expires_at, last_synced_at) — one row per user, RLS enforced |
+| `health_steps_hourly` | Cached step counts — one row per user/date/hour (EST); upsert-safe primary key |
+| `health_heart_rate_daily` | Cached daily HR — avg_bpm, min_bpm, max_bpm, sample_count per user/date |
+| `health_sleep_sessions` | Cached sleep sessions — stages JSONB, timeline JSONB, is_nap flag; keyed by Google session_id |
 
 ---
 
@@ -326,6 +329,11 @@ src/
 - Token refresh handled automatically in `sync/route.js` — checks `expires_at`, refreshes via `oauth2.googleapis.com/token`
 - API endpoint: `health.googleapis.com/v4/users/me/dataTypes/{type}/dataPoints` — `users/me` only, NOT `users/-`
 - Civil date filtering used for EST-safe day boundaries (not UTC time ranges) via `civilStartTime.date` object
+- **Two-path sync**: GET reads from Supabase cache (fast), POST fetches from Google and writes to cache
+- **Incremental sync**: POST fetches only since `last_synced_at - 1 hour`; first sync fetches 30 days back
+- **Auto-background-sync**: pages load cache instantly, then fire background POST if data is >15 min stale
+- Cache tables: `health_steps_hourly` (user/date/hour), `health_heart_rate_daily` (user/date), `health_sleep_sessions` (user/session_id)
+- `last_synced_at` column on `google_health_tokens` tracks last successful sync
 
 ### Step Tracker (`/life-hub/health/steps`)
 - Today / Yesterday / Week tabs + Refresh button (Header sub-component)

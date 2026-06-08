@@ -17,14 +17,24 @@ export default function HealthPage() {
         const syncRes = await fetch('/api/health/sync')
         const syncData = await syncRes.json()
         if (!syncData.error) setData(syncData)
+        setLoading(false)
+        if (syncData.neverSynced || !syncData.lastSyncedAt || Date.now() - new Date(syncData.lastSyncedAt).getTime() > 15 * 60 * 1000) {
+          fetch('/api/health/sync', { method: 'POST' })
+            .then(() => fetch('/api/health/sync'))
+            .then(r => r.json())
+            .then(fresh => { if (!fresh.error) setData(fresh) })
+            .catch(() => {})
+        }
+      } else {
+        setLoading(false)
       }
-      setLoading(false)
     }
     load()
   }, [])
 
   async function handleSync() {
     setSyncing(true)
+    await fetch('/api/health/sync', { method: 'POST' })
     const res = await fetch('/api/health/sync')
     const syncData = await res.json()
     if (!syncData.error) setData(syncData)

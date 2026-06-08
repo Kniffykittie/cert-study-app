@@ -3,14 +3,28 @@ import { NextResponse } from 'next/server'
 
 const BASE = 'https://health.googleapis.com/v4'
 const TZ = 'America/New_York'
+const STALE_MS = 15 * 60 * 1000 // 15 minutes
+const SLEEP_STAGES = { AWAKE: 'Awake', LIGHT: 'Light', DEEP: 'Deep', REM: 'REM', UNKNOWN: 'Unknown' }
 
 function estDateStr(date = new Date()) {
   return date.toLocaleDateString('en-CA', { timeZone: TZ })
 }
 
-function estDayBounds(dateStr) {
-  // Use civil time matching instead of UTC math to avoid DST issues
-  return dateStr
+function getEstHour(isoString) {
+  return parseInt(new Date(isoString).toLocaleString('en-US', { timeZone: TZ, hour: 'numeric', hour12: false })) % 24
+}
+
+function getCivilDateStr(point) {
+  const d = point.steps?.interval?.civilStartTime?.date
+  if (!d) return null
+  return `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`
+}
+
+function pointTime(p) {
+  return p.steps?.interval?.startTime
+    ?? p.heartRate?.sampleTime?.physicalTime
+    ?? p.sleep?.interval?.startTime
+    ?? null
 }
 
 async function refreshTokenIfNeeded(supabase, userId, tokenRow) {
@@ -40,13 +54,6 @@ async function refreshTokenIfNeeded(supabase, userId, tokenRow) {
   return data.access_token
 }
 
-function pointTime(p) {
-  return p.steps?.interval?.startTime
-    ?? p.heartRate?.sampleTime?.physicalTime
-    ?? p.sleep?.interval?.startTime
-    ?? null
-}
-
 async function fetchDataType(accessToken, dataType, since) {
   let allPoints = []
   let pageToken = null
@@ -61,7 +68,6 @@ async function fetchDataType(accessToken, dataType, since) {
     if (points.length === 0) break
     allPoints = allPoints.concat(points)
     pageToken = json.nextPageToken ?? null
-    // Stop paginating once we've reached data older than our cutoff
     if (since) {
       const oldest = pointTime(points[points.length - 1])
       if (oldest && oldest < since) break
@@ -70,20 +76,121 @@ async function fetchDataType(accessToken, dataType, since) {
   return allPoints
 }
 
-function getEstHour(isoString) {
-  return parseInt(new Date(isoString).toLocaleString('en-US', { timeZone: TZ, hour: 'numeric', hour12: false })) % 24
-}
-
-function getCivilDateStr(point) {
-  const d = point.steps?.interval?.civilStartTime?.date
-  if (!d) return null
-  return `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`
-}
+// ─── GET: read from Supabase cache (fast) ────────────────────────────────────
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url)
   const range = searchParams.get('range') ?? 'today'
 
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: tokenRow } = await supabase
+    .from('google_health_tokens')
+    .select('last_synced_at')
+    .eq('user_id', user.id)
+    .single()
+
+  if (!tokenRow) return NextResponse.json({ error: 'Not connected' }, { status: 400 })
+
+  const todayEST = estDateStr()
+  const yesterdayEST = estDateStr(new Date(Date.now() - 86400000))
+  const targetDate = range === 'yesterday' ? yesterdayEST : todayEST
+  const neverSynced = !tokenRow.last_synced_at
+
+  if (range === 'week') {
+    const weekStart = estDateStr(new Date(Date.now() - 6 * 86400000))
+
+    const [stepsRows, hrRow, sleepRow] = await Promise.all([
+      supabase.from('health_steps_hourly')
+        .select('date, steps')
+        .eq('user_id', user.id)
+        .gte('date', weekStart),
+      supabase.from('health_heart_rate_daily')
+        .select('avg_bpm')
+        .eq('user_id', user.id)
+        .eq('date', todayEST)
+        .maybeSingle(),
+      supabase.from('health_sleep_sessions')
+        .select('sleep_minutes')
+        .eq('user_id', user.id)
+        .gte('date', yesterdayEST)
+        .order('sleep_minutes', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ])
+
+    const days = Array.from({ length: 7 }, (_, i) =>
+      estDateStr(new Date(Date.now() - (6 - i) * 86400000))
+    )
+    const dailyTotals = {}
+    days.forEach(d => { dailyTotals[d] = 0 })
+    ;(stepsRows.data ?? []).forEach(r => {
+      if (dailyTotals[r.date] !== undefined) dailyTotals[r.date] += r.steps
+    })
+
+    const weeklySteps = days.map(d => ({
+      date: d,
+      label: new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }),
+      steps: dailyTotals[d],
+    }))
+    const totalSteps = weeklySteps.reduce((s, d) => s + d.steps, 0)
+    const avgSteps = Math.round(totalSteps / 7)
+
+    return NextResponse.json({
+      range: 'week', weeklySteps, totalSteps, avgSteps,
+      heartRate: hrRow.data?.avg_bpm ?? null,
+      sleepHours: null, sleepStages: {}, sleepTimeline: [],
+      neverSynced,
+      lastSyncedAt: tokenRow.last_synced_at,
+    })
+  }
+
+  // Today / Yesterday
+  const [stepsRows, hrRow, sleepRow] = await Promise.all([
+    supabase.from('health_steps_hourly')
+      .select('hour, steps')
+      .eq('user_id', user.id)
+      .eq('date', targetDate),
+    supabase.from('health_heart_rate_daily')
+      .select('avg_bpm')
+      .eq('user_id', user.id)
+      .eq('date', targetDate)
+      .maybeSingle(),
+    supabase.from('health_sleep_sessions')
+      .select('sleep_minutes, stages, timeline')
+      .eq('user_id', user.id)
+      .gte('date', range === 'yesterday'
+        ? estDateStr(new Date(Date.now() - 2 * 86400000))
+        : yesterdayEST)
+      .lte('date', targetDate)
+      .order('sleep_minutes', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  const hourlyMap = {}
+  ;(stepsRows.data ?? []).forEach(r => { hourlyMap[r.hour] = r.steps })
+  const hourlySteps = Array.from({ length: 24 }, (_, h) => ({ hour: h, steps: hourlyMap[h] ?? 0 }))
+  const steps = (stepsRows.data ?? []).reduce((s, r) => s + r.steps, 0) || null
+
+  const sleepData = sleepRow.data
+  const sleepHours = sleepData ? Math.round((sleepData.sleep_minutes / 60) * 10) / 10 : null
+  const sleepStages = sleepData?.stages ?? {}
+  const sleepTimeline = sleepData?.timeline ?? []
+
+  return NextResponse.json({
+    range, steps, heartRate: hrRow.data?.avg_bpm ?? null,
+    sleepHours, hourlySteps, sleepStages, sleepTimeline,
+    neverSynced,
+    lastSyncedAt: tokenRow.last_synced_at,
+  })
+}
+
+// ─── POST: fetch from Google, write to Supabase cache ────────────────────────
+
+export async function POST(req) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -99,118 +206,109 @@ export async function GET(req) {
   const accessToken = await refreshTokenIfNeeded(supabase, user.id, tokenRow)
   if (!accessToken) return NextResponse.json({ error: 'Token refresh failed' }, { status: 401 })
 
-  const todayEST = estDateStr()
-  const yesterdayEST = estDateStr(new Date(Date.now() - 86400000))
-  const todayUTC = new Date().toISOString().split('T')[0]
-  const yesterdayUTC = new Date(Date.now() - 86400000).toISOString().split('T')[0]
-
-  const stepsSince = range === 'week'
-    ? new Date(Date.now() - 8 * 86400000).toISOString()
-    : new Date(Date.now() - 2 * 86400000).toISOString()
-  const sleepSince = new Date(Date.now() - 8 * 86400000).toISOString()
-  const hrSince = new Date(Date.now() - 2 * 86400000).toISOString()
+  // Fetch since last sync minus 1 hour overlap, or 30 days back for first sync
+  const since = tokenRow.last_synced_at
+    ? new Date(new Date(tokenRow.last_synced_at).getTime() - 3600000).toISOString()
+    : new Date(Date.now() - 30 * 86400000).toISOString()
 
   const [stepsPoints, heartPoints, sleepPoints] = await Promise.all([
-    fetchDataType(accessToken, 'steps', stepsSince),
-    fetchDataType(accessToken, 'heart-rate', hrSince),
-    fetchDataType(accessToken, 'sleep', sleepSince),
+    fetchDataType(accessToken, 'steps', since),
+    fetchDataType(accessToken, 'heart-rate', since),
+    fetchDataType(accessToken, 'sleep', since),
   ])
 
-  // --- STEPS ---
-  const targetDate = range === 'yesterday' ? yesterdayEST : todayEST
-
-  if (range === 'week') {
-    // Build daily totals for last 7 days
-    const days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(Date.now() - i * 86400000)
-      return estDateStr(d)
-    }).reverse()
-
-    const dailyTotals = {}
-    days.forEach(d => { dailyTotals[d] = 0 })
-
-    stepsPoints.forEach(p => {
-      const d = getCivilDateStr(p)
-      if (d && dailyTotals[d] !== undefined) {
-        dailyTotals[d] += parseInt(p.steps?.count ?? 0)
-      }
+  // ── Write steps (aggregate per hour per day, then upsert) ──
+  const stepsBucket = {}
+  stepsPoints.forEach(p => {
+    const date = getCivilDateStr(p)
+    const hour = getEstHour(p.steps?.interval?.startTime ?? '')
+    if (!date || isNaN(hour)) return
+    const key = `${date}|${hour}`
+    stepsBucket[key] = (stepsBucket[key] ?? 0) + parseInt(p.steps?.count ?? 0)
+  })
+  if (Object.keys(stepsBucket).length > 0) {
+    const stepsRows = Object.entries(stepsBucket).map(([key, steps]) => {
+      const [date, hour] = key.split('|')
+      return { user_id: user.id, date, hour: parseInt(hour), steps, synced_at: new Date().toISOString() }
     })
-
-    const weeklySteps = days.map(d => ({
-      date: d,
-      label: new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }),
-      steps: dailyTotals[d],
-    }))
-
-    const totalSteps = weeklySteps.reduce((s, d) => s + d.steps, 0)
-    const avgSteps = Math.round(totalSteps / 7)
-
-    // Heart rate — today only regardless of range
-    const nowEST = new Date().toLocaleString('en-US', { timeZone: TZ })
-    const estTodayStart = new Date(todayEST + 'T00:00:00').toISOString()
-    const estTodayEnd = new Date(todayEST + 'T23:59:59').toISOString()
-    const todayHrVals = heartPoints
-      .filter(p => { const t = p.heartRate?.sampleTime?.physicalTime; return t && t >= estTodayStart && t <= estTodayEnd })
-      .map(p => parseInt(p.heartRate?.beatsPerMinute)).filter(Boolean)
-    const heartRate = todayHrVals.length > 0 ? Math.round(todayHrVals.reduce((a, b) => a + b, 0) / todayHrVals.length) : null
-
-    return NextResponse.json({ range: 'week', weeklySteps, totalSteps, avgSteps, heartRate, sleepHours: null, sleepStages: {}, sleepTimeline: [] })
+    await supabase.from('health_steps_hourly').upsert(stepsRows, { onConflict: 'user_id,date,hour' })
   }
 
-  // Today or yesterday — hourly breakdown
-  const daySteps = stepsPoints.filter(p => getCivilDateStr(p) === targetDate)
-  const steps = daySteps.length > 0 ? daySteps.reduce((sum, p) => sum + parseInt(p.steps?.count ?? 0), 0) : null
-
-  const stepsByHour = {}
-  for (let h = 0; h < 24; h++) stepsByHour[h] = 0
-  daySteps.forEach(p => {
-    const hour = getEstHour(p.steps.interval.startTime)
-    stepsByHour[hour] += parseInt(p.steps?.count ?? 0)
+  // ── Write heart rate (avg/min/max per day) ──
+  const hrBucket = {}
+  heartPoints.forEach(p => {
+    const t = p.heartRate?.sampleTime?.physicalTime
+    const bpm = parseInt(p.heartRate?.beatsPerMinute)
+    if (!t || isNaN(bpm) || bpm <= 0) return
+    const date = estDateStr(new Date(t))
+    if (!hrBucket[date]) hrBucket[date] = []
+    hrBucket[date].push(bpm)
   })
-  const hourlySteps = Array.from({ length: 24 }, (_, h) => ({ hour: h, steps: stepsByHour[h] }))
-
-  // Heart rate
-  const hrDate = range === 'yesterday' ? yesterdayEST : todayEST
-  const hrStart = new Date(hrDate + 'T00:00:00-04:00').toISOString()
-  const hrEnd = new Date(hrDate + 'T23:59:59-04:00').toISOString()
-  const hrVals = heartPoints
-    .filter(p => { const t = p.heartRate?.sampleTime?.physicalTime; return t && t >= hrStart && t <= hrEnd })
-    .map(p => parseInt(p.heartRate?.beatsPerMinute)).filter(Boolean)
-  const heartRate = hrVals.length > 0 ? Math.round(hrVals.reduce((a, b) => a + b, 0) / hrVals.length) : null
-
-  // Sleep
-  const SLEEP_STAGES = { AWAKE: 'Awake', LIGHT: 'Light', DEEP: 'Deep', REM: 'REM', UNKNOWN: 'Unknown' }
-  const lastNightSleep = sleepPoints.filter(p => {
-    const start = p.sleep?.interval?.startTime ?? ''
-    return start.startsWith(yesterdayUTC) || start.startsWith(todayUTC)
-  })
-
-  // Pick the longest sleep session (main sleep vs naps)
-  const mainSleep = lastNightSleep.reduce((best, p) => {
-    const mins = parseInt(p.sleep?.summary?.minutesInSleepPeriod ?? 0)
-    return mins > (parseInt(best?.sleep?.summary?.minutesInSleepPeriod ?? 0)) ? p : best
-  }, null)
-
-  const sleepMinsAsleep = mainSleep ? parseInt(mainSleep.sleep?.summary?.minutesAsleep ?? 0) : 0
-  const sleepHours = sleepMinsAsleep > 0 ? Math.round((sleepMinsAsleep / 60) * 10) / 10 : null
-
-  const sleepStages = {}
-  if (mainSleep) {
-    mainSleep.sleep?.summary?.stagesSummary?.forEach(s => {
-      const label = SLEEP_STAGES[s.type] ?? 'Unknown'
-      sleepStages[label] = (sleepStages[label] ?? 0) + parseInt(s.minutes ?? 0)
-    })
+  if (Object.keys(hrBucket).length > 0) {
+    const hrRows = Object.entries(hrBucket).map(([date, vals]) => ({
+      user_id: user.id,
+      date,
+      avg_bpm: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
+      min_bpm: Math.min(...vals),
+      max_bpm: Math.max(...vals),
+      sample_count: vals.length,
+      synced_at: new Date().toISOString(),
+    }))
+    await supabase.from('health_heart_rate_daily').upsert(hrRows, { onConflict: 'user_id,date' })
   }
 
-  const sleepTimeline = (mainSleep?.sleep?.stages ?? [])
-    .filter(s => s.startTime && s.endTime)
-    .map(s => ({
-      stage: SLEEP_STAGES[s.type] ?? 'Unknown',
-      start: s.startTime,
-      end: s.endTime,
-      mins: Math.round((new Date(s.endTime) - new Date(s.startTime)) / 60000),
-    }))
-    .sort((a, b) => new Date(a.start) - new Date(b.start))
+  // ── Write sleep sessions ──
+  if (sleepPoints.length > 0) {
+    const sleepRows = sleepPoints
+      .filter(p => p.sleep?.interval?.startTime && p.sleep?.interval?.endTime)
+      .map(p => {
+        const sessionId = p.name?.split('/').pop() ?? `${user.id}-${p.sleep.interval.startTime}`
+        const startTime = p.sleep.interval.startTime
+        const endTime = p.sleep.interval.endTime
+        const date = estDateStr(new Date(startTime))
+        const summary = p.sleep?.summary ?? {}
+        const totalMins = parseInt(summary.minutesInSleepPeriod ?? 0)
+        const isNap = p.sleep?.metadata?.nap === true || totalMins < 180
 
-  return NextResponse.json({ range, steps, heartRate, sleepHours, hourlySteps, sleepStages, sleepTimeline })
+        const stages = {}
+        ;(summary.stagesSummary ?? []).forEach(s => {
+          const label = SLEEP_STAGES[s.type] ?? 'Unknown'
+          stages[label] = (stages[label] ?? 0) + parseInt(s.minutes ?? 0)
+        })
+
+        const timeline = (p.sleep?.stages ?? [])
+          .filter(s => s.startTime && s.endTime)
+          .map(s => ({
+            stage: SLEEP_STAGES[s.type] ?? 'Unknown',
+            start: s.startTime,
+            end: s.endTime,
+            mins: Math.round((new Date(s.endTime) - new Date(s.startTime)) / 60000),
+          }))
+          .sort((a, b) => new Date(a.start) - new Date(b.start))
+
+        return {
+          user_id: user.id,
+          session_id: sessionId,
+          date,
+          start_time: startTime,
+          end_time: endTime,
+          sleep_minutes: parseInt(summary.minutesAsleep ?? 0),
+          awake_minutes: parseInt(summary.minutesAwake ?? 0),
+          stages,
+          timeline,
+          is_nap: isNap,
+          synced_at: new Date().toISOString(),
+        }
+      })
+    if (sleepRows.length > 0) {
+      await supabase.from('health_sleep_sessions').upsert(sleepRows, { onConflict: 'user_id,session_id' })
+    }
+  }
+
+  // ── Update last_synced_at ──
+  await supabase.from('google_health_tokens')
+    .update({ last_synced_at: new Date().toISOString() })
+    .eq('user_id', user.id)
+
+  return NextResponse.json({ ok: true, synced: new Date().toISOString() })
 }
