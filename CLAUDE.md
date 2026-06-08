@@ -48,6 +48,12 @@ src/
       generate-questions/route.js  AI question generation (spaced repetition weighting)
       generate-templates/route.js  AI template generation (batch of 5, dedup)
       test-chat/route.js           Tutor chat during practice tests
+      health/
+        connect/route.js           Initiates Google Health OAuth (owner account only)
+        callback/route.js          Handles OAuth callback, saves tokens
+        status/route.js            Checks if Google Health is connected
+        sync/route.js              Fetches steps/heart rate/sleep from Google Health API v4
+        disconnect/route.js        Removes stored tokens
     study-hub/
       page.js                     Overview (DailyStreak component)
       ccna/page.js                CCNA cert page (DomainTrend + Recommended Focus)
@@ -121,6 +127,7 @@ src/
 | `lab_progress` | Completed lab steps per user (user_id, lab_set_id, lab_id, step_id, completed_at) |
 | `lab_notes` | Per-lab notes per user (user_id, lab_set_id, lab_id, notes, updated_at) |
 | `lab_timers` | Per-lab timer state (user_id, lab_set_id, lab_id, elapsed_seconds, is_running, last_started_at) — unique per user+lab |
+| `google_health_tokens` | Google Health OAuth tokens per user (access_token, refresh_token, expires_at) — one row per user, RLS enforced |
 
 ---
 

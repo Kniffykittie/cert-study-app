@@ -341,6 +341,7 @@ Multi-feature expansion — contextual panels, new lab sets, and smart study too
 | `flashcards` | Generated flashcard decks — saved permanently per cert |
 | `flashcard_progress` | Per-card mastery state: mastered flag, consecutive_correct count |
 | `lab_timers` | Per-lab timer state — elapsed_seconds, is_running, last_started_at; unique per user+lab |
+| `google_health_tokens` | OAuth tokens for Google Health API — access_token, refresh_token, expires_at; one row per user |
 
 ## Future Features (Security)
 - Two-factor authentication (placeholder exists in Settings → Security section)
@@ -352,12 +353,37 @@ Multi-feature expansion — contextual panels, new lab sets, and smart study too
 - Advanced CCNA lab set (spanning tree deep dive, advanced OSPF, BGP intro)
 - PWA conversion (add to home screen, offline support)
 
-## Future Features (Life Hub — not yet started)
-- Fitbit / Google Fit integration
-- Sleep, workout, and nutrition logging
+## Future Features (Life Hub)
+- Sleep tracking (no data when watch not worn — shows — correctly)
+- Workout and nutrition logging
 - Supplement tracking and encyclopedia
 - Correlation engine (study performance vs health data)
 - Daily morning brief page
+- Wire Life Hub landing page cards with real health data
+
+### Phase 23 - Complete
+Google Health API integration (Life Hub):
+
+**Google Health OAuth flow**
+- Google Cloud project created, Google Health API enabled, OAuth 2.0 credentials configured
+- Scopes: `googlehealth.activity_and_fitness.readonly`, `googlehealth.health_metrics_and_measurements.readonly`, `googlehealth.sleep.readonly`
+- `/api/health/connect` — initiates OAuth (403s if not allowed account)
+- `/api/health/callback` — exchanges code for tokens, saves to `google_health_tokens` table
+- `/api/health/status` — checks connection state
+- `/api/health/disconnect` — removes tokens
+- `/api/health/sync` — fetches steps, heart rate, sleep from Google Health API v4
+
+**Settings — Connected Apps section**
+- Only visible when logged in as the owner account (email check)
+- Shows connection status and connected-since date
+- Connect / Disconnect buttons; success/error messages on redirect back
+
+**Life Hub → Health page**
+- Shows connect prompt if not linked
+- Live data: Steps Today (with progress bar toward 10k goal), Avg Heart Rate, Sleep Last Night
+- Refresh button re-fetches on demand
+- Data from Google Pixel Watch 4 via Google Health API v4 (`users/me` endpoint)
+- Sleep shows `—` correctly when watch not worn
 
 ### Phase 22 - Complete
 Settings page Study Preferences + live home page:
