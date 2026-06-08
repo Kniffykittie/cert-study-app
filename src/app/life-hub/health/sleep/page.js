@@ -171,11 +171,38 @@ export default function SleepTrackerPage() {
                   </div>
                 ))}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: '48px' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{fmtTime(sleepTimeline[0].start)}</span>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{fmtTime(sleepTimeline[sleepTimeline.length - 1].end)}</span>
-              </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '8px' }}>Hover segments for details</p>
+              {/* Time axis with intermediate markers */}
+              {(() => {
+                const durationMins = (timelineEnd - timelineStart) / 60000
+                const intervalMins = durationMins <= 180 ? 30 : durationMins <= 480 ? 60 : 120
+                const intervalMs = intervalMins * 60000
+                const firstTick = Math.ceil(timelineStart / intervalMs) * intervalMs
+                const ticks = []
+                for (let t = firstTick; t <= timelineEnd; t += intervalMs) ticks.push(t)
+                const markers = [timelineStart, ...ticks.filter(t => t > timelineStart && t < timelineEnd), timelineEnd]
+                return (
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                    <div style={{ width: '38px', flexShrink: 0 }} />
+                    <div style={{ flex: 1, position: 'relative', height: '16px' }}>
+                      {markers.map((ms, i) => {
+                        const pct = ((ms - timelineStart) / timelineSpan) * 100
+                        const isFirst = i === 0
+                        const isLast = i === markers.length - 1
+                        return (
+                          <span key={ms} style={{
+                            position: 'absolute', left: `${pct}%`, fontSize: '10px',
+                            color: 'var(--text-secondary)', whiteSpace: 'nowrap',
+                            transform: isFirst ? 'none' : isLast ? 'translateX(-100%)' : 'translateX(-50%)',
+                          }}>
+                            {fmtTime(new Date(ms).toISOString())}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
+              <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '10px' }}>Hover segments for details</p>
             </div>
           )}
         </>
