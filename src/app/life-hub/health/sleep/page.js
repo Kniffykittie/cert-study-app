@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 
 const STAGE_COLORS = {
@@ -9,11 +9,20 @@ const STAGE_COLORS = {
   'Awake': 'var(--warning)',
   'Unknown': 'var(--border)',
 }
+const STAGE_ORDER = ['Awake', 'REM', 'Light', 'Deep']
+
+function fmtTime(iso) {
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
 
 export default function SleepTrackerPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [tooltip, setTooltip] = useState(null)
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+
+  const handleMouseMove = useCallback((e) => setMousePos({ x: e.clientX, y: e.clientY }), [])
 
   async function load() {
     const statusRes = await fetch('/api/health/status')
@@ -58,7 +67,6 @@ export default function SleepTrackerPage() {
   const totalSleepMins = Object.values(sleepStages).reduce((a, b) => a + b, 0)
   const hasData = sleepHours !== null && sleepTimeline.length > 0
 
-  // Timeline chart dimensions
   const timelineStart = sleepTimeline.length > 0 ? new Date(sleepTimeline[0].start).getTime() : 0
   const timelineEnd = sleepTimeline.length > 0 ? new Date(sleepTimeline[sleepTimeline.length - 1].end).getTime() : 0
   const timelineSpan = timelineEnd - timelineStart || 1
@@ -101,7 +109,7 @@ export default function SleepTrackerPage() {
             ))}
           </div>
 
-          {/* Stage breakdown */}
+          {/* Stage breakdown bar */}
           {Object.keys(sleepStages).length > 0 && (
             <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
               <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Sleep Stage Breakdown</div>
@@ -123,32 +131,50 @@ export default function SleepTrackerPage() {
             </div>
           )}
 
-          {/* Sleep timeline */}
+          {/* Hypnogram timeline */}
           {sleepTimeline.length > 0 && (
-            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}
+              onMouseMove={handleMouseMove}>
               <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Sleep Timeline</div>
-              <div style={{ display: 'flex', height: '48px', borderRadius: '6px', overflow: 'hidden', marginBottom: '8px' }}>
-                {sleepTimeline.map((seg, i) => {
-                  const segStart = new Date(seg.start).getTime()
-                  const segEnd = new Date(seg.end).getTime()
-                  const width = ((segEnd - segStart) / timelineSpan) * 100
-                  return (
-                    <div key={i} style={{ width: `${width}%`, backgroundColor: STAGE_COLORS[seg.stage] ?? 'var(--border)', minWidth: '1px' }}
-                      title={`${seg.stage}: ${seg.mins}m`} />
-                  )
-                })}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
+                {STAGE_ORDER.map(stage => (
+                  <div key={stage} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '38px', fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'right', flexShrink: 0 }}>{stage}</div>
+                    <div style={{ flex: 1, height: '22px', backgroundColor: 'var(--background)', borderRadius: '3px', position: 'relative', overflow: 'hidden' }}>
+                      {sleepTimeline.filter(s => s.stage === stage).map((seg, i) => {
+                        const left = ((new Date(seg.start).getTime() - timelineStart) / timelineSpan) * 100
+                        const width = ((new Date(seg.end).getTime() - new Date(seg.start).getTime()) / timelineSpan) * 100
+                        return (
+                          <div key={i} style={{
+                            position: 'absolute', left: `${left}%`, width: `${Math.max(width, 0.3)}%`,
+                            height: '100%', backgroundColor: STAGE_COLORS[stage] ?? 'var(--border)',
+                            borderRadius: '2px', cursor: 'pointer', opacity: 0.9,
+                          }}
+                            onMouseEnter={() => setTooltip(seg)}
+                            onMouseLeave={() => setTooltip(null)}
+                          />
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-                  {new Date(sleepTimeline[0].start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-                  {new Date(sleepTimeline[sleepTimeline.length - 1].end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: '48px' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{fmtTime(sleepTimeline[0].start)}</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{fmtTime(sleepTimeline[sleepTimeline.length - 1].end)}</span>
               </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '8px' }}>Hover segments for details</p>
             </div>
           )}
         </>
+      )}
+
+      {tooltip && (
+        <div style={{ position: 'fixed', left: mousePos.x + 12, top: mousePos.y - 48, backgroundColor: '#1A1A1A', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px 12px', fontSize: '13px', color: 'var(--text-primary)', pointerEvents: 'none', zIndex: 9999, whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+          <div style={{ fontWeight: '600', color: STAGE_COLORS[tooltip.stage] ?? 'var(--text-primary)', marginBottom: '2px' }}>{tooltip.stage}</div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{fmtTime(tooltip.start)} — {fmtTime(tooltip.end)}</div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{tooltip.mins} min</div>
+        </div>
       )}
     </div>
   )

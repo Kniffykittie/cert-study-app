@@ -191,9 +191,11 @@ export default function StepTrackerPage() {
             )
           })}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          {[0, 3, 6, 9, 12, 15, 18, 21].map(h => (
-            <span key={h} style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>{fmtHour(h).replace(' ', '')}</span>
+        <div style={{ display: 'flex' }}>
+          {Array.from({ length: 24 }, (_, h) => (
+            <div key={h} style={{ flex: 1, textAlign: 'center', color: 'var(--text-secondary)', fontSize: '10px' }}>
+              {[0, 3, 6, 9, 12, 15, 18, 21].includes(h) ? fmtHour(h).replace(' ', '') : ''}
+            </div>
           ))}
         </div>
         <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '8px' }}>Green = peak hour · Hover bars for details</p>
