@@ -15,7 +15,6 @@ const ALLOWED_EQUIPMENT = ['body weight', 'dumbbell']
 export default function ExerciseLibraryPage() {
   const [exercises, setExercises] = useState([])
   const [loading, setLoading] = useState(true)
-  const [seeding, setSeeding] = useState(false)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
   const [activeGroup, setActiveGroup] = useState('Arms')
@@ -32,15 +31,6 @@ export default function ExerciseLibraryPage() {
       .order('name')
     setExercises(data ?? [])
     setLoading(false)
-  }
-
-  async function handleSeed() {
-    setSeeding(true)
-    const res = await fetch('/api/exercises/seed', { method: 'POST' })
-    const json = await res.json()
-    if (json.ok) await loadExercises()
-    else alert(json.error)
-    setSeeding(false)
   }
 
   function scrollToGroup(label) {
@@ -61,19 +51,11 @@ export default function ExerciseLibraryPage() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h1 style={{ color: 'var(--accent-blue)', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Exercise Library</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-            {loading ? 'Loading...' : `${totalCount.toLocaleString()} dumbbell & bodyweight exercises`}
-          </p>
-        </div>
-        {!loading && (
-          <button onClick={handleSeed} disabled={seeding}
-            style={{ backgroundColor: totalCount === 0 ? 'var(--accent-blue)' : 'var(--surface)', border: totalCount === 0 ? 'none' : '1px solid var(--border)', color: totalCount === 0 ? '#fff' : 'var(--text-secondary)', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: seeding ? 'not-allowed' : 'pointer', opacity: seeding ? 0.6 : 1, flexShrink: 0 }}>
-            {seeding ? 'Loading...' : totalCount === 0 ? 'Load Exercise Database' : '↻ Reload'}
-          </button>
-        )}
+      <div style={{ marginBottom: '20px' }}>
+        <h1 style={{ color: 'var(--accent-blue)', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Exercise Library</h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+          {loading ? 'Loading...' : `${totalCount.toLocaleString()} dumbbell & bodyweight exercises`}
+        </p>
       </div>
 
       {/* Search */}
@@ -89,7 +71,7 @@ export default function ExerciseLibraryPage() {
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '48px', textAlign: 'center' }}>
           <div style={{ fontSize: '40px', marginBottom: '16px' }}>🏋️</div>
           <h2 style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>No exercises loaded yet</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px' }}>Click "Load Exercise Database" above to get started.</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px' }}>No exercises have been added yet.</p>
         </div>
       ) : (
         <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
