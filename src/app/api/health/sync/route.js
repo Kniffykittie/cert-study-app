@@ -36,8 +36,9 @@ async function listDataPoints(accessToken, dataType, startTime, endTime) {
     `${BASE}/users/-/dataTypes/${dataType}/dataPoints?${params}`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
-  if (!res.ok) return null
-  return res.json()
+  const json = await res.json()
+  if (!res.ok) return { _error: json, _status: res.status, _type: dataType }
+  return json
 }
 
 async function dailyRollUp(accessToken, dataType, date) {
@@ -49,8 +50,9 @@ async function dailyRollUp(accessToken, dataType, date) {
       body: JSON.stringify({ dates: [date] }),
     }
   )
-  if (!res.ok) return null
-  return res.json()
+  const json = await res.json()
+  if (!res.ok) return { _error: json, _status: res.status, _type: dataType }
+  return json
 }
 
 export async function GET() {
