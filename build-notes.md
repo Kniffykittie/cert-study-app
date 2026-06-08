@@ -383,12 +383,12 @@ Multi-feature expansion — contextual panels, new lab sets, and smart study too
 - **Vitamin/nutrient encyclopedia** — searchable reference with AI-generated explanations per nutrient
 
 ### Workouts
+- **Exercise library** — ✅ COMPLETE — 34 exercises, muscle group nav, image cards, detailed modal with form/feel/do-not callouts
 - **Workout logging** — log exercises with sets/reps/weight or duration, workout type (strength/cardio/flexibility)
 - **Workout history** — past sessions, volume over time, PRs per exercise
 - **Workout templates** — save common routines for quick logging
-- **AI workout plan generator** — dumbbell and bodyweight only (no bench), generates a full 7-day weekly plan; updates day by day but always shows the full week ahead; each day's plan includes exercise photos and form tips
-- **Exercise library** — dumbbell and bodyweight exercises with photos showing how to perform them, organized by muscle group (Arms / Legs / Core / Shoulders / Back / Chest); click any exercise to open a detail popup with photo, form tips, common mistakes, and variations
-- **Yoga & stretching planner** — AI-generated weekly yoga/stretching plan (one session per day); each session shows poses/stretches with photos and correct form tips; plan generated a full week in advance and updated day by day
+- **AI workout plan generator** — dumbbell and bodyweight only, generates a full 7-day weekly plan; each day includes exercise photos and form tips from the exercise library
+- **Yoga & stretching planner** — AI-generated weekly yoga/stretching plan (one session per day); each session shows poses/stretches with photos and correct form tips
 - **Stretching library** — all stretches organized by muscle being stretched; click any stretch to open a popup with photo, hold duration, form tips, and what it targets
 
 ### Goals & Body Metrics
@@ -431,12 +431,17 @@ Google Health API integration (Life Hub):
 - Sleep shows `—` correctly when watch not worn
 
 ### Phase 26 - Complete
-Exercise Library:
-- `exercises` Supabase table — id, name, body_part, equipment, target, secondary_muscles[], instructions[], gif_url; indexed on body_part/equipment/target
-- `POST /api/exercises/seed` — one-time call fetches all ~1300 exercises from ExerciseDB (RapidAPI), upserts to Supabase
-- `/life-hub/workouts/exercises` — grid view with search, body part filter pills, equipment filter (All/Dumbbell/Bodyweight); click any card opens detail modal with GIF, muscle tags, secondary muscles, step-by-step instructions
-- GIFs load lazily from ExerciseDB CDN; API key only used once for seed
-- Workouts dropdown added to LifeHubSidebar (Overview / Exercise Library)
+Exercise Library (fully rebuilt — ExerciseDB removed):
+- `exercises` Supabase table — id, name, body_part, equipment, target, secondary_muscles[], instructions[], gif_url (nullable)
+- ExerciseDB/RapidAPI seed route removed — exercises are manually curated, not API-sourced
+- 34 exercises total: Arms (12), Back (10), Chest (9), Core (11), Legs (9), Shoulders (8) — dumbbell + bodyweight only
+- Exercise images stored in `public/exercises/` as .jfif files, served as static assets
+- Redesigned layout: sticky left muscle-group nav with counts, scrollable grouped sections — no filter bubbles
+- Cards show image thumbnail (140px) or 🏋️ placeholder; click opens detail modal
+- Detail modal: full-width image, muscle tags, secondary muscles, numbered instructions, green "WHERE YOU SHOULD FEEL IT" callout, red "DO NOT" callout
+- Each exercise has detailed form cues, pause/squeeze tips, what not to do, and exactly where to feel it
+- Workouts dropdown in LifeHubSidebar: Overview + Exercise Library; auto-opens on active routes
+- To add new exercises: save image to `public/exercises/`, push, then insert row into `exercises` table via Supabase
 
 ### Phase 25 - Complete
 Google Health data caching layer:
