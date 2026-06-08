@@ -61,6 +61,9 @@ src/
         page.js                   Health Overview — steps today, avg heart rate, sleep last night
         steps/page.js             Step Tracker — hourly/weekly bar charts, goal progress, fixed tooltip
         sleep/page.js             Sleep Tracker — stage breakdown bar, timeline chart, no-data state
+    workouts/
+      page.js                     Workouts landing (placeholder)
+      exercises/page.js           Exercise Library — grid of exercises, filter by body part/equipment, click for detail modal with GIF + instructions
     study-hub/
       page.js                     Overview (DailyStreak component)
       ccna/page.js                CCNA cert page (DomainTrend + Recommended Focus)
@@ -103,7 +106,7 @@ src/
     LabTimer.js                   Per-lab persistent timer — Start/Pause/Reset, survives navigation via Supabase lab_timers table
     FloatingReferencePanel.js     Fixed button on test page (practice mode only) — cert-filtered quick reference (subnetting, ports, OSI, attacks, encryption)
     FloatingChat.js               Fixed chat bubble on all Study Hub pages — session-only tutor chat via /api/chat
-    LifeHubSidebar.js             Life Hub nav sidebar — Health dropdown (Overview/Step Tracker/Sleep Tracker), auto-opens on health routes
+    LifeHubSidebar.js             Life Hub nav sidebar — Health dropdown (Overview/Step Tracker/Sleep Tracker), Workouts dropdown (Overview/Exercise Library), auto-opens on active routes
 ```
 
 ---

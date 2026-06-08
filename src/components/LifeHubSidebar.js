@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 export default function LifeHubSidebar() {
   const [displayName, setDisplayName] = useState('')
   const [healthOpen, setHealthOpen] = useState(false)
+  const [workoutsOpen, setWorkoutsOpen] = useState(false)
   const pathname = usePathname()
 
   useEffect(() => {
@@ -22,6 +23,7 @@ export default function LifeHubSidebar() {
 
   useEffect(() => {
     if (pathname.startsWith('/life-hub/health')) setHealthOpen(true)
+    if (pathname.startsWith('/life-hub/workouts')) setWorkoutsOpen(true)
   }, [pathname])
 
   const initial = displayName ? displayName[0].toUpperCase() : '?'
@@ -77,7 +79,30 @@ export default function LifeHubSidebar() {
       </div>
 
       {navLink('Nutrition', '/life-hub/nutrition')}
-      {navLink('Workouts', '/life-hub/workouts')}
+
+      {/* Workouts dropdown */}
+      {(() => {
+        const workoutsActive = pathname.startsWith('/life-hub/workouts')
+        return (
+          <div>
+            <div
+              onClick={() => setWorkoutsOpen(o => !o)}
+              style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: workoutsActive && !workoutsOpen ? 'rgba(123,47,190,0.12)' : 'transparent', color: workoutsActive ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: workoutsActive ? '600' : '400', borderLeft: workoutsActive ? '2px solid var(--accent-purple)' : '2px solid transparent' }}
+              onMouseEnter={e => { if (!workoutsActive) e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.08)' }}
+              onMouseLeave={e => { if (!workoutsActive) e.currentTarget.style.backgroundColor = workoutsActive && !workoutsOpen ? 'rgba(123,47,190,0.12)' : 'transparent' }}
+            >
+              <span>Workouts</span>
+              <span style={{ fontSize: '10px', transition: 'transform 0.2s', display: 'inline-block', transform: workoutsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+            </div>
+            {workoutsOpen && (
+              <div style={{ paddingLeft: '12px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {navLink('Overview', '/life-hub/workouts')}
+                {navLink('Exercise Library', '/life-hub/workouts/exercises')}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
         <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '6px', textDecoration: 'none' }}

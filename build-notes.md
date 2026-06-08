@@ -430,6 +430,14 @@ Google Health API integration (Life Hub):
 - Data from Google Pixel Watch 4 via Google Health API v4 (`users/me` endpoint)
 - Sleep shows `—` correctly when watch not worn
 
+### Phase 26 - Complete
+Exercise Library:
+- `exercises` Supabase table — id, name, body_part, equipment, target, secondary_muscles[], instructions[], gif_url; indexed on body_part/equipment/target
+- `POST /api/exercises/seed` — one-time call fetches all ~1300 exercises from ExerciseDB (RapidAPI), upserts to Supabase
+- `/life-hub/workouts/exercises` — grid view with search, body part filter pills, equipment filter (All/Dumbbell/Bodyweight); click any card opens detail modal with GIF, muscle tags, secondary muscles, step-by-step instructions
+- GIFs load lazily from ExerciseDB CDN; API key only used once for seed
+- Workouts dropdown added to LifeHubSidebar (Overview / Exercise Library)
+
 ### Phase 25 - Complete
 Google Health data caching layer:
 
