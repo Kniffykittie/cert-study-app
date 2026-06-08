@@ -148,8 +148,8 @@ export default function ExerciseLibraryPage() {
                   { label: selected.body_part, color: 'var(--accent-blue)' },
                   { label: selected.equipment, color: 'var(--accent-purple)' },
                   { label: selected.target, color: 'var(--success)' },
-                ].filter(t => t.label).map(t => (
-                  <span key={t.label} style={{ fontSize: '12px', color: t.color, backgroundColor: 'var(--background)', border: `1px solid ${t.color}`, borderRadius: '6px', padding: '3px 10px', textTransform: 'capitalize' }}>{t.label}</span>
+                ].filter(t => t.label).map((t, i) => (
+                  <span key={i} style={{ fontSize: '12px', color: t.color, backgroundColor: 'var(--background)', border: `1px solid ${t.color}`, borderRadius: '6px', padding: '3px 10px', textTransform: 'capitalize' }}>{t.label}</span>
                 ))}
               </div>
               {selected.secondary_muscles?.length > 0 && (
