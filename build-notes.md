@@ -358,7 +358,11 @@ Multi-feature expansion — contextual panels, new lab sets, and smart study too
 
 ## Future Features (Life Hub)
 
-### Health — Google Health / Pixel Watch
+- **Exercise/yoga photos** — use ExerciseDB API (free tier via RapidAPI) for exercise GIFs; already organized by muscle group, includes instructions and equipment type, licensed for app use. Yoga/stretching may need a separate source or CSS illustrations — revisit when building that section.
+- **Nutrition photos** — Open Food Facts first for barcode scanning (free, no key needed); fall back to manual entry when data incomplete. Revisit Nutritionix if micronutrient coverage proves insufficient.
+- **Vercel Cron for HR auto-sync** — requires Vercel Pro plan. Check account tier before building; fallback is Supabase Edge Functions with pg_cron (works on free tier).
+
+
 - **Heart Rate Tracker page** — hourly HR chart, resting HR, peak HR, zone breakdown (Rest/Fat Burn/Cardio/Peak)
 - **Vercel Cron Job auto-sync** — server-side scheduled job (every 30-60 min) that calls Google Health API and writes to cache tables without user loading the website; ensures HR/steps/sleep always fresh in Supabase
 - **Health Overview wiring** — connect landing page cards with live Supabase data (steps today, avg HR, sleep last night)
