@@ -9,8 +9,8 @@ export async function POST() {
   if (!RAPIDAPI_KEY) return NextResponse.json({ error: 'RAPIDAPI_KEY not set' }, { status: 500 })
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const res = await fetch(
     `https://${RAPIDAPI_HOST}/exercises?limit=${PAGE_SIZE}&offset=0`,
@@ -19,16 +19,17 @@ export async function POST() {
   if (!res.ok) return NextResponse.json({ error: `ExerciseDB error: ${res.status}` }, { status: 502 })
 
   const exercises = await res.json()
+  if (!Array.isArray(exercises)) return NextResponse.json({ error: 'Unexpected response from ExerciseDB' }, { status: 502 })
 
   const rows = exercises.map(e => ({
     id: e.id,
     name: e.name,
-    body_part: e.bodyPart,
-    equipment: e.equipment,
-    target: e.target,
-    secondary_muscles: e.secondaryMuscles ?? [],
+    body_part: e.bodyPart ?? e.body_part ?? null,
+    equipment: e.equipment ?? null,
+    target: e.target ?? null,
+    secondary_muscles: e.secondaryMuscles ?? e.secondary_muscles ?? [],
     instructions: e.instructions ?? [],
-    gif_url: e.gifUrl,
+    gif_url: e.gifUrl ?? e.image ?? null,
   }))
 
   const { error } = await supabase

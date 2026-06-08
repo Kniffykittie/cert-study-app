@@ -62,10 +62,10 @@ export default function ExerciseLibraryPage() {
           <h1 style={{ color: 'var(--accent-blue)', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Exercise Library</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Dumbbell & bodyweight exercises with photos and instructions</p>
         </div>
-        {exercises.length === 0 && !loading && (
+        {!loading && (
           <button onClick={handleSeed} disabled={seeding}
-            style={{ backgroundColor: 'var(--accent-blue)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: seeding ? 'not-allowed' : 'pointer', opacity: seeding ? 0.6 : 1 }}>
-            {seeding ? 'Loading exercises...' : 'Load Exercise Database'}
+            style={{ backgroundColor: exercises.length === 0 ? 'var(--accent-blue)' : 'var(--surface)', border: exercises.length === 0 ? 'none' : '1px solid var(--border)', color: exercises.length === 0 ? '#fff' : 'var(--text-secondary)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: seeding ? 'not-allowed' : 'pointer', opacity: seeding ? 0.6 : 1 }}>
+            {seeding ? 'Loading exercises...' : exercises.length === 0 ? 'Load Exercise Database' : '↻ Reload Database'}
           </button>
         )}
       </div>
