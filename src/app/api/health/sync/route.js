@@ -30,12 +30,11 @@ async function refreshTokenIfNeeded(supabase, userId, tokenRow) {
   return data.access_token
 }
 
-async function listDataPoints(accessToken, dataType, filter) {
-  const params = new URLSearchParams({ filter })
-  const res = await fetch(
-    `${BASE}/users/-/dataTypes/${dataType}/dataPoints?${params}`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  )
+async function listDataPoints(accessToken, dataType, filter = null) {
+  const url = filter
+    ? `${BASE}/users/-/dataTypes/${dataType}/dataPoints?filter=${encodeURIComponent(filter)}`
+    : `${BASE}/users/-/dataTypes/${dataType}/dataPoints`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
   const json = await res.json()
   if (!res.ok) return { _error: json, _status: res.status, _type: dataType }
   return json
@@ -65,9 +64,9 @@ export async function GET() {
   const sleepFilter = `interval.end_time >= "${yesterday}T18:00:00Z" AND interval.end_time < "${today}T12:00:00Z"`
 
   const [stepsData, heartData, sleepData] = await Promise.all([
-    listDataPoints(accessToken, 'steps', stepsFilter),
-    listDataPoints(accessToken, 'heart-rate', hrFilter),
-    listDataPoints(accessToken, 'sleep', sleepFilter),
+    listDataPoints(accessToken, 'steps'),
+    listDataPoints(accessToken, 'heart-rate'),
+    listDataPoints(accessToken, 'sleep'),
   ])
 
   const steps = stepsData?.dataPoints?.reduce((sum, p) => sum + (p.value ?? 0), 0) ?? null
