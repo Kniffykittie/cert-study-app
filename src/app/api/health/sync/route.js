@@ -56,12 +56,18 @@ export async function GET() {
   const accessToken = await refreshTokenIfNeeded(supabase, user.id, tokenRow)
   if (!accessToken) return NextResponse.json({ error: 'Token refresh failed' }, { status: 401 })
 
-  // Test: get user identity and list available data types
-  const [identityRes, stepsData, heartData] = await Promise.all([
-    fetch(`${BASE}/users/-/identity`, { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.json()),
-    fetch(`${BASE}/users/-/dataTypes/steps/dataPoints`, { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.json()),
-    fetch(`${BASE}/users/-/dataTypes/com.google.step_count.delta/dataPoints`, { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.json()),
+  const today = new Date().toISOString().split('T')[0]
+
+  // Get user identity first to get healthUserId
+  const identityRes = await fetch(`${BASE}/users/-/identity`, { headers: { Authorization: `Bearer ${accessToken}` } })
+  const identity = await identityRes.json()
+  const userId = identity.healthUserId ?? '-'
+
+  const [stepsMe, stepsId, stepsFilter] = await Promise.all([
+    fetch(`${BASE}/users/me/dataTypes/steps/dataPoints`, { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.json()),
+    fetch(`${BASE}/users/${userId}/dataTypes/steps/dataPoints`, { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.json()),
+    fetch(`${BASE}/users/${userId}/dataTypes/steps/dataPoints?filter=${encodeURIComponent(`date="${today}"`)}`, { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.json()),
   ])
 
-  return NextResponse.json({ _debug: { identityRes, stepsData, heartData } })
+  return NextResponse.json({ _debug: { userId, stepsMe, stepsId, stepsFilter } })
 }
