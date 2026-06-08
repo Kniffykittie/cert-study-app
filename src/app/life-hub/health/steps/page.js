@@ -67,55 +67,56 @@ export default function StepTrackerPage() {
     const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
 
     return (
-      <div>
-        <Header range={range} onRange={handleRangeChange} onRefresh={() => fetchData(range)} syncing={syncing} />
+      <>
+        <div>
+          <Header range={range} onRange={handleRangeChange} onRefresh={() => fetchData(range)} syncing={syncing} />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
-          {[
-            { label: 'Total Steps', value: totalSteps.toLocaleString(), unit: '7 days', color: 'var(--accent-blue)' },
-            { label: 'Daily Average', value: avgSteps.toLocaleString(), unit: `/ ${goal.toLocaleString()} goal`, color: avgSteps >= goal ? 'var(--success)' : 'var(--warning)' },
-            { label: 'Goal Days', value: `${weeklySteps.filter(d => d.steps >= goal).length}/7`, unit: 'days hit goal', color: 'var(--success)' },
-          ].map(card => (
-            <div key={card.label} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '8px' }}>{card.label}</div>
-              <div style={{ color: card.color, fontSize: '28px', fontWeight: '700', lineHeight: 1 }}>{card.value}</div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>{card.unit}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-          <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Steps by Day</div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '140px', marginBottom: '8px' }} onMouseMove={handleMouseMove}>
-            {weeklySteps.map(({ date, label, steps: s }) => {
-              const pct = (s / maxSteps) * 100
-              const isToday = date === todayStr
-              const metGoal = s >= goal
-              return (
-                <div key={date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', cursor: 'pointer' }}
-                  onMouseEnter={() => setTooltip({ label, steps: s })}
-                  onMouseLeave={() => setTooltip(null)}>
-                  <div style={{ width: '100%', height: `${Math.max(pct, s > 0 ? 3 : 1)}%`, backgroundColor: metGoal ? 'var(--success)' : isToday ? 'var(--accent-blue)' : 'var(--accent-purple)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s', opacity: isToday ? 1 : 0.8 }} />
-                </div>
-              )
-            })}
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {weeklySteps.map(({ date, label }) => (
-              <div key={date} style={{ flex: 1, textAlign: 'center', color: 'var(--text-secondary)', fontSize: '11px' }}>{label}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
+            {[
+              { label: 'Total Steps', value: totalSteps.toLocaleString(), unit: '7 days', color: 'var(--accent-blue)' },
+              { label: 'Daily Average', value: avgSteps.toLocaleString(), unit: `/ ${goal.toLocaleString()} goal`, color: avgSteps >= goal ? 'var(--success)' : 'var(--warning)' },
+              { label: 'Goal Days', value: `${weeklySteps.filter(d => d.steps >= goal).length}/7`, unit: 'days hit goal', color: 'var(--success)' },
+            ].map(card => (
+              <div key={card.label} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '8px' }}>{card.label}</div>
+                <div style={{ color: card.color, fontSize: '28px', fontWeight: '700', lineHeight: 1 }}>{card.value}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>{card.unit}</div>
+              </div>
             ))}
           </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '8px' }}>Green = goal met · Blue = today · Purple = other days</p>
+
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+            <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Steps by Day</div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '140px', marginBottom: '8px' }} onMouseMove={handleMouseMove}>
+              {weeklySteps.map(({ date, label, steps: s }) => {
+                const pct = (s / maxSteps) * 100
+                const isToday = date === todayStr
+                const metGoal = s >= goal
+                return (
+                  <div key={date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', cursor: 'pointer' }}
+                    onMouseEnter={() => setTooltip({ label, steps: s })}
+                    onMouseLeave={() => setTooltip(null)}>
+                    <div style={{ width: '100%', height: `${Math.max(pct, s > 0 ? 3 : 1)}%`, backgroundColor: metGoal ? 'var(--success)' : isToday ? 'var(--accent-blue)' : 'var(--accent-purple)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s', opacity: isToday ? 1 : 0.8 }} />
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {weeklySteps.map(({ date, label }) => (
+                <div key={date} style={{ flex: 1, textAlign: 'center', color: 'var(--text-secondary)', fontSize: '11px' }}>{label}</div>
+              ))}
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '8px' }}>Green = goal met · Blue = today · Purple = other days</p>
+          </div>
         </div>
-      </div>
-      {tooltip && (
-        <div style={{ position: 'fixed', left: mousePos.x + 12, top: mousePos.y - 40, backgroundColor: '#1A1A1A', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 12px', fontSize: '13px', color: 'var(--text-primary)', pointerEvents: 'none', zIndex: 9999, whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
-          <span style={{ fontWeight: '600' }}>{tooltip.label}</span> — <span style={{ color: 'var(--accent-blue)' }}>{tooltip.steps.toLocaleString()}</span> steps
-          {tooltip.steps >= goal && <span style={{ color: 'var(--success)', marginLeft: '8px' }}>✓ Goal</span>}
-        </div>
-      )}
-    </div>
-  )
+        {tooltip && (
+          <div style={{ position: 'fixed', left: mousePos.x + 12, top: mousePos.y - 40, backgroundColor: '#1A1A1A', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 12px', fontSize: '13px', color: 'var(--text-primary)', pointerEvents: 'none', zIndex: 9999, whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+            <span style={{ fontWeight: '600' }}>{tooltip.label}</span> — <span style={{ color: 'var(--accent-blue)' }}>{tooltip.steps.toLocaleString()}</span> steps
+            {tooltip.steps >= goal && <span style={{ color: 'var(--success)', marginLeft: '8px' }}>✓ Goal</span>}
+          </div>
+        )}
+      </>
+    )
   }
 
   // Today / Yesterday — hourly view
