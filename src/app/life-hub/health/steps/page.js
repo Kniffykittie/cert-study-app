@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 
 const RANGES = [
@@ -14,6 +14,9 @@ export default function StepTrackerPage() {
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [tooltip, setTooltip] = useState(null)
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+
+  const handleMouseMove = useCallback((e) => setMousePos({ x: e.clientX, y: e.clientY }), [])
 
   async function fetchData(r) {
     setSyncing(true)
@@ -83,13 +86,7 @@ export default function StepTrackerPage() {
 
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
           <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Steps by Day</div>
-          {tooltip && (
-            <div style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px 12px', fontSize: '13px', color: 'var(--text-primary)', marginBottom: '12px', display: 'inline-block' }}>
-              <span style={{ fontWeight: '600' }}>{tooltip.label}</span> — {tooltip.steps.toLocaleString()} steps
-              {tooltip.steps >= goal && <span style={{ color: 'var(--success)', marginLeft: '8px' }}>✓ Goal met</span>}
-            </div>
-          )}
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '140px', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '140px', marginBottom: '8px' }} onMouseMove={handleMouseMove}>
             {weeklySteps.map(({ date, label, steps: s }) => {
               const pct = (s / maxSteps) * 100
               const isToday = date === todayStr
@@ -111,7 +108,14 @@ export default function StepTrackerPage() {
           <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '8px' }}>Green = goal met · Blue = today · Purple = other days</p>
         </div>
       </div>
-    )
+      {tooltip && (
+        <div style={{ position: 'fixed', left: mousePos.x + 12, top: mousePos.y - 40, backgroundColor: '#1A1A1A', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 12px', fontSize: '13px', color: 'var(--text-primary)', pointerEvents: 'none', zIndex: 9999, whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+          <span style={{ fontWeight: '600' }}>{tooltip.label}</span> — <span style={{ color: 'var(--accent-blue)' }}>{tooltip.steps.toLocaleString()}</span> steps
+          {tooltip.steps >= goal && <span style={{ color: 'var(--success)', marginLeft: '8px' }}>✓ Goal</span>}
+        </div>
+      )}
+    </div>
+  )
   }
 
   // Today / Yesterday — hourly view
@@ -157,12 +161,7 @@ export default function StepTrackerPage() {
 
       <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
         <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Steps by Hour (Eastern)</div>
-        {tooltip && (
-          <div style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px 12px', fontSize: '13px', color: 'var(--text-primary)', marginBottom: '12px', display: 'inline-block' }}>
-            <span style={{ fontWeight: '600' }}>{fmtHour(tooltip.hour)}</span> — {tooltip.steps.toLocaleString()} steps
-          </div>
-        )}
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '120px', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '120px', marginBottom: '8px' }} onMouseMove={handleMouseMove}>
           {hourlySteps.map(({ hour, steps: s }) => {
             const pct = (s / maxSteps) * 100
             const isPast = range === 'yesterday' || hour <= nowHour
@@ -183,6 +182,12 @@ export default function StepTrackerPage() {
         </div>
         <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '8px' }}>Green = peak hour · Hover bars for details</p>
       </div>
+      {tooltip && (
+        <div style={{ position: 'fixed', left: mousePos.x + 12, top: mousePos.y - 40, backgroundColor: '#1A1A1A', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 12px', fontSize: '13px', color: 'var(--text-primary)', pointerEvents: 'none', zIndex: 9999, whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+          <span style={{ fontWeight: '600' }}>{tooltip.label ?? fmtHour(tooltip.hour)}</span> — <span style={{ color: 'var(--accent-blue)' }}>{tooltip.steps.toLocaleString()}</span> steps
+          {tooltip.steps >= goal && <span style={{ color: 'var(--success)', marginLeft: '8px' }}>✓ Goal</span>}
+        </div>
+      )}
     </div>
   )
 }

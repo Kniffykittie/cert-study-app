@@ -354,7 +354,6 @@ Multi-feature expansion — contextual panels, new lab sets, and smart study too
 - PWA conversion (add to home screen, offline support)
 
 ## Future Features (Life Hub)
-- Sleep tracking (no data when watch not worn — shows — correctly)
 - Workout and nutrition logging
 - Supplement tracking and encyclopedia
 - Correlation engine (study performance vs health data)
@@ -384,6 +383,28 @@ Google Health API integration (Life Hub):
 - Refresh button re-fetches on demand
 - Data from Google Pixel Watch 4 via Google Health API v4 (`users/me` endpoint)
 - Sleep shows `—` correctly when watch not worn
+
+### Phase 24 - Complete
+Step Tracker and Sleep Tracker pages:
+
+**Step Tracker** (`/life-hub/health/steps`)
+- Today / Yesterday / Week range tabs + Refresh button
+- Hourly bar chart (24 bars, Eastern time) — peak hour highlighted green, past hours blue, future grey
+- Daily goal progress bar with 0–10k scale labels
+- Summary cards: Total Steps, Peak Hour, Progress %
+- Week view: 7-day bar chart, Total / Daily Avg / Goal Days cards
+- Hover tooltips use `position: fixed` overlay following mouse cursor — no layout shift
+
+**Sleep Tracker** (`/life-hub/health/sleep`)
+- Summary cards: Total Sleep, Deep Sleep, REM, Light
+- Stage breakdown proportional bar (Deep=blue, REM=purple, Light=green, Awake=yellow)
+- Full sleep timeline chart with proportional segments
+- "No sleep data" state (😴) when watch not worn — shows correctly
+
+**Health sidebar dropdown**
+- "Health" nav item in LifeHubSidebar now toggles a dropdown
+- Sub-items: Overview, Step Tracker, Sleep Tracker
+- Auto-opens when on any `/life-hub/health` path
 
 ### Phase 22 - Complete
 Settings page Study Preferences + live home page:
