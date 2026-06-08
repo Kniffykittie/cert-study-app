@@ -64,14 +64,21 @@ export async function GET() {
     fetchDataType(accessToken, 'sleep'),
   ])
 
-  // Filter to today's data and sum steps
-  const todaySteps = stepsPoints
-    .filter(p => p.steps?.interval?.startTime?.startsWith(todayUTC))
+  // Filter to today's steps and build hourly breakdown
+  const todaySteps = stepsPoints.filter(p => p.steps?.interval?.startTime?.startsWith(todayUTC))
   const steps = todaySteps.length > 0
     ? todaySteps.reduce((sum, p) => sum + parseInt(p.steps?.count ?? 0), 0)
     : null
 
-  // Today's heart rate average
+  const stepsByHour = {}
+  for (let h = 0; h < 24; h++) stepsByHour[h] = 0
+  todaySteps.forEach(p => {
+    const hour = new Date(p.steps.interval.startTime).getUTCHours()
+    stepsByHour[hour] += parseInt(p.steps?.count ?? 0)
+  })
+  const hourlySteps = Array.from({ length: 24 }, (_, h) => ({ hour: h, steps: stepsByHour[h] }))
+
+  // Today's heart rate
   const todayHr = heartPoints
     .filter(p => p.heartRate?.sampleTime?.physicalTime?.startsWith(todayUTC))
     .map(p => parseInt(p.heartRate?.beatsPerMinute))
@@ -80,7 +87,8 @@ export async function GET() {
     ? Math.round(todayHr.reduce((a, b) => a + b, 0) / todayHr.length)
     : null
 
-  // Sleep from last night (yesterday evening to this morning)
+  // Sleep stages from last night
+  const SLEEP_STAGES = { AWAKE: 'Awake', LIGHT: 'Light', DEEP: 'Deep', REM: 'REM', UNKNOWN: 'Unknown' }
   const lastNightSleep = sleepPoints.filter(p => {
     const start = p.sleep?.interval?.startTime ?? ''
     return start.startsWith(yesterdayUTC) || start.startsWith(todayUTC)
@@ -93,5 +101,25 @@ export async function GET() {
   }, 0)
   const sleepHours = sleepMs > 0 ? Math.round((sleepMs / 3600000) * 10) / 10 : null
 
-  return NextResponse.json({ steps, heartRate, sleepHours })
+  const sleepStages = {}
+  lastNightSleep.forEach(p => {
+    const stage = p.sleep?.stage ?? 'UNKNOWN'
+    const label = SLEEP_STAGES[stage] ?? stage
+    const start = p.sleep?.interval?.startTime
+    const end = p.sleep?.interval?.endTime
+    if (!start || !end) return
+    const mins = Math.round((new Date(end) - new Date(start)) / 60000)
+    sleepStages[label] = (sleepStages[label] ?? 0) + mins
+  })
+  const sleepTimeline = lastNightSleep
+    .filter(p => p.sleep?.interval?.startTime && p.sleep?.interval?.endTime)
+    .map(p => ({
+      stage: SLEEP_STAGES[p.sleep.stage] ?? p.sleep.stage ?? 'Unknown',
+      start: p.sleep.interval.startTime,
+      end: p.sleep.interval.endTime,
+      mins: Math.round((new Date(p.sleep.interval.endTime) - new Date(p.sleep.interval.startTime)) / 60000),
+    }))
+    .sort((a, b) => new Date(a.start) - new Date(b.start))
+
+  return NextResponse.json({ steps, heartRate, sleepHours, hourlySteps, sleepStages, sleepTimeline })
 }

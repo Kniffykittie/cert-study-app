@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 export default function LifeHubSidebar() {
   const [displayName, setDisplayName] = useState('')
+  const [healthOpen, setHealthOpen] = useState(false)
   const pathname = usePathname()
 
   useEffect(() => {
@@ -19,7 +20,25 @@ export default function LifeHubSidebar() {
     fetchProfile()
   }, [])
 
+  useEffect(() => {
+    if (pathname.startsWith('/life-hub/health')) setHealthOpen(true)
+  }, [pathname])
+
   const initial = displayName ? displayName[0].toUpperCase() : '?'
+
+  const navLink = (label, href) => {
+    const active = pathname === href
+    return (
+      <Link key={href} href={href}
+        style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', textDecoration: 'none', display: 'block', backgroundColor: active ? 'rgba(123,47,190,0.12)' : 'transparent', color: active ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: active ? '600' : '400', borderLeft: active ? '2px solid var(--accent-purple)' : '2px solid transparent' }}
+        onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.08)' }}
+        onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}>
+        {label}
+      </Link>
+    )
+  }
+
+  const healthActive = pathname.startsWith('/life-hub/health')
 
   return (
     <aside style={{ width: '220px', minHeight: '100vh', backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '16px 12px', gap: '4px', flexShrink: 0 }}>
@@ -35,23 +54,30 @@ export default function LifeHubSidebar() {
 
       <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '4px 12px', marginBottom: '4px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Life Hub</div>
 
-      {[
-        { label: 'Overview', href: '/life-hub' },
-        { label: 'Health', href: '/life-hub/health' },
-        { label: 'Nutrition', href: '/life-hub/nutrition' },
-        { label: 'Workouts', href: '/life-hub/workouts' },
-        { label: 'Sleep', href: '/life-hub/sleep' },
-      ].map(item => {
-        const active = pathname === item.href
-        return (
-          <Link key={item.href} href={item.href}
-            style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', textDecoration: 'none', display: 'block', backgroundColor: active ? 'rgba(123,47,190,0.12)' : 'transparent', color: active ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: active ? '600' : '400', borderLeft: active ? '2px solid var(--accent-purple)' : '2px solid transparent' }}
-            onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.08)' }}
-            onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}>
-            {item.label}
-          </Link>
-        )
-      })}
+      {navLink('Overview', '/life-hub')}
+
+      {/* Health dropdown */}
+      <div>
+        <div
+          onClick={() => setHealthOpen(o => !o)}
+          style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: healthActive && !healthOpen ? 'rgba(123,47,190,0.12)' : 'transparent', color: healthActive ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: healthActive ? '600' : '400', borderLeft: healthActive ? '2px solid var(--accent-purple)' : '2px solid transparent' }}
+          onMouseEnter={e => { if (!healthActive) e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.08)' }}
+          onMouseLeave={e => { if (!healthActive) e.currentTarget.style.backgroundColor = healthActive && !healthOpen ? 'rgba(123,47,190,0.12)' : 'transparent' }}
+        >
+          <span>Health</span>
+          <span style={{ fontSize: '10px', transition: 'transform 0.2s', display: 'inline-block', transform: healthOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+        </div>
+        {healthOpen && (
+          <div style={{ paddingLeft: '12px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {navLink('Overview', '/life-hub/health')}
+            {navLink('Step Tracker', '/life-hub/health/steps')}
+            {navLink('Sleep Tracker', '/life-hub/health/sleep')}
+          </div>
+        )}
+      </div>
+
+      {navLink('Nutrition', '/life-hub/nutrition')}
+      {navLink('Workouts', '/life-hub/workouts')}
 
       <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
         <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '6px', textDecoration: 'none' }}
