@@ -191,8 +191,9 @@ export default function WorkoutsPage() {
               const dayIndex = plan.plan.indexOf(day)
               const isRest = !day.exercises?.length
               const color = focusColor(day.focus)
+              const cardKey = day.day_of_week ?? day.day_number ?? sortedIndex
               return (
-                <div key={day.day_of_week} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+                <div key={cardKey} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
                   <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                     <div style={{ flex: 1 }}>
                       <select value={day.day_of_week} onChange={e => { moveDay(dayIndex, e.target.value); setTimeout(saveDayChanges, 300) }}
