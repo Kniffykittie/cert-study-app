@@ -89,5 +89,5 @@ export async function GET() {
   }, 0) ?? 0
   const sleepHours = sleepMs > 0 ? Math.round((sleepMs / 3600000) * 10) / 10 : null
 
-  return NextResponse.json({ steps, heartRate: avgHr, sleepHours })
+  return NextResponse.json({ steps, heartRate: avgHr, sleepHours, _debug: { stepsRollup, heartData, sleepData } })
 }
