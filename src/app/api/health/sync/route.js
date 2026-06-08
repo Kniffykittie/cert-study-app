@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+const BASE = 'https://health.googleapis.com/v4'
+
 async function refreshTokenIfNeeded(supabase, userId, tokenRow) {
   if (!tokenRow.refresh_token) return tokenRow.access_token
   const expiresAt = new Date(tokenRow.expires_at)
@@ -19,20 +21,33 @@ async function refreshTokenIfNeeded(supabase, userId, tokenRow) {
   const data = await res.json()
   if (!res.ok || !data.access_token) return null
 
-  const expiresAt2 = new Date(Date.now() + data.expires_in * 1000).toISOString()
   await supabase.from('google_health_tokens').update({
     access_token: data.access_token,
-    expires_at: expiresAt2,
+    expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(),
     updated_at: new Date().toISOString(),
   }).eq('user_id', userId)
 
   return data.access_token
 }
 
-async function fetchHealthData(accessToken, dataType, startTime, endTime) {
+async function listDataPoints(accessToken, dataType, startTime, endTime) {
+  const params = new URLSearchParams({ startTime, endTime })
   const res = await fetch(
-    `https://health.googleapis.com/v1/users/-/dataSources/${dataType}/datasets/${startTime}-${endTime}`,
+    `${BASE}/users/-/dataTypes/${dataType}/dataPoints?${params}`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
+  )
+  if (!res.ok) return null
+  return res.json()
+}
+
+async function dailyRollUp(accessToken, dataType, date) {
+  const res = await fetch(
+    `${BASE}/users/-/dataTypes/${dataType}/dataPoints:dailyRollUp`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dates: [date] }),
+    }
   )
   if (!res.ok) return null
   return res.json()
@@ -54,25 +69,23 @@ export async function GET() {
   const accessToken = await refreshTokenIfNeeded(supabase, user.id, tokenRow)
   if (!accessToken) return NextResponse.json({ error: 'Token refresh failed' }, { status: 401 })
 
-  const now = Date.now()
-  const startOfDay = new Date()
-  startOfDay.setHours(0, 0, 0, 0)
-  const startNs = startOfDay.getTime() * 1e6
-  const endNs = now * 1e6
+  const today = new Date().toISOString().split('T')[0]
+  const startOfDay = `${today}T00:00:00Z`
+  const endOfDay = `${today}T23:59:59Z`
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
 
-  const [stepsData, heartData, sleepData] = await Promise.all([
-    fetchHealthData(accessToken, 'derived:com.google.step_count.delta:com.google.android.gms:estimated_steps', startNs, endNs),
-    fetchHealthData(accessToken, 'derived:com.google.heart_rate.bpm:com.google.android.gms:merge_heart_rate_bpm', startNs, endNs),
-    fetchHealthData(accessToken, 'derived:com.google.sleep.segment:com.google.android.gms:merged', startNs - 86400e9, endNs),
+  const [stepsRollup, heartData, sleepData] = await Promise.all([
+    dailyRollUp(accessToken, 'steps', today),
+    listDataPoints(accessToken, 'heart-rate', startOfDay, endOfDay),
+    listDataPoints(accessToken, 'sleep', `${yesterday}T18:00:00Z`, `${today}T12:00:00Z`),
   ])
 
-  const steps = stepsData?.point?.reduce((sum, p) => sum + (p.value?.[0]?.intVal ?? 0), 0) ?? null
-  const heartRates = heartData?.point?.map(p => p.value?.[0]?.fpVal).filter(Boolean) ?? []
+  const steps = stepsRollup?.dataPoints?.[0]?.value ?? null
+  const heartRates = heartData?.dataPoints?.map(p => p.value).filter(Boolean) ?? []
   const avgHr = heartRates.length ? Math.round(heartRates.reduce((a, b) => a + b, 0) / heartRates.length) : null
-  const sleepMs = sleepData?.point?.reduce((sum, p) => {
-    const start = parseInt(p.startTimeNanos) / 1e6
-    const end = parseInt(p.endTimeNanos) / 1e6
-    return sum + (end - start)
+  const sleepMs = sleepData?.dataPoints?.reduce((sum, p) => {
+    if (!p.startTime || !p.endTime) return sum
+    return sum + (new Date(p.endTime) - new Date(p.startTime))
   }, 0) ?? 0
   const sleepHours = sleepMs > 0 ? Math.round((sleepMs / 3600000) * 10) / 10 : null
 
