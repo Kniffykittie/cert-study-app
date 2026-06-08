@@ -66,7 +66,7 @@ export async function POST(req) {
 
   const body = await req.json()
   const { goals, experience, days_per_week, workout_days, pushup_count, pullup_count, squat_count,
-    has_pullup_bar, has_ab_roller, dumbbell_pairs, dumbbell_note, limitations } = body
+    has_pullup_bar, has_ab_roller, dumbbell_pairs, dumbbell_note, limitations, cardio_options } = body
 
   const goalsArray = Array.isArray(goals) ? goals : (goals || '').split(',')
   const wantsWeightLoss = goalsArray.includes('weight_loss')
@@ -84,9 +84,23 @@ export async function POST(req) {
 
   const workoutDaysList = Array.isArray(workout_days) ? workout_days : []
 
-  const cardioNote = wantsWeightLoss
-    ? `CARDIO REQUIREMENT: Because weight loss is a goal, add cardio to ${wantsMuscle ? 'rest days only (to preserve energy for lifting)' : 'each workout day after the main workout OR on rest days'}. Cardio options: HIIT (20 min), jump rope (15 min), brisk walk (30 min), mountain climbers circuit. Include these as a "cardio" section in rest days or after lifting days.`
-    : 'No dedicated cardio required.'
+  const cardioOptionsArray = Array.isArray(cardio_options) ? cardio_options : []
+  const hasNoCardio = cardioOptionsArray.includes('none') || cardioOptionsArray.length === 0
+  const cardioMap = {
+    walk: 'Brisk Walk 30-45 min',
+    jump_rope: 'Jump Rope 15-20 min',
+    bike: 'Stationary Bike 20-30 min',
+    stair_climb: 'Stair Climbing 15-20 min',
+    hiit: 'Bodyweight HIIT (burpees, high knees, jumping jacks) 20 min',
+    shadow_boxing: 'Shadow Boxing 3x2 min rounds',
+  }
+  const availableCardio = cardioOptionsArray.filter(c => c !== 'none').map(c => cardioMap[c] || c)
+
+  const cardioNote = wantsWeightLoss && !hasNoCardio
+    ? `CARDIO REQUIREMENT: Because weight loss is a goal, add cardio using ONLY these options the client has chosen: ${availableCardio.join(', ')}. Place cardio on ${wantsMuscle ? 'rest days only (to preserve lifting energy)' : 'workout days after lifting OR on rest days'}. Never suggest cardio the client did not select.`
+    : hasNoCardio
+      ? 'CLIENT PREFERS NO CARDIO — do not add any cardio recommendations anywhere.'
+      : `CLIENT HAS THESE CARDIO OPTIONS AVAILABLE: ${availableCardio.join(', ')}. Only add cardio if it genuinely fits their goals.`
 
   const prompt = `You are a personal trainer creating a customized weekly workout plan.
 

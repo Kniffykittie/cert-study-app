@@ -9,8 +9,9 @@ const MUSCLE_GROUPS = [
   { label: 'Core', parts: ['waist'] },
   { label: 'Legs', parts: ['upper legs', 'lower legs', 'calves'] },
   { label: 'Shoulders', parts: ['shoulders'] },
+  { label: 'Cardio', parts: ['cardio'] },
 ]
-const ALLOWED_EQUIPMENT = ['body weight', 'dumbbell']
+const ALLOWED_EQUIPMENT = ['body weight', 'dumbbell', 'jump rope', 'none']
 
 export default function ExerciseLibraryPage() {
   const [exercises, setExercises] = useState([])
@@ -27,7 +28,7 @@ export default function ExerciseLibraryPage() {
     const { data } = await supabase
       .from('exercises')
       .select('*')
-      .in('equipment', ALLOWED_EQUIPMENT)
+      .or('equipment.in.(dumbbell,body weight),body_part.eq.cardio')
       .order('name')
     setExercises(data ?? [])
     setLoading(false)
@@ -46,6 +47,8 @@ export default function ExerciseLibraryPage() {
     ),
   })).filter(g => g.exercises.length > 0)
 
+  const cardioGroup = grouped.find(g => g.label === 'Cardio')
+
   const totalCount = exercises.length
 
   return (
@@ -54,7 +57,7 @@ export default function ExerciseLibraryPage() {
       <div style={{ marginBottom: '20px' }}>
         <h1 style={{ color: 'var(--accent-blue)', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Exercise Library</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-          {loading ? 'Loading...' : `${totalCount.toLocaleString()} dumbbell & bodyweight exercises`}
+          {loading ? 'Loading...' : `${totalCount.toLocaleString()} dumbbell, bodyweight & cardio exercises`}
         </p>
       </div>
 

@@ -29,6 +29,8 @@ export default function WorkoutsPage() {
   const [aiCheckin, setAiCheckin] = useState(null) // {question, pendingChange}
   const [aiCheckinInput, setAiCheckinInput] = useState('')
   const [aiCheckinLoading, setAiCheckinLoading] = useState(false)
+  const [cardioModal, setCardioModal] = useState(null) // dayIndex
+  const [cardioExercises, setCardioExercises] = useState([])
 
   useEffect(() => { load() }, [])
 
@@ -46,6 +48,9 @@ export default function WorkoutsPage() {
     setProfile(prof)
     setPlan(planData)
     setAllExercises(exercises ?? [])
+
+    const { data: cardio } = await supabase.from('exercises').select('id,name,body_part').eq('body_part', 'cardio').order('name')
+    setCardioExercises(cardio ?? [])
     setLoading(false)
 
     if (!prof) router.push('/life-hub/workouts/setup')
@@ -80,6 +85,15 @@ export default function WorkoutsPage() {
       days[dayIndex] = { ...oldDay, day_of_week: newDayOfWeek }
       return { ...p, plan: days }
     })
+  }
+
+  async function setCardioForDay(dayIndex, cardioText) {
+    const days = [...plan.plan]
+    days[dayIndex] = { ...days[dayIndex], cardio: cardioText }
+    const supabase = createClient()
+    await supabase.from('workout_plans').update({ plan: days }).eq('id', plan.id)
+    setPlan(p => ({ ...p, plan: days }))
+    setCardioModal(null)
   }
 
   async function saveDayChanges() {
@@ -209,12 +223,16 @@ export default function WorkoutsPage() {
 
                   {isRest ? (
                     <div style={{ padding: '20px 14px' }}>
-                      <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px', marginBottom: day.cardio ? '12px' : 0 }}>😴 Rest & Recovery</div>
+                      <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '12px' }}>😴 Rest & Recovery</div>
                       {day.cardio && (
-                        <div style={{ backgroundColor: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.2)', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: 'var(--text-primary)' }}>
+                        <div style={{ backgroundColor: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.2)', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: 'var(--text-primary)', marginBottom: '10px' }}>
                           <span style={{ color: 'var(--success)', fontWeight: '600' }}>🏃 Cardio: </span>{day.cardio}
                         </div>
                       )}
+                      <button onClick={() => setCardioModal(dayIndex)}
+                        style={{ width: '100%', backgroundColor: 'var(--background)', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '8px', fontSize: '12px', cursor: 'pointer' }}>
+                        {day.cardio ? '🔄 Change Cardio' : '+ Add Cardio'}
+                      </button>
                     </div>
                   ) : (
                     <div style={{ padding: '12px 14px' }}>
@@ -281,6 +299,39 @@ export default function WorkoutsPage() {
                   <span style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'capitalize' }}>{ex.body_part}</span>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cardio Picker Modal */}
+      {cardioModal !== null && (
+        <div onClick={() => setCardioModal(null)} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', width: '100%', maxWidth: '400px', maxHeight: '70vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', margin: 0 }}>
+                {plan.plan[cardioModal]?.cardio ? 'Change Cardio' : 'Add Cardio'} — {plan.plan[cardioModal]?.day_of_week}
+              </h2>
+              <button onClick={() => setCardioModal(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ overflowY: 'auto', padding: '12px' }}>
+              {plan.plan[cardioModal]?.cardio && (
+                <button onClick={() => setCardioForDay(cardioModal, null)}
+                  style={{ width: '100%', padding: '10px 14px', marginBottom: '10px', backgroundColor: 'rgba(255,60,60,0.08)', border: '1px solid rgba(255,60,60,0.2)', borderRadius: '8px', cursor: 'pointer', color: 'var(--error)', fontSize: '13px' }}>
+                  Remove Cardio
+                </button>
+              )}
+              {cardioExercises.map(ex => (
+                <button key={ex.id} onClick={() => setCardioForDay(cardioModal, ex.name)}
+                  style={{ width: '100%', padding: '10px 14px', marginBottom: '6px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', color: 'var(--text-primary)', fontSize: '13px', textTransform: 'capitalize' }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--success)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                  🏃 {ex.name}
+                </button>
+              ))}
+              {cardioExercises.length === 0 && (
+                <div style={{ color: 'var(--text-secondary)', fontSize: '13px', textAlign: 'center', padding: '24px' }}>No cardio exercises found.</div>
+              )}
             </div>
           </div>
         </div>

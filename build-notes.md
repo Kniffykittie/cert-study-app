@@ -430,6 +430,22 @@ Google Health API integration (Life Hub):
 - Data from Google Pixel Watch 4 via Google Health API v4 (`users/me` endpoint)
 - Sleep shows `—` correctly when watch not worn
 
+### Phase 27 - Complete
+AI Workout Plan Generator + Cardio System:
+- 7-step onboarding setup: experience, goals (multi-select), days per week, schedule (pick actual days), fitness check ("please try"), cardio preferences, equipment + limitations
+- Multi-select goals with toggle: muscle, weight_loss, fitness, endurance
+- Cardio preferences step: walk, jump_rope, bike, stair_climb, hiit, shadow_boxing, none (mutually exclusive)
+- `generate-plan/route.js`: EXERCISE_LIST with pullup_bar/ab_roller equipment flags, filters exercises by available equipment, cardioNote only uses user-selected cardio options
+- Plan stored as JSONB in `workout_plans.plan` — array of 7 day objects with day_of_week, exercises, cardio
+- `schedule` JSONB column on `workout_plans` stores workout_days array
+- Plan page shows actual days (Mon-Sun) sorted by DAYS_OF_WEEK index
+- Day reassignment: dropdown select per card, auto-swaps conflicting days, saves to Supabase
+- Add Exercise: picker modal from full exercise list → AI check-in asks permanent vs one-time → saves if permanent
+- Remove Exercise: × button → AI check-in → removes from plan if permanent
+- Add/Change Cardio on rest day cards: picker shows cardio exercises from DB; remove option if cardio already set
+- 9 cardio exercises in `exercises` table with body_part='cardio'
+- Cardio section added to Exercise Library page (body_part='cardio' pulled separately)
+
 ### Phase 26 - Complete
 Exercise Library (fully rebuilt — ExerciseDB removed):
 - `exercises` Supabase table — id, name, body_part, equipment, target, secondary_muscles[], instructions[], gif_url (nullable)

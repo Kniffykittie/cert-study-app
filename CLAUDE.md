@@ -62,8 +62,12 @@ src/
         steps/page.js             Step Tracker — hourly/weekly bar charts, goal progress, fixed tooltip
         sleep/page.js             Sleep Tracker — stage breakdown bar, timeline chart, no-data state
     workouts/
-      page.js                     Workouts landing (placeholder)
-      exercises/page.js           Exercise Library — grid of exercises, filter by body part/equipment, click for detail modal with GIF + instructions
+      page.js                     My Workout Plan — weekly plan cards sorted Mon-Sun, day reassignment, add/remove exercises with AI check-in, add/change cardio on rest days
+      setup/page.js               7-step onboarding: experience, goals (multi-select), days, schedule (pick days), fitness check, cardio preferences, equipment
+      exercises/page.js           Exercise Library — sticky muscle-group nav, scrollable grouped sections, cards with image/placeholder, detail modal with form cues, Cardio section
+      api/
+        workouts/
+          generate-plan/route.js  AI workout plan generator — filters exercises by equipment, cardio from user-selected options only
     study-hub/
       page.js                     Overview (DailyStreak component)
       ccna/page.js                CCNA cert page (DomainTrend + Recommended Focus)

@@ -10,7 +10,8 @@ const STEPS = [
   { id: 'goals', title: 'Your Goals', subtitle: 'Select everything that applies — you can have more than one.' },
   { id: 'days', title: 'Your Schedule', subtitle: 'How many days per week can you commit to working out?' },
   { id: 'schedule', title: 'Pick Your Days', subtitle: 'Which days of the week work best for you?' },
-  { id: 'fitness', title: 'Quick Fitness Check', subtitle: 'Do as many as you can with good form — this calibrates your plan.' },
+  { id: 'fitness', title: 'Quick Fitness Check', subtitle: 'Please actually try these before answering — set your phone down and do as many as you can with good form right now. This is the most important step for building a plan that actually fits you.' },
+  { id: 'cardio', title: 'Cardio Options', subtitle: 'What cardio can you realistically do? Only select what you actually have access to and are comfortable with.' },
   { id: 'equipment', title: 'Your Equipment', subtitle: 'Tell us exactly what you have so we never program something impossible.' },
   { id: 'limitations', title: 'Any Limitations?', subtitle: 'Injuries, pain, or areas to avoid. Type "none" if nothing applies.' },
 ]
@@ -40,10 +41,20 @@ export default function WorkoutSetupPage() {
     has_ab_roller: null,
     dumbbell_pairs: '',
     dumbbell_note: '',
+    cardio_options: [],
     limitations: '',
   })
 
   function set(key, val) { setForm(f => ({ ...f, [key]: val })) }
+
+  function toggleCardio(val) {
+    setForm(f => ({
+      ...f,
+      cardio_options: f.cardio_options.includes(val)
+        ? f.cardio_options.filter(c => c !== val)
+        : [...f.cardio_options, val],
+    }))
+  }
 
   function toggleGoal(val) {
     setForm(f => ({
@@ -70,6 +81,7 @@ export default function WorkoutSetupPage() {
     if (s === 'days') return !!form.days_per_week
     if (s === 'schedule') return form.workout_days.length === form.days_per_week
     if (s === 'fitness') return form.pushup_count !== '' && form.squat_count !== '' && form.has_pullup_bar !== null && form.has_ab_roller !== null
+    if (s === 'cardio') return form.cardio_options.length > 0
     if (s === 'equipment') return !!form.dumbbell_pairs.trim()
     if (s === 'limitations') return !!form.limitations.trim()
     return true
@@ -96,7 +108,7 @@ export default function WorkoutSetupPage() {
       pushup_count: parseInt(form.pushup_count) || 0,
       pullup_count: form.has_pullup_bar ? (parseInt(form.pullup_count) || 0) : -1,
       squat_count: parseInt(form.squat_count) || 0,
-      available_weights: `Pairs: ${form.dumbbell_pairs}${form.dumbbell_note ? '. Note: ' + form.dumbbell_note : ''}`,
+      available_weights: `Pairs: ${form.dumbbell_pairs}${form.dumbbell_note ? '. Note: ' + form.dumbbell_note : ''}. Cardio: ${form.cardio_options.join(', ')}`,
       limitations: form.limitations,
       updated_at: new Date().toISOString(),
     }
@@ -250,6 +262,44 @@ export default function WorkoutSetupPage() {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {current.id === 'cardio' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ backgroundColor: 'rgba(0,128,255,0.08)', border: '1px solid rgba(0,128,255,0.2)', borderRadius: '8px', padding: '12px 14px', fontSize: '13px', color: 'var(--text-primary)', lineHeight: '1.6', marginBottom: '4px' }}>
+              Select <strong>only what you actually have access to</strong>. If you live in an apartment with no outdoor space, don't select walking. If you hate jumping, skip jump rope. Your plan will only include what you choose.
+            </div>
+            {[
+              { val: 'walk', label: 'Walking / Running', desc: 'Outdoors, treadmill, or around the neighborhood' },
+              { val: 'jump_rope', label: 'Jump Rope', desc: 'You own one and have ceiling space to use it' },
+              { val: 'bike', label: 'Stationary Bike', desc: 'Stationary bike or outdoor cycling' },
+              { val: 'stair_climb', label: 'Stair Climbing', desc: 'Access to stairs at home, gym, or outside' },
+              { val: 'hiit', label: 'Bodyweight HIIT', desc: 'Burpees, high knees, jumping jacks — no equipment needed' },
+              { val: 'shadow_boxing', label: 'Shadow Boxing', desc: 'Punching combinations in open space' },
+              { val: 'none', label: 'None of the above', desc: 'I prefer to keep rest days as pure rest' },
+            ].map(o => {
+              const active = form.cardio_options.includes(o.val)
+              const isNone = o.val === 'none'
+              return (
+                <button key={o.val} onClick={() => {
+                  if (isNone) { setForm(f => ({ ...f, cardio_options: active ? [] : ['none'] })); return }
+                  setForm(f => {
+                    const filtered = f.cardio_options.filter(c => c !== 'none')
+                    return { ...f, cardio_options: filtered.includes(o.val) ? filtered.filter(c => c !== o.val) : [...filtered, o.val] }
+                  })
+                }}
+                  style={{ padding: '14px 18px', borderRadius: '10px', border: `2px solid ${active ? 'var(--accent-purple)' : 'var(--border)'}`, backgroundColor: active ? 'rgba(123,47,190,0.1)' : 'var(--surface)', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '2px' }}>{o.label}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{o.desc}</div>
+                  </div>
+                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${active ? 'var(--accent-purple)' : 'var(--border)'}`, backgroundColor: active ? 'var(--accent-purple)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {active && <span style={{ color: '#fff', fontSize: '12px' }}>✓</span>}
+                  </div>
+                </button>
+              )
+            })}
           </div>
         )}
 
