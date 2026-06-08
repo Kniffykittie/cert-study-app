@@ -206,6 +206,25 @@ src/
 - Progress page and Results page include Mixed as a 4th cert (green, `var(--success)`)
 - `MIXED_DOMAINS` constant in test/page.js maps each cert to its overlap domains
 
+### Mark as Learned (Wrong Answer Review)
+- When answer is revealed in practice mode and question came from wrong-answer-review (`q._wrongAnswerId` exists), a purple "✓ Mark as Learned" button appears next to Next Question
+- One click PATCHes `/api/wrong-answers` → sets `learned_at` on that `question_answers` row
+- Wrong-answers GET route filters `learned_at IS NULL` so marked questions never appear again
+- Button turns green and disabled after click; state tracked in `markedLearned` object keyed by question index
+
+### AI Documentation Feedback
+- StepCard: Save button on DOCUMENT YOUR WORK textarea calls POST `/api/lab-doc-feedback`
+- Sends step title, content, document prompts array, and user's text
+- Returns 1-3 sentences of specific feedback; displayed inline below textarea with 🤖 icon
+- Save button shows "Analyzing..." while Claude responds; onBlur no longer auto-saves (explicit save only)
+
+### Lab Completion Summary
+- "Complete Lab — Get Summary" button above Prev/Next nav on every lab page
+- Only enabled when ALL steps are checked AND every step with a `document` array has non-empty localStorage text
+- Calls POST `/api/lab-summary` with lab data + per-step docs + notes → AI returns 3-section summary
+- Summary modal shows: What You Built / Key Concepts Practiced / Keep Practicing
+- Modal has Close, Next Lab →, or View Lab Set buttons depending on lab position
+
 ### Wrong Answer Review
 - Card on Take a Test setup screen (purple, below Fix My Weaknesses)
 - Select a cert → shows count of stored wrong answers → "Start Review" loads them as a practice session

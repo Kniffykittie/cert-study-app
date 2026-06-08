@@ -44,6 +44,8 @@ function StepCard({ step, index, completed, onToggle, isActive, onClick, docKey 
   const [revealedHints, setRevealedHints] = useState(0)
   const [stepDoc, setStepDoc] = useState('')
   const [docSaved, setDocSaved] = useState(false)
+  const [docFeedback, setDocFeedback] = useState('')
+  const [feedbackLoading, setFeedbackLoading] = useState(false)
 
   useEffect(() => {
     if (docKey && typeof window !== 'undefined') {
@@ -51,11 +53,28 @@ function StepCard({ step, index, completed, onToggle, isActive, onClick, docKey 
     }
   }, [docKey])
 
-  function saveStepDoc() {
-    if (!docKey) return
+  async function saveStepDoc() {
+    if (!docKey || !stepDoc) return
     localStorage.setItem(docKey, stepDoc)
     setDocSaved(true)
     setTimeout(() => setDocSaved(false), 1500)
+    if (!step.document?.length) return
+    setFeedbackLoading(true)
+    try {
+      const res = await fetch('/api/lab-doc-feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stepTitle: step.title,
+          stepContent: step.description ?? step.content ?? '',
+          documentPrompts: step.document,
+          userText: stepDoc,
+        }),
+      })
+      const data = await res.json()
+      if (data.feedback) setDocFeedback(data.feedback)
+    } catch {}
+    setFeedbackLoading(false)
   }
 
   return (
@@ -135,10 +154,10 @@ function StepCard({ step, index, completed, onToggle, isActive, onClick, docKey 
                 <div style={{ color: 'var(--accent-purple)', fontSize: '11px', fontWeight: '700', letterSpacing: '0.06em' }}>📝 DOCUMENT YOUR WORK</div>
                 <button
                   onClick={saveStepDoc}
-                  disabled={!stepDoc}
-                  style={{ backgroundColor: docSaved ? 'var(--success)' : 'var(--accent-purple)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 12px', fontSize: '11px', fontWeight: '600', cursor: stepDoc ? 'pointer' : 'not-allowed', opacity: stepDoc ? 1 : 0.4, transition: 'background-color 0.2s' }}
+                  disabled={!stepDoc || feedbackLoading}
+                  style={{ backgroundColor: docSaved ? 'var(--success)' : 'var(--accent-purple)', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 12px', fontSize: '11px', fontWeight: '600', cursor: stepDoc && !feedbackLoading ? 'pointer' : 'not-allowed', opacity: stepDoc ? 1 : 0.4, transition: 'background-color 0.2s' }}
                 >
-                  {docSaved ? '✓ Saved' : 'Save'}
+                  {feedbackLoading ? 'Analyzing...' : docSaved ? '✓ Saved' : 'Save'}
                 </button>
               </div>
               <div style={{ marginBottom: '10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -152,10 +171,15 @@ function StepCard({ step, index, completed, onToggle, isActive, onClick, docKey 
               <textarea
                 value={stepDoc}
                 onChange={e => setStepDoc(e.target.value)}
-                onBlur={saveStepDoc}
                 placeholder="Answer the prompts above. Treat this like a real network admin documenting their work — your future self will thank you."
                 style={{ width: '100%', minHeight: '120px', backgroundColor: 'var(--background)', border: '1px solid #3A2A5A', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '13px', fontFamily: 'inherit', lineHeight: '1.6', resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
               />
+              {docFeedback && (
+                <div style={{ marginTop: '10px', backgroundColor: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: '8px', padding: '10px 14px', display: 'flex', gap: '8px' }}>
+                  <span style={{ color: 'var(--accent-purple)', fontSize: '14px', flexShrink: 0 }}>🤖</span>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.6', margin: 0 }}>{docFeedback}</p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -176,6 +200,9 @@ export default function LabPage() {
   const [notesSaved, setNotesSaved] = useState(false)
   const [userId, setUserId] = useState(null)
   const [showTopology, setShowTopology] = useState(true)
+  const [summaryModal, setSummaryModal] = useState(false)
+  const [summaryText, setSummaryText] = useState('')
+  const [summaryLoading, setSummaryLoading] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
@@ -230,6 +257,34 @@ export default function LabPage() {
     setNotesSaved(true)
     setTimeout(() => setNotesSaved(false), 2000)
   }, [userId, setId, labId, notes])
+
+  async function completeLab() {
+    setSummaryLoading(true)
+    setSummaryModal(true)
+    const userDocs = {}
+    for (const step of lab.steps) {
+      const key = `lab_step_doc_${setId}_${labId}_${step.id}`
+      userDocs[step.id] = localStorage.getItem(key) ?? ''
+    }
+    try {
+      const res = await fetch('/api/lab-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          labTitle: lab.title,
+          labDescription: lab.description,
+          steps: lab.steps,
+          userDocs,
+          labNotes: notes,
+        }),
+      })
+      const data = await res.json()
+      setSummaryText(data.summary ?? 'Unable to generate summary.')
+    } catch {
+      setSummaryText('Unable to generate summary. Check your connection and try again.')
+    }
+    setSummaryLoading(false)
+  }
 
   if (!lab || !set) {
     return (
@@ -359,6 +414,27 @@ export default function LabPage() {
         />
       </div>
 
+      {/* Complete Lab button — only when all steps done and documented */}
+      {(() => {
+        const allStepsDone = lab.steps.every(s => completedSteps[s.id])
+        const allDocsDone = lab.steps.every(s => {
+          if (!s.document?.length) return true
+          const key = `lab_step_doc_${setId}_${labId}_${s.id}`
+          return (localStorage.getItem(key) ?? '').trim().length > 0
+        })
+        const canComplete = allStepsDone && allDocsDone
+        return (
+          <div style={{ marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button
+              onClick={canComplete ? completeLab : undefined}
+              disabled={!canComplete}
+              style={{ width: '100%', backgroundColor: canComplete ? 'var(--success)' : 'var(--surface)', border: `1px solid ${canComplete ? 'var(--success)' : 'var(--border)'}`, borderRadius: '10px', padding: '14px', color: canComplete ? '#0D0D0D' : 'var(--text-secondary)', fontSize: '14px', fontWeight: '700', cursor: canComplete ? 'pointer' : 'not-allowed', opacity: canComplete ? 1 : 0.5, transition: 'all 0.2s' }}>
+              {canComplete ? '🎉 Complete Lab — Get Summary' : `Complete Lab — ${!allStepsDone ? 'mark all steps done' : 'save documentation for all steps'} first`}
+            </button>
+          </div>
+        )
+      })()}
+
       {/* Prev / Next */}
       <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between' }}>
         {prevLab ? (
@@ -374,13 +450,66 @@ export default function LabPage() {
           </button>
         ) : (
           <button onClick={() => router.push(`/study-hub/labs/${setId}`)}
-            style={{ backgroundColor: 'var(--success)', border: 'none', borderRadius: '8px', padding: '10px 18px', color: '#fff', fontSize: '13px', cursor: 'pointer', fontWeight: '600' }}>
-            ✓ Complete Set
+            style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 18px', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontWeight: '600' }}>
+            ← Back to Lab Set
           </button>
         )}
       </div>
 
     </div>
+
+    {/* Lab Summary Modal */}
+    {summaryModal && (
+      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '32px', maxWidth: '600px', width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div>
+              <h2 style={{ color: 'var(--success)', fontSize: '20px', fontWeight: '700', margin: '0 0 4px' }}>🎉 Lab Complete!</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>{lab.title}</p>
+            </div>
+            <button onClick={() => setSummaryModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', padding: '4px 8px' }}>✕</button>
+          </div>
+          {summaryLoading ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)', fontSize: '14px' }}>
+              <div style={{ fontSize: '28px', marginBottom: '12px' }}>🤖</div>
+              Generating your summary...
+            </div>
+          ) : (
+            <div style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>
+              {summaryText.split('\n').map((line, i) => {
+                if (line.startsWith('**') && line.endsWith('**')) {
+                  return <div key={i} style={{ color: 'var(--text-primary)', fontWeight: '700', fontSize: '15px', marginTop: i > 0 ? '18px' : 0, marginBottom: '6px' }}>{line.replace(/\*\*/g, '')}</div>
+                }
+                if (line.startsWith('- ')) {
+                  return <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}><span style={{ color: 'var(--accent-blue)', flexShrink: 0 }}>•</span><span>{line.slice(2)}</span></div>
+                }
+                return line ? <p key={i} style={{ margin: '0 0 8px' }}>{line}</p> : null
+              })}
+            </div>
+          )}
+          {!summaryLoading && (
+            <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setSummaryModal(false)}
+                style={{ backgroundColor: 'var(--background)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>
+                Close
+              </button>
+              {nextLab && (
+                <button onClick={() => router.push(`/study-hub/labs/${setId}/${nextLab.id}`)}
+                  style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                  Next Lab →
+                </button>
+              )}
+              {!nextLab && (
+                <button onClick={() => router.push(`/study-hub/labs/${setId}`)}
+                  style={{ backgroundColor: 'var(--success)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                  ✓ View Lab Set
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    )}
 
     <FloatingCommandPanel />
     </>

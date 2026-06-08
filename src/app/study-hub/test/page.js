@@ -247,6 +247,7 @@ export default function TestPage() {
   const [wrongReviewCert, setWrongReviewCert] = useState(null)
   const [wrongReviewCount, setWrongReviewCount] = useState(null)
   const [wrongReviewLoading, setWrongReviewLoading] = useState(false)
+  const [markedLearned, setMarkedLearned] = useState({})
   const searchParams = useSearchParams()
 
   // Refs so unmount cleanup can read latest state without stale closures
@@ -574,6 +575,17 @@ export default function TestPage() {
     const res = await fetch(`/api/wrong-answers?cert=${certKey}`)
     const data = await res.json()
     setWrongReviewCount(data.total ?? 0)
+  }
+
+  async function markAsLearned(idx) {
+    const id = questions[idx]?._wrongAnswerId
+    if (!id) return
+    setMarkedLearned(prev => ({ ...prev, [idx]: true }))
+    await fetch('/api/wrong-answers', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
   }
 
   async function startWrongReview() {
@@ -1293,17 +1305,27 @@ export default function TestPage() {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>1–4 to select · Enter to submit/next</span>
-            {!revealed ? (
-              <button onClick={submitAnswer} disabled={!selectedAnswer}
-                style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: !selectedAnswer ? 'not-allowed' : 'pointer', opacity: !selectedAnswer ? 0.5 : 1 }}>
-                Submit Answer
-              </button>
-            ) : (
-              <button onClick={nextQuestion} disabled={saving}
-                style={{ backgroundColor: 'var(--success)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: saving ? 'not-allowed' : 'pointer' }}>
-                {saving ? 'Saving...' : isLast ? 'Finish Test' : 'Next Question →'}
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              {revealed && q._wrongAnswerId && (
+                <button
+                  onClick={() => markAsLearned(current)}
+                  disabled={markedLearned[current]}
+                  style={{ backgroundColor: markedLearned[current] ? 'rgba(46,204,113,0.1)' : 'var(--surface)', color: markedLearned[current] ? 'var(--success)' : 'var(--accent-purple)', border: `1px solid ${markedLearned[current] ? 'rgba(46,204,113,0.4)' : 'rgba(167,139,250,0.4)'}`, borderRadius: '8px', padding: '12px 18px', fontSize: '13px', fontWeight: '600', cursor: markedLearned[current] ? 'default' : 'pointer' }}>
+                  {markedLearned[current] ? '✓ Marked as Learned' : '✓ Mark as Learned'}
+                </button>
+              )}
+              {!revealed ? (
+                <button onClick={submitAnswer} disabled={!selectedAnswer}
+                  style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: !selectedAnswer ? 'not-allowed' : 'pointer', opacity: !selectedAnswer ? 0.5 : 1 }}>
+                  Submit Answer
+                </button>
+              ) : (
+                <button onClick={nextQuestion} disabled={saving}
+                  style={{ backgroundColor: 'var(--success)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: saving ? 'not-allowed' : 'pointer' }}>
+                  {saving ? 'Saving...' : isLast ? 'Finish Test' : 'Next Question →'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <ChatPanel cert={cert} question={q.question} topic={q.topic} options={q.options} />

@@ -355,6 +355,31 @@ Multi-feature expansion — contextual panels, new lab sets, and smart study too
 - Correlation engine (study performance vs health data)
 - Daily morning brief page
 
+### Phase 21 - Complete
+Mark as Learned, Lab Completion Summary, and AI Doc Feedback:
+
+**Mark as Learned**
+- `learned_at TIMESTAMPTZ` column added to `question_answers`
+- Wrong-answers API now filters out rows where `learned_at IS NOT NULL`; includes `id` in returned question objects as `_wrongAnswerId`
+- PATCH /api/wrong-answers sets learned_at on the given row
+- When answer is revealed in practice mode and question has `_wrongAnswerId`, a purple "✓ Mark as Learned" button appears
+- One click marks it — button turns green and is disabled; question won't appear in future Wrong Answer Reviews
+
+**Lab Completion Summary**
+- "Complete Lab — Get Summary" button at bottom of every lab page
+- Only enabled when: all steps are checked complete AND every step with a document array has non-empty localStorage docs
+- Button shows specific reason if not yet enabled ("mark all steps done" or "save documentation for all steps" first)
+- On click: calls POST /api/lab-summary with lab title, description, all steps, user's documentation per step, and notes
+- Returns AI summary with three sections: What You Built, Key Concepts Practiced, Keep Practicing
+- Shown in a modal with markdown-style rendering; Close, Next Lab →, or View Lab Set buttons
+- Old "Complete Set" nav button replaced with "← Back to Lab Set" — the new Complete Lab button handles that flow
+
+**AI Documentation Feedback**
+- On Save in the DOCUMENT YOUR WORK textarea: calls POST /api/lab-doc-feedback
+- Sends step title, step content, document prompts, and user text to Claude
+- Returns 1-3 sentences of specific, actionable feedback shown inline below the textarea with a 🤖 icon
+- Save button shows "Analyzing..." while waiting; onBlur no longer triggers save (explicit save only)
+
 ### Phase 20 - Complete
 Wrong Answer Review + Per-Lab Timer:
 
