@@ -101,14 +101,20 @@ export default function ExerciseLibraryPage() {
                   {group.label}
                   <span style={{ fontSize: '12px', fontWeight: '400', color: 'var(--text-secondary)', marginLeft: '8px' }}>{group.exercises.length} exercises</span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
                   {group.exercises.map(ex => (
                     <button key={ex.id} onClick={() => setSelected(ex)}
-                      style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 14px', textAlign: 'left', cursor: 'pointer', transition: 'border-color 0.15s' }}
+                      style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', textAlign: 'left', cursor: 'pointer', transition: 'border-color 0.15s', overflow: 'hidden', padding: 0 }}
                       onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-blue)'}
                       onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
-                      <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '500', textTransform: 'capitalize', marginBottom: '4px' }}>{ex.name}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{ex.equipment}</div>
+                      {ex.gif_url
+                        ? <img src={ex.gif_url} alt={ex.name} style={{ width: '100%', height: '140px', objectFit: 'cover', backgroundColor: '#111', display: 'block' }} loading="lazy" />
+                        : <div style={{ width: '100%', height: '140px', backgroundColor: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>🏋️</div>
+                      }
+                      <div style={{ padding: '10px 12px' }}>
+                        <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '500', textTransform: 'capitalize', marginBottom: '3px' }}>{ex.name}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{ex.equipment}</div>
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -127,7 +133,11 @@ export default function ExerciseLibraryPage() {
           style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div onClick={e => e.stopPropagation()}
             style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 20px 16px' }}>
+            {selected.gif_url
+              ? <img src={selected.gif_url} alt={selected.name} style={{ width: '100%', height: '220px', objectFit: 'cover', backgroundColor: '#111', borderRadius: '12px 12px 0 0', display: 'block' }} />
+              : <div style={{ width: '100%', height: '120px', backgroundColor: '#111', borderRadius: '12px 12px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '48px' }}>🏋️</div>
+            }
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px 12px' }}>
               <h2 style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700', textTransform: 'capitalize' }}>{selected.name}</h2>
               <button onClick={() => setSelected(null)}
                 style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>✕</button>
