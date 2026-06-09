@@ -72,6 +72,25 @@ export default function SettingsPage() {
   const [pinModalMsg, setPinModalMsg] = useState('')
   const [pinModalLoading, setPinModalLoading] = useState(false)
 
+  // 2FA state
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
+  const [twoFactorId, setTwoFactorId] = useState(null)
+  const [recoveryCodesLeft, setRecoveryCodesLeft] = useState(0)
+  const [showEnrollModal, setShowEnrollModal] = useState(false)
+  const [enrollStep, setEnrollStep] = useState(1) // 1=scan, 2=verify, 3=recovery codes
+  const [enrollFactorId, setEnrollFactorId] = useState(null)
+  const [enrollQR, setEnrollQR] = useState('')
+  const [enrollSecret, setEnrollSecret] = useState('')
+  const [enrollCode, setEnrollCode] = useState('')
+  const [enrollError, setEnrollError] = useState('')
+  const [enrollLoading, setEnrollLoading] = useState(false)
+  const [recoveryCodes, setRecoveryCodes] = useState([])
+  const [recoveryCodesCopied, setRecoveryCodesCopied] = useState(false)
+  const [showDisable2FAModal, setShowDisable2FAModal] = useState(false)
+  const [disable2FACode, setDisable2FACode] = useState('')
+  const [disable2FAError, setDisable2FAError] = useState('')
+  const [disable2FALoading, setDisable2FALoading] = useState(false)
+
   // Admin panel state
   const [adminUsers, setAdminUsers] = useState([])
   const [adminLoading, setAdminLoading] = useState(false)
@@ -105,6 +124,16 @@ export default function SettingsPage() {
           const unlocked = sessionStorage.getItem(PRIVACY_PIN_SESSION_KEY)
           if (!unlocked) setPrivacyPinGated(true)
         }
+      }
+
+      // Check 2FA status
+      const { data: factors } = await supabase.auth.mfa.listFactors()
+      const totp = factors?.totp?.find(f => f.status === 'verified')
+      if (totp) {
+        setTwoFactorEnabled(true)
+        setTwoFactorId(totp.id)
+        const { data: codes } = await supabase.from('recovery_codes').select('id, used_at').eq('user_id', user.id)
+        setRecoveryCodesLeft(codes?.filter(c => !c.used_at).length ?? 0)
       }
 
       if (user.email.toLowerCase() === OWNER_EMAIL) {
@@ -299,6 +328,84 @@ export default function SettingsPage() {
     if (!dateStr) return null
     const diff = new Date(dateStr) - new Date()
     return Math.ceil(diff / (1000 * 60 * 60 * 24))
+  }
+
+  // 2FA handlers
+  async function handleStartEnroll() {
+    setEnrollStep(1)
+    setEnrollCode('')
+    setEnrollError('')
+    setEnrollLoading(true)
+    const supabase = createClient()
+    const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', issuer: 'CSA', friendlyName: 'Authenticator' })
+    setEnrollLoading(false)
+    if (error) { setEnrollError(error.message); return }
+    setEnrollFactorId(data.id)
+    setEnrollQR(data.totp.qr_code)
+    setEnrollSecret(data.totp.secret)
+    setShowEnrollModal(true)
+  }
+
+  async function handleEnrollVerify() {
+    if (enrollCode.length < 6) return
+    setEnrollLoading(true)
+    setEnrollError('')
+    const supabase = createClient()
+    const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: enrollFactorId, code: enrollCode })
+    if (error) {
+      setEnrollError('Incorrect code. Try again.')
+      setEnrollLoading(false)
+      return
+    }
+    // Generate recovery codes
+    const res = await fetch('/api/2fa/generate-recovery', { method: 'POST' })
+    const json = await res.json()
+    setEnrollLoading(false)
+    if (json.codes) {
+      setRecoveryCodes(json.codes)
+      setEnrollStep(3)
+    } else {
+      setEnrollError('Failed to generate recovery codes.')
+    }
+  }
+
+  function handleEnrollDone() {
+    setShowEnrollModal(false)
+    setTwoFactorEnabled(true)
+    setTwoFactorId(enrollFactorId)
+    setRecoveryCodesLeft(10)
+    setEnrollCode('')
+    setEnrollQR('')
+    setEnrollSecret('')
+    setRecoveryCodes([])
+    setRecoveryCodesCopied(false)
+  }
+
+  function handleCopyRecoveryCodes() {
+    navigator.clipboard.writeText(recoveryCodes.join('\n'))
+    setRecoveryCodesCopied(true)
+    setTimeout(() => setRecoveryCodesCopied(false), 2000)
+  }
+
+  async function handleDisable2FA() {
+    if (disable2FACode.length < 6) return
+    setDisable2FALoading(true)
+    setDisable2FAError('')
+    const supabase = createClient()
+    const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: twoFactorId, code: disable2FACode })
+    if (error) {
+      setDisable2FAError('Incorrect code. Try again.')
+      setDisable2FALoading(false)
+      return
+    }
+    await supabase.auth.mfa.unenroll({ factorId: twoFactorId })
+    await supabase.from('recovery_codes').delete().eq('user_id', (await supabase.auth.getUser()).data.user.id)
+    setDisable2FALoading(false)
+    setShowDisable2FAModal(false)
+    setTwoFactorEnabled(false)
+    setTwoFactorId(null)
+    setRecoveryCodesLeft(0)
+    setDisable2FACode('')
   }
 
   // Privacy PIN handlers
@@ -711,6 +818,40 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            {/* Two-Factor Authentication */}
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+              <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Two-Factor Authentication</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>Require an authenticator app code at every login.</p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: twoFactorEnabled ? 'var(--success)' : 'var(--border)' }} />
+                  <div>
+                    <span style={{ color: twoFactorEnabled ? 'var(--success)' : 'var(--text-secondary)', fontSize: '14px', fontWeight: '600' }}>
+                      {twoFactorEnabled ? 'Enabled' : 'Not set'}
+                    </span>
+                    {twoFactorEnabled && (
+                      <span style={{ color: recoveryCodesLeft <= 2 ? 'var(--warning)' : 'var(--text-secondary)', fontSize: '12px', marginLeft: '10px' }}>
+                        {recoveryCodesLeft} recovery code{recoveryCodesLeft !== 1 ? 's' : ''} remaining
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {twoFactorEnabled ? (
+                    <button onClick={() => { setShowDisable2FAModal(true); setDisable2FACode(''); setDisable2FAError('') }}
+                      style={{ backgroundColor: 'transparent', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '7px', padding: '7px 14px', fontSize: '13px', cursor: 'pointer' }}>
+                      Disable
+                    </button>
+                  ) : (
+                    <button onClick={handleStartEnroll} disabled={enrollLoading}
+                      style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '7px', padding: '7px 14px', fontSize: '13px', cursor: enrollLoading ? 'not-allowed' : 'pointer', opacity: enrollLoading ? 0.5 : 1 }}>
+                      {enrollLoading ? 'Loading...' : 'Enable 2FA'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Owner Access (owner only) */}
             {isOwner && (
               <div style={{ backgroundColor: 'var(--surface)', border: `1px solid ${ownerUnlocked ? 'var(--accent-purple)' : 'var(--border)'}`, borderRadius: '10px', padding: '20px' }}>
@@ -877,6 +1018,14 @@ export default function SettingsPage() {
                                 Clear PIN
                               </button>
                             )}
+                            {u.has_2fa && (
+                              <button
+                                onClick={() => adminAction(u.id, 'reset-2fa', { userId: u.id }, '2FA reset')}
+                                disabled={!!adminActionLoading[key('reset-2fa')]}
+                                style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '5px', padding: '4px 10px', fontSize: '11px', cursor: adminActionLoading[key('reset-2fa')] ? 'not-allowed' : 'pointer', opacity: adminActionLoading[key('reset-2fa')] ? 0.5 : 1 }}>
+                                Reset 2FA
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -986,6 +1135,112 @@ export default function SettingsPage() {
               <button onClick={handleRemovePin} disabled={pinModalLoading || !removePinInput}
                 style={{ backgroundColor: 'var(--error)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: pinModalLoading || !removePinInput ? 'not-allowed' : 'pointer', opacity: pinModalLoading || !removePinInput ? 0.5 : 1 }}>
                 {pinModalLoading ? 'Removing...' : 'Remove PIN'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2FA Enrollment modal */}
+      {showEnrollModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', maxWidth: '420px', width: '100%', padding: '28px' }}>
+
+            {enrollStep === 1 && (
+              <>
+                <h3 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', marginBottom: '6px' }}>Step 1 — Scan QR Code</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>Open your authenticator app (Google Authenticator, Authy, 1Password) and scan this code.</p>
+                {enrollQR && (
+                  <div style={{ backgroundColor: '#fff', padding: '12px', borderRadius: '8px', display: 'inline-block', marginBottom: '16px' }}>
+                    <img src={enrollQR} alt="2FA QR Code" style={{ width: '180px', height: '180px', display: 'block' }} />
+                  </div>
+                )}
+                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px' }}>Can't scan? Enter this code manually:</p>
+                <div style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px 12px', fontFamily: 'monospace', fontSize: '13px', color: 'var(--accent-blue)', letterSpacing: '0.1em', marginBottom: '20px', wordBreak: 'break-all' }}>
+                  {enrollSecret}
+                </div>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button onClick={() => { setShowEnrollModal(false); setEnrollQR(''); setEnrollSecret('') }}
+                    style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
+                  <button onClick={() => { setEnrollStep(2); setEnrollCode(''); setEnrollError('') }}
+                    style={{ backgroundColor: 'var(--accent-blue)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                    I've scanned it →
+                  </button>
+                </div>
+              </>
+            )}
+
+            {enrollStep === 2 && (
+              <>
+                <h3 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', marginBottom: '6px' }}>Step 2 — Verify Code</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>Enter the 6-digit code from your authenticator app to confirm setup.</p>
+                {enrollError && <p style={{ color: 'var(--error)', fontSize: '13px', marginBottom: '12px' }}>{enrollError}</p>}
+                <input
+                  type="text" inputMode="numeric" value={enrollCode}
+                  onChange={e => setEnrollCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  onKeyDown={e => e.key === 'Enter' && handleEnrollVerify()}
+                  placeholder="000000" autoFocus maxLength={6}
+                  style={{ width: '100%', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '14px', color: 'var(--text-primary)', fontSize: '28px', outline: 'none', letterSpacing: '0.4em', textAlign: 'center', marginBottom: '20px', boxSizing: 'border-box' }}
+                />
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setEnrollStep(1)} disabled={enrollLoading}
+                    style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>Back</button>
+                  <button onClick={handleEnrollVerify} disabled={enrollLoading || enrollCode.length < 6}
+                    style={{ backgroundColor: 'var(--accent-blue)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: enrollLoading || enrollCode.length < 6 ? 'not-allowed' : 'pointer', opacity: enrollLoading || enrollCode.length < 6 ? 0.5 : 1 }}>
+                    {enrollLoading ? 'Verifying...' : 'Confirm'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {enrollStep === 3 && (
+              <>
+                <h3 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', marginBottom: '6px' }}>Step 3 — Save Recovery Codes</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '6px' }}>
+                  These codes let you sign in if you lose access to your authenticator. Each code works once.
+                </p>
+                <p style={{ color: 'var(--warning)', fontSize: '12px', fontWeight: '600', marginBottom: '16px' }}>⚠️ These will not be shown again. Save them now.</p>
+                <div style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '14px' }}>
+                  {recoveryCodes.map((code, i) => (
+                    <span key={i} style={{ fontFamily: 'monospace', fontSize: '13px', color: 'var(--text-primary)', letterSpacing: '0.05em' }}>{code}</span>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button onClick={handleCopyRecoveryCodes}
+                    style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>
+                    {recoveryCodesCopied ? '✓ Copied' : 'Copy All'}
+                  </button>
+                  <button onClick={handleEnrollDone}
+                    style={{ backgroundColor: 'var(--success)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                    I've saved them — Done
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Disable 2FA modal */}
+      {showDisable2FAModal && (
+        <div onClick={() => !disable2FALoading && (setShowDisable2FAModal(false), setDisable2FACode(''), setDisable2FAError(''))} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', maxWidth: '360px', width: '100%', padding: '28px' }}>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', marginBottom: '6px' }}>Disable 2FA</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>Enter your current authenticator code to confirm.</p>
+            {disable2FAError && <p style={{ color: 'var(--error)', fontSize: '13px', marginBottom: '12px' }}>{disable2FAError}</p>}
+            <input
+              type="text" inputMode="numeric" value={disable2FACode}
+              onChange={e => setDisable2FACode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              onKeyDown={e => e.key === 'Enter' && handleDisable2FA()}
+              placeholder="000000" autoFocus
+              style={{ width: '100%', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '14px', color: 'var(--text-primary)', fontSize: '28px', outline: 'none', letterSpacing: '0.4em', textAlign: 'center', marginBottom: '20px', boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => { setShowDisable2FAModal(false); setDisable2FACode(''); setDisable2FAError('') }} disabled={disable2FALoading}
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleDisable2FA} disabled={disable2FALoading || disable2FACode.length < 6}
+                style={{ backgroundColor: 'var(--error)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: disable2FALoading || disable2FACode.length < 6 ? 'not-allowed' : 'pointer', opacity: disable2FALoading || disable2FACode.length < 6 ? 0.5 : 1 }}>
+                {disable2FALoading ? 'Disabling...' : 'Disable 2FA'}
               </button>
             </div>
           </div>

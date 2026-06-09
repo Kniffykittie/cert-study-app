@@ -219,6 +219,17 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 
 ## Phase Log
 
+### Phase 44 - Complete
+- **2FA (TOTP)** — full Supabase MFA implementation
+- Settings → Security: 2FA card with status indicator + recovery codes remaining count; 3-step enrollment modal (scan QR → verify 6-digit code → save 10 recovery codes displayed once); Disable flow requires current TOTP code
+- Login: after successful password, checks `mfa.getAuthenticatorAssuranceLevel()`; if aal2 required shows TOTP input screen; "Use recovery code instead" link unenrolls TOTP and lets user proceed (forces re-enrollment)
+- API: `2fa/generate-recovery` (10 bcrypt-hashed codes, returns plain once), `2fa/use-recovery` (verifies hash, marks used, unenrolls via admin client)
+- Owner admin panel: "Reset 2FA" button per user (calls `owner/admin/reset-2fa`); `has_2fa` field added to users API response
+- `recovery_codes` table created with RLS
+- **Note:** Must enable MFA in Supabase dashboard before this works — Auth → Sign In Methods → enable "Time-based one-time password (TOTP)"
+
+---
+
 ### Phase 43 - Complete
 - **Update Password page** at `/update-password` — listens for Supabase `PASSWORD_RECOVERY` auth event; 3-second fallback to "invalid link" state if no token detected; password strength bar (4 segments, color-coded), match indicator on confirm field, show/hide toggles; signs out and redirects to /login on success
 - Required by owner admin panel "Send Password Reset" button and any future self-serve password reset flow

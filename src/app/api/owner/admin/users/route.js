@@ -34,6 +34,7 @@ export async function GET() {
     display_name: profileMap[u.id]?.display_name || null,
     is_disabled: profileMap[u.id]?.is_disabled || false,
     has_pin: !!(profileMap[u.id]?.settings_pin_hash),
+    has_2fa: !!(u.factors?.some(f => f.factor_type === 'totp' && f.status === 'verified')),
   }))
 
   return NextResponse.json({ users: result })

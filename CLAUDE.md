@@ -88,11 +88,15 @@ src/
           force-logout/route.js        POST — owner only; invalidates all sessions for a user via admin client
           send-reset/route.js          POST — owner only; sends password reset email via admin client
           clear-pin/route.js           POST — owner only; nulls out settings_pin_hash on profiles
+          reset-2fa/route.js           POST — owner only; deletes all TOTP factors for a user via admin client + clears their recovery codes
       invite/
         validate/route.js              GET ?code= — public; checks if code exists and unused; IP-based brute force protection (5 failed attempts/hr blocks IP); records attempts in join_attempts table
         redeem/route.js                POST — authenticated; marks invite code used_by + used_at
       lab-summary/route.js             AI lab completion summary (3 sections); uses getUser() + is_disabled check; prompt injection protected
       delete-account/route.js          POST — full cascade delete across all tables + supabase admin auth user removal; uses getUser()
+      2fa/
+        generate-recovery/route.js    POST — generates 10 bcrypt-hashed recovery codes, stores in recovery_codes table, returns plain codes once; uses getUser()
+        use-recovery/route.js         POST — verifies recovery code against hashes, marks used, unenrolls all TOTP factors via admin client; uses getUser()
       settings-pin/
         set/route.js                   POST — bcrypt hash PIN and save to profiles.settings_pin_hash; uses getUser()
         verify/route.js                POST — bcrypt compare PIN against stored hash; uses getUser()
@@ -199,6 +203,7 @@ src/
 | `workout_plans` | AI-generated weekly plans — plan JSONB (7 day objects), plan_notes, progression_notes, schedule JSONB, is_active |
 | `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, daily_steps, target_weight_lbs, timeline, notes, ai_overview; one row per user (UNIQUE on user_id) |
 | `api_rate_limits` | Per-user per-route per-hour call counts; incremented atomically via `increment_rate_limit` Postgres function |
+| `recovery_codes` | 2FA recovery codes — user_id, code_hash TEXT (bcrypt), used_at TIMESTAMPTZ (null = unused); generated on 2FA enrollment, displayed once; RLS: user SELECT/UPDATE own rows |
 | `invite_codes` | Owner-generated one-time signup codes — code (unique), created_by, used_by (nullable), used_at; RLS: SELECT=public, INSERT=owner, UPDATE=authenticated |
 | `join_attempts` | IP-based brute force tracking for /join — ip TEXT, attempted_at, success BOOLEAN; `check_join_rate_limit(ip)` Postgres function counts fails in last hour |
 | `manual_steps_daily` | Manual step count per user per day — user_id, date, steps; unique(user_id, date); shown on workouts page when Google Health not connected |
