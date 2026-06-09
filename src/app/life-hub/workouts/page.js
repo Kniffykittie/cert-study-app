@@ -39,6 +39,12 @@ export default function WorkoutsPage() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
 
+    const { data: goalsProfile } = await supabase.from('goals_profiles').select('id').eq('user_id', session.user.id).single()
+    if (!goalsProfile) {
+      router.push('/life-hub/goals/setup?redirect=/life-hub/workouts')
+      return
+    }
+
     const [{ data: prof }, { data: planData }, { data: exercises }] = await Promise.all([
       supabase.from('workout_profiles').select('*').eq('user_id', session.user.id).single(),
       supabase.from('workout_plans').select('*').eq('user_id', session.user.id).eq('is_active', true).single(),

@@ -8,6 +8,7 @@ export default function LifeHubSidebar() {
   const [displayName, setDisplayName] = useState('')
   const [healthOpen, setHealthOpen] = useState(false)
   const [workoutsOpen, setWorkoutsOpen] = useState(false)
+  const [goalsOpen, setGoalsOpen] = useState(false)
   const pathname = usePathname()
 
   useEffect(() => {
@@ -24,6 +25,7 @@ export default function LifeHubSidebar() {
   useEffect(() => {
     if (pathname.startsWith('/life-hub/health')) setHealthOpen(true)
     if (pathname.startsWith('/life-hub/workouts')) setWorkoutsOpen(true)
+    if (pathname.startsWith('/life-hub/goals')) setGoalsOpen(true)
   }, [pathname])
 
   const initial = displayName ? displayName[0].toUpperCase() : '?'
@@ -57,6 +59,30 @@ export default function LifeHubSidebar() {
       <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '4px 12px', marginBottom: '4px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Life Hub</div>
 
       {navLink('Overview', '/life-hub')}
+
+      {/* Goals dropdown */}
+      {(() => {
+        const goalsActive = pathname.startsWith('/life-hub/goals')
+        return (
+          <div>
+            <div
+              onClick={() => setGoalsOpen(o => !o)}
+              style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: goalsActive && !goalsOpen ? 'rgba(123,47,190,0.12)' : 'transparent', color: goalsActive ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: goalsActive ? '600' : '400', borderLeft: goalsActive ? '2px solid var(--accent-purple)' : '2px solid transparent' }}
+              onMouseEnter={e => { if (!goalsActive) e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.08)' }}
+              onMouseLeave={e => { if (!goalsActive) e.currentTarget.style.backgroundColor = goalsActive && !goalsOpen ? 'rgba(123,47,190,0.12)' : 'transparent' }}
+            >
+              <span>Goals</span>
+              <span style={{ fontSize: '10px', transition: 'transform 0.2s', display: 'inline-block', transform: goalsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+            </div>
+            {goalsOpen && (
+              <div style={{ paddingLeft: '12px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {navLink('My Goals', '/life-hub/goals')}
+                {navLink('Setup', '/life-hub/goals/setup')}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Health dropdown */}
       <div>

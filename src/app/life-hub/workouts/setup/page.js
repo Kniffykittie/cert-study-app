@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -28,6 +28,17 @@ function defaultWorkoutDays(count) {
 export default function WorkoutSetupPage() {
   const router = useRouter()
   const [step, setStep] = useState(0)
+
+  useEffect(() => {
+    async function checkGoals() {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const { data } = await supabase.from('goals_profiles').select('id').eq('user_id', session.user.id).single()
+      if (!data) router.push('/life-hub/goals/setup?redirect=/life-hub/workouts/setup')
+    }
+    checkGoals()
+  }, [router])
   const [generating, setGenerating] = useState(false)
   const [form, setForm] = useState({
     experience: '',

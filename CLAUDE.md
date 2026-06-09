@@ -90,12 +90,15 @@ src/
         page.js                        Health Overview — steps today, avg heart rate, sleep last night
         steps/page.js                  Step Tracker — hourly/weekly bar charts, goal progress, fixed tooltip
         sleep/page.js                  Sleep Tracker — stage breakdown bar, timeline chart, no-data state
+      goals/
+        page.js                        Goals overview — AI overview, active goals chips, body metrics, lifestyle summary, Edit Goals button
+        setup/page.js                  3-step goals onboarding: goals multi-select, body metrics, starting point (activity + timeline + notes); gates workouts/nutrition if incomplete
       workouts/
-        page.js                        My Workout Plan — weekly plan cards sorted Mon-Sun, day reassignment, add/remove exercises with AI check-in, add/change cardio on rest days
-        setup/page.js                  7-step onboarding: experience, goals (multi-select), days, schedule, fitness check, cardio preferences, equipment
+        page.js                        My Workout Plan — weekly plan cards sorted Mon-Sun, day reassignment, add/remove exercises with AI check-in, add/change cardio on rest days; gates on goals profile
+        setup/page.js                  7-step onboarding: experience, goals (multi-select), days, schedule, fitness check, cardio preferences, equipment; gates on goals profile
         exercises/page.js              Exercise Library — sticky muscle-group nav, scrollable grouped sections, image cards, detail modal with form cues, Cardio section
       nutrition/
-        page.js                        Nutrition (placeholder)
+        page.js                        Nutrition (placeholder) — gates on goals profile
     study-hub/
       layout.js                        Study Hub layout with StudyHubSidebar + FloatingChat
       page.js                          Overview (DailyStreak component)
@@ -165,6 +168,7 @@ src/
 | `exercises` | Exercise library — name, body_part, equipment, target, secondary_muscles[], instructions[], gif_url (nullable) |
 | `workout_profiles` | User's fitness profile — experience, goal, days_per_week, fitness stats, equipment, limitations, available_weights |
 | `workout_plans` | AI-generated weekly plans — plan JSONB (7 day objects), plan_notes, progression_notes, schedule JSONB, is_active |
+| `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, activity_level, target_weight_lbs, timeline, notes, ai_overview; one row per user (UNIQUE on user_id) |
 
 ---
 
@@ -325,6 +329,17 @@ src/
 - **Small Office Network Series** (`small-office-network.js`): 5 labs, 27 steps — Labs 1–4 build VLANs → DHCP → STP redundancy → ACLs on shared topology; Lab 5 full-office capstone
 - **Network+ Fundamentals** (`network-plus-fundamentals.js`): 5 labs, 25 steps — Topology docs, VLAN + inter-VLAN routing, wireless WPA2, troubleshooting (explicit 7-step build-then-break-then-fix), port security
 - **Security+ Network Labs** (`security-plus-labs.js`): 4 labs, 20 steps — ACL firewall, DMZ three-zone design, device hardening (SSH v2/encrypted passwords/rate limiting), network segmentation (VLANs by trust level)
+
+### Goals & Body Metrics
+- Setup flow: 3 steps — Goals (multi-select 8 options), Body Metrics (height/weight/age/sex/target weight), Starting Point (activity level, timeline, notes)
+- Upserts to `goals_profiles` table on finish, then calls `/api/goals/generate-overview` for a personalized 3-paragraph AI overview
+- Overview stored in `goals_profiles.ai_overview`, displayed on the Goals page with a 🤖 header
+- Goals page shows: AI overview panel, active goals chips, body metrics (with BMI + label), lifestyle summary, notes
+- BMI labels: Underweight (<18.5), Normal (18.5–25), Overweight (25–30), Obese (≥30)
+- **Gating**: `/life-hub/workouts`, `/life-hub/workouts/setup`, and `/life-hub/nutrition` all redirect to `/life-hub/goals/setup?redirect=<path>` if no goals profile found
+- Setup page `?redirect=<path>` param causes `handleFinish()` to route back to the intended destination
+- **Workout plan context**: `generate-plan/route.js` fetches `goals_profiles` at generation time and injects body/lifestyle context into the AI prompt
+- API: `/api/goals/generate-overview` — POST, any authenticated user, updates `ai_overview` column on their own row
 
 ### Google Health Integration
 - OAuth flow restricted to owner account only (`sethproper40@yahoo.com`) — 403 for all others

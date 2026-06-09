@@ -74,6 +74,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `exercises` | Exercise library — name, body_part, equipment, target, secondary_muscles[], instructions[], gif_url (nullable) |
 | `workout_profiles` | User's fitness profile — experience, goal, days_per_week, fitness stats, equipment, limitations, available_weights |
 | `workout_plans` | AI-generated weekly plans — plan JSONB (7 day objects), plan_notes, progression_notes, schedule JSONB, is_active |
+| `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, activity_level, target_weight_lbs, timeline, notes, ai_overview; UNIQUE on user_id |
 
 ---
 
@@ -127,6 +128,18 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 
 ## Phase Log
 *(Newest phase first)*
+
+### Phase 30 - Complete
+Goals & Body Metrics — personalized profile that gates and powers all Life Hub AI:
+- Created `goals_profiles` Supabase table: goals TEXT[], height/weight/age/sex, activity_level, target_weight_lbs, timeline, notes, ai_overview; RLS user-scoped
+- `src/app/life-hub/goals/setup/page.js`: 3-step onboarding — Goals (multi-select 8 options), Body Metrics (height/weight/age/sex/target), Starting Point (activity level, timeline, notes); upserts to `goals_profiles` then calls generate-overview API; supports `?redirect=` param
+- `src/app/api/goals/generate-overview/route.js`: POST — calls Claude claude-sonnet-4-6 with full profile, returns 3-paragraph personalized overview, saves to `ai_overview` column
+- `src/app/life-hub/goals/page.js`: Goals overview — AI overview panel, active goals chips, body metrics card (with BMI + label), lifestyle card, notes; Edit Goals button links to setup
+- `src/components/LifeHubSidebar.js`: Goals dropdown added between Overview and Health; auto-opens on `/life-hub/goals/*`
+- `src/app/life-hub/workouts/page.js`: Goals gate — checks `goals_profiles` on load, redirects to `/life-hub/goals/setup?redirect=/life-hub/workouts` if none
+- `src/app/life-hub/workouts/setup/page.js`: Goals gate added (same pattern)
+- `src/app/life-hub/nutrition/page.js`: Goals gate added (same pattern)
+- `src/app/api/workouts/generate-plan/route.js`: Fetches `goals_profiles` at generation time; injects age/sex/height/weight/target/activity/timeline/life-goals into the AI prompt as body context
 
 ### Phase 29 - Complete
 Shared flashcard decks + owner-only generation and write actions:

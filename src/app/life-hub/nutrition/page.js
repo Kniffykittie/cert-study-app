@@ -1,4 +1,22 @@
+'use client'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+
 export default function NutritionPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    async function checkGoals() {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const { data } = await supabase.from('goals_profiles').select('id').eq('user_id', session.user.id).single()
+      if (!data) router.push('/life-hub/goals/setup?redirect=/life-hub/nutrition')
+    }
+    checkGoals()
+  }, [router])
+
   return (
     <div>
       <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
