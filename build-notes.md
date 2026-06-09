@@ -528,6 +528,10 @@ Every new Life Hub feature that generates loggable data **ships with a reset row
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 30g - Complete
+- Added `bcryptjs` dependency (for owner PIN and future per-user privacy PIN hashing)
+- Owner PIN set to bcrypt hash stored as `OWNER_PIN_HASH` environment variable in Vercel — plaintext never committed
+
 ### Phase 30f - Complete
 Settings page tabbed navigation:
 - Replaced single-scroll layout with 4 tabs: Account, Study, Data & Reset, Security
