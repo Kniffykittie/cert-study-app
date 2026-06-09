@@ -1,0 +1,39 @@
+#!/bin/sh
+# Blocks push if code files changed but CLAUDE.md or build-notes.md were not updated.
+
+REMOTE="$1"
+URL="$2"
+
+while read local_ref local_sha remote_ref remote_sha; do
+  # New branch with no upstream yet — compare against empty tree
+  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    RANGE="$local_sha"
+    CHANGED=$(git diff-tree --no-commit-id -r --name-only "$local_sha" 2>/dev/null)
+  else
+    RANGE="$remote_sha..$local_sha"
+    CHANGED=$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null)
+  fi
+
+  # Check if any non-MD source files changed
+  CODE_CHANGED=$(echo "$CHANGED" | grep -v "^CLAUDE\.md$" | grep -v "^build-notes\.md$" | grep -E "\.(js|ts|jsx|tsx|css|json|sql)$")
+
+  if [ -n "$CODE_CHANGED" ]; then
+    MD_UPDATED=$(echo "$CHANGED" | grep -E "^(CLAUDE\.md|build-notes\.md)$")
+    if [ -z "$MD_UPDATED" ]; then
+      echo ""
+      echo "  ╔══════════════════════════════════════════════════════════╗"
+      echo "  ║  BLOCKED: MD notes not updated                          ║"
+      echo "  ║                                                          ║"
+      echo "  ║  Code files changed but CLAUDE.md and build-notes.md   ║"
+      echo "  ║  were not updated in this push.                         ║"
+      echo "  ║                                                          ║"
+      echo "  ║  Update both files and include them in your commit,     ║"
+      echo "  ║  then push again.                                        ║"
+      echo "  ╚══════════════════════════════════════════════════════════╝"
+      echo ""
+      exit 1
+    fi
+  fi
+done
+
+exit 0

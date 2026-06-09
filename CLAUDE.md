@@ -46,7 +46,9 @@ var(--accent-purple)      #a78bfa
 git pull origin claude/adoring-shannon-sTxW8
 ```
 
-### MD Notes — Required Before Every Push
+### MD Notes — Enforced by Pre-Push Hook
+A git hook at `.githooks/pre-push` **blocks the push** if code files changed but `CLAUDE.md` and `build-notes.md` were not updated in the same commit. After cloning, run `npm run setup-hooks` once to activate it.
+
 Both `CLAUDE.md` and `build-notes.md` must be updated in the **same commit** as any feature or fix. Specifically:
 - **CLAUDE.md:** update directory structure if files added/removed, update relevant feature section, update lab set counts/step counts if labs changed
 - **build-notes.md:** add new phase entry at the top of the Phase Log, update Database Tables if schema changed, remove completed items from Future Features

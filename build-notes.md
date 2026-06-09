@@ -32,6 +32,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 ---
 
 ## Session Rules
+- **MD notes are enforced by a pre-push git hook** (`.githooks/pre-push`) — pushes that change code files without updating `CLAUDE.md` and `build-notes.md` are blocked automatically. Run `npm run setup-hooks` once after cloning to activate it.
 - **After every commit/push:** give the user the pull command in a code block:
   ```
   git pull origin claude/adoring-shannon-sTxW8
