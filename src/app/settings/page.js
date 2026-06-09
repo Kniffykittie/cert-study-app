@@ -31,6 +31,10 @@ export default function SettingsPage() {
   const [healthDisconnecting, setHealthDisconnecting] = useState(false)
   const [showHealthSection, setShowHealthSection] = useState(false)
 
+  const [resetConfirm, setResetConfirm] = useState(null) // { scope, cert?, label }
+  const [resetting, setResetting] = useState(false)
+  const [resetMsg, setResetMsg] = useState('')
+
   const searchParams = useSearchParams()
 
   useEffect(() => {
@@ -90,6 +94,26 @@ export default function SettingsPage() {
     setHealthConnected(false)
     setHealthConnectedAt(null)
     setHealthDisconnecting(false)
+  }
+
+  async function handleReset() {
+    if (!resetConfirm) return
+    setResetting(true)
+    const res = await fetch('/api/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope: resetConfirm.scope, cert: resetConfirm.cert }),
+    })
+    const json = await res.json()
+    setResetting(false)
+    setResetConfirm(null)
+    if (json.ok) {
+      setResetMsg(`${resetConfirm.label} reset successfully.`)
+      setTimeout(() => setResetMsg(''), 4000)
+    } else {
+      setResetMsg('Reset failed. Try again.')
+      setTimeout(() => setResetMsg(''), 4000)
+    }
   }
 
   async function handleLogout() {
@@ -285,6 +309,82 @@ export default function SettingsPage() {
           </div>
         )}
 
+        {/* Data & Reset */}
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '16px' }}>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Data & Reset</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>Clear test data or plans if you were just testing things out and want a clean start.</p>
+
+          {resetMsg && (
+            <div style={{ backgroundColor: resetMsg.includes('successfully') ? 'rgba(46,204,113,0.08)' : 'rgba(204,0,0,0.08)', border: `1px solid ${resetMsg.includes('successfully') ? 'rgba(46,204,113,0.3)' : 'rgba(204,0,0,0.3)'}`, borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '13px', color: resetMsg.includes('successfully') ? 'var(--success)' : 'var(--error)' }}>
+              {resetMsg}
+            </div>
+          )}
+
+          {/* Study Hub resets */}
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>Study Hub</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {CERTS.map(cert => (
+                <div key={cert.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                  <div>
+                    <div style={{ color: cert.color, fontSize: '13px', fontWeight: '600' }}>{cert.label}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Questions, scores, test history, flashcards</div>
+                  </div>
+                  <button onClick={() => setResetConfirm({ scope: 'cert', cert: cert.key, label: `${cert.label} study data` })}
+                    style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
+                    Reset
+                  </button>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                <div>
+                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>All Certs</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Wipe all questions, scores, bookmarks, and flashcards</div>
+                </div>
+                <button onClick={() => setResetConfirm({ scope: 'all_study', label: 'All study data' })}
+                  style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
+                  Reset All
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Workout resets */}
+          <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>Workouts</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                <div>
+                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>Current Plan</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Delete your active workout plan — keeps your fitness profile</div>
+                </div>
+                <button onClick={() => setResetConfirm({ scope: 'workout_plan', label: 'Workout plan' })}
+                  style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
+                  Reset
+                </button>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                <div>
+                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>Full Workout Reset</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Delete plan and fitness profile — restart the setup from scratch</div>
+                </div>
+                <button onClick={() => setResetConfirm({ scope: 'workout_profile', label: 'Workout profile & plan' })}
+                  style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
+                  Reset All
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Security */}
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
           <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Security</h2>
@@ -298,6 +398,29 @@ export default function SettingsPage() {
         </div>
 
       </div>
+
+      {/* Reset confirmation modal */}
+      {resetConfirm && (
+        <div onClick={() => !resetting && setResetConfirm(null)} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--error)', borderRadius: '12px', maxWidth: '400px', width: '100%', padding: '28px' }}>
+            <div style={{ fontSize: '28px', marginBottom: '12px' }}>⚠️</div>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', marginBottom: '8px' }}>Reset {resetConfirm.label}?</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+              This will permanently delete all <strong style={{ color: 'var(--text-primary)' }}>{resetConfirm.label.toLowerCase()}</strong> for your account. This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setResetConfirm(null)} disabled={resetting}
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={handleReset} disabled={resetting}
+                style={{ backgroundColor: 'var(--error)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: resetting ? 'not-allowed' : 'pointer', opacity: resetting ? 0.6 : 1 }}>
+                {resetting ? 'Resetting...' : 'Yes, Reset'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -127,6 +127,18 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 28 - Complete
+Settings — Data & Reset section:
+- New section in Settings page between Connected Apps and Security
+- Per-cert reset (CCNA / Network+ / Security+): deletes question_answers, topic_performance, test_sessions, paused_tests, flashcards, flashcard_progress for that cert
+- All study data reset: all of the above across all certs + bookmarked_questions + flagged_questions
+- Workout plan reset: deletes workout_plans — keeps fitness profile so the user can regenerate a plan without redoing setup
+- Full workout reset: deletes workout_plans + workout_profiles — returns user to the 7-step setup on next visit
+- All resets require a confirmation modal (⚠️) with explicit "Yes, Reset" button — cannot be triggered accidentally
+- Success/error message displayed inline after completion
+- New API route: POST /api/reset with { scope, cert? }
+- Pattern established: as new Life Hub sections are added, their reset row gets added here with the same button style
+
 ### Phase 27 - Complete
 AI Workout Plan Generator + Cardio System:
 - 7-step onboarding: experience, goals (multi-select), days per week, schedule (pick actual days), fitness check ("please try"), cardio preferences, equipment + limitations

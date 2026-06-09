@@ -64,6 +64,7 @@ Always provide a brief summary covering:
 src/
   app/
     api/
+      reset/route.js                   POST — scoped data reset (cert, all_study, workout_plan, workout_profile)
       bookmarks/route.js               CRUD for bookmarked questions
       generate-questions/route.js      AI question generation (spaced repetition weighting)
       generate-templates/route.js      AI template generation (batch of 5, dedup)
@@ -350,6 +351,16 @@ src/
 - Plan page sorts Mon–Sun; day reassignment via dropdown auto-swaps conflicts
 - Add/remove exercises via picker modal with AI check-in (permanent vs one-time)
 - Add/Change Cardio on rest day cards via picker from `exercises` table (body_part='cardio')
+
+### Settings — Data & Reset
+- Per-cert reset: clears `question_answers`, `topic_performance`, `test_sessions`, `paused_tests`, `flashcards`, `flashcard_progress` for that cert only
+- All study data reset: same tables across all certs + `bookmarked_questions` + `flagged_questions`
+- Workout plan reset: deletes all `workout_plans` rows — keeps the fitness profile intact
+- Full workout reset: deletes `workout_plans` + `workout_profiles` — user returns to setup flow on next visit
+- All resets gated behind a confirmation modal (⚠️ warning, explicit "Yes, Reset" button); cannot be triggered by accident
+- Success/error message shown inline after completion
+- API route: `POST /api/reset` with `{ scope: 'cert'|'all_study'|'workout_plan'|'workout_profile', cert? }`
+- **Pattern for new sections:** as new Life Hub features are built, add their reset row here with the same button style
 
 ### Exercise Library
 - Sticky left muscle-group nav with counts; scrollable grouped sections; Cardio section at bottom
