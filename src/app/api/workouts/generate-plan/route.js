@@ -68,7 +68,7 @@ export async function POST(req) {
   const { goals, experience, days_per_week, workout_days, pushup_count, pullup_count, squat_count,
     has_pullup_bar, has_ab_roller, dumbbell_pairs, dumbbell_note, limitations, cardio_options } = body
 
-  const { data: goalsProfile } = await supabase.from('goals_profiles').select('goals,height_inches,weight_lbs,age,sex,body_composition,activity_level,target_weight_lbs,timeline').eq('user_id', session.user.id).single()
+  const { data: goalsProfile } = await supabase.from('goals_profiles').select('goals,height_inches,weight_lbs,age,sex,body_composition,activity_level,daily_steps,target_weight_lbs,timeline').eq('user_id', session.user.id).single()
 
   const goalsArray = Array.isArray(goals) ? goals : (goals || '').split(',')
   const wantsWeightLoss = goalsArray.includes('weight_loss')
@@ -126,7 +126,7 @@ BODY & LIFESTYLE CONTEXT (from user's goals profile):
 - Height: ${goalsProfile.height_inches ? `${Math.floor(goalsProfile.height_inches/12)}ft ${Math.round(goalsProfile.height_inches%12)}in` : 'not provided'}
 - Weight: ${goalsProfile.weight_lbs ? goalsProfile.weight_lbs + ' lbs' : 'not provided'}${goalsProfile.target_weight_lbs ? `, target: ${goalsProfile.target_weight_lbs} lbs` : ''}
 - Body composition: ${goalsProfile.body_composition ? (BODY_COMP_CONTEXT[goalsProfile.body_composition] || goalsProfile.body_composition) : 'not provided'}
-- Activity level outside gym: ${ACTIVITY_MAP[goalsProfile.activity_level] ?? goalsProfile.activity_level ?? 'not provided'}
+- Activity level outside gym: ${ACTIVITY_MAP[goalsProfile.activity_level] ?? goalsProfile.activity_level ?? 'not provided'}${goalsProfile.daily_steps ? ` (~${goalsProfile.daily_steps.toLocaleString()} steps/day — already has strong cardio base from daily movement)` : ''}
 - Timeline: ${goalsProfile.timeline ?? 'not specified'}
 Use this context to fine-tune volume, intensity, and cardio recommendations.` : ''
 

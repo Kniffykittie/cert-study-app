@@ -141,6 +141,7 @@ export default function GoalsPage() {
           <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '16px' }}>Lifestyle</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {profile.activity_level && <MetricRow label="Activity" value={ACTIVITY_LABELS[profile.activity_level] || profile.activity_level} />}
+            {profile.daily_steps && <MetricRow label="Daily Steps" value={`~${Number(profile.daily_steps).toLocaleString()} / day`} />}
             {profile.timeline && <MetricRow label="Timeline" value={TIMELINE_LABELS[profile.timeline] || profile.timeline} />}
           </div>
         </div>

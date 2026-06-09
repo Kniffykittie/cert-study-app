@@ -129,6 +129,14 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 30d - Complete
+Activity level revamp + daily steps field:
+- `ACTIVITY_LEVELS` descriptions rewritten around total daily movement (steps/day ranges baked in) rather than gym sessions only; someone with 15k steps/day now clearly lands in "Very Active"
+- `daily_steps` INTEGER column added to `goals_profiles` via migration
+- `goals/setup/page.js`: daily steps optional input added to Step 2 (Starting Point) below activity level; prefills from existing profile
+- `goals/page.js`: Daily Steps row shown in Lifestyle card
+- `generate-overview/route.js` + `generate-plan/route.js`: daily_steps appended to activity level context line; workout plan prompt notes strong cardio base if steps are high
+
 ### Phase 30c - Complete
 Goals gate overlay + body composition selector + BMI disclaimer:
 - Gate pages now show a centered overlay ("Complete your Goals Setup first" + "Take me there →") instead of hard-redirecting — applies to workouts, workouts/setup, and nutrition

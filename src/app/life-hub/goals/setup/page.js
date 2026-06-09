@@ -15,10 +15,10 @@ const GOALS = [
 ]
 
 const ACTIVITY_LEVELS = [
-  { key: 'sedentary', label: 'Sedentary', desc: 'Mostly sitting — desk job, little daily movement' },
-  { key: 'lightly_active', label: 'Lightly Active', desc: 'Some movement — light exercise 1–2 days/week' },
-  { key: 'moderately_active', label: 'Moderately Active', desc: 'Regular exercise 3–4 days/week' },
-  { key: 'very_active', label: 'Very Active', desc: '5+ days/week or a physically demanding job' },
+  { key: 'sedentary', label: 'Sedentary', desc: 'Desk job, car commute, minimal walking. Under 5k steps/day. Little to no planned exercise.' },
+  { key: 'lightly_active', label: 'Lightly Active', desc: 'Some daily movement — occasional walks, light errands. ~5k–8k steps/day. 0–1 workouts/week.' },
+  { key: 'moderately_active', label: 'Moderately Active', desc: 'Regular movement throughout the day, active commute, or 2–3 gym sessions/week. ~8k–12k steps/day.' },
+  { key: 'very_active', label: 'Very Active', desc: 'High daily movement — 12k+ steps, physical job, or dedicated training 4+ days/week. Could be one or the other.' },
 ]
 
 const TIMELINES = [
@@ -76,6 +76,7 @@ export default function GoalsSetupPage() {
   const [sex, setSex] = useState('')
   const [bodyComposition, setBodyComposition] = useState('')
   const [activityLevel, setActivityLevel] = useState('')
+  const [dailySteps, setDailySteps] = useState('')
   const [targetWeight, setTargetWeight] = useState('')
   const [timeline, setTimeline] = useState('')
   const [notes, setNotes] = useState('')
@@ -94,6 +95,7 @@ export default function GoalsSetupPage() {
         if (data.sex) setSex(data.sex)
         if (data.body_composition) setBodyComposition(data.body_composition)
         if (data.activity_level) setActivityLevel(data.activity_level)
+        if (data.daily_steps) setDailySteps(String(data.daily_steps))
         if (data.target_weight_lbs) setTargetWeight(String(data.target_weight_lbs))
         if (data.timeline) setTimeline(data.timeline)
         if (data.notes) setNotes(data.notes)
@@ -144,6 +146,7 @@ export default function GoalsSetupPage() {
       sex: sex || null,
       body_composition: bodyComposition || null,
       activity_level: activityLevel,
+      daily_steps: dailySteps ? parseInt(dailySteps) : null,
       target_weight_lbs: targetWeight ? parseFloat(targetWeight) : null,
       timeline,
       notes: notes || null,
@@ -316,6 +319,16 @@ export default function GoalsSetupPage() {
                       {activityLevel === a.key && <span style={{ color: 'var(--accent-purple)', fontSize: '16px' }}>✓</span>}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>AVERAGE DAILY STEPS <span style={{ fontWeight: '400' }}>(optional)</span></label>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '10px', lineHeight: '1.5' }}>From your phone, watch, or rough estimate. Helps the AI understand your real movement level beyond the gym.</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input type="number" value={dailySteps} onChange={e => setDailySteps(e.target.value)} placeholder="e.g. 15000" min="0" max="50000"
+                    style={{ width: '140px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>steps / day</span>
                 </div>
               </div>
 

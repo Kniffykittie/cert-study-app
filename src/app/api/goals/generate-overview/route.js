@@ -35,7 +35,7 @@ export async function POST(req) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { goals, height_inches, weight_lbs, age, sex, body_composition, activity_level, target_weight_lbs, timeline, notes } = await req.json()
+  const { goals, height_inches, weight_lbs, age, sex, body_composition, activity_level, daily_steps, target_weight_lbs, timeline, notes } = await req.json()
 
   const BODY_COMP_MAP = {
     lean_muscular: 'Lean & Muscular (6–17% body fat) — do NOT use BMI as a health indicator for this person',
@@ -60,7 +60,7 @@ THEIR PROFILE:
 - Height: ${heightFt ?? 'not provided'}
 - Weight: ${weight_lbs ? weight_lbs + ' lbs' : 'not provided'}${bmi ? ` (BMI: ${bmi} — use body composition descriptor below as the more accurate indicator)` : ''}
 - Body composition: ${body_composition ? (BODY_COMP_MAP[body_composition] || body_composition) : 'not provided'}
-- Activity level: ${ACTIVITY_LABELS[activity_level] ?? activity_level ?? 'not provided'}
+- Activity level: ${ACTIVITY_LABELS[activity_level] ?? activity_level ?? 'not provided'}${daily_steps ? ` — averages ~${daily_steps.toLocaleString()} steps/day` : ''}
 ${target_weight_lbs ? `- Target weight: ${target_weight_lbs} lbs` : ''}
 ${timeline ? `- Timeline: ${TIMELINE_LABELS[timeline] ?? timeline}` : ''}
 ${notes ? `- Additional notes: ${notes}` : ''}
