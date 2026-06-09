@@ -341,6 +341,11 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 - Google Health OAuth — full connect/disconnect flow on live URL
 - Owner admin "Send Password Reset" button — sends real email to user
 
+**Future features that must be built AFTER Vercel deploy (require live environment):**
+- Vercel Cron Job (health auto-sync) — this is a Vercel-only feature configured in `vercel.json`; cannot exist locally
+- PWA conversion — service workers require HTTPS; local dev runs HTTP so install prompt and offline mode won't function until live
+- Barcode scanner (nutrition) — camera API requires HTTPS in most browsers; will appear broken locally
+
 ---
 
 ## Future Features
