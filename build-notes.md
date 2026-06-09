@@ -547,6 +547,11 @@ Every new Life Hub feature that generates loggable data **ships with a reset row
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 30i - Complete
+- Switched owner PIN verification from bcrypt to SHA-256 (Node built-in `crypto`) — bcrypt hash contains `$` signs that dotenv misparses; SHA-256 hex digest is plain hex with no special characters
+- `OWNER_PIN_HASH` in `.env.local` is now a plain hex string, no quotes needed
+- `bcryptjs` dependency kept in package.json for future per-user privacy PIN (profiles table)
+
 ### Phase 30h - Complete
 Owner PIN unlock in Settings:
 - New `/api/owner/verify-pin` POST route — bcrypt compares submitted PIN against `OWNER_PIN_HASH` env var; 3 wrong attempts triggers 1-hour lockout tracked in module-level state; owner email guard (403 for anyone else)

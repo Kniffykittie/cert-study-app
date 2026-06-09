@@ -1,4 +1,4 @@
-import bcrypt from 'bcryptjs'
+import { createHash } from 'crypto'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
@@ -29,7 +29,8 @@ export async function POST(req) {
   const hash = process.env.OWNER_PIN_HASH
   if (!hash) return NextResponse.json({ error: 'PIN not configured on server' }, { status: 500 })
 
-  const match = await bcrypt.compare(String(pin), hash)
+  const submitted = createHash('sha256').update(String(pin)).digest('hex')
+  const match = submitted === hash
   if (!match) {
     state.count++
     if (state.count >= MAX_ATTEMPTS) {
