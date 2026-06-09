@@ -61,7 +61,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `question_templates` | Template library with variable_sets and is_retired flag |
 | `bookmarked_questions` | Bookmarks with reason, notes, and full question snapshot |
 | `flagged_questions` | User-reported question issues |
-| `profiles` | User display name, exam_dates JSONB, daily_goal INT, default_cert TEXT, is_disabled BOOLEAN (owner-controlled ban flag — checked at top of every API route) |
+| `profiles` | User display name, exam_dates JSONB, daily_goal INT, default_cert TEXT, is_disabled BOOLEAN (owner-controlled ban flag — checked at top of every API route), settings_pin_hash TEXT (optional bcrypt hash for Settings page PIN lock) |
 | `lab_progress` | Completed lab steps per user (user_id, lab_set_id, lab_id, step_id, completed_at) |
 | `lab_notes` | Per-lab freeform notes per user (user_id, lab_set_id, lab_id, notes, updated_at) |
 | `lab_timers` | Per-lab timer state — elapsed_seconds, is_running, last_started_at; unique per user+lab |
@@ -87,6 +87,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `nutrient_profiles` | *(planned)* Cached AI-generated nutrient encyclopedia entries — keyed by nutrient name, shared across all users; sections: what it does, cool facts, deficiency signs, toxicity, food sources, supplement notes |
 | `invite_codes` | *(planned)* Single-use invite codes — code TEXT UNIQUE, created_by, created_at, used_at TIMESTAMPTZ, used_by; null used_at = unused |
 | `api_rate_limits` | *(planned)* Per-user per-endpoint rate limiting — user_id, endpoint, call_count, window_start; checked at top of every AI route |
+| `recovery_codes` | *(planned)* 2FA recovery codes — user_id, code_hash TEXT, used_at TIMESTAMPTZ (null = unused); generated once on 2FA enrollment |
 
 ---
 
@@ -150,13 +151,51 @@ Add `is_disabled BOOLEAN DEFAULT false` to the `profiles` table. At the top of e
 Enable email confirmation in Supabase Auth dashboard (Auth → Settings → Enable email confirmations). When enabled, new accounts get a confirmation email and cannot log in until the link is clicked. No code changes required — Supabase handles the entire flow. Prevents fake/typo emails and ensures every account has a real reachable address.
 
 **10. Sign out everywhere button**
-In Settings → Account: "Sign Out of All Devices" button. Calls `supabase.auth.signOut({ scope: 'global' })` which invalidates all active sessions for that user across every device. One line of code. Important for the scenario where a user suspects their account was accessed somewhere else.
+In Settings → Security: "Sign Out Everywhere" button alongside the regular Sign Out button. Calls `supabase.auth.signOut({ scope: 'global' })` which invalidates all active sessions for that user across every device. ✅ Already built.
 
 **11. Disable email enumeration**
 In Supabase Auth dashboard (Auth → Settings): enable "Prevent email enumeration." Without this, the login error message differs depending on whether the email exists or not — letting someone probe your database to harvest registered emails. With it enabled, all auth failures return the same generic message.
 
 **12. Owner PIN for elevated actions**
 Any action that only the owner can take (generate templates, generate flashcards, generate invite codes, add/retire templates) requires a PIN entry before proceeding. UX: clicking an owner-only action button opens a small modal with a 4–6 digit PIN input. The PIN is stored as a hashed value in an environment variable (`OWNER_PIN_HASH`), never in the database. On submit the entered PIN is hashed and compared — if it matches, the action proceeds; if it fails, increment a failure counter stored server-side (in `api_rate_limits` table reusing the same pattern). After 3 failed attempts within an hour, lock owner actions for 60 minutes and return a clear message ("Too many incorrect attempts — owner actions locked for 60 minutes"). The lockout is per-user so it only affects the owner account. PIN is never logged, never sent to the AI, never stored in plain text. To change the PIN, update the env variable and redeploy.
+
+**13. Per-user Privacy PIN (optional, user-controlled)**
+Users can optionally set a PIN that locks their Settings page. If set, navigating to Settings shows a PIN entry modal before any content is visible — protects against someone physically picking up their device. PIN stored as a bcrypt hash in `profiles.settings_pin_hash`. Wrong PIN keeps the page locked. Correct PIN unlocks for that browser session.
+- PIN reset requires password re-entry (or TOTP verification if 2FA is enabled)
+- Owner can clear a user's PIN from the admin panel if they get locked out
+- This is a "physical access" protection, not a deep security layer — API routes are already independently protected by session auth
+- UX: Settings → Security → "Set Privacy PIN" button; if already set shows "Change PIN" and "Remove PIN"
+
+**14. Per-user 2FA — TOTP via authenticator app (optional, user-controlled)**
+Users can optionally enable two-factor authentication using any TOTP authenticator app (Google Authenticator, Authy, 1Password, etc.). Supabase supports this natively via `supabase.auth.mfa`.
+- **Enrollment flow** (Settings → Security → Enable 2FA): generates a QR code the user scans with their authenticator app, then asks them to enter the current 6-digit code to confirm enrollment
+- **Recovery codes**: on enrollment, generate 8–10 single-use recovery codes displayed once for the user to save/download. These are the ONLY way back in if they lose their phone. Non-negotiable to include — without them a lost phone = permanent lockout. Codes stored as hashed values in a `recovery_codes` table.
+- **Login flow update**: after email/password, if 2FA is enrolled, show a TOTP entry screen before granting access
+- **Password change gated behind 2FA**: if 2FA is enabled, "Change Password" in Settings requires TOTP verification first — prevents someone who accessed your email from changing your app password
+- **Security status card** at top of Security section: shows PIN (Enabled / Not set), 2FA (Enabled / Not set), Recovery Codes (Saved / Not generated) — makes gaps visible so users are nudged to complete their setup
+- Owner can reset (remove) any user's 2FA enrollment from the admin panel — see item 15
+
+**DB:** New table `recovery_codes` — user_id, code_hash TEXT, used_at TIMESTAMPTZ (null = unused), created_at
+
+**15. Owner Admin Panel (in Settings, owner-only section)**
+A section at the bottom of the Settings page that only renders for `sethproper40@yahoo.com` — invisible to all other users, no separate URL needed.
+
+**User list**: all accounts shown as cards — email, display name, joined date, last active date, account status (Active / Disabled)
+
+**Per-user actions** (accessible via a "Manage" button on each user card):
+- 🔒 **Disable account** / ✅ **Enable account** — sets `is_disabled` flag; disabled users get 403 on all API calls
+- 🔄 **Invalidate all sessions** — force re-login on all devices without disabling the account; useful when a friend reports suspected unauthorized access
+- 📧 **Send password reset email** — triggers Supabase password reset email on the user's behalf; for friends who lost access
+- 🔑 **Reset 2FA** — removes the user's enrolled TOTP factor; they re-enroll on next login; use this when a friend loses their authenticator and has no recovery codes
+- 🔐 **Clear Privacy PIN** — removes their settings PIN lock; use this if they forgot it and can't get into Settings to reset it
+
+**What the owner cannot and should not see:**
+- Passwords (never stored in readable form)
+- PINs (stored as hashed values only)
+- Recovery codes (stored as hashed values only)
+- 2FA secrets (stored in Supabase Auth, not accessible)
+
+The owner solves lockout problems by *resetting* access, never by *reading* credentials. This is the correct pattern — you help friends recover without ever being able to impersonate them.
 
 ### Invite system (owner-only, built in Settings)
 Single-use invite codes — the cleanest way to control who gets in without manually creating accounts.
@@ -193,6 +232,9 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 0i. Sign out everywhere — `supabase.auth.signOut({ scope: 'global' })` in Settings
 0j. Disable email enumeration — enable in Supabase Auth dashboard (no code needed)
 0k. Owner PIN — hashed PIN in env var, modal on every owner action, 3-strike 60-min lockout
+0l. Per-user Privacy PIN — optional, bcrypt hash in profiles.settings_pin_hash, gates Settings page
+0m. Per-user 2FA — Supabase TOTP MFA, login challenge, password change gate, recovery codes, security status card
+0n. Owner Admin Panel — bottom of Settings page, owner-only; user list with disable/enable, invalidate sessions, send password reset, reset 2FA, clear PIN
 
 **Tier 1 — Foundation (everything downstream depends on these)**
 1. Phase 31 — Goals Setup Depth Fields (obstacles, motivations, dietary prefs, sleep hours, goal story) — richer AI context for every feature that follows
