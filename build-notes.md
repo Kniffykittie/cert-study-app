@@ -84,6 +84,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `progress_photos` | *(planned Phase 32)* User progress photo gallery — photo_url, taken_at DATE, description TEXT |
 | `daily_briefs` | *(planned — Correlation Engine)* Cached daily "what should I do today" AI paragraph — keyed by user_id + date; regenerated once per day on first Life Hub load |
 | `monthly_wraps` | *(planned)* Cached monthly wrap-up reports — report_data JSONB (aggregated stats across both hubs), ai_narrative TEXT; generated once on first visit, never re-called; UNIQUE on user_id + month |
+| `nutrient_profiles` | *(planned)* Cached AI-generated nutrient encyclopedia entries — keyed by nutrient name, shared across all users; sections: what it does, cool facts, deficiency signs, toxicity, food sources, supplement notes |
 
 ---
 
@@ -240,7 +241,24 @@ When the nutrition dashboard loads, it queries the user's supplement stack and a
 - **Supplement stack → nutrition integration** — supplements are NOT a daily check-off tracker; instead the user maintains a supplement stack (name, dose, timing, nutrient content) that feeds automatically into the nutrition dashboard. Creatine with BCAAs contributes to amino acid totals; vitamin D supplement counts toward vitamin D RDV; all supplements on their stack add to micronutrient totals passively every day without re-logging. AI can see the full supplement stack when generating recommendations. DB: `supplement_stack` table — user_id, name, dose, timing, nutrients JSONB (nutrient name → amount per dose). Build nutrition dashboard and supplement stack as connected from day one — do not silo them.
 - **Daily nutrition dashboard** — calories eaten vs goal, net calories (eaten minus burned), macro ring charts, meal history by day, micronutrient progress bars against RDVs (supplement contributions included)
 - **Nutrition history** — past days/weeks, average macros, trend charts; targets personalized using goals_profiles (dietary_prefs, weight goal, body composition)
-- **Vitamin/nutrient encyclopedia** — searchable AI-generated reference per nutrient
+- **Vitamin/nutrient encyclopedia** — full reference page at `/life-hub/nutrition/encyclopedia`. Three entry points coexist on the same page without competing:
+
+  **Rotating symptom prompts (top of page)** — a soft banner that cycles through everyday-language symptom questions with a gentle fade transition every few seconds while the user browses. Written the way people actually think, not clinically: "Do your muscles cramp at night?" / "Do you feel anxious for no real reason?" / "Is your hair thinning?" / "Do you get sick more than twice a year?" / "Do you wake up tired even after a full night's sleep?" / "Do you have trouble focusing?" / "Are your nails brittle?" / "Do you feel sluggish in the afternoon?" Each prompt is clickable — tapping it goes straight to the relevant nutrient entries. The rotation keeps cycling while they browse so different prompts catch their eye on different visits. This creates awareness people didn't have when they landed — most people don't self-identify as having symptoms; they just think everyone feels that way until a specific question makes them pause.
+
+  **"Find My Symptoms" button** — always visible, sticky at top right. For the user who already knows they want to investigate something specific. Opens a full symptom selector grid — tap everything that applies, see ranked nutrient results with a one-line explanation of the connection per result.
+
+  **Browse section** — full encyclopedia below the prompt banner. Searchable by name. Filterable by category (Vitamins / Minerals / Amino Acids / Fatty Acids) and by goal (Sleep / Energy / Muscle & Recovery / Fat Loss / Immune Health / Mental Focus / Bone Health / Heart Health). Each nutrient shown as a card with name, one-sentence description, and personalized relevance badge if it connects to their goals_profiles data.
+
+  **Individual nutrient entry** — opens as a full page or large modal. Sections in this order:
+  - **What it actually does** — plain English paragraph, written like explaining to a friend, no jargon
+  - **Cool facts** — 2–3 genuinely interesting things most people don't know (e.g. "Magnesium is involved in over 300 enzymatic reactions in your body" / "Your body stores almost no vitamin B12 — it relies entirely on regular intake") — the things that make people go "huh" and actually remember it
+  - **Signs you might not be getting enough** — specific and honest, not vague ("muscle twitches especially at night, difficulty sleeping, anxiety, constipation" — not just "fatigue")
+  - **What happens if you get too much** — the section nobody includes and everybody should; some nutrients are harmless in excess, others are genuinely dangerous (vitamin A toxicity, iron overload, too much zinc suppresses copper); being honest about this builds trust
+  - **How to get it from food** — actual foods with approximate amounts per serving, not just "eat vegetables"
+  - **Supplement notes** — typical dosing, best time of day, what to take it with or avoid, interactions; cross-references their supplement stack if they have one ("You take calcium and iron together — these compete for absorption; consider spacing them 2 hours apart")
+  - **Relevance to you** — personalized section at the bottom; shows which of their goals connect to this nutrient; shows their 30-day average intake vs RDV once nutrition logging is active; supplement stack interaction warnings if applicable
+
+  **Generation & caching** — each entry generated once via claude-sonnet-4-6 and cached in a shared `nutrient_profiles` table keyed by nutrient name (same pattern as supplement_profiles — one entry shared across all users, never regenerated unless manually triggered). Personalized elements (relevance badges, intake comparison, stack warnings) calculated client-side from the user's own data — no AI call needed for those.
 
 ---
 
