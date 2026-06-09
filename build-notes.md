@@ -80,49 +80,175 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 
 ## Future Features
 
-### Security
-- Two-factor authentication (placeholder exists in Settings → Security section)
-- Password change from within the app
+> **Format:** Each item includes user intent, UX spec, data model notes, and AI context impact so it can be built the next day without re-discussing.
 
-### Study Hub
-- More concept cards in Study Mode
-- Exam countdown timer with target date
-- Advanced CCNA lab set (spanning tree deep dive, advanced OSPF, BGP intro)
-- PWA conversion (add to home screen, offline support)
+---
 
-### Life Hub — Health
+### Phase 31 — Goals Setup: Depth Fields
+*Adds the context fields that make the AI overview and workout plan genuinely personalized rather than generic.*
+
+**Biggest Obstacle(s)**
+- Multi-select (pick all that apply): Time / Consistency / Diet & Nutrition / Past Injuries / Low Motivation / Not Sure Where to Start / Burnout / Stress / Lack of Support / Sleep
+- After selecting, an optional text box appears: "Want to tell us more about your situation?" — free text, 3-row textarea
+- Saves to `goals_profiles.obstacles TEXT[]` and `goals_profiles.obstacle_notes TEXT`
+- AI impact: overview directly addresses what's gotten in the way before; workout plan avoids over-scheduling someone who cited "time" as obstacle
+
+**Primary Motivation**
+- Multi-select (pick all that apply): Look Better / Get Stronger / Live Longer & Healthier / Improve Athletic Performance / Reduce Pain or Discomfort / Mental Health & Stress Relief / Set a Good Example (family/kids) / Compete or Train for a Sport / Confidence
+- After selecting, optional text: "Anything specific driving this?" — free text
+- Saves to `goals_profiles.motivations TEXT[]` and `goals_profiles.motivation_notes TEXT`
+- AI impact: changes the *tone* and framing of all recommendations — aesthetics-focused vs longevity-focused vs performance-focused people need completely different language and priorities
+
+**Why These Goals?**
+- Single open-ended textarea: "Tell us what's behind your goals — what made you decide to make a change, or what are you working toward?" — 4-row textarea, optional
+- Saves to `goals_profiles.goal_story TEXT`
+- AI impact: gives the AI the human context it needs to write an overview that actually resonates instead of sounding like a form letter
+
+**Dietary Preference**
+- Multi-select (pick all that apply): No Restrictions / Vegetarian / Vegan / Pescatarian / Keto / Low-Carb / Gluten-Free / Dairy-Free / Intermittent Fasting / Halal / Kosher / Other
+- Optional text: "Anything specific about how you eat?" — free text
+- Saves to `goals_profiles.dietary_prefs TEXT[]` and `goals_profiles.dietary_notes TEXT`
+- AI impact: nutrition section recommendations, supplement advice, and calorie framing all depend on this heavily
+
+**Sleep Hours**
+- Simple number input: "How many hours of sleep do you typically get?" — range 3–12, step 0.5
+- Saves to `goals_profiles.sleep_hours NUMERIC`
+- AI impact: under-slept users get explicitly different recovery volume and intensity advice; maps to better_sleep goal if present
+
+**DB migration needed:** Add columns `obstacles TEXT[], obstacle_notes TEXT, motivations TEXT[], motivation_notes TEXT, goal_story TEXT, dietary_prefs TEXT[], dietary_notes TEXT, sleep_hours NUMERIC` to `goals_profiles`
+
+**UX:** Add these as a new **Step 3 — Your Context** between the current Starting Point and the finish. Step count goes from 3 → 4. Progress bar updates to 4 segments. All fields optional so nobody gets blocked.
+
+---
+
+### Phase 32 — Body Measurement Tracking (own page)
+*Separate page at `/life-hub/goals/measurements`. Tracks waist, hips, chest, arms, thighs etc. over time — the only reliable way to see body composition change independent of scale weight.*
+
+**The Problem It Solves**
+Scale weight is a terrible progress indicator when building muscle + losing fat simultaneously. Someone can work hard for 3 months and see no weight change while losing 2 inches off their waist. This page makes that progress visible.
+
+**Page: `/life-hub/goals/measurements`**
+- Sidebar nav entry under Goals dropdown: "Measurements"
+- Header: "Body Measurements" with a "Log Today's Measurements" button
+- Explainer section at the top (collapsible after first visit): what measurements to take, what equipment you need (just a soft tape measure), and how to do each one correctly with brief instructions. Cover:
+  - Waist: measure at the narrowest point, usually just above the belly button, exhale normally before measuring — do not suck in
+  - Hips: widest point of your hips/glutes, feet together
+  - Chest: across the fullest part, arms relaxed at sides, after a normal exhale
+  - Left Arm / Right Arm: flexed, at the peak of the bicep
+  - Left Thigh / Right Thigh: mid-thigh, standing, weight evenly distributed
+  - Neck: just below the Adam's apple
+  - Note: always measure the same time of day (morning before eating is best), same amount of clothing, same body position
+- Log form: date picker (defaults today) + inputs for each measurement in inches (all optional — log only what you want to track)
+- History: table of past logs sorted newest-first with change indicators (green ↓ for waist/hips if losing, green ↑ for arms if building)
+- Chart view: line chart per measurement over time (toggle which measurements to show)
+
+**DB:** New table `body_measurements` — user_id, logged_at DATE, waist_in, hips_in, chest_in, left_arm_in, right_arm_in, left_thigh_in, right_thigh_in, neck_in (all NUMERIC nullable)
+
+**AI integration:** Latest measurements stored/fetched and injected into generate-plan context — "waist trending down 1.5in over 60 days" tells the AI the plan is working and should maintain current approach
+
+---
+
+### Phase 33 — Daily Check-In Widget (Life Hub Home)
+*30-second daily log on the Life Hub landing page. Seeds the correlation engine data layer.*
+
+**Widget on `/life-hub`**
+- Shows at top of Life Hub home if not yet checked in today
+- Two sliders or emoji-tap rows: Energy today (1–5) and Mood today (1–5)
+- Optional one-liner: "Anything notable today?" — single-line text input
+- Submit button saves and dismisses widget for the day
+- After submission: shows today's check-in as a compact summary row
+
+**History / Trends**
+- 28-day heatmap below the widget (similar to DailyStreak) — color intensity by average energy+mood
+- Visible patterns: "You've averaged 3.2 energy on Mondays vs 4.1 on Fridays"
+
+**DB:** New table `daily_checkins` — user_id, date DATE (unique per user), energy_level SMALLINT (1–5), mood_level SMALLINT (1–5), notes TEXT, created_at
+
+**Correlation engine hook:** Check-in data eventually joins with sleep, steps, test scores for AI insight generation
+
+---
+
+### Phase 34 — Water Intake Tracker
+*Simple, high-engagement daily hydration tracker. Lives on the Life Hub home or its own page.*
+
+**UX**
+- Daily goal defaulting to 8 cups (64 oz) — user can adjust in settings or inline
+- Big tap-to-add button: "+ 1 Cup" (8 oz) with a secondary "+ Custom" for other amounts
+- Progress ring or bar showing cups today vs goal
+- Green ring fills as you log; completes with a small animation when goal hit
+- Today's log list: timestamps of each entry with delete option
+- 7-day history: daily totals as a small bar chart below today's tracker
+
+**DB:** New table `water_logs` — user_id, logged_at TIMESTAMPTZ, amount_oz NUMERIC; aggregate to daily in query
+
+**AI context:** daily average hydration passed into generate-overview and nutrition recommendations — under-hydrated users get hydration called out explicitly
+
+---
+
+### Phase 35 — Supplement Tracker
+*Log daily supplements, see streaks, get AI-generated context on what you're taking.*
+
+**UX**
+- My Supplements list: user-defined list of supplements they take (name, dose, timing: morning/afternoon/evening/with meals)
+- Daily log: check off each supplement as taken — "Mark All Taken" one-tap option
+- Streak per supplement (like DailyStreak) — consecutive days taken
+- Calendar heatmap: full months taken = green, partial = blue, missed = grey
+- Add supplement form: name + dose + optional timing note
+- AI profile card per supplement (generated on demand, cached): what it does, typical dosing, best time to take, common interactions, food sources if applicable — uses claude-sonnet-4-6
+
+**DB:** New tables:
+- `supplements` — user_id, name, dose, timing, is_active, created_at
+- `supplement_logs` — user_id, supplement_id, taken_at DATE, created_at
+- `supplement_profiles` — supplement name (normalized), ai_profile TEXT, generated_at (shared/cached across all users)
+
+---
+
+### Life Hub — Health (remaining)
 - **Heart Rate Tracker page** — hourly HR chart, resting HR, peak HR, zone breakdown (Rest/Fat Burn/Cardio/Peak)
 - **Vercel Cron Job auto-sync** — scheduled server-side job syncing Google Health data every 30–60 min without user loading the page
 - **Health Overview wiring** — connect landing page cards with live Supabase data
 - **Weekly/monthly sleep trends** — avg sleep per night over 7/30 days, trend line, goal line (8h)
 
-### Life Hub — Nutrition
+---
+
+### Life Hub — Nutrition (full build)
 - **Food logging** — calories, macros, micronutrients (B12, magnesium, potassium, vitamin D, iron, zinc, calcium, omega-3, fiber, sodium) tracked against RDVs
 - **Barcode scanner** — scan packaging via phone camera, auto-populate from Open Food Facts; preview before saving
 - **Manual food entry** — full nutrition fields form when no barcode available
 - **My Foods library** — personal library of frequently eaten foods, organized by category, one-tap logging
 - **Daily nutrition dashboard** — calories vs goal, macro ring charts, meal history, micronutrient progress bars
-- **Nutrition history** — past days/weeks, average macros, trend charts
-- **Supplement tracker** — log daily supplements, mark taken/skipped, streak and calendar heatmap
-- **Supplement encyclopedia** — AI-generated profiles: benefits, dose, timing, interactions, food sources
+- **Nutrition history** — past days/weeks, average macros, trend charts; targets personalized using goals_profiles (dietary_prefs, weight goal, body composition)
 - **Vitamin/nutrient encyclopedia** — searchable AI-generated reference per nutrient
 
-### Life Hub — Workouts
+---
+
+### Life Hub — Workouts (remaining)
 - **Post-workout logging** — "Start Workout" → log sets/reps/weight per exercise → "Complete Workout" triggers AI check-in
 - **Workout history** — past sessions, volume over time, PRs per exercise
 - **Yoga & stretching planner** — AI-generated weekly yoga/stretching plan with poses and form tips
 - **Stretching library** — organized by muscle group; click to open popup with photo, hold duration, form tips
 
-### Goals & Body Metrics
-- **Goals page** — input personal goals (build muscle / lose weight / improve sleep / etc.); AI guidance and actionable recommendations
-- **Body metrics profile** — height, weight, sex, body type, age; used to calculate personalized calorie targets and macro ratios
-- **Goal progress tracking** — track body weight over time, compare against goal, show trend
+---
 
 ### Correlation Engine
 - **Daily snapshots** — background job saves combined study + health data to Supabase daily
-- **AI insights** — Claude surfaces patterns (e.g. "test scores 12% higher after 7+ hours sleep")
-- **Correlation charts** — scatter plots / trend lines: study score vs sleep, steps, protein, HR
-- **Morning brief page** — daily summary: yesterday's health snapshot + today's study recommendation
+- **AI insights** — Claude surfaces patterns (e.g. "test scores 12% higher after 7+ hours sleep", "energy avg 4.1 on days with 10k+ steps")
+- **Correlation charts** — scatter plots / trend lines: study score vs sleep, steps, protein, HR, energy check-in
+- **Morning brief page** — daily summary: yesterday's health snapshot + today's study recommendation + one AI insight
+
+---
+
+### Study Hub (remaining)
+- More concept cards in Study Mode
+- Exam countdown timer with target date
+- Advanced CCNA lab set (spanning tree deep dive, advanced OSPF, BGP intro)
+- PWA conversion (add to home screen, offline support)
+
+---
+
+### Security
+- Two-factor authentication (placeholder exists in Settings → Security section)
+- Password change from within the app
 
 ---
 

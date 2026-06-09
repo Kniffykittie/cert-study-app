@@ -331,7 +331,7 @@ src/
 - **Security+ Network Labs** (`security-plus-labs.js`): 4 labs, 20 steps — ACL firewall, DMZ three-zone design, device hardening (SSH v2/encrypted passwords/rate limiting), network segmentation (VLANs by trust level)
 
 ### Goals & Body Metrics
-- Setup flow: 3 steps — Goals (multi-select 8 options), Body Metrics (height/weight/age/sex/body composition/target weight), Starting Point (activity level, timeline, notes)
+- Setup flow: 3 steps — Goals (multi-select 8 options), Body Metrics (height/weight/age/sex/body composition/target weight), Starting Point (activity level + daily steps + timeline + notes)
 - Body composition selector: sex-dependent options with plain-language labels + body fat % ranges; Male-only "💀 Holy Sh*t" (50%+) option triggers a meme modal that remaps to 'obese' before saving
 - Upserts to `goals_profiles` table on finish, then calls `/api/goals/generate-overview` for a personalized 3-paragraph AI overview
 - Overview stored in `goals_profiles.ai_overview`, displayed on the Goals page with a 🤖 header
@@ -341,6 +341,11 @@ src/
 - Setup page `?redirect=<path>` param causes `handleFinish()` to route back to the intended destination
 - **Workout plan context**: `generate-plan/route.js` fetches `goals_profiles` at generation time and injects body/lifestyle context into the AI prompt
 - API: `/api/goals/generate-overview` — POST, any authenticated user, updates `ai_overview` column on their own row
+- **Planned Phase 31:** Add Step 3 "Your Context" — Biggest Obstacle(s) multi-select + free text, Primary Motivation multi-select + free text, Why These Goals open textarea, Dietary Preference multi-select + free text, Sleep Hours. New DB columns on `goals_profiles`.
+- **Planned Phase 32:** Body Measurements page at `/life-hub/goals/measurements` — measurement how-to guide, log form, history table with change indicators, line chart over time. New `body_measurements` table.
+- **Planned Phase 33:** Daily Check-In widget on Life Hub home — energy + mood rating, optional note, 28-day heatmap. New `daily_checkins` table.
+- **Planned Phase 34:** Water intake tracker — daily goal, tap-to-add, progress ring, 7-day chart. New `water_logs` table.
+- **Planned Phase 35:** Supplement tracker — user supplement list, daily check-off, per-supplement streak + calendar heatmap, AI profile cards cached in `supplement_profiles`.
 
 ### Google Health Integration
 - OAuth flow restricted to owner account only (`sethproper40@yahoo.com`) — 403 for all others
