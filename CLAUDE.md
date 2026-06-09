@@ -66,7 +66,7 @@ Always provide a brief summary covering:
 src/
   app/
     api/
-      reset/route.js                   POST — scoped data reset (cert, all_study, workout_plan, workout_profile)
+      reset/route.js                   POST — scoped data reset (cert, all_study, workout_plan, workout_profile, goals_profile)
       bookmarks/route.js               CRUD for bookmarked questions
       generate-questions/route.js      AI question generation (spaced repetition weighting)
       generate-templates/route.js      AI template generation (batch of 5, dedup)
@@ -75,6 +75,8 @@ src/
       wrong-answers/route.js           GET wrong answers by cert (deduped by question text)
       lab-doc-feedback/route.js        AI feedback on step documentation textarea
       lab-summary/route.js             AI lab completion summary (3 sections)
+      goals/
+        generate-overview/route.js     POST — generates personalized 3-paragraph AI overview from goals_profiles data, saves to ai_overview column
       health/
         connect/route.js               Initiates Google Health OAuth (owner account only)
         callback/route.js              Handles OAuth callback, saves tokens
@@ -91,8 +93,8 @@ src/
         steps/page.js                  Step Tracker — hourly/weekly bar charts, goal progress, fixed tooltip
         sleep/page.js                  Sleep Tracker — stage breakdown bar, timeline chart, no-data state
       goals/
-        page.js                        Goals overview — AI overview, active goals chips, body metrics, lifestyle summary, Edit Goals button
-        setup/page.js                  3-step goals onboarding: goals multi-select, body metrics, starting point (activity + timeline + notes); gates workouts/nutrition if incomplete
+        page.js                        Goals overview — AI overview panel, active goals chips, body metrics card (BMI + disclaimer + build label), lifestyle card (activity + daily steps + timeline), notes; Edit Goals button
+        setup/page.js                  3-step goals onboarding: Step 1 Goals (multi-select 8 options), Step 2 Your Body (height/weight/age/sex/body composition/target weight), Step 3 Starting Point (activity level + daily steps + timeline + notes); supports ?redirect= param; gates workouts/nutrition if incomplete
       workouts/
         page.js                        My Workout Plan — weekly plan cards sorted Mon-Sun, day reassignment, add/remove exercises with AI check-in, add/change cardio on rest days; gates on goals profile
         setup/page.js                  7-step onboarding: experience, goals (multi-select), days, schedule, fitness check, cardio preferences, equipment; gates on goals profile
@@ -131,7 +133,7 @@ src/
       security-plus-labs.js            Security+ lab set — 4 labs, 20 steps — all steps have document arrays
   components/
     StudyHubSidebar.js                 Nav sidebar with test-in-progress guard
-    LifeHubSidebar.js                  Life Hub nav — Health dropdown, Workouts dropdown, auto-opens on active routes
+    LifeHubSidebar.js                  Life Hub nav — Goals dropdown (My Goals + Setup), Health dropdown (Overview/Steps/Sleep), Workouts dropdown (My Plan + Exercise Library); each auto-opens on active routes
     BookmarkModal.js                   Bookmark reason + notes modal
     DailyStreak.js                     30q/day streak tracker with 28-day calendar heatmap
     DomainTrend.js                     Per-domain score trend SVG chart (no library)

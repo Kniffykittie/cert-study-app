@@ -74,7 +74,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `exercises` | Exercise library — name, body_part, equipment, target, secondary_muscles[], instructions[], gif_url (nullable) |
 | `workout_profiles` | User's fitness profile — experience, goal, days_per_week, fitness stats, equipment, limitations, available_weights |
 | `workout_plans` | AI-generated weekly plans — plan JSONB (7 day objects), plan_notes, progression_notes, schedule JSONB, is_active |
-| `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, target_weight_lbs, timeline, notes, ai_overview; UNIQUE on user_id |
+| `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, daily_steps, target_weight_lbs, timeline, notes, ai_overview; UNIQUE on user_id |
 
 ---
 
@@ -280,16 +280,22 @@ Goals profile reset added for testing:
 - `src/app/settings/page.js`: Goals section added at the bottom of Data & Reset with a Reset button and confirmation modal
 
 ### Phase 30 - Complete
-Goals & Body Metrics — personalized profile that gates and powers all Life Hub AI:
-- Created `goals_profiles` Supabase table: goals TEXT[], height/weight/age/sex, activity_level, target_weight_lbs, timeline, notes, ai_overview; RLS user-scoped
-- `src/app/life-hub/goals/setup/page.js`: 3-step onboarding — Goals (multi-select 8 options), Body Metrics (height/weight/age/sex/target), Starting Point (activity level, timeline, notes); upserts to `goals_profiles` then calls generate-overview API; supports `?redirect=` param
-- `src/app/api/goals/generate-overview/route.js`: POST — calls Claude claude-sonnet-4-6 with full profile, returns 3-paragraph personalized overview, saves to `ai_overview` column
-- `src/app/life-hub/goals/page.js`: Goals overview — AI overview panel, active goals chips, body metrics card (with BMI + label), lifestyle card, notes; Edit Goals button links to setup
-- `src/components/LifeHubSidebar.js`: Goals dropdown added between Overview and Health; auto-opens on `/life-hub/goals/*`
-- `src/app/life-hub/workouts/page.js`: Goals gate — checks `goals_profiles` on load, redirects to `/life-hub/goals/setup?redirect=/life-hub/workouts` if none
-- `src/app/life-hub/workouts/setup/page.js`: Goals gate added (same pattern)
-- `src/app/life-hub/nutrition/page.js`: Goals gate added (same pattern)
-- `src/app/api/workouts/generate-plan/route.js`: Fetches `goals_profiles` at generation time; injects age/sex/height/weight/target/activity/timeline/life-goals into the AI prompt as body context
+Goals & Body Metrics — full setup flow, overview page, gating, and AI integration. Current state after all 30a–30d sub-phases:
+
+**What's built and live:**
+- `goals_profiles` table: goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, daily_steps, target_weight_lbs, timeline, notes, ai_overview; RLS user-scoped; UNIQUE on user_id
+- `src/app/life-hub/goals/setup/page.js`: 3-step onboarding
+  - Step 1 — Your Goals: multi-select 8 goal options
+  - Step 2 — Your Body: height, weight, age, sex, body composition (sex-dependent selector with % ranges; Male has "💀 Holy Sh*t" 50%+ option that triggers meme modal → remaps to obese), target weight
+  - Step 3 — Starting Point: activity level (descriptions include step ranges, not just gym sessions), daily steps optional input, timeline, notes
+  - Supports `?redirect=<path>` — routes back to intended destination after finish
+  - Prefills from existing profile on revisit
+- `src/app/api/goals/generate-overview/route.js`: POST — builds personalized prompt from full profile including body_composition and daily_steps context, calls Claude, saves to ai_overview column
+- `src/app/life-hub/goals/page.js`: shows AI overview panel, active goals chips, body metrics card (BMI + disclaimer noting muscle mass caveat + build label), lifestyle card (activity level + daily steps + timeline), notes
+- `src/components/LifeHubSidebar.js`: Goals dropdown (My Goals + Setup) added between Overview and Health; auto-opens on `/life-hub/goals/*`
+- Gate overlay on `/life-hub/workouts`, `/life-hub/workouts/setup`, `/life-hub/nutrition`: shows centered "Complete your Goals Setup first" prompt with "Take me there →" button instead of hard redirect
+- `src/app/api/workouts/generate-plan/route.js`: fetches goals_profiles at plan generation time; injects age/sex/height/weight/body_composition/daily_steps/activity/target/timeline/life-goals into AI prompt
+- Settings → Data & Reset: Goals Profile reset section added (scope: goals_profile)
 
 ### Phase 29 - Complete
 Shared flashcard decks + owner-only generation and write actions:
@@ -307,14 +313,15 @@ Shared flashcard decks + owner-only generation and write actions:
 ### Phase 28 - Complete
 Settings — Data & Reset section:
 - New section in Settings page between Connected Apps and Security
-- Per-cert reset (CCNA / Network+ / Security+): deletes question_answers, topic_performance, test_sessions, paused_tests, flashcards, flashcard_progress for that cert
+- Per-cert reset (CCNA / Network+ / Security+): deletes question_answers, topic_performance, test_sessions, paused_tests, flashcard_progress for that cert (shared flashcard deck untouched)
 - All study data reset: all of the above across all certs + bookmarked_questions + flagged_questions
-- Workout plan reset: deletes workout_plans — keeps fitness profile so the user can regenerate a plan without redoing setup
-- Full workout reset: deletes workout_plans + workout_profiles — returns user to the 7-step setup on next visit
+- Workout plan reset: deletes workout_plans — keeps fitness profile so the user can regenerate without redoing setup
+- Full workout reset: deletes workout_plans + workout_profiles — returns user to 7-step setup on next visit
+- Goals profile reset: deletes goals_profiles row — re-triggers gate overlay on workouts/nutrition until setup is completed again
 - All resets require a confirmation modal (⚠️) with explicit "Yes, Reset" button — cannot be triggered accidentally
 - Success/error message displayed inline after completion
-- New API route: POST /api/reset with { scope, cert? }
-- Pattern established: as new Life Hub sections are added, their reset row gets added here with the same button style
+- API route: POST /api/reset with { scope: 'cert'|'all_study'|'workout_plan'|'workout_profile'|'goals_profile', cert? }
+- Pattern: as new Life Hub sections are added, their reset row gets added here with the same button style
 
 ### Phase 27 - Complete
 AI Workout Plan Generator + Cardio System:
