@@ -3,10 +3,13 @@ import { NextResponse } from 'next/server'
 
 export async function POST(req) {
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const userId = session.user.id
+  const { data: profile } = await supabase.from('profiles').select('is_disabled').eq('id', user.id).single()
+  if (profile?.is_disabled) return NextResponse.json({ error: 'Account disabled' }, { status: 403 })
+
+  const userId = user.id
   const { scope, cert } = await req.json()
 
   if (scope === 'cert' && cert) {

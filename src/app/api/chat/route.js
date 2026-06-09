@@ -1,8 +1,16 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@/lib/supabase/server'
 
 const client = new Anthropic()
 
 export async function POST(req) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: profile } = await supabase.from('profiles').select('is_disabled').eq('id', user.id).single()
+  if (profile?.is_disabled) return Response.json({ error: 'Account disabled' }, { status: 403 })
+
   const { messages } = await req.json()
   if (!messages?.length) return Response.json({ error: 'No messages provided' }, { status: 400 })
 

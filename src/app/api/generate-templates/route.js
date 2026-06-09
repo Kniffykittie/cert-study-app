@@ -11,9 +11,9 @@ export async function POST(req) {
     if (!cert || !domain) return Response.json({ error: 'cert and domain required' }, { status: 400 })
 
     const supabase = await createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 })
-    if (session.user.email.toLowerCase() !== OWNER_EMAIL) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    if (user.email.toLowerCase() !== OWNER_EMAIL) {
       return Response.json({ error: 'Template generation is managed by the app owner.' }, { status: 403 })
     }
 

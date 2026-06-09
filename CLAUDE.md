@@ -36,6 +36,10 @@ var(--accent-purple)      #a78bfa
 - **No comments** unless the WHY is non-obvious
 - **Security:** `ANTHROPIC_API_KEY` is secret, never share. Only `NEXT_PUBLIC_` Supabase keys are safe.
 - Mobile responsive via `@media (max-width: 768px)` CSS
+- **Every AI route must use `getUser()` not `getSession()`** — and check `is_disabled` on the profiles table before proceeding
+- **Every new DB table must have RLS in the same migration** — no exceptions; pattern: `user_id = auth.uid()`
+- **All user-supplied free text injected into AI prompts must be wrapped in `<user_input>` tags** with a note telling Claude to treat it as data only
+- **Every new loggable feature ships with a reset row in Settings** in the same build session
 
 ---
 
@@ -66,17 +70,18 @@ Always provide a brief summary covering:
 src/
   app/
     api/
-      reset/route.js                   POST — scoped data reset (cert, all_study, workout_plan, workout_profile, goals_profile)
+      reset/route.js                   POST — scoped data reset; uses getUser() + is_disabled check
       bookmarks/route.js               CRUD for bookmarked questions
-      generate-questions/route.js      AI question generation (spaced repetition weighting)
-      generate-templates/route.js      AI template generation (batch of 5, dedup)
-      test-chat/route.js               Tutor chat during practice tests
-      chat/route.js                    General study chat (FloatingChat component)
+      generate-questions/route.js      AI question generation (spaced repetition weighting); uses getUser()
+      generate-templates/route.js      AI template generation (batch of 5, dedup); owner-only; uses getUser()
+      generate-flashcards/route.js     AI flashcard generation; owner-only; uses getUser()
+      test-chat/route.js               Tutor chat during practice tests; uses getUser()
+      chat/route.js                    General study chat (FloatingChat component); uses getUser() + is_disabled check
       wrong-answers/route.js           GET wrong answers by cert (deduped by question text)
-      lab-doc-feedback/route.js        AI feedback on step documentation textarea
-      lab-summary/route.js             AI lab completion summary (3 sections)
+      lab-doc-feedback/route.js        AI feedback on step documentation; uses getUser() + is_disabled check; prompt injection protected
+      lab-summary/route.js             AI lab completion summary (3 sections); uses getUser() + is_disabled check; prompt injection protected
       goals/
-        generate-overview/route.js     POST — generates personalized 3-paragraph AI overview from goals_profiles data, saves to ai_overview column
+        generate-overview/route.js     POST — AI overview from goals_profiles; uses getUser() + is_disabled check; prompt injection protected; only called from handleFinish() on setup page
       health/
         connect/route.js               Initiates Google Health OAuth (owner account only)
         callback/route.js              Handles OAuth callback, saves tokens
@@ -84,7 +89,7 @@ src/
         sync/route.js                  GET = read cache; POST = fetch from Google + write cache
         disconnect/route.js            Removes stored tokens
       workouts/
-        generate-plan/route.js         AI workout plan generator — filters by equipment, cardio from user-selected options only
+        generate-plan/route.js         AI workout plan generator; uses getUser() + is_disabled check; prompt injection protected on limitations + dumbbell_note fields
     life-hub/
       layout.js                        Life Hub layout with LifeHubSidebar
       page.js                          Life Hub landing
@@ -157,7 +162,7 @@ src/
 | `question_templates` | Template library with variable_sets and is_retired flag |
 | `bookmarked_questions` | Bookmarks with reason, notes, and full question snapshot |
 | `flagged_questions` | User-reported question issues |
-| `profiles` | User display name, exam_dates JSONB, daily_goal INT, default_cert TEXT |
+| `profiles` | User display name, exam_dates JSONB, daily_goal INT, default_cert TEXT, is_disabled BOOLEAN (owner ban flag, checked in every AI route) |
 | `lab_progress` | Completed lab steps per user (user_id, lab_set_id, lab_id, step_id, completed_at) |
 | `lab_notes` | Per-lab freeform notes per user (user_id, lab_set_id, lab_id, notes, updated_at) |
 | `lab_timers` | Per-lab timer state — elapsed_seconds, is_running, last_started_at; unique per user+lab |

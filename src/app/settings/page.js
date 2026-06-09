@@ -123,6 +123,13 @@ export default function SettingsPage() {
     router.refresh()
   }
 
+  async function handleSignOutEverywhere() {
+    const supabase = createClient()
+    await supabase.auth.signOut({ scope: 'global' })
+    router.push('/login')
+    router.refresh()
+  }
+
   function daysUntil(dateStr) {
     if (!dateStr) return null
     const diff = new Date(dateStr) - new Date()
@@ -406,12 +413,23 @@ export default function SettingsPage() {
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
           <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Security</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>Two-factor authentication and password change coming in a later phase.</p>
-          <button
-            onClick={handleLogout}
-            style={{ backgroundColor: 'var(--error-border)', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
-          >
-            Sign Out
-          </button>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleLogout}
+              style={{ backgroundColor: 'var(--error-border)', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+            >
+              Sign Out
+            </button>
+            <button
+              onClick={handleSignOutEverywhere}
+              style={{ backgroundColor: 'transparent', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+            >
+              Sign Out Everywhere
+            </button>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '10px' }}>
+            "Sign Out Everywhere" signs you out of all devices and sessions simultaneously.
+          </p>
         </div>
 
       </div>

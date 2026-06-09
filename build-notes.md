@@ -486,6 +486,18 @@ Every new Life Hub feature that generates loggable data **ships with a reset row
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 30e - Complete
+Security hardening — no user input required:
+- All AI routes switched from `getSession()` to `getUser()` for verified auth: reset, generate-flashcards, generate-templates, goals/generate-overview, workouts/generate-plan
+- `is_disabled BOOLEAN DEFAULT false` column added to `profiles` table via migration — every AI route and chat route now checks this before proceeding; owner flips flag via Supabase dashboard to ban a user
+- Prompt injection protection added to all routes that inject user free-text into AI prompts: goals notes wrapped in `<user_input>` tags in generate-overview; limitations and dumbbell_note wrapped in generate-plan; userText wrapped in lab-doc-feedback; userDocs and labNotes wrapped in lab-summary
+- `chat/route.js` and `lab-doc-feedback/route.js` and `lab-summary/route.js` had zero authentication — all three now require valid `getUser()` session + is_disabled check
+- "Sign Out Everywhere" button added to Settings → Security section — calls `supabase.auth.signOut({ scope: 'global' })` to invalidate all active sessions across all devices
+- Security rules added to CLAUDE.md Key Rules so they are enforced on every future build session
+- **Two items require manual Supabase dashboard action (cannot be done via SQL):**
+  - Auth → Settings → Enable email confirmations (email verification on signup)
+  - Auth → Settings → Prevent email enumeration
+
 ### Phase 30d - Complete
 Activity level revamp + daily steps field:
 - `ACTIVITY_LEVELS` descriptions rewritten around total daily movement (steps/day ranges baked in) rather than gym sessions only; someone with 15k steps/day now clearly lands in "Very Active"

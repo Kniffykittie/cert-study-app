@@ -15,9 +15,9 @@ const OWNER_EMAIL = 'sethproper40@yahoo.com'
 
 export async function POST(request) {
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  if (session.user.email.toLowerCase() !== OWNER_EMAIL) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  if (user.email.toLowerCase() !== OWNER_EMAIL) {
     return Response.json({ error: 'Flashcard generation is managed by the app owner.' }, { status: 403 })
   }
 
