@@ -188,7 +188,7 @@ src/
 
 ### Template System
 - Templates are **shared** — `question_templates` has open SELECT RLS for all authenticated users; generation locked to owner only at API level (403 for non-owner)
-- Generate Templates panel in the UI only renders for the owner; coverage table is visible to all users
+- Generate Templates panel and all retire/restore buttons in the UI only render for the owner; coverage table and browsing are visible to all users
 - Templates use `{{placeholder}}` variables filled from `variable_sets` JSON
 - Generate 5 at a time — **count is intentionally locked at 5** (higher counts caused API/JSON truncation crashes)
 - Pre-made Templates page: Browse / Duplicates / Approved Similar / Retired tabs
@@ -229,7 +229,7 @@ src/
 ### Flashcards
 - **Shared deck** — cards are generated once by the owner and readable by all users; `flashcards` RLS SELECT policy is `true` for all authenticated users; write operations still require `user_id = auth.uid()`
 - Landing page: per-cert deck stats (mastered / learning / unlearned counts, mastery progress bar)
-- Generate Deck (60 cards) and Add 40 More Cards buttons only visible to owner (`sethproper40@yahoo.com`); non-owners see "check back soon" when deck is empty
+- Generate Deck, Add 40 More Cards, and + Add Card (in StudySession) buttons only visible to owner (`sethproper40@yahoo.com`); non-owners see "check back soon" when deck is empty
 - Per-cert study sessions at `/study-hub/flashcards/[cert]` via `StudySession.js`
 - Progress tracked per-user in `flashcard_progress`: `mastered` flag, `consecutive_correct` count
 - Weak Domain Section below cert cards — queries `topic_performance` for domains <65% accuracy (≥5 seen), up to 6 cards with accuracy bar and direct link
