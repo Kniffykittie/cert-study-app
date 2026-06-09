@@ -273,6 +273,25 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 
 ---
 
+## Vercel Deployment — When Ready
+> When it's time to go live, walk the user through this step by step. They have a Vercel account but have not connected a project yet.
+
+**Steps to walk through:**
+1. Connect GitHub repo to Vercel (Import Project → select `cert-study-app`)
+2. Set framework preset to **Next.js**
+3. Add all environment variables before first deploy:
+   - `NEXT_PUBLIC_SUPABASE_URL` — from Supabase project settings
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — from Supabase project settings
+   - `ANTHROPIC_API_KEY` — from Anthropic console (secret, never public)
+   - `OWNER_PIN_HASH` — bcrypt hash of owner PIN (already set in `.env.local`)
+   - `GOOGLE_CLIENT_ID` — from Google Cloud Console (for Health OAuth)
+   - `GOOGLE_CLIENT_SECRET` — from Google Cloud Console
+   - `NEXT_PUBLIC_SITE_URL` — the Vercel production URL (needed for OAuth redirects)
+4. Deploy and verify all features work on the live URL
+5. Update Google OAuth redirect URIs in Google Cloud Console to include the Vercel URL
+
+---
+
 ## Future Features
 
 > **Format:** Each item includes user intent, UX spec, data model notes, and AI context impact so it can be built the next day without re-discussing.
