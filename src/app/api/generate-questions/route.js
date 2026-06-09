@@ -97,11 +97,14 @@ export async function POST(request) {
     .eq('is_retired', false)
     .in('domain', domainNames)
 
-  const shuffled = (poolTemplates ?? []).sort(() => Math.random() - 0.5)
+  const pool = (poolTemplates ?? []).sort(() => Math.random() - 0.5)
+  if (!pool.length) return Response.json({ questions: [] })
+
   const usedDomainCounts = {}
   const questions = []
 
-  for (const tmpl of shuffled) {
+  // First pass: respect domain distribution
+  for (const tmpl of pool) {
     if (questions.length >= count) break
     const domainAlloc = distribution.find(d => d.domain === tmpl.domain)
     if (!domainAlloc) continue
@@ -109,6 +112,15 @@ export async function POST(request) {
     if (used >= domainAlloc.count) continue
     questions.push(fillTemplate(tmpl))
     usedDomainCounts[tmpl.domain] = used + 1
+  }
+
+  // Fill remaining by cycling pool — variables re-rolled each time so questions differ
+  if (questions.length < count) {
+    let i = 0
+    while (questions.length < count) {
+      questions.push(fillTemplate(pool[i % pool.length]))
+      i++
+    }
   }
 
   return Response.json({ questions })

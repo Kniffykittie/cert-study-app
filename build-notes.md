@@ -219,6 +219,12 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 
 ## Phase Log
 
+### Phase 40 - Complete
+- Template cycling: if bank runs short, loop back through pool re-rolling variables until requested count is met — user always gets full 25/50/etc. questions
+- `generate-questions/route.js`: added fill-remainder loop after initial distribution pass
+
+---
+
 ### Phase 39 - Complete
 - Removed AI fallback from `generate-questions` route — tests now serve only from filled templates (no live AI generation per test)
 - Removed `generate-questions` from rate limit table (no AI calls = no cost risk)
