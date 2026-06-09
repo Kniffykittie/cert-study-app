@@ -72,7 +72,7 @@ src/
     api/
       reset/route.js                   POST — scoped data reset; uses getUser() + is_disabled check
       bookmarks/route.js               CRUD for bookmarked questions
-      generate-questions/route.js      AI question generation (spaced repetition weighting); uses getUser()
+      generate-questions/route.js      Template-only question serving (spaced repetition weighting, no AI calls); uses getUser() + is_disabled check
       generate-templates/route.js      AI template generation (batch of 5, dedup); owner-only; uses getUser()
       generate-flashcards/route.js     AI flashcard generation; owner-only; uses getUser()
       test-chat/route.js               Tutor chat during practice tests; uses getUser()
