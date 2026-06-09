@@ -12,9 +12,16 @@ const CERTS = [
   { key: 'security-plus', label: 'Security+', color: 'var(--error)' },
 ]
 
+const TABS = [
+  { key: 'account', label: 'Account' },
+  { key: 'study', label: 'Study' },
+  { key: 'data', label: 'Data & Reset' },
+  { key: 'security', label: 'Security' },
+]
 
 export default function SettingsPage() {
   const router = useRouter()
+  const [activeTab, setActiveTab] = useState('account')
   const [displayName, setDisplayName] = useState('')
   const [savedName, setSavedName] = useState('')
   const [email, setEmail] = useState('')
@@ -31,7 +38,7 @@ export default function SettingsPage() {
   const [healthDisconnecting, setHealthDisconnecting] = useState(false)
   const [showHealthSection, setShowHealthSection] = useState(false)
 
-  const [resetConfirm, setResetConfirm] = useState(null) // { scope, cert?, label }
+  const [resetConfirm, setResetConfirm] = useState(null)
   const [resetting, setResetting] = useState(false)
   const [resetMsg, setResetMsg] = useState('')
 
@@ -143,294 +150,321 @@ export default function SettingsPage() {
         <Link href="/" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'block', marginBottom: '24px' }}>← Home</Link>
 
         <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Settings</h1>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>Account preferences and app configuration.</p>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>Account preferences and app configuration.</p>
 
-        {/* Account */}
-        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '16px' }}>
-          <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Account</h2>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Email</span>
-            <span style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{email || '—'}</span>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Plan</span>
-            <span style={{ color: 'var(--text-primary)', fontSize: '14px' }}>Personal</span>
-          </div>
-
-          <div>
-            <label style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Display Name</label>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <input
-                type="text"
-                value={displayName}
-                onChange={e => setDisplayName(e.target.value)}
-                placeholder="Enter your name"
-                style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }}
-              />
-              <button
-                onClick={handleSaveName}
-                disabled={saving || displayName === savedName}
-                style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 18px', fontSize: '13px', fontWeight: '600', cursor: saving || displayName === savedName ? 'not-allowed' : 'pointer', opacity: saving || displayName === savedName ? 0.5 : 1 }}
-              >
-                {saving ? 'Saving...' : saveMsg || 'Save'}
-              </button>
-            </div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '6px' }}>This name appears in your greeting on the home screen.</p>
-          </div>
-        </div>
-
-        {/* Study Preferences */}
-        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '16px' }}>
-          <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '20px' }}>Study Preferences</h2>
-
-          {/* Exam target dates */}
-          <div style={{ marginBottom: '24px' }}>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.05em', marginBottom: '12px' }}>TARGET EXAM DATES</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {CERTS.map(cert => {
-                const days = daysUntil(examDates[cert.key])
-                return (
-                  <div key={cert.key} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ color: cert.color, fontSize: '13px', fontWeight: '600', width: '90px', flexShrink: 0 }}>{cert.label}</span>
-                    <input
-                      type="date"
-                      value={examDates[cert.key] || ''}
-                      onChange={e => setExamDates(prev => ({ ...prev, [cert.key]: e.target.value }))}
-                      style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', colorScheme: 'dark' }}
-                    />
-                    {days !== null && (
-                      <span style={{ fontSize: '12px', fontWeight: '600', color: days < 14 ? 'var(--error)' : days < 30 ? 'var(--warning)' : 'var(--success)', flexShrink: 0, minWidth: '70px', textAlign: 'right' }}>
-                        {days < 0 ? 'Past' : days === 0 ? 'Today!' : `${days}d away`}
-                      </span>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Exam countdowns appear on your home screen and cert pages.</p>
-          </div>
-
-          {/* Daily goal */}
-          <div style={{ marginBottom: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.05em' }}>DAILY QUESTION GOAL</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input
-                  type="number"
-                  min={20}
-                  max={200}
-                  value={dailyGoal}
-                  onChange={e => setDailyGoal(Math.min(200, Math.max(20, parseInt(e.target.value) || 20)))}
-                  style={{ width: '64px', backgroundColor: 'var(--background)', border: '1px solid var(--accent-blue)', borderRadius: '6px', padding: '4px 8px', color: 'var(--accent-blue)', fontSize: '16px', fontWeight: '700', outline: 'none', textAlign: 'center' }}
-                />
-                <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>/ day</span>
-              </div>
-            </div>
-            <input
-              type="range"
-              min={20}
-              max={200}
-              step={5}
-              value={dailyGoal}
-              onChange={e => setDailyGoal(parseInt(e.target.value))}
-              style={{ width: '100%', accentColor: 'var(--accent-blue)', cursor: 'pointer' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>20 — minimum</span>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-                {dailyGoal <= 30 ? 'Light & steady' : dailyGoal <= 60 ? 'Solid daily habit' : dailyGoal <= 100 ? 'Serious grind' : 'Full exam crunch'}
-              </span>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>200 — maximum</span>
-            </div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Your streak tracker counts a day complete when you hit this goal.</p>
-          </div>
-
-          {/* Default cert */}
-          <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.05em', marginBottom: '12px' }}>DEFAULT CERTIFICATION</div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <div onClick={() => setDefaultCert('')}
-                style={{ padding: '8px 16px', backgroundColor: !defaultCert ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `1px solid ${!defaultCert ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '8px', color: !defaultCert ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontWeight: !defaultCert ? '600' : '400' }}>
-                No preference
-              </div>
-              {CERTS.map(cert => (
-                <div key={cert.key} onClick={() => setDefaultCert(cert.key)}
-                  style={{ padding: '8px 16px', backgroundColor: defaultCert === cert.key ? `${cert.color}18` : 'var(--background)', border: `1px solid ${defaultCert === cert.key ? cert.color : 'var(--border)'}`, borderRadius: '8px', color: defaultCert === cert.key ? cert.color : 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontWeight: defaultCert === cert.key ? '600' : '400' }}>
-                  {cert.label}
-                </div>
-              ))}
-            </div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Pre-selects this cert when you open Take a Test.</p>
-          </div>
-
-          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
-            {prefSaveMsg && <span style={{ color: prefSaveMsg === 'Saved!' ? 'var(--success)' : 'var(--error)', fontSize: '13px' }}>{prefSaveMsg}</span>}
+        {/* Tab bar */}
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '4px' }}>
+          {TABS.map(tab => (
             <button
-              onClick={handleSavePrefs}
-              disabled={prefSaving}
-              style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '13px', fontWeight: '600', cursor: prefSaving ? 'not-allowed' : 'pointer', opacity: prefSaving ? 0.5 : 1 }}
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                border: 'none',
+                borderRadius: '7px',
+                fontSize: '13px',
+                fontWeight: activeTab === tab.key ? '600' : '400',
+                cursor: 'pointer',
+                backgroundColor: activeTab === tab.key ? 'var(--accent-blue)' : 'transparent',
+                color: activeTab === tab.key ? '#E8E8E8' : 'var(--text-secondary)',
+                transition: 'all 0.15s',
+              }}
             >
-              {prefSaving ? 'Saving...' : 'Save Preferences'}
+              {tab.label}
             </button>
-          </div>
+          ))}
         </div>
 
-        {/* Connected Apps */}
-        {showHealthSection && (
-          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '16px' }}>
-            <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Connected Apps</h2>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>❤️</div>
-                <div>
-                  <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>Google Health</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
-                    {healthConnected ? `Connected ${healthConnectedAt ? `· since ${healthConnectedAt}` : ''}` : 'Steps, sleep, heart rate'}
-                  </div>
-                </div>
-              </div>
-              {healthConnected ? (
-                <button
-                  onClick={handleDisconnectHealth}
-                  disabled={healthDisconnecting}
-                  style={{ backgroundColor: 'var(--error-border)', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: healthDisconnecting ? 'not-allowed' : 'pointer', opacity: healthDisconnecting ? 0.5 : 1 }}
-                >
-                  {healthDisconnecting ? 'Disconnecting...' : 'Disconnect'}
-                </button>
-              ) : (
-                <a href="/api/health/connect"
-                  style={{ backgroundColor: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.4)', color: '#4285F4', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}
-                >
-                  Connect
-                </a>
-              )}
+        {/* Account tab */}
+        {activeTab === 'account' && (
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+            <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Account</h2>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Email</span>
+              <span style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{email || '—'}</span>
             </div>
-            {searchParams.get('health') === 'connected' && (
-              <p style={{ color: 'var(--success)', fontSize: '12px', marginTop: '12px' }}>✓ Google Health connected successfully.</p>
-            )}
-            {searchParams.get('health') === 'error' && (
-              <p style={{ color: 'var(--error)', fontSize: '12px', marginTop: '12px' }}>Failed to connect. Please try again.</p>
-            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Plan</span>
+              <span style={{ color: 'var(--text-primary)', fontSize: '14px' }}>Personal</span>
+            </div>
+
+            <div>
+              <label style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Display Name</label>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={e => setDisplayName(e.target.value)}
+                  placeholder="Enter your name"
+                  style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }}
+                />
+                <button
+                  onClick={handleSaveName}
+                  disabled={saving || displayName === savedName}
+                  style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 18px', fontSize: '13px', fontWeight: '600', cursor: saving || displayName === savedName ? 'not-allowed' : 'pointer', opacity: saving || displayName === savedName ? 0.5 : 1 }}
+                >
+                  {saving ? 'Saving...' : saveMsg || 'Save'}
+                </button>
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '6px' }}>This name appears in your greeting on the home screen.</p>
+            </div>
           </div>
         )}
 
-        {/* Data & Reset */}
-        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '16px' }}>
-          <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Data & Reset</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>Clear test data or plans if you were just testing things out and want a clean start.</p>
+        {/* Study tab */}
+        {activeTab === 'study' && (
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+            <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '20px' }}>Study Preferences</h2>
 
-          {resetMsg && (
-            <div style={{ backgroundColor: resetMsg.includes('successfully') ? 'rgba(46,204,113,0.08)' : 'rgba(204,0,0,0.08)', border: `1px solid ${resetMsg.includes('successfully') ? 'rgba(46,204,113,0.3)' : 'rgba(204,0,0,0.3)'}`, borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '13px', color: resetMsg.includes('successfully') ? 'var(--success)' : 'var(--error)' }}>
-              {resetMsg}
+            <div style={{ marginBottom: '24px' }}>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.05em', marginBottom: '12px' }}>TARGET EXAM DATES</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {CERTS.map(cert => {
+                  const days = daysUntil(examDates[cert.key])
+                  return (
+                    <div key={cert.key} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ color: cert.color, fontSize: '13px', fontWeight: '600', width: '90px', flexShrink: 0 }}>{cert.label}</span>
+                      <input
+                        type="date"
+                        value={examDates[cert.key] || ''}
+                        onChange={e => setExamDates(prev => ({ ...prev, [cert.key]: e.target.value }))}
+                        style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', colorScheme: 'dark' }}
+                      />
+                      {days !== null && (
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: days < 14 ? 'var(--error)' : days < 30 ? 'var(--warning)' : 'var(--success)', flexShrink: 0, minWidth: '70px', textAlign: 'right' }}>
+                          {days < 0 ? 'Past' : days === 0 ? 'Today!' : `${days}d away`}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Exam countdowns appear on your home screen and cert pages.</p>
             </div>
-          )}
 
-          {/* Study Hub resets */}
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>Study Hub</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {CERTS.map(cert => (
-                <div key={cert.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
-                  <div>
-                    <div style={{ color: cert.color, fontSize: '13px', fontWeight: '600' }}>{cert.label}</div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Questions, scores, test history, flashcard progress</div>
+            <div style={{ marginBottom: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.05em' }}>DAILY QUESTION GOAL</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="number"
+                    min={20}
+                    max={200}
+                    value={dailyGoal}
+                    onChange={e => setDailyGoal(Math.min(200, Math.max(20, parseInt(e.target.value) || 20)))}
+                    style={{ width: '64px', backgroundColor: 'var(--background)', border: '1px solid var(--accent-blue)', borderRadius: '6px', padding: '4px 8px', color: 'var(--accent-blue)', fontSize: '16px', fontWeight: '700', outline: 'none', textAlign: 'center' }}
+                  />
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>/ day</span>
+                </div>
+              </div>
+              <input
+                type="range"
+                min={20}
+                max={200}
+                step={5}
+                value={dailyGoal}
+                onChange={e => setDailyGoal(parseInt(e.target.value))}
+                style={{ width: '100%', accentColor: 'var(--accent-blue)', cursor: 'pointer' }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>20 — minimum</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                  {dailyGoal <= 30 ? 'Light & steady' : dailyGoal <= 60 ? 'Solid daily habit' : dailyGoal <= 100 ? 'Serious grind' : 'Full exam crunch'}
+                </span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>200 — maximum</span>
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Your streak tracker counts a day complete when you hit this goal.</p>
+            </div>
+
+            <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.05em', marginBottom: '12px' }}>DEFAULT CERTIFICATION</div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <div onClick={() => setDefaultCert('')}
+                  style={{ padding: '8px 16px', backgroundColor: !defaultCert ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `1px solid ${!defaultCert ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '8px', color: !defaultCert ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontWeight: !defaultCert ? '600' : '400' }}>
+                  No preference
+                </div>
+                {CERTS.map(cert => (
+                  <div key={cert.key} onClick={() => setDefaultCert(cert.key)}
+                    style={{ padding: '8px 16px', backgroundColor: defaultCert === cert.key ? `${cert.color}18` : 'var(--background)', border: `1px solid ${defaultCert === cert.key ? cert.color : 'var(--border)'}`, borderRadius: '8px', color: defaultCert === cert.key ? cert.color : 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontWeight: defaultCert === cert.key ? '600' : '400' }}>
+                    {cert.label}
                   </div>
-                  <button onClick={() => setResetConfirm({ scope: 'cert', cert: cert.key, label: `${cert.label} study data` })}
+                ))}
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Pre-selects this cert when you open Take a Test.</p>
+            </div>
+
+            <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
+              {prefSaveMsg && <span style={{ color: prefSaveMsg === 'Saved!' ? 'var(--success)' : 'var(--error)', fontSize: '13px' }}>{prefSaveMsg}</span>}
+              <button
+                onClick={handleSavePrefs}
+                disabled={prefSaving}
+                style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '13px', fontWeight: '600', cursor: prefSaving ? 'not-allowed' : 'pointer', opacity: prefSaving ? 0.5 : 1 }}
+              >
+                {prefSaving ? 'Saving...' : 'Save Preferences'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Data & Reset tab */}
+        {activeTab === 'data' && (
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+            <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Data & Reset</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>Clear test data or plans if you were just testing things out and want a clean start.</p>
+
+            {resetMsg && (
+              <div style={{ backgroundColor: resetMsg.includes('successfully') ? 'rgba(46,204,113,0.08)' : 'rgba(204,0,0,0.08)', border: `1px solid ${resetMsg.includes('successfully') ? 'rgba(46,204,113,0.3)' : 'rgba(204,0,0,0.3)'}`, borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '13px', color: resetMsg.includes('successfully') ? 'var(--success)' : 'var(--error)' }}>
+                {resetMsg}
+              </div>
+            )}
+
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>Study Hub</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {CERTS.map(cert => (
+                  <div key={cert.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                    <div>
+                      <div style={{ color: cert.color, fontSize: '13px', fontWeight: '600' }}>{cert.label}</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Questions, scores, test history, flashcard progress</div>
+                    </div>
+                    <button onClick={() => setResetConfirm({ scope: 'cert', cert: cert.key, label: `${cert.label} study data` })}
+                      style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
+                      Reset
+                    </button>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                  <div>
+                    <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>All Certs</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Wipe all questions, scores, bookmarks, and flashcard progress</div>
+                  </div>
+                  <button onClick={() => setResetConfirm({ scope: 'all_study', label: 'All study data' })}
+                    style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
+                    Reset All
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border)', marginBottom: '20px' }}>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>Workouts</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                  <div>
+                    <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>Current Plan</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Delete your active workout plan — keeps your fitness profile</div>
+                  </div>
+                  <button onClick={() => setResetConfirm({ scope: 'workout_plan', label: 'Workout plan' })}
                     style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
                     Reset
                   </button>
                 </div>
-              ))}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
-                <div>
-                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>All Certs</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Wipe all questions, scores, bookmarks, and flashcard progress</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                  <div>
+                    <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>Full Workout Reset</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Delete plan and fitness profile — restart the setup from scratch</div>
+                  </div>
+                  <button onClick={() => setResetConfirm({ scope: 'workout_profile', label: 'Workout profile & plan' })}
+                    style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
+                    Reset All
+                  </button>
                 </div>
-                <button onClick={() => setResetConfirm({ scope: 'all_study', label: 'All study data' })}
-                  style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
-                  Reset All
-                </button>
               </div>
             </div>
-          </div>
 
-          {/* Workout resets */}
-          <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>Workouts</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>Goals</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
                 <div>
-                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>Current Plan</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Delete your active workout plan — keeps your fitness profile</div>
+                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>Goals Profile</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Delete goals profile and AI overview — returns to goals setup on next visit</div>
                 </div>
-                <button onClick={() => setResetConfirm({ scope: 'workout_plan', label: 'Workout plan' })}
+                <button onClick={() => setResetConfirm({ scope: 'goals_profile', label: 'Goals profile' })}
                   style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
                   Reset
                 </button>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-                <div>
-                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>Full Workout Reset</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Delete plan and fitness profile — restart the setup from scratch</div>
-                </div>
-                <button onClick={() => setResetConfirm({ scope: 'workout_profile', label: 'Workout profile & plan' })}
-                  style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
-                  Reset All
+            </div>
+          </div>
+        )}
+
+        {/* Security tab */}
+        {activeTab === 'security' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+              <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Security</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>Two-factor authentication and password change coming in a later phase.</p>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={handleLogout}
+                  style={{ backgroundColor: 'var(--error-border)', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  Sign Out
+                </button>
+                <button
+                  onClick={handleSignOutEverywhere}
+                  style={{ backgroundColor: 'transparent', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  Sign Out Everywhere
                 </button>
               </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '10px' }}>
+                "Sign Out Everywhere" signs you out of all devices and sessions simultaneously.
+              </p>
             </div>
-          </div>
 
-          {/* Goals reset */}
-          <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>Goals</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
-              <div>
-                <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>Goals Profile</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Delete goals profile and AI overview — returns to goals setup on next visit</div>
+            {showHealthSection && (
+              <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+                <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Connected Apps</h2>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>❤️</div>
+                    <div>
+                      <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>Google Health</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+                        {healthConnected ? `Connected ${healthConnectedAt ? `· since ${healthConnectedAt}` : ''}` : 'Steps, sleep, heart rate'}
+                      </div>
+                    </div>
+                  </div>
+                  {healthConnected ? (
+                    <button
+                      onClick={handleDisconnectHealth}
+                      disabled={healthDisconnecting}
+                      style={{ backgroundColor: 'var(--error-border)', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: healthDisconnecting ? 'not-allowed' : 'pointer', opacity: healthDisconnecting ? 0.5 : 1 }}
+                    >
+                      {healthDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                    </button>
+                  ) : (
+                    <a href="/api/health/connect"
+                      style={{ backgroundColor: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.4)', color: '#4285F4', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}
+                    >
+                      Connect
+                    </a>
+                  )}
+                </div>
+                {searchParams.get('health') === 'connected' && (
+                  <p style={{ color: 'var(--success)', fontSize: '12px', marginTop: '12px' }}>✓ Google Health connected successfully.</p>
+                )}
+                {searchParams.get('health') === 'error' && (
+                  <p style={{ color: 'var(--error)', fontSize: '12px', marginTop: '12px' }}>Failed to connect. Please try again.</p>
+                )}
               </div>
-              <button onClick={() => setResetConfirm({ scope: 'goals_profile', label: 'Goals profile' })}
-                style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
-                Reset
-              </button>
-            </div>
+            )}
           </div>
-        </div>
-
-        {/* Security */}
-        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-          <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Security</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>Two-factor authentication and password change coming in a later phase.</p>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <button
-              onClick={handleLogout}
-              style={{ backgroundColor: 'var(--error-border)', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
-            >
-              Sign Out
-            </button>
-            <button
-              onClick={handleSignOutEverywhere}
-              style={{ backgroundColor: 'transparent', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
-            >
-              Sign Out Everywhere
-            </button>
-          </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '10px' }}>
-            "Sign Out Everywhere" signs you out of all devices and sessions simultaneously.
-          </p>
-        </div>
+        )}
 
       </div>
 

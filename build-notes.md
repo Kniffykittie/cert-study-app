@@ -528,6 +528,13 @@ Every new Life Hub feature that generates loggable data **ships with a reset row
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 30f - Complete
+Settings page tabbed navigation:
+- Replaced single-scroll layout with 4 tabs: Account, Study, Data & Reset, Security
+- Tab bar rendered as pill-style toggle (active tab = accent-blue filled, inactive = transparent) inside a surface card
+- Connected Apps (Google Health, owner-only) moved into the Security tab to keep tab count at 4
+- All handler functions, state, and modal unchanged — only the render section restructured
+
 ### Phase 30e - Complete
 Security hardening — no user input required:
 - All AI routes switched from `getSession()` to `getUser()` for verified auth: reset, generate-flashcards, generate-templates, goals/generate-overview, workouts/generate-plan
