@@ -213,9 +213,9 @@ Scale weight is a terrible progress indicator when building muscle + losing fat 
 
 ### Life Hub — Nutrition (full build)
 - **Food logging** — calories, macros, micronutrients (B12, magnesium, potassium, vitamin D, iron, zinc, calcium, omega-3, fiber, sodium) tracked against RDVs
-- **Barcode scanner** — scan packaging via phone camera, auto-populate from Open Food Facts; preview before saving
+- **Barcode scanner** — scan packaging via phone camera, auto-populate from Open Food Facts; full nutrition preview shown before saving — user can manually add or edit any missing/incorrect fields before confirming
 - **Manual food entry** — full nutrition fields form when no barcode available
-- **My Foods library** — personal library of frequently eaten foods, organized by category, one-tap logging
+- **My Foods library** — personal library of frequently eaten foods, organized by category, one-tap logging; user can add new foods, remove foods, and edit/update nutrition facts on any saved food at any time
 - **Daily nutrition dashboard** — calories vs goal, macro ring charts, meal history, micronutrient progress bars
 - **Nutrition history** — past days/weeks, average macros, trend charts; targets personalized using goals_profiles (dietary_prefs, weight goal, body composition)
 - **Vitamin/nutrient encyclopedia** — searchable AI-generated reference per nutrient
@@ -225,8 +225,14 @@ Scale weight is a terrible progress indicator when building muscle + losing fat 
 ### Life Hub — Workouts (remaining)
 - **Post-workout logging** — "Start Workout" → log sets/reps/weight per exercise → "Complete Workout" triggers AI check-in
 - **Workout history** — past sessions, volume over time, PRs per exercise
-- **Yoga & stretching planner** — AI-generated weekly yoga/stretching plan with poses and form tips
-- **Stretching library** — organized by muscle group; click to open popup with photo, hold duration, form tips
+- **Yoga & stretching planner** — AI-generated rolling weekly plan (always shows 7 days ahead from today, e.g. if today is June 8 it shows June 8–15, updating each day); stretches and poses correlate directly to that day's workout — arm day gets shoulder/bicep/tricep stretches, leg day gets hip flexor/quad/hamstring stretches, rest days get full-body recovery flows; includes pose names, hold duration, and form tips
+- **Stretching library** — organized by the muscle being stretched; click any stretch to open a popup with photo, hold duration, form tips, and common mistakes to avoid
+
+---
+
+### Life Hub — Landing Page
+- **Wire overview cards** — connect all landing page cards with live data from every connected source (steps, HR, sleep, nutrition, check-in)
+- **Daily readiness score** — composite score shown on the Life Hub home; calculated from sleep quality, steps, resting HR, and nutrition completeness; gives the user a single at-a-glance number to understand how their body is doing today
 
 ---
 
