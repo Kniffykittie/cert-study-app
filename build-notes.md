@@ -83,6 +83,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `supplement_profiles` | *(planned Phase 35)* Cached AI-generated supplement info cards — keyed by normalized supplement name, shared across all users |
 | `progress_photos` | *(planned Phase 32)* User progress photo gallery — photo_url, taken_at DATE, description TEXT |
 | `daily_briefs` | *(planned — Correlation Engine)* Cached daily "what should I do today" AI paragraph — keyed by user_id + date; regenerated once per day on first Life Hub load |
+| `monthly_wraps` | *(planned)* Cached monthly wrap-up reports — report_data JSONB (aggregated stats across both hubs), ai_narrative TEXT; generated once on first visit, never re-called; UNIQUE on user_id + month |
 
 ---
 
@@ -258,6 +259,36 @@ When the nutrition dashboard loads, it queries the user's supplement stack and a
 - **Wire overview cards** — connect all landing page cards with live data from every connected source (steps, HR, sleep, nutrition, check-in)
 - **Daily readiness score** — composite 0–100 score on the Life Hub home; 6 components, each a named constant in code so weights are tunable without re-architecting. Starting weights: sleep quality last night (0–20), sleep consistency rolling 3-night average — one bad night after 6 good ones is very different from a third consecutive bad night (0–15), resting HR vs personal 30-day rolling baseline — scored relative to the user's own typical HR, not an absolute number (0–15), steps vs daily goal (0–15), workout recovery load — reduces score based on how hard the user trained in the last 48 hours and how many consecutive training days they've had; requires workout logging to be built first, defaults to neutral until data exists (0–20), subjective energy/mood from daily check-in — self-reported feel is one of the strongest readiness signals and conflicts between objective score and low self-report should be surfaced explicitly, not ignored; defaults to neutral on days with no check-in (0–15). Total = 100. Hydration component (from Phase 34 water tracker) to be added when that data exists — redistribute weights at that time. Each component weight is a single named constant; tuning is a one-line change.
 - **"What should I do today?" AI recommendation** — one short paragraph on the Life Hub home, generated fresh each day, that reads ALL available data (readiness score, sleep last night, last workout logged, steps trend, nutrition completeness, check-in energy/mood, exam date countdown from study hub) and gives a single actionable recommendation. Not a dashboard — a *paragraph*. Examples: "Your readiness is 58 and you trained legs hard yesterday. Today do a light upper body session or go for a walk — don't push heavy. Your CCNA is in 34 days and your sleep has been under 6 hours 4 of the last 7 nights; that's affecting your study retention more than your workout volume is." This is the feature no competitor has — it connects fitness data to study performance in plain language. Generated via claude-sonnet-4-6 with the full data context injected. Cache result for the day (regenerate once per day at first page load) — do not call the API on every visit. Store in `daily_briefs` table keyed by user_id + date.
+
+---
+
+### Monthly Wrap-Up Page
+*A full-picture monthly report spanning both hubs — the feature that makes users feel like the app actually knows them.*
+
+**Page: `/wrap-up`** (top-level, not nested under Study or Life Hub — it spans both)
+- Sidebar entry in both hubs or the main nav
+- On first visit before any month has completed: page is greyed out with a lock icon and a countdown — "Your first wrap-up unlocks in X days." Shows a skeleton preview of what the report will look like so users know what they're working toward, not just a blank page.
+- After the first month completes: one card per completed month, newest at top. Click any card to open that month's full report. Each card shows month name + a one-line AI teaser (e.g. "Your strongest study month yet — accuracy up 11%").
+
+**Report sections (each section is omitted gracefully if that data doesn't exist yet, with a nudge to start logging for future wrap-ups):**
+
+*Study* — total questions answered, avg accuracy vs prior month (delta shown), domains that improved most, domains still weak, predicted score change, total study time, streak days hit
+
+*Fitness* — workouts completed vs planned (e.g. "9 of 12"), PRs hit this month with exercise names, progressive overload milestones reached, total volume lifted if trackable
+
+*Health* — avg nightly sleep vs prior month, avg daily steps vs prior month, avg resting HR vs prior month, best sleep week, most active week
+
+*Nutrition* — avg daily calories vs target, macro consistency score, days on target (section omitted until nutrition is built)
+
+*Body* — weight change if logged (start vs end of month), measurement changes if logged, progress photo from this month if any (thumbnail shown inline)
+
+*Mindset* — avg energy and mood from daily check-ins, best week vs worst week, any notable patterns (e.g. "Energy averaged 4.2 on days with 10k+ steps vs 2.8 on sedentary days")
+
+**AI narrative** — the report closes with a 3–4 sentence AI-written paragraph synthesizing the whole month across both hubs. Not bullet points — a *story*. Example: "January was your strongest study month yet — accuracy up 11% — and it coincided with your best sleep average in three months. You hit 9 of 12 planned workouts and set two PRs. The one pattern worth watching: your energy check-ins dropped in the last week alongside your sleep dipping below 6 hours. February's opportunity: protect your sleep in the back half of the month and your study scores will follow." Generated via claude-sonnet-4-6 with the full month's aggregated data injected as context.
+
+**Generation logic** — generated once on the first visit to that month's report, then cached permanently. Never re-calls the API on repeat visits. If a section has no data, it is skipped with a one-line nudge to enable that feature for next month's report.
+
+**DB:** New table `monthly_wraps` — user_id, month (YYYY-MM), report_data JSONB (aggregated stats), ai_narrative TEXT, generated_at TIMESTAMPTZ; UNIQUE on user_id + month
 
 ---
 
