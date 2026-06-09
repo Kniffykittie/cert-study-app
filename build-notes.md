@@ -547,6 +547,12 @@ Every new Life Hub feature that generates loggable data **ships with a reset row
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 30p - Complete
+Color-coded lab doc feedback:
+- AI now returns `{ rating: 'good'|'partial'|'poor', feedback: '...' }` as JSON
+- Feedback box on lab steps: green border/text for good, yellow for partial, red for poor
+- Falls back to partial if JSON parse fails
+
 ### Phase 30o - Complete
 Lab doc feedback rate limit reduced to 15/hr with wait time message:
 - `lab-doc-feedback` limit changed from 25 → 15 per hour

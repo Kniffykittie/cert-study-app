@@ -31,18 +31,29 @@ ${documentPrompts.map((p, i) => `${i + 1}. ${p}`).join('\n')}
 Student's documentation:
 ${safeUserText}
 
-Give 1-3 sentences of specific, actionable feedback. Be honest:
-- If the notes are thorough and hit the key points, say so clearly and briefly
-- If something is missing or vague, name exactly what they should add (e.g. "include the actual IP addresses you assigned" or "explain WHY that port went into blocking state, not just that it did")
-- Don't be generic. Reference their actual words when possible.
+Respond with a JSON object only — no markdown, no preamble. Format:
+{"rating":"good"|"partial"|"poor","feedback":"1-3 sentences"}
 
-Reply with only the feedback sentences, no preamble.`
+Rating guide:
+- "good" — thorough, hits the key points, specific details present
+- "partial" — has some content but missing important specifics or explanations
+- "poor" — vague, incomplete, or missing the point entirely
+
+Feedback rules:
+- If good: say so clearly and briefly
+- If partial or poor: name exactly what is missing (e.g. "include the actual IP addresses you assigned")
+- Reference their actual words when possible. Be direct, not generic.`
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 150,
+    max_tokens: 200,
     messages: [{ role: 'user', content: prompt }],
   })
 
-  return NextResponse.json({ feedback: message.content[0].text })
+  try {
+    const parsed = JSON.parse(message.content[0].text)
+    return NextResponse.json({ feedback: parsed.feedback, rating: parsed.rating })
+  } catch {
+    return NextResponse.json({ feedback: message.content[0].text, rating: 'partial' })
+  }
 }

@@ -45,6 +45,7 @@ function StepCard({ step, index, completed, onToggle, isActive, onClick, docKey 
   const [stepDoc, setStepDoc] = useState('')
   const [docSaved, setDocSaved] = useState(false)
   const [docFeedback, setDocFeedback] = useState('')
+  const [feedbackRating, setFeedbackRating] = useState('partial')
   const [feedbackLoading, setFeedbackLoading] = useState(false)
 
   useEffect(() => {
@@ -74,8 +75,10 @@ function StepCard({ step, index, completed, onToggle, isActive, onClick, docKey 
       const data = await res.json()
       if (data.error === 'rate_limited') {
         setDocFeedback(`⏳ You must wait ${data.waitMinutes} minute${data.waitMinutes !== 1 ? 's' : ''} before submitting another lab step.`)
+        setFeedbackRating('poor')
       } else if (data.feedback) {
         setDocFeedback(data.feedback)
+        setFeedbackRating(data.rating ?? 'partial')
       }
     } catch {}
     setFeedbackLoading(false)
@@ -178,12 +181,20 @@ function StepCard({ step, index, completed, onToggle, isActive, onClick, docKey 
                 placeholder="Answer the prompts above. Treat this like a real network admin documenting their work — your future self will thank you."
                 style={{ width: '100%', minHeight: '120px', backgroundColor: 'var(--background)', border: '1px solid #3A2A5A', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '13px', fontFamily: 'inherit', lineHeight: '1.6', resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
               />
-              {docFeedback && (
-                <div style={{ marginTop: '10px', backgroundColor: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: '8px', padding: '10px 14px', display: 'flex', gap: '8px' }}>
-                  <span style={{ color: 'var(--accent-purple)', fontSize: '14px', flexShrink: 0 }}>🤖</span>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.6', margin: 0 }}>{docFeedback}</p>
-                </div>
-              )}
+              {docFeedback && (() => {
+                const colors = {
+                  good:    { bg: 'rgba(46,204,113,0.08)',  border: 'rgba(46,204,113,0.35)',  text: 'var(--success)' },
+                  partial: { bg: 'rgba(241,196,15,0.08)',  border: 'rgba(241,196,15,0.35)',  text: 'var(--warning)' },
+                  poor:    { bg: 'rgba(204,0,0,0.08)',     border: 'rgba(204,0,0,0.35)',     text: 'var(--error)' },
+                }
+                const c = colors[feedbackRating] ?? colors.partial
+                return (
+                  <div style={{ marginTop: '10px', backgroundColor: c.bg, border: `1px solid ${c.border}`, borderRadius: '8px', padding: '10px 14px', display: 'flex', gap: '8px' }}>
+                    <span style={{ fontSize: '14px', flexShrink: 0 }}>🤖</span>
+                    <p style={{ color: c.text, fontSize: '12px', lineHeight: '1.6', margin: 0 }}>{docFeedback}</p>
+                  </div>
+                )
+              })()}
             </div>
           )}
         </div>
