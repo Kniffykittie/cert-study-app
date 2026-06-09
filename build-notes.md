@@ -219,6 +219,13 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 
 ## Phase Log
 
+### Phase 43 - Complete
+- **Update Password page** at `/update-password` — listens for Supabase `PASSWORD_RECOVERY` auth event; 3-second fallback to "invalid link" state if no token detected; password strength bar (4 segments, color-coded), match indicator on confirm field, show/hide toggles; signs out and redirects to /login on success
+- Required by owner admin panel "Send Password Reset" button and any future self-serve password reset flow
+- **Note:** Supabase redirect URL for password reset must point to `NEXT_PUBLIC_SITE_URL/update-password` — already wired in send-reset/route.js
+
+---
+
 ### Phase 42 - Complete
 - **Owner Admin Panel** — User Management card in Security tab (visible when owner unlocked); lists all accounts with email, display name, join date, last seen, active/disabled status, PIN indicator; per-user actions: Enable/Disable, Force Logout, Send Password Reset, Clear PIN; owner's own row shown but actions disabled
 - **Brute force protection on /join** — `join_attempts` table + `check_join_rate_limit` Postgres function; 5 failed invite code attempts per IP per hour triggers 429 block; attempts (success/fail) recorded via service role client; IP read from x-forwarded-for header

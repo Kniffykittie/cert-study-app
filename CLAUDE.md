@@ -126,6 +126,8 @@ src/
         page.js                        Nutrition (placeholder) — gates on goals profile
     join/
       page.js                          Invite-only signup — requires valid invite code + email + password; validates code, creates Supabase auth user, redeems code
+    update-password/
+      page.js                          Password reset landing — listens for PASSWORD_RECOVERY auth event; strength bar, match indicator, show/hide toggles; invalid/expired state if no token; redirects to /login on success
     study-hub/
       layout.js                        Study Hub layout with StudyHubSidebar + FloatingChat
       page.js                          Overview (DailyStreak component)
