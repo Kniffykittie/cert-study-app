@@ -72,7 +72,11 @@ function StepCard({ step, index, completed, onToggle, isActive, onClick, docKey 
         }),
       })
       const data = await res.json()
-      if (data.feedback) setDocFeedback(data.feedback)
+      if (data.error === 'rate_limited') {
+        setDocFeedback(`⏳ You must wait ${data.waitMinutes} minute${data.waitMinutes !== 1 ? 's' : ''} before submitting another lab step.`)
+      } else if (data.feedback) {
+        setDocFeedback(data.feedback)
+      }
     } catch {}
     setFeedbackLoading(false)
   }

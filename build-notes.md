@@ -547,6 +547,12 @@ Every new Life Hub feature that generates loggable data **ships with a reset row
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 30o - Complete
+Lab doc feedback rate limit reduced to 15/hr with wait time message:
+- `lab-doc-feedback` limit changed from 25 → 15 per hour
+- Route returns `{ error: 'rate_limited', waitMinutes }` on 429
+- Lab step card shows "You must wait X minutes before submitting another lab step"
+
 ### Phase 30n - Complete
 Lab summary rate limit tightened to 1/hr with wait time message:
 - `lab-summary` limit changed from 10 → 1 per hour

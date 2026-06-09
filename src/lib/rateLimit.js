@@ -2,7 +2,7 @@ const LIMITS = {
   'chat': 30,
   'test-chat': 30,
   'generate-questions': 20,
-  'lab-doc-feedback': 25,
+  'lab-doc-feedback': 15,
   'lab-summary': 1,
   'goals/generate-overview': 5,
   'workouts/generate-plan': 3,
