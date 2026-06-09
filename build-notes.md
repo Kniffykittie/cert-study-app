@@ -85,11 +85,75 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `daily_briefs` | *(planned — Correlation Engine)* Cached daily "what should I do today" AI paragraph — keyed by user_id + date; regenerated once per day on first Life Hub load |
 | `monthly_wraps` | *(planned)* Cached monthly wrap-up reports — report_data JSONB (aggregated stats across both hubs), ai_narrative TEXT; generated once on first visit, never re-called; UNIQUE on user_id + month |
 | `nutrient_profiles` | *(planned)* Cached AI-generated nutrient encyclopedia entries — keyed by nutrient name, shared across all users; sections: what it does, cool facts, deficiency signs, toxicity, food sources, supplement notes |
+| `invite_codes` | *(planned)* Single-use invite codes — code TEXT UNIQUE, created_by, created_at, used_at TIMESTAMPTZ, used_by; null used_at = unused |
+| `api_rate_limits` | *(planned)* Per-user per-endpoint rate limiting — user_id, endpoint, call_count, window_start; checked at top of every AI route |
+
+---
+
+## Security & Multi-User Readiness
+*Must be addressed before opening the app to other users.*
+
+### What's already safe
+- Anthropic API key lives only in `.env.local` and server-side `/api/*` routes — never touches the browser; Vercel encrypts env vars and they're inaccessible to client code as long as they don't have `NEXT_PUBLIC_` prefix
+- Supabase RLS (Row Level Security) scopes every query to the logged-in user at the database level — someone cannot read another user's data even if they know their user ID or the Supabase anon key
+- React/Next.js escapes JSX output by default — prevents XSS from user-entered text
+- Supabase JS client uses parameterized queries — SQL injection not possible
+- `generate-overview` only fires inside `handleFinish()` on the goals setup page — confirmed not called on step navigation or re-renders; correct as-is
+
+### Priority fixes before opening to other users
+
+**1. Rate limiting on AI endpoints (highest priority — protects your Anthropic bill)**
+Implement per-user rate limiting using a `api_rate_limits` table in Supabase — user_id, endpoint, call_count, window_start. Each AI route checks this at the top before doing anything. If limit is exceeded, return 429 with a clear message ("You've hit the limit for this — try again in X minutes"). Limits:
+
+| Endpoint | Limit | Window |
+|---|---|---|
+| `generate-questions` | 50 calls | Per hour |
+| `generate-plan` | 5 calls | Per day |
+| `generate-flashcards` | 10 calls | Per day |
+| `chat` | 200 calls | Per day |
+| `test-chat` | 200 calls | Per day |
+| `lab-doc-feedback` | 50 calls | Per day |
+| `lab-summary` | 20 calls | Per day |
+| `generate-templates` | 20 calls | Per day |
+
+Note: `generate-overview` does NOT need a time-based rate limit — it is only triggered by profile saves, which is a natural cap. Do not add a manual regenerate button for this endpoint.
+
+**2. RLS on every new table (enforced rule)**
+Every new table created must have RLS policies added in the same migration — no exceptions. The pattern: `user_id = auth.uid()` for SELECT, INSERT, UPDATE, DELETE. Tables still needing RLS when built: body_measurements, weight_logs, progress_photos, daily_checkins, water_logs, supplement_stack, workout sessions log, monthly_wraps, daily_briefs. If a table is created without RLS, any authenticated user can read or write any row.
+
+**3. Progress photos — private storage + signed URLs**
+When photo uploads are built: validate file type server-side using magic bytes (actual file signature, not just extension) — only accept JPEG, PNG, WEBP signatures; reject everything else before storing. Store in a private Supabase Storage bucket, not public. Serve photos via signed URLs that expire (1 hour) — generated fresh when the page loads. A copied URL is useless after expiry and useless without being authenticated.
+
+**4. Use `getUser()` on sensitive routes**
+`getSession()` reads from a cookie (fast, fine for most reads). `getUser()` validates the session against Supabase servers on every call — can't be fooled by a stolen or forged cookie. Switch to `getUser()` on routes that do destructive operations or cost money: all AI generation endpoints, the reset route, and any future delete operations.
+
+### Invite system (owner-only, built in Settings)
+Single-use invite codes — the cleanest way to control who gets in without manually creating accounts.
+
+**Settings page — "Invite Friends" section**
+- Visible only to owner (`sethproper40@yahoo.com`) — greyed out and locked for all other users
+- Owner clicks "Generate Invite Code" — creates a single-use code (random 8-char alphanumeric) stored in `invite_codes` table with created_at and used_at (null until claimed)
+- Code is displayed once with a copy button — owner sends it to the friend however they want
+- List of generated codes shown below with status: Pending / Used (with date used)
+- Owner can revoke any unused code
+
+**Signup flow at `/join`**
+- Hidden from the main login screen (no visible link)
+- Simple form: email, password, invite code
+- On submit: validate code exists in `invite_codes` where used_at IS NULL; if valid, create the account and mark the code as used (set used_at); if invalid or already used, show a clear error
+- Once used, the code is permanently claimed — sharing the URL without a code gets nobody in
+
+**DB:** New table `invite_codes` — id, code TEXT UNIQUE, created_by UUID, created_at, used_at TIMESTAMPTZ (null = unused), used_by UUID (null until claimed)
 
 ---
 
 ## Recommended Build Order
 *Each tier depends on the previous. Do not skip tiers — later features rely on data generated by earlier ones.*
+
+**Tier 0 — Security (do this before opening to any other user)**
+0a. Rate limiting — `api_rate_limits` table + checks on all AI endpoints
+0b. Invite system — `invite_codes` table + `/join` signup page + owner-only Settings section
+0c. Switch sensitive routes to `getUser()` — generate-plan, generate-overview, reset route
 
 **Tier 1 — Foundation (everything downstream depends on these)**
 1. Phase 31 — Goals Setup Depth Fields (obstacles, motivations, dietary prefs, sleep hours, goal story) — richer AI context for every feature that follows
