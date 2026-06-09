@@ -222,6 +222,7 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 ### Phase 45 - Complete
 - **Authenticator app name on 2FA login** — during 2FA enrollment in Settings, user picks their authenticator app (Google Authenticator, Authy, 1Password, Microsoft Authenticator, Other) via chip selector; saved to `profiles.authenticator_name`
 - Login screen TOTP prompt now reads "Enter the 6-digit code from **[App Name]**" instead of generic fallback text
+- Settings 2FA card shows "Used through [App Name]" below the Enabled status line; updates immediately on enrollment without page reload
 - DB: `ALTER TABLE profiles ADD COLUMN authenticator_name TEXT`
 
 ---

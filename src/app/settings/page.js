@@ -92,6 +92,7 @@ export default function SettingsPage() {
   const [disable2FALoading, setDisable2FALoading] = useState(false)
 
   const [enrollAuthName, setEnrollAuthName] = useState('')
+  const [savedAuthName, setSavedAuthName] = useState('')
 
   // Admin panel state
   const [adminUsers, setAdminUsers] = useState([])
@@ -113,7 +114,7 @@ export default function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       setEmail(user.email)
-      const { data } = await supabase.from('profiles').select('display_name, exam_dates, daily_goal, default_cert, settings_pin_hash').eq('id', user.id).single()
+      const { data } = await supabase.from('profiles').select('display_name, exam_dates, daily_goal, default_cert, settings_pin_hash, authenticator_name').eq('id', user.id).single()
       if (data) {
         if (data.display_name) { setDisplayName(data.display_name); setSavedName(data.display_name) }
         if (data.exam_dates) setExamDates({ ccna: '', 'network-plus': '', 'security-plus': '', ...data.exam_dates })
@@ -121,6 +122,8 @@ export default function SettingsPage() {
         if (data.default_cert) setDefaultCert(data.default_cert)
 
         // Privacy PIN gate
+        if (data.authenticator_name) setSavedAuthName(data.authenticator_name)
+
         if (data.settings_pin_hash) {
           setPrivacyPinSet(true)
           const unlocked = sessionStorage.getItem(PRIVACY_PIN_SESSION_KEY)
@@ -383,6 +386,7 @@ export default function SettingsPage() {
     setTwoFactorEnabled(true)
     setTwoFactorId(enrollFactorId)
     setRecoveryCodesLeft(10)
+    if (enrollAuthName.trim()) setSavedAuthName(enrollAuthName.trim())
     setEnrollCode('')
     setEnrollQR('')
     setEnrollSecret('')
@@ -843,6 +847,11 @@ export default function SettingsPage() {
                       <span style={{ color: recoveryCodesLeft <= 2 ? 'var(--warning)' : 'var(--text-secondary)', fontSize: '12px', marginLeft: '10px' }}>
                         {recoveryCodesLeft} recovery code{recoveryCodesLeft !== 1 ? 's' : ''} remaining
                       </span>
+                    )}
+                    {twoFactorEnabled && savedAuthName && (
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>
+                        Used through {savedAuthName}
+                      </div>
                     )}
                   </div>
                 </div>
