@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 const client = new Anthropic()
 
@@ -66,6 +67,9 @@ export async function POST(req) {
 
   const { data: profileCheck } = await supabase.from('profiles').select('is_disabled').eq('id', user.id).single()
   if (profileCheck?.is_disabled) return NextResponse.json({ error: 'Account disabled' }, { status: 403 })
+
+  const { allowed } = await checkRateLimit(supabase, user.id, 'workouts/generate-plan')
+  if (!allowed) return NextResponse.json({ error: 'Rate limit reached — try again next hour.' }, { status: 429 })
 
   const body = await req.json()
   const { goals, experience, days_per_week, workout_days, pushup_count, pullup_count, squat_count,

@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 import { fillTemplate } from '@/lib/fillTemplate'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 const client = new Anthropic()
 
@@ -84,6 +85,9 @@ export async function POST(request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { allowed } = await checkRateLimit(supabase, user.id, 'generate-questions')
+  if (!allowed) return Response.json({ error: 'Rate limit reached — try again next hour.' }, { status: 429 })
 
   const { cert, count, topics, difficulty = 'hard' } = await request.json()
 

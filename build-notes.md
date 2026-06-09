@@ -547,6 +547,14 @@ Every new Life Hub feature that generates loggable data **ships with a reset row
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 30m - Complete
+Rate limiting on all AI routes:
+- New `api_rate_limits` table tracking calls per user per route per hour window
+- Postgres function `increment_rate_limit` does atomic upsert+increment — no race conditions
+- Shared helper `src/lib/rateLimit.js` — fails open on DB error (never blocks on infrastructure issues)
+- Limits: chat 30/hr, test-chat 30/hr, generate-questions 20/hr, lab-doc-feedback 25/hr, lab-summary 10/hr, goals/generate-overview 5/hr, workouts/generate-plan 3/hr
+- All 7 routes updated; owner-only routes (generate-templates, generate-flashcards) excluded
+
 ### Phase 30l - Complete
 Open Google Health to all users + manual steps fallback:
 - Removed owner-only guard from `/api/health/connect/route.js` — any authenticated user can now connect their Google watch; friends must be added as test users in Google Cloud Console (APIs & Services → OAuth consent screen → Test users)
