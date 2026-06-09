@@ -547,6 +547,15 @@ Every new Life Hub feature that generates loggable data **ships with a reset row
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 30j - Complete
+Invite system — full end-to-end:
+- `invite_codes` table with RLS (SELECT=public, INSERT=owner, UPDATE=authenticated+unused)
+- `POST /api/owner/generate-invite` — owner-only, generates `XXXX-XXXX` random hex code
+- `GET /api/invite/validate?code=` — public, checks code exists and unused (needed pre-signup)
+- `POST /api/invite/redeem` — authenticated, marks code used_by + used_at after signup
+- `/join` page — invite code + email + password form; validates code first, signs up via Supabase, redeems code; success state with "Go to Sign In" button; supports `?code=` param for pre-filled links
+- Settings → Security tab → "Invite Friends" card (visible when owner PIN unlocked): Generate Code button, list of all codes with Active/Used badges, Copy Code and Copy Link buttons per unused code
+
 ### Phase 30i - Complete
 - Switched owner PIN verification from bcrypt to SHA-256 (Node built-in `crypto`) — bcrypt hash contains `$` signs that dotenv misparses; SHA-256 hex digest is plain hex with no special characters
 - `OWNER_PIN_HASH` in `.env.local` is now a plain hex string, no quotes needed

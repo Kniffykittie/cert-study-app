@@ -52,6 +52,11 @@ export default function SettingsPage() {
   const [pinError, setPinError] = useState('')
   const [pinLockedSeconds, setPinLockedSeconds] = useState(0)
 
+  const [inviteCodes, setInviteCodes] = useState([])
+  const [inviteGenerating, setInviteGenerating] = useState(false)
+  const [inviteMsg, setInviteMsg] = useState('')
+  const [copiedCode, setCopiedCode] = useState('')
+
   const searchParams = useSearchParams()
 
   useEffect(() => {
@@ -71,7 +76,10 @@ export default function SettingsPage() {
       if (user.email.toLowerCase() === OWNER_EMAIL) {
         setIsOwner(true)
         const expiry = sessionStorage.getItem(PIN_SESSION_KEY)
-        if (expiry && Date.now() < parseInt(expiry)) setOwnerUnlocked(true)
+        if (expiry && Date.now() < parseInt(expiry)) {
+          setOwnerUnlocked(true)
+          // fetchInviteCodes called after state settles via useEffect
+        }
       }
 
       if (user.email.toLowerCase() === ALLOWED_HEALTH_EMAIL) {
@@ -154,6 +162,10 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
+    if (ownerUnlocked) fetchInviteCodes()
+  }, [ownerUnlocked])
+
+  useEffect(() => {
     if (pinLockedSeconds <= 0) return
     const t = setInterval(() => setPinLockedSeconds(s => s <= 1 ? (clearInterval(t), 0) : s - 1), 1000)
     return () => clearInterval(t)
@@ -175,6 +187,7 @@ export default function SettingsPage() {
       sessionStorage.setItem(PIN_SESSION_KEY, String(expiry))
       setOwnerUnlocked(true)
       setPinInput('')
+      fetchInviteCodes()
     } else if (json.lockedSeconds) {
       setPinLockedSeconds(json.lockedSeconds)
       setPinError(json.error)
@@ -189,6 +202,42 @@ export default function SettingsPage() {
     setOwnerUnlocked(false)
     setPinInput('')
     setPinError('')
+    setInviteCodes([])
+  }
+
+  async function fetchInviteCodes() {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('invite_codes')
+      .select('id, code, used_by, used_at, created_at')
+      .order('created_at', { ascending: false })
+      .limit(20)
+    if (data) setInviteCodes(data)
+  }
+
+  async function handleGenerateInvite() {
+    setInviteGenerating(true)
+    setInviteMsg('')
+    const res = await fetch('/api/owner/generate-invite', { method: 'POST' })
+    const json = await res.json()
+    setInviteGenerating(false)
+    if (json.code) {
+      setInviteMsg(json.code)
+      fetchInviteCodes()
+    }
+  }
+
+  function handleCopyCode(code) {
+    navigator.clipboard.writeText(code)
+    setCopiedCode(code)
+    setTimeout(() => setCopiedCode(''), 2000)
+  }
+
+  function handleCopyLink(code) {
+    const url = `${window.location.origin}/join?code=${code}`
+    navigator.clipboard.writeText(url)
+    setCopiedCode(code + '_link')
+    setTimeout(() => setCopiedCode(''), 2000)
   }
 
   function daysUntil(dateStr) {
@@ -494,7 +543,7 @@ export default function SettingsPage() {
 
                 {ownerUnlocked ? (
                   <div>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>Owner tools are active for this session. Admin panel and additional controls coming in a later phase.</p>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>Owner tools are active for this session. Admin panel coming in a later phase.</p>
                     <button
                       onClick={handleLockOwner}
                       style={{ backgroundColor: 'transparent', border: '1px solid var(--accent-purple)', color: 'var(--accent-purple)', borderRadius: '8px', padding: '8px 18px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
@@ -534,6 +583,61 @@ export default function SettingsPage() {
                         {pinSubmitting ? 'Checking...' : 'Unlock'}
                       </button>
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {ownerUnlocked && (
+              <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <div>
+                    <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '2px' }}>Invite Friends</h2>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Generate a one-time code and share it so someone can create an account.</p>
+                  </div>
+                  <button
+                    onClick={handleGenerateInvite}
+                    disabled={inviteGenerating}
+                    style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: inviteGenerating ? 'not-allowed' : 'pointer', opacity: inviteGenerating ? 0.5 : 1, flexShrink: 0 }}
+                  >
+                    {inviteGenerating ? 'Generating...' : '+ New Code'}
+                  </button>
+                </div>
+
+                {inviteCodes.length === 0 ? (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', textAlign: 'center', padding: '16px 0' }}>No invite codes yet. Generate one above.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {inviteCodes.map(invite => (
+                      <div key={invite.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: 'var(--background)', border: `1px solid ${invite.used_by ? 'var(--border)' : 'rgba(0,128,255,0.3)'}`, borderRadius: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ color: invite.used_by ? 'var(--text-secondary)' : 'var(--accent-blue)', fontFamily: 'monospace', fontSize: '15px', fontWeight: '700', letterSpacing: '0.1em', textDecoration: invite.used_by ? 'line-through' : 'none' }}>
+                            {invite.code}
+                          </span>
+                          {invite.used_by ? (
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '11px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', padding: '2px 6px' }}>Used</span>
+                          ) : (
+                            <span style={{ color: 'var(--success)', fontSize: '11px', backgroundColor: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.3)', borderRadius: '4px', padding: '2px 6px' }}>Active</span>
+                          )}
+                        </div>
+                        {!invite.used_by && (
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              onClick={() => handleCopyCode(invite.code)}
+                              style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', cursor: 'pointer' }}
+                            >
+                              {copiedCode === invite.code ? '✓ Copied' : 'Copy Code'}
+                            </button>
+                            <button
+                              onClick={() => handleCopyLink(invite.code)}
+                              style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', cursor: 'pointer' }}
+                            >
+                              {copiedCode === invite.code + '_link' ? '✓ Copied' : 'Copy Link'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

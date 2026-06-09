@@ -81,6 +81,10 @@ src/
       lab-doc-feedback/route.js        AI feedback on step documentation; uses getUser() + is_disabled check; prompt injection protected
       owner/
         verify-pin/route.js            POST — verifies owner PIN against OWNER_PIN_HASH env var; 3-attempt lockout for 1 hour; owner email check; module-level brute-force state
+        generate-invite/route.js       POST — owner only; generates random XXXX-XXXX invite code; inserts to invite_codes table
+      invite/
+        validate/route.js              GET ?code= — public; checks if code exists and unused
+        redeem/route.js                POST — authenticated; marks invite code used_by + used_at
       lab-summary/route.js             AI lab completion summary (3 sections); uses getUser() + is_disabled check; prompt injection protected
       goals/
         generate-overview/route.js     POST — AI overview from goals_profiles; uses getUser() + is_disabled check; prompt injection protected; only called from handleFinish() on setup page
@@ -108,6 +112,8 @@ src/
         exercises/page.js              Exercise Library — sticky muscle-group nav, scrollable grouped sections, image cards, detail modal with form cues, Cardio section
       nutrition/
         page.js                        Nutrition (placeholder) — gates on goals profile
+    join/
+      page.js                          Invite-only signup — requires valid invite code + email + password; validates code, creates Supabase auth user, redeems code
     study-hub/
       layout.js                        Study Hub layout with StudyHubSidebar + FloatingChat
       page.js                          Overview (DailyStreak component)
@@ -178,6 +184,7 @@ src/
 | `workout_profiles` | User's fitness profile — experience, goal, days_per_week, fitness stats, equipment, limitations, available_weights |
 | `workout_plans` | AI-generated weekly plans — plan JSONB (7 day objects), plan_notes, progression_notes, schedule JSONB, is_active |
 | `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, daily_steps, target_weight_lbs, timeline, notes, ai_overview; one row per user (UNIQUE on user_id) |
+| `invite_codes` | Owner-generated one-time signup codes — code (unique), created_by, used_by (nullable), used_at; RLS: SELECT=public, INSERT=owner, UPDATE=authenticated |
 
 ---
 
