@@ -22,6 +22,7 @@ export default function WorkoutsPage() {
   const [plan, setPlan] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [goalsGated, setGoalsGated] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const [reassigning, setReassigning] = useState(false)
   const [exerciseModal, setExerciseModal] = useState(null) // {dayIndex, mode: 'add'|'remove', exerciseIndex}
@@ -41,7 +42,8 @@ export default function WorkoutsPage() {
 
     const { data: goalsProfile } = await supabase.from('goals_profiles').select('id').eq('user_id', session.user.id).single()
     if (!goalsProfile) {
-      router.push('/life-hub/goals/setup?redirect=/life-hub/workouts')
+      setGoalsGated(true)
+      setLoading(false)
       return
     }
 
@@ -164,6 +166,8 @@ export default function WorkoutsPage() {
     : []
 
   if (loading) return <div style={{ color: 'var(--text-secondary)', padding: '48px', textAlign: 'center' }}>Loading...</div>
+
+  if (goalsGated) return <GoalsGate redirect="/life-hub/workouts" />
   if (!profile) return null
 
   const goalLabels = { muscle: 'Build Muscle', weight_loss: 'Lose Weight', fitness: 'General Fitness', endurance: 'Build Endurance' }
@@ -368,6 +372,24 @@ export default function WorkoutsPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function GoalsGate({ redirect }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', padding: '40px' }}>
+      <div style={{ textAlign: 'center', maxWidth: '420px' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
+        <h2 style={{ color: 'var(--text-primary)', fontSize: '20px', fontWeight: '700', marginBottom: '10px' }}>Complete your Goals Setup first</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+          This page uses your personal goals profile to power AI recommendations. Take 2 minutes to set it up — you only do it once.
+        </p>
+        <a href={`/life-hub/goals/setup?redirect=${redirect}`}
+          style={{ display: 'inline-block', backgroundColor: 'var(--accent-purple)', color: '#fff', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', textDecoration: 'none' }}>
+          Take me there →
+        </a>
+      </div>
     </div>
   )
 }

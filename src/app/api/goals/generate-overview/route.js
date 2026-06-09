@@ -35,7 +35,17 @@ export async function POST(req) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { goals, height_inches, weight_lbs, age, sex, activity_level, target_weight_lbs, timeline, notes } = await req.json()
+  const { goals, height_inches, weight_lbs, age, sex, body_composition, activity_level, target_weight_lbs, timeline, notes } = await req.json()
+
+  const BODY_COMP_MAP = {
+    lean_muscular: 'Lean & Muscular (6–17% body fat) — do NOT use BMI as a health indicator for this person',
+    lean_toned: 'Lean & Toned (14–20% body fat)',
+    lean: 'Lean / Low Body Fat (6–20%)',
+    athletic: 'Athletic / Fit build — BMI may overstate body fat due to muscle mass',
+    average: 'Average build',
+    overweight: 'Carrying extra weight',
+    obese: 'Obese',
+  }
 
   const heightFt = height_inches ? `${Math.floor(height_inches / 12)}ft ${Math.round(height_inches % 12)}in` : null
   const bmi = (height_inches && weight_lbs) ? ((weight_lbs / (height_inches * height_inches)) * 703).toFixed(1) : null
@@ -48,7 +58,8 @@ THEIR PROFILE:
 - Age: ${age ?? 'not provided'}
 - Sex: ${sex ?? 'not provided'}
 - Height: ${heightFt ?? 'not provided'}
-- Weight: ${weight_lbs ? weight_lbs + ' lbs' : 'not provided'}${bmi ? ` (BMI: ${bmi})` : ''}
+- Weight: ${weight_lbs ? weight_lbs + ' lbs' : 'not provided'}${bmi ? ` (BMI: ${bmi} — use body composition descriptor below as the more accurate indicator)` : ''}
+- Body composition: ${body_composition ? (BODY_COMP_MAP[body_composition] || body_composition) : 'not provided'}
 - Activity level: ${ACTIVITY_LABELS[activity_level] ?? activity_level ?? 'not provided'}
 ${target_weight_lbs ? `- Target weight: ${target_weight_lbs} lbs` : ''}
 ${timeline ? `- Timeline: ${TIMELINE_LABELS[timeline] ?? timeline}` : ''}

@@ -74,7 +74,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `exercises` | Exercise library — name, body_part, equipment, target, secondary_muscles[], instructions[], gif_url (nullable) |
 | `workout_profiles` | User's fitness profile — experience, goal, days_per_week, fitness stats, equipment, limitations, available_weights |
 | `workout_plans` | AI-generated weekly plans — plan JSONB (7 day objects), plan_notes, progression_notes, schedule JSONB, is_active |
-| `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, activity_level, target_weight_lbs, timeline, notes, ai_overview; UNIQUE on user_id |
+| `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, target_weight_lbs, timeline, notes, ai_overview; UNIQUE on user_id |
 
 ---
 
@@ -128,6 +128,17 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 
 ## Phase Log
 *(Newest phase first)*
+
+### Phase 30c - Complete
+Goals gate overlay + body composition selector + BMI disclaimer:
+- Gate pages now show a centered overlay ("Complete your Goals Setup first" + "Take me there →") instead of hard-redirecting — applies to workouts, workouts/setup, and nutrition
+- Body composition selector added to Step 1 (Your Body) — sex-dependent options with plain-language labels and body fat % ranges; clearing sex resets body composition selection
+- Male-only "💀 Holy Sh*t" option (50%+) triggers a meme modal: "You must be kidding me" — confirms remaps to 'obese' before advancing; "No wait, I lied" lets them go back and fix it
+- BMI disclaimer added to Goals overview page below weight: warns that BMI doesn't account for muscle mass
+- Body composition label shown in Body Metrics card on Goals page
+- `generate-overview/route.js`: body_composition passed to AI with muscle-specific note (lean/athletic builds told to ignore BMI as indicator)
+- `generate-plan/route.js`: body_composition included in body context block with workout-specific guidance (e.g. obese → joint-friendly progressions)
+- `goals_profiles` table: `body_composition TEXT` column added via migration
 
 ### Phase 30b - Complete
 Goals profile reset added for testing:

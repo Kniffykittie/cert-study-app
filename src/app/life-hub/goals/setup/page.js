@@ -31,6 +31,31 @@ const TIMELINES = [
 
 const SEX_OPTIONS = ['Male', 'Female', 'Non-binary', 'Prefer not to say']
 
+const BODY_COMP_OPTIONS = {
+  Male: [
+    { key: 'lean_muscular', label: 'Lean & Muscular', desc: 'Visibly defined, low body fat', range: '6–17%' },
+    { key: 'athletic', label: 'Athletic / Fit', desc: 'Active build, some muscle definition', range: '14–24%' },
+    { key: 'average', label: 'Average', desc: 'Moderate fat, not particularly lean or heavy', range: '18–25%' },
+    { key: 'overweight', label: 'Carrying Extra Weight', desc: 'Noticeably above a lean build', range: '25–35%' },
+    { key: 'obese', label: 'Obese', desc: 'Significantly above healthy range', range: '35–50%' },
+    { key: 'holy_shit', label: '💀 Holy Sh*t', desc: '...you good bro?', range: '50%+' },
+  ],
+  Female: [
+    { key: 'lean_toned', label: 'Lean & Toned', desc: 'Visibly defined, low body fat', range: '14–20%' },
+    { key: 'athletic', label: 'Athletic / Fit', desc: 'Active build, some muscle definition', range: '18–25%' },
+    { key: 'average', label: 'Average', desc: 'Moderate fat, not particularly lean or heavy', range: '25–32%' },
+    { key: 'overweight', label: 'Carrying Extra Weight', desc: 'Noticeably above a lean build', range: '32–40%' },
+    { key: 'obese', label: 'Obese', desc: 'Significantly above healthy range', range: '40%+' },
+  ],
+  default: [
+    { key: 'lean', label: 'Lean / Low Body Fat', desc: 'Visibly defined, low body fat', range: '6–20%' },
+    { key: 'athletic', label: 'Athletic / Fit', desc: 'Active build, some muscle definition', range: '14–25%' },
+    { key: 'average', label: 'Average', desc: 'Moderate fat, not particularly lean or heavy', range: '18–32%' },
+    { key: 'overweight', label: 'Carrying Extra Weight', desc: 'Noticeably above a lean build', range: '25–40%' },
+    { key: 'obese', label: 'Obese', desc: 'Significantly above healthy range', range: '40%+' },
+  ],
+}
+
 const STEPS = ['Your Goals', 'Your Body', 'Starting Point']
 
 export default function GoalsSetupPage() {
@@ -41,6 +66,7 @@ export default function GoalsSetupPage() {
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [generatingOverview, setGeneratingOverview] = useState(false)
+  const [showHolyShitModal, setShowHolyShitModal] = useState(false)
 
   const [selectedGoals, setSelectedGoals] = useState([])
   const [heightFt, setHeightFt] = useState('')
@@ -48,6 +74,7 @@ export default function GoalsSetupPage() {
   const [weightLbs, setWeightLbs] = useState('')
   const [age, setAge] = useState('')
   const [sex, setSex] = useState('')
+  const [bodyComposition, setBodyComposition] = useState('')
   const [activityLevel, setActivityLevel] = useState('')
   const [targetWeight, setTargetWeight] = useState('')
   const [timeline, setTimeline] = useState('')
@@ -65,6 +92,7 @@ export default function GoalsSetupPage() {
         if (data.weight_lbs) setWeightLbs(String(data.weight_lbs))
         if (data.age) setAge(String(data.age))
         if (data.sex) setSex(data.sex)
+        if (data.body_composition) setBodyComposition(data.body_composition)
         if (data.activity_level) setActivityLevel(data.activity_level)
         if (data.target_weight_lbs) setTargetWeight(String(data.target_weight_lbs))
         if (data.timeline) setTimeline(data.timeline)
@@ -78,11 +106,25 @@ export default function GoalsSetupPage() {
     setSelectedGoals(prev => prev.includes(key) ? prev.filter(g => g !== key) : [...prev, key])
   }
 
+  function getBodyCompOptions() {
+    if (sex === 'Male') return BODY_COMP_OPTIONS.Male
+    if (sex === 'Female') return BODY_COMP_OPTIONS.Female
+    return BODY_COMP_OPTIONS.default
+  }
+
   function canAdvance() {
     if (step === 0) return selectedGoals.length > 0
     if (step === 1) return true
     if (step === 2) return !!activityLevel && !!timeline
     return false
+  }
+
+  function handleNext() {
+    if (bodyComposition === 'holy_shit') {
+      setShowHolyShitModal(true)
+      return
+    }
+    setStep(s => s + 1)
   }
 
   async function handleFinish() {
@@ -100,6 +142,7 @@ export default function GoalsSetupPage() {
       weight_lbs: weightLbs ? parseFloat(weightLbs) : null,
       age: age ? parseInt(age) : null,
       sex: sex || null,
+      body_composition: bodyComposition || null,
       activity_level: activityLevel,
       target_weight_lbs: targetWeight ? parseFloat(targetWeight) : null,
       timeline,
@@ -122,6 +165,7 @@ export default function GoalsSetupPage() {
   }
 
   const wantsWeightChange = selectedGoals.includes('lose_weight') || selectedGoals.includes('build_muscle')
+  const bodyCompOptions = getBodyCompOptions()
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--background)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 16px' }}>
@@ -171,13 +215,13 @@ export default function GoalsSetupPage() {
           <div>
             <h2 style={{ color: 'var(--text-primary)', fontSize: '17px', fontWeight: '700', marginBottom: '6px' }}>Tell us about yourself</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>Used to personalize calorie targets, workout intensity, and health recommendations. All optional.</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
               <div>
                 <label style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '8px' }}>SEX</label>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   {SEX_OPTIONS.map(s => (
-                    <button key={s} onClick={() => setSex(s)}
+                    <button key={s} onClick={() => { setSex(s); setBodyComposition('') }}
                       style={{ padding: '8px 16px', backgroundColor: sex === s ? 'rgba(123,47,190,0.12)' : 'var(--surface)', border: `1px solid ${sex === s ? 'var(--accent-purple)' : 'var(--border)'}`, borderRadius: '8px', color: sex === s ? 'var(--accent-purple)' : 'var(--text-secondary)', fontSize: '13px', fontWeight: sex === s ? '600' : '400', cursor: 'pointer' }}>
                       {s}
                     </button>
@@ -209,6 +253,42 @@ export default function GoalsSetupPage() {
                   <input type="number" value={weightLbs} onChange={e => setWeightLbs(e.target.value)} placeholder="e.g. 175" min="80" max="500"
                     style={{ width: '120px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
                   <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>lbs</span>
+                </div>
+              </div>
+
+              {/* Body Composition */}
+              <div>
+                <label style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
+                  BODY COMPOSITION <span style={{ fontWeight: '400' }}>(optional)</span>
+                </label>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '10px', lineHeight: '1.5' }}>
+                  BMI alone doesn't tell the whole story — muscle weighs more than fat. Pick the description that best fits your current build.
+                  {!sex && <span style={{ color: 'var(--accent-purple)' }}> Select a sex above to see tailored ranges.</span>}
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {bodyCompOptions.map(opt => {
+                    const isHolyShit = opt.key === 'holy_shit'
+                    const active = bodyComposition === opt.key
+                    return (
+                      <button key={opt.key} onClick={() => setBodyComposition(active ? '' : opt.key)}
+                        style={{
+                          backgroundColor: isHolyShit ? (active ? 'rgba(204,0,0,0.12)' : 'rgba(204,0,0,0.04)') : (active ? 'rgba(123,47,190,0.12)' : 'var(--surface)'),
+                          border: `1px solid ${isHolyShit ? (active ? 'var(--error)' : 'var(--error-border)') : (active ? 'var(--accent-purple)' : 'var(--border)')}`,
+                          borderRadius: '8px', padding: '10px 14px', textAlign: 'left', cursor: 'pointer',
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px',
+                        }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ color: isHolyShit ? 'var(--error)' : (active ? 'var(--accent-purple)' : 'var(--text-primary)'), fontSize: '13px', fontWeight: '600' }}>{opt.label}</div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>{opt.desc}</div>
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <span style={{ fontSize: '12px', color: isHolyShit ? 'var(--error)' : 'var(--text-secondary)', fontWeight: '600', backgroundColor: 'var(--background)', padding: '2px 8px', borderRadius: '10px', border: `1px solid ${isHolyShit ? 'var(--error-border)' : 'var(--border)'}` }}>
+                            {opt.range}
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
@@ -283,7 +363,7 @@ export default function GoalsSetupPage() {
           </button>
           <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{step + 1} of {STEPS.length}</span>
           {step < STEPS.length - 1 ? (
-            <button onClick={() => setStep(s => s + 1)} disabled={!canAdvance()}
+            <button onClick={handleNext} disabled={!canAdvance()}
               style={{ backgroundColor: 'var(--accent-purple)', border: 'none', color: '#fff', borderRadius: '8px', padding: '11px 24px', fontSize: '14px', fontWeight: '600', cursor: canAdvance() ? 'pointer' : 'not-allowed', opacity: canAdvance() ? 1 : 0.4 }}>
               Next →
             </button>
@@ -296,6 +376,29 @@ export default function GoalsSetupPage() {
         </div>
 
       </div>
+
+      {/* Holy Sh*t Modal */}
+      {showHolyShitModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' }}>
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--error-border)', borderRadius: '16px', padding: '32px', maxWidth: '420px', width: '100%', textAlign: 'center' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>💀</div>
+            <h2 style={{ color: 'var(--error)', fontSize: '20px', fontWeight: '700', marginBottom: '12px' }}>You must be kidding me.</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+              50%+? I appreciate the honesty, I really do. But I'm going to go ahead and log you as <strong style={{ color: 'var(--text-primary)' }}>Obese (35–50%)</strong> and we're never speaking of this again. Deal?
+            </p>
+            <button
+              onClick={() => { setBodyComposition('obese'); setShowHolyShitModal(false); setStep(s => s + 1) }}
+              style={{ backgroundColor: 'var(--error)', border: 'none', color: '#fff', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', width: '100%', marginBottom: '10px' }}>
+              Fine. Let's never talk about this. 💀
+            </button>
+            <button
+              onClick={() => setShowHolyShitModal(false)}
+              style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '10px 28px', fontSize: '13px', cursor: 'pointer', width: '100%' }}>
+              No wait, I lied. Let me fix that.
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -28,6 +28,7 @@ function defaultWorkoutDays(count) {
 export default function WorkoutSetupPage() {
   const router = useRouter()
   const [step, setStep] = useState(0)
+  const [goalsGated, setGoalsGated] = useState(false)
 
   useEffect(() => {
     async function checkGoals() {
@@ -35,10 +36,10 @@ export default function WorkoutSetupPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
       const { data } = await supabase.from('goals_profiles').select('id').eq('user_id', session.user.id).single()
-      if (!data) router.push('/life-hub/goals/setup?redirect=/life-hub/workouts/setup')
+      if (!data) setGoalsGated(true)
     }
     checkGoals()
-  }, [router])
+  }, [])
   const [generating, setGenerating] = useState(false)
   const [form, setForm] = useState({
     experience: '',
@@ -138,6 +139,22 @@ export default function WorkoutSetupPage() {
 
   const current = STEPS[step]
   const isLast = step === STEPS.length - 1
+
+  if (goalsGated) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', padding: '40px' }}>
+      <div style={{ textAlign: 'center', maxWidth: '420px' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
+        <h2 style={{ color: 'var(--text-primary)', fontSize: '20px', fontWeight: '700', marginBottom: '10px' }}>Complete your Goals Setup first</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+          This page uses your personal goals profile to power AI recommendations. Take 2 minutes to set it up — you only do it once.
+        </p>
+        <a href="/life-hub/goals/setup?redirect=/life-hub/workouts/setup"
+          style={{ display: 'inline-block', backgroundColor: 'var(--accent-purple)', color: '#fff', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', textDecoration: 'none' }}>
+          Take me there →
+        </a>
+      </div>
+    </div>
+  )
 
   return (
     <div style={{ maxWidth: '560px', margin: '0 auto', paddingTop: '40px' }}>

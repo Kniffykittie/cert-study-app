@@ -68,7 +68,7 @@ export async function POST(req) {
   const { goals, experience, days_per_week, workout_days, pushup_count, pullup_count, squat_count,
     has_pullup_bar, has_ab_roller, dumbbell_pairs, dumbbell_note, limitations, cardio_options } = body
 
-  const { data: goalsProfile } = await supabase.from('goals_profiles').select('goals,height_inches,weight_lbs,age,sex,activity_level,target_weight_lbs,timeline').eq('user_id', session.user.id).single()
+  const { data: goalsProfile } = await supabase.from('goals_profiles').select('goals,height_inches,weight_lbs,age,sex,body_composition,activity_level,target_weight_lbs,timeline').eq('user_id', session.user.id).single()
 
   const goalsArray = Array.isArray(goals) ? goals : (goals || '').split(',')
   const wantsWeightLoss = goalsArray.includes('weight_loss')
@@ -110,12 +110,22 @@ export async function POST(req) {
     reduce_stress: 'Reduce Stress', flexibility: 'Flexibility & Mobility',
   }
   const ACTIVITY_MAP = { sedentary: 'Sedentary', lightly_active: 'Lightly Active', moderately_active: 'Moderately Active', very_active: 'Very Active' }
+  const BODY_COMP_CONTEXT = {
+    lean_muscular: 'Lean & Muscular (6–17% body fat) — prioritize muscle preservation and progressive overload',
+    lean_toned: 'Lean & Toned (14–20% body fat)',
+    lean: 'Lean / Low Body Fat (6–20%)',
+    athletic: 'Athletic / Fit build — BMI may overstate body fat due to muscle',
+    average: 'Average build',
+    overweight: 'Carrying extra weight — factor in joint-friendly progressions where appropriate',
+    obese: 'Obese — prioritize low-impact options and steady progression',
+  }
   const bodyContext = goalsProfile ? `
 BODY & LIFESTYLE CONTEXT (from user's goals profile):
 - Life goals: ${(goalsProfile.goals ?? []).map(g => GOAL_LABELS_MAP[g] || g).join(', ')}
 - Age: ${goalsProfile.age ?? 'not provided'}, Sex: ${goalsProfile.sex ?? 'not provided'}
 - Height: ${goalsProfile.height_inches ? `${Math.floor(goalsProfile.height_inches/12)}ft ${Math.round(goalsProfile.height_inches%12)}in` : 'not provided'}
 - Weight: ${goalsProfile.weight_lbs ? goalsProfile.weight_lbs + ' lbs' : 'not provided'}${goalsProfile.target_weight_lbs ? `, target: ${goalsProfile.target_weight_lbs} lbs` : ''}
+- Body composition: ${goalsProfile.body_composition ? (BODY_COMP_CONTEXT[goalsProfile.body_composition] || goalsProfile.body_composition) : 'not provided'}
 - Activity level outside gym: ${ACTIVITY_MAP[goalsProfile.activity_level] ?? goalsProfile.activity_level ?? 'not provided'}
 - Timeline: ${goalsProfile.timeline ?? 'not specified'}
 Use this context to fine-tune volume, intensity, and cardio recommendations.` : ''

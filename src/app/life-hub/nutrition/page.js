@@ -1,21 +1,40 @@
 'use client'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function NutritionPage() {
-  const router = useRouter()
+  const [goalsGated, setGoalsGated] = useState(false)
+  const [checked, setChecked] = useState(false)
 
   useEffect(() => {
     async function checkGoals() {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
+      if (!session) { setChecked(true); return }
       const { data } = await supabase.from('goals_profiles').select('id').eq('user_id', session.user.id).single()
-      if (!data) router.push('/life-hub/goals/setup?redirect=/life-hub/nutrition')
+      if (!data) setGoalsGated(true)
+      setChecked(true)
     }
     checkGoals()
-  }, [router])
+  }, [])
+
+  if (!checked) return null
+
+  if (goalsGated) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', padding: '40px' }}>
+      <div style={{ textAlign: 'center', maxWidth: '420px' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
+        <h2 style={{ color: 'var(--text-primary)', fontSize: '20px', fontWeight: '700', marginBottom: '10px' }}>Complete your Goals Setup first</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+          This page uses your personal goals profile to personalize nutrition targets and macro recommendations. Take 2 minutes to set it up — you only do it once.
+        </p>
+        <a href="/life-hub/goals/setup?redirect=/life-hub/nutrition"
+          style={{ display: 'inline-block', backgroundColor: 'var(--accent-purple)', color: '#fff', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', textDecoration: 'none' }}>
+          Take me there →
+        </a>
+      </div>
+    </div>
+  )
 
   return (
     <div>

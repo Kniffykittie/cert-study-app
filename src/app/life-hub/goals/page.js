@@ -4,6 +4,16 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
+const BODY_COMP_LABELS = {
+  lean_muscular: 'Lean & Muscular (6–17%)',
+  lean_toned: 'Lean & Toned (14–20%)',
+  lean: 'Lean / Low Body Fat (6–20%)',
+  athletic: 'Athletic / Fit',
+  average: 'Average',
+  overweight: 'Carrying Extra Weight',
+  obese: 'Obese',
+}
+
 const GOAL_LABELS = {
   lose_weight: 'Lose Weight',
   build_muscle: 'Build Muscle',
@@ -114,6 +124,12 @@ export default function GoalsPage() {
                 </>
               } />
             )}
+            {bmi && (
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4', padding: '6px 0', borderTop: '1px solid var(--border)', marginTop: '2px' }}>
+                ⚠️ BMI doesn't account for muscle mass — athletes and muscular builds often read higher than their actual body composition.
+              </div>
+            )}
+            {profile.body_composition && <MetricRow label="Build" value={BODY_COMP_LABELS[profile.body_composition] || profile.body_composition} />}
             {profile.target_weight_lbs && <MetricRow label="Target" value={`${profile.target_weight_lbs} lbs`} />}
             {profile.age && <MetricRow label="Age" value={profile.age} />}
             {profile.sex && <MetricRow label="Sex" value={profile.sex} />}

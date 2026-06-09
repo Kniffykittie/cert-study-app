@@ -168,7 +168,7 @@ src/
 | `exercises` | Exercise library — name, body_part, equipment, target, secondary_muscles[], instructions[], gif_url (nullable) |
 | `workout_profiles` | User's fitness profile — experience, goal, days_per_week, fitness stats, equipment, limitations, available_weights |
 | `workout_plans` | AI-generated weekly plans — plan JSONB (7 day objects), plan_notes, progression_notes, schedule JSONB, is_active |
-| `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, activity_level, target_weight_lbs, timeline, notes, ai_overview; one row per user (UNIQUE on user_id) |
+| `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, target_weight_lbs, timeline, notes, ai_overview; one row per user (UNIQUE on user_id) |
 
 ---
 
@@ -331,12 +331,13 @@ src/
 - **Security+ Network Labs** (`security-plus-labs.js`): 4 labs, 20 steps — ACL firewall, DMZ three-zone design, device hardening (SSH v2/encrypted passwords/rate limiting), network segmentation (VLANs by trust level)
 
 ### Goals & Body Metrics
-- Setup flow: 3 steps — Goals (multi-select 8 options), Body Metrics (height/weight/age/sex/target weight), Starting Point (activity level, timeline, notes)
+- Setup flow: 3 steps — Goals (multi-select 8 options), Body Metrics (height/weight/age/sex/body composition/target weight), Starting Point (activity level, timeline, notes)
+- Body composition selector: sex-dependent options with plain-language labels + body fat % ranges; Male-only "💀 Holy Sh*t" (50%+) option triggers a meme modal that remaps to 'obese' before saving
 - Upserts to `goals_profiles` table on finish, then calls `/api/goals/generate-overview` for a personalized 3-paragraph AI overview
 - Overview stored in `goals_profiles.ai_overview`, displayed on the Goals page with a 🤖 header
-- Goals page shows: AI overview panel, active goals chips, body metrics (with BMI + label), lifestyle summary, notes
-- BMI labels: Underweight (<18.5), Normal (18.5–25), Overweight (25–30), Obese (≥30)
-- **Gating**: `/life-hub/workouts`, `/life-hub/workouts/setup`, and `/life-hub/nutrition` all redirect to `/life-hub/goals/setup?redirect=<path>` if no goals profile found
+- Goals page shows: AI overview panel, active goals chips, body metrics (with BMI + disclaimer + build label), lifestyle summary, notes
+- BMI labels: Underweight (<18.5), Normal (18.5–25), Overweight (25–30), Obese (≥30); BMI disclaimer shown below weight noting it doesn't account for muscle mass
+- **Gating**: `/life-hub/workouts`, `/life-hub/workouts/setup`, and `/life-hub/nutrition` show a centered gate overlay (dimmed, "Complete your Goals Setup first" + "Take me there →" button) instead of a hard redirect
 - Setup page `?redirect=<path>` param causes `handleFinish()` to route back to the intended destination
 - **Workout plan context**: `generate-plan/route.js` fetches `goals_profiles` at generation time and injects body/lifestyle context into the AI prompt
 - API: `/api/goals/generate-overview` — POST, any authenticated user, updates `ai_overview` column on their own row
