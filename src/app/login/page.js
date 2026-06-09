@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [totpStep, setTotpStep] = useState(false)
   const [totpCode, setTotpCode] = useState('')
   const [factorId, setFactorId] = useState(null)
+  const [authAppName, setAuthAppName] = useState('')
   const [useRecovery, setUseRecovery] = useState(false)
   const [recoveryCode, setRecoveryCode] = useState('')
 
@@ -36,6 +37,10 @@ export default function LoginPage() {
       const totp = factors?.totp?.find(f => f.status === 'verified')
       if (totp) {
         setFactorId(totp.id)
+        // Fetch authenticator name from profile
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: profile } = await supabase.from('profiles').select('authenticator_name').eq('id', user.id).single()
+        if (profile?.authenticator_name) setAuthAppName(profile.authenticator_name)
         setTotpStep(true)
         setLoading(false)
         return
@@ -105,7 +110,7 @@ export default function LoginPage() {
           {!useRecovery ? (
             <form onSubmit={handleTotpVerify} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <p style={{ color: 'var(--text-secondary)', fontSize: '14px', textAlign: 'center', lineHeight: '1.6' }}>
-                Enter the 6-digit code from your authenticator app.
+                Enter the 6-digit code from {authAppName ? <strong style={{ color: 'var(--text-primary)' }}>{authAppName}</strong> : 'your authenticator app'}.
               </p>
               <input
                 type="text"

@@ -219,6 +219,13 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 
 ## Phase Log
 
+### Phase 45 - Complete
+- **Authenticator app name on 2FA login** — during 2FA enrollment in Settings, user picks their authenticator app (Google Authenticator, Authy, 1Password, Microsoft Authenticator, Other) via chip selector; saved to `profiles.authenticator_name`
+- Login screen TOTP prompt now reads "Enter the 6-digit code from **[App Name]**" instead of generic fallback text
+- DB: `ALTER TABLE profiles ADD COLUMN authenticator_name TEXT`
+
+---
+
 ### Phase 44 - Complete
 - **2FA (TOTP)** — full Supabase MFA implementation
 - Settings → Security: 2FA card with status indicator + recovery codes remaining count; 3-step enrollment modal (scan QR → verify 6-digit code → save 10 recovery codes displayed once); Disable flow requires current TOTP code

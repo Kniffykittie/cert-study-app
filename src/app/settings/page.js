@@ -91,6 +91,8 @@ export default function SettingsPage() {
   const [disable2FAError, setDisable2FAError] = useState('')
   const [disable2FALoading, setDisable2FALoading] = useState(false)
 
+  const [enrollAuthName, setEnrollAuthName] = useState('')
+
   // Admin panel state
   const [adminUsers, setAdminUsers] = useState([])
   const [adminLoading, setAdminLoading] = useState(false)
@@ -335,6 +337,7 @@ export default function SettingsPage() {
     setEnrollStep(1)
     setEnrollCode('')
     setEnrollError('')
+    setEnrollAuthName('')
     setEnrollLoading(true)
     const supabase = createClient()
     const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', issuer: 'CSA', friendlyName: 'Authenticator' })
@@ -369,7 +372,13 @@ export default function SettingsPage() {
     }
   }
 
-  function handleEnrollDone() {
+  async function handleEnrollDone() {
+    // Save authenticator name to profile if provided
+    if (enrollAuthName.trim()) {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.from('profiles').upsert({ id: user.id, authenticator_name: enrollAuthName.trim(), updated_at: new Date().toISOString() })
+    }
     setShowEnrollModal(false)
     setTwoFactorEnabled(true)
     setTwoFactorId(enrollFactorId)
@@ -377,6 +386,7 @@ export default function SettingsPage() {
     setEnrollCode('')
     setEnrollQR('')
     setEnrollSecret('')
+    setEnrollAuthName('')
     setRecoveryCodes([])
     setRecoveryCodesCopied(false)
   }
@@ -1158,6 +1168,17 @@ export default function SettingsPage() {
                 <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px' }}>Can't scan? Enter this code manually:</p>
                 <div style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px 12px', fontFamily: 'monospace', fontSize: '13px', color: 'var(--accent-blue)', letterSpacing: '0.1em', marginBottom: '20px', wordBreak: 'break-all' }}>
                   {enrollSecret}
+                </div>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '8px' }}>WHICH APP ARE YOU USING? <span style={{ fontWeight: '400', color: 'var(--text-secondary)' }}>(optional)</span></label>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {['Google Authenticator', 'Authy', '1Password', 'Microsoft Authenticator', 'Other'].map(name => (
+                      <button key={name} type="button" onClick={() => setEnrollAuthName(name)}
+                        style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', border: `1px solid ${enrollAuthName === name ? 'var(--accent-blue)' : 'var(--border)'}`, backgroundColor: enrollAuthName === name ? 'rgba(0,128,255,0.1)' : 'var(--background)', color: enrollAuthName === name ? 'var(--accent-blue)' : 'var(--text-secondary)', fontWeight: enrollAuthName === name ? '600' : '400' }}>
+                        {name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                   <button onClick={() => { setShowEnrollModal(false); setEnrollQR(''); setEnrollSecret('') }}
