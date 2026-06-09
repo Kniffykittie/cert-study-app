@@ -82,13 +82,11 @@ export default function SettingsPage() {
         }
       }
 
-      if (user.email.toLowerCase() === ALLOWED_HEALTH_EMAIL) {
-        setShowHealthSection(true)
-        const statusRes = await fetch('/api/health/status')
-        const status = await statusRes.json()
-        setHealthConnected(status.connected)
-        if (status.connectedAt) setHealthConnectedAt(new Date(status.connectedAt).toLocaleDateString())
-      }
+      setShowHealthSection(true)
+      const statusRes = await fetch('/api/health/status')
+      const status = await statusRes.json()
+      setHealthConnected(status.connected)
+      if (status.connectedAt) setHealthConnectedAt(new Date(status.connectedAt).toLocaleDateString())
     }
     fetchProfile()
   }, [])

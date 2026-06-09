@@ -32,6 +32,11 @@ export default function WorkoutsPage() {
   const [aiCheckinLoading, setAiCheckinLoading] = useState(false)
   const [cardioModal, setCardioModal] = useState(null) // dayIndex
   const [cardioExercises, setCardioExercises] = useState([])
+  const [healthConnected, setHealthConnected] = useState(null)
+  const [stepsToday, setStepsToday] = useState(0)
+  const [stepsInput, setStepsInput] = useState('')
+  const [stepsSaving, setStepsSaving] = useState(false)
+  const [stepsSaved, setStepsSaved] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -62,6 +67,32 @@ export default function WorkoutsPage() {
     setLoading(false)
 
     if (!prof) router.push('/life-hub/workouts/setup')
+
+    const [statusRes, stepsRes] = await Promise.all([
+      fetch('/api/health/status'),
+      fetch('/api/health/manual-steps'),
+    ])
+    const status = await statusRes.json()
+    const stepsData = await stepsRes.json()
+    setHealthConnected(status.connected)
+    if (!status.connected) {
+      setStepsToday(stepsData.steps ?? 0)
+      setStepsInput(String(stepsData.steps ?? 0))
+    }
+  }
+
+  async function handleSaveSteps() {
+    const val = parseInt(stepsInput)
+    if (isNaN(val) || val < 0) return
+    setStepsSaving(true)
+    const res = await fetch('/api/health/manual-steps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ steps: val }),
+    })
+    const json = await res.json()
+    setStepsSaving(false)
+    if (json.ok) { setStepsToday(val); setStepsSaved(true); setTimeout(() => setStepsSaved(false), 2000) }
   }
 
   async function handleRegenerate() {
@@ -344,6 +375,46 @@ export default function WorkoutsPage() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Today's Steps — shown only when Google Health is not connected */}
+      {healthConnected === false && (
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginTop: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div>
+              <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>Today's Steps</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Log your daily step count manually</div>
+            </div>
+            {stepsToday > 0 && (
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ color: 'var(--accent-blue)', fontSize: '22px', fontWeight: '700' }}>{stepsToday.toLocaleString()}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{Math.round(stepsToday / 10000 * 100)}% of 10k goal</div>
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <input
+              type="number"
+              min={0}
+              max={100000}
+              value={stepsInput}
+              onChange={e => setStepsInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSaveSteps()}
+              placeholder="Enter steps"
+              style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }}
+            />
+            <button
+              onClick={handleSaveSteps}
+              disabled={stepsSaving}
+              style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: stepsSaving ? 'not-allowed' : 'pointer', opacity: stepsSaving ? 0.5 : 1 }}
+            >
+              {stepsSaving ? 'Saving...' : stepsSaved ? '✓ Saved' : 'Save'}
+            </button>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>
+            Want automatic step tracking? Connect Google Health in <a href="/settings" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>Settings</a>.
+          </p>
         </div>
       )}
 

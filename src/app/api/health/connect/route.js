@@ -1,8 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
-const ALLOWED_EMAIL = 'Sethproper40@yahoo.com'
-
 const SCOPES = [
   'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
   'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
@@ -12,10 +10,7 @@ const SCOPES = [
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user || user.email.toLowerCase() !== ALLOWED_EMAIL.toLowerCase()) {
-    return new Response('Unauthorized', { status: 403 })
-  }
+  if (!user) return new Response('Unauthorized', { status: 401 })
 
   const state = crypto.randomUUID()
   const params = new URLSearchParams({

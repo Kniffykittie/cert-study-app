@@ -547,6 +547,14 @@ Every new Life Hub feature that generates loggable data **ships with a reset row
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 30l - Complete
+Open Google Health to all users + manual steps fallback:
+- Removed owner-only guard from `/api/health/connect/route.js` — any authenticated user can now connect their Google watch; friends must be added as test users in Google Cloud Console (APIs & Services → OAuth consent screen → Test users)
+- Connected Apps section in Settings now shows for all users (not just owner)
+- New `manual_steps_daily` table with RLS; new `/api/health/manual-steps` GET/POST route
+- Workouts page now loads health connection status and shows a "Today's Steps" card at the bottom when Google Health is NOT connected — shows current count, progress toward 10k, number input + Save, and a link to Settings to connect their watch
+- Card is hidden automatically if they connect Google Health
+
 ### Phase 30k - Complete
 Fix health data localStorage leaking across accounts:
 - Health overview/steps/sleep pages were reading from localStorage before confirming connection — test account saw owner's cached health data
