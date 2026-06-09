@@ -212,20 +212,23 @@ Scale weight is a terrible progress indicator when building muscle + losing fat 
 ---
 
 ### Life Hub — Nutrition (full build)
-- **Food logging** — calories, macros, micronutrients (B12, magnesium, potassium, vitamin D, iron, zinc, calcium, omega-3, fiber, sodium) tracked against RDVs
+- **Calorie & macro target calculation (TDEE)** — daily calorie goal is NOT hardcoded; it is calculated from goals_profiles using the Mifflin-St Jeor formula (height, weight, age, sex → BMR, then multiplied by activity level multiplier). Macro splits adjust by goal: muscle building = higher protein target (~0.8–1g per lb bodyweight), weight loss = moderate deficit (300–500 cal below TDEE), maintain = at TDEE. This runs at goals setup completion and whenever the profile is updated. No personalized calorie goal = nutrition dashboard is meaningless.
+- **Calorie burn / net calories** — post-workout logging captures estimated calories burned (duration + workout type → estimated burn); nutrition dashboard shows both total calories eaten AND net calories (eaten minus burned); critical for accurate deficit/surplus tracking for weight goals
+- **Food logging** — calories, macros, micronutrients (B12, magnesium, potassium, vitamin D, iron, zinc, calcium, omega-3, fiber, sodium) tracked against RDVs; each meal entry includes a timestamp and meal type (breakfast/lunch/dinner/snack) so timing context is available for IF users and workout nutrition timing
 - **Barcode scanner** — scan packaging via phone camera, auto-populate from Open Food Facts; full nutrition preview shown before saving — user can manually add or edit any missing/incorrect fields before confirming
 - **Manual food entry** — full nutrition fields form when no barcode available
 - **My Foods library** — personal library of frequently eaten foods, organized by category, one-tap logging; user can add new foods, remove foods, and edit/update nutrition facts on any saved food at any time
-- **Daily nutrition dashboard** — calories vs goal, macro ring charts, meal history, micronutrient progress bars
+- **Supplement → nutrition integration** — supplements logged in the supplement tracker count toward micronutrient RDVs on the nutrition dashboard (e.g. taking vitamin D supplement contributes to daily vitamin D total); build both features with this connection in mind so data isn't siloed
+- **Daily nutrition dashboard** — calories eaten vs goal, net calories (eaten minus burned), macro ring charts, meal history by day, micronutrient progress bars against RDVs
 - **Nutrition history** — past days/weeks, average macros, trend charts; targets personalized using goals_profiles (dietary_prefs, weight goal, body composition)
 - **Vitamin/nutrient encyclopedia** — searchable AI-generated reference per nutrient
 
 ---
 
 ### Life Hub — Workouts (remaining)
-- **Post-workout logging** — "Start Workout" → log sets/reps/weight per exercise → "Complete Workout" triggers AI check-in
-- **Workout history** — past sessions, volume over time, PRs per exercise
-- **Yoga & stretching planner** — AI-generated rolling weekly plan (always shows 7 days ahead from today, e.g. if today is June 8 it shows June 8–15, updating each day); stretches and poses correlate directly to that day's workout — arm day gets shoulder/bicep/tricep stretches, leg day gets hip flexor/quad/hamstring stretches, rest days get full-body recovery flows; includes pose names, hold duration, and form tips
+- **Post-workout logging** — opens with today's active plan pre-loaded (pulls from workout_plans JSONB for today's day_of_week); user fills in actual sets/reps/weight done per exercise — do NOT build as a blank form or nobody will use it; "Complete Workout" saves session, triggers AI check-in, and logs estimated calories burned (duration + workout type)
+- **Workout history** — past sessions with volume over time, PRs per exercise; PR = heaviest weight ever logged for that exercise; surface a PR badge on the workout complete screen when a new max is hit; show per-exercise PR history on the history page
+- **Yoga & stretching planner** — AI-generated rolling weekly plan (always shows 7 days ahead from today, e.g. if today is June 8 it shows June 8–15, updating each day); queries active workout_plans JSONB to determine muscle groups scheduled each day BEFORE generating stretches — arm day gets shoulder/bicep/tricep stretches, leg day gets hip flexor/quad/hamstring stretches, rest days get full-body recovery flows; includes pose names, hold duration, and form tips
 - **Stretching library** — organized by the muscle being stretched; click any stretch to open a popup with photo, hold duration, form tips, and common mistakes to avoid
 
 ---
