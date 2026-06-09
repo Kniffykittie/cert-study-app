@@ -75,6 +75,12 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `workout_profiles` | User's fitness profile — experience, goal, days_per_week, fitness stats, equipment, limitations, available_weights |
 | `workout_plans` | AI-generated weekly plans — plan JSONB (7 day objects), plan_notes, progression_notes, schedule JSONB, is_active |
 | `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, daily_steps, target_weight_lbs, timeline, notes, ai_overview; UNIQUE on user_id |
+| `body_measurements` | *(planned Phase 32)* Per-user dated body measurements — waist_in, hips_in, chest_in, left/right arm/thigh, neck_in; all NUMERIC nullable |
+| `weight_logs` | *(planned Phase 32)* Per-user dated scale weight entries — weight_lbs NUMERIC; one entry per user per day |
+| `daily_checkins` | *(planned Phase 33)* Energy + mood ratings per day — energy_level SMALLINT(1–5), mood_level SMALLINT(1–5), notes TEXT; UNIQUE on user_id + date |
+| `water_logs` | *(planned Phase 34)* Per-user water intake entries — logged_at TIMESTAMPTZ, amount_oz NUMERIC; aggregate to daily total in queries |
+| `supplement_stack` | *(planned Phase 35)* User's supplement list — name, dose, timing, nutrients JSONB, is_active; feeds micronutrient totals to nutrition dashboard passively |
+| `supplement_profiles` | *(planned Phase 35)* Cached AI-generated supplement info cards — keyed by normalized supplement name, shared across all users |
 
 ---
 
@@ -142,9 +148,13 @@ Scale weight is a terrible progress indicator when building muscle + losing fat 
 - History: table of past logs sorted newest-first with change indicators (green ↓ for waist/hips if losing, green ↑ for arms if building)
 - Chart view: line chart per measurement over time (toggle which measurements to show)
 
-**DB:** New table `body_measurements` — user_id, logged_at DATE, waist_in, hips_in, chest_in, left_arm_in, right_arm_in, left_thigh_in, right_thigh_in, neck_in (all NUMERIC nullable)
+**Weight logging** — "Log Today's Weight" input lives on this page alongside body measurements, not on the Goals page. goals_profiles holds only the one-time starting weight; actual tracked weight over time lives in a separate `weight_logs` table with dated entries. Show a line chart of weight over time with the target weight from goals_profiles as a goal line — this is the only real way to see if you're moving toward your target. Change indicators on the history table: green ↓ if trending toward goal weight, red ↑ if moving away.
 
-**AI integration:** Latest measurements stored/fetched and injected into generate-plan context — "waist trending down 1.5in over 60 days" tells the AI the plan is working and should maintain current approach
+**DB:** New tables:
+- `body_measurements` — user_id, logged_at DATE, waist_in, hips_in, chest_in, left_arm_in, right_arm_in, left_thigh_in, right_thigh_in, neck_in (all NUMERIC nullable)
+- `weight_logs` — user_id, logged_at DATE, weight_lbs NUMERIC; one entry per day
+
+**AI integration:** Latest measurements and recent weight trend injected into generate-plan context — "waist trending down 1.5in over 60 days" or "weight down 6 lbs in 8 weeks" tells the AI the plan is working and should maintain current approach
 
 ---
 
@@ -185,21 +195,24 @@ Scale weight is a terrible progress indicator when building muscle + losing fat 
 
 ---
 
-### Phase 35 — Supplement Tracker
-*Log daily supplements, see streaks, get AI-generated context on what you're taking.*
+### Phase 35 — Supplement Stack
+*Not a daily check-off tracker — a persistent stack that feeds nutrition data automatically and gives the AI full context on what the user takes.*
+
+**What it is**
+The user maintains a list of supplements they take regularly (their "stack"). These are not logged daily — they're set-and-forget entries that automatically contribute their nutrients to the nutrition dashboard every day. If someone takes creatine with BCAAs, those amino acids count toward their daily totals without re-logging. Vitamin D, magnesium, zinc — all passively add to micronutrient tracking.
 
 **UX**
-- My Supplements list: user-defined list of supplements they take (name, dose, timing: morning/afternoon/evening/with meals)
-- Daily log: check off each supplement as taken — "Mark All Taken" one-tap option
-- Streak per supplement (like DailyStreak) — consecutive days taken
-- Calendar heatmap: full months taken = green, partial = blue, missed = grey
-- Add supplement form: name + dose + optional timing note
-- AI profile card per supplement (generated on demand, cached): what it does, typical dosing, best time to take, common interactions, food sources if applicable — uses claude-sonnet-4-6
+- My Supplement Stack: list of supplements the user takes (name, dose, timing: morning/afternoon/evening/with meals, nutrient content)
+- Add supplement form: name + dose + timing + optional nutrient data (user can enter what's on the label — e.g. vitamin D: 2000 IU, zinc: 15mg); if they don't know nutrient content, they can leave it blank and the AI card will still show general info
+- Edit / remove any supplement at any time
+- AI info card per supplement (generated on demand, cached): what it does, typical dosing, best time to take, synergies with other supplements, common interactions, food sources if applicable — uses claude-sonnet-4-6
+
+**Nutrition connection**
+When the nutrition dashboard loads, it queries the user's supplement stack and adds each supplement's nutrient content to that day's micronutrient totals. No action needed from the user — it just works. This must be built as a connected system from day one, not bolted on after.
 
 **DB:** New tables:
-- `supplements` — user_id, name, dose, timing, is_active, created_at
-- `supplement_logs` — user_id, supplement_id, taken_at DATE, created_at
-- `supplement_profiles` — supplement name (normalized), ai_profile TEXT, generated_at (shared/cached across all users)
+- `supplement_stack` — user_id, name, dose, timing, nutrients JSONB (nutrient_name → amount + unit), is_active, created_at
+- `supplement_profiles` — supplement name (normalized), ai_profile TEXT, generated_at (shared/cached across all users — same pattern as question_templates)
 
 ---
 
@@ -212,30 +225,31 @@ Scale weight is a terrible progress indicator when building muscle + losing fat 
 ---
 
 ### Life Hub — Nutrition (full build)
-- **Calorie & macro target calculation (TDEE)** — daily calorie goal is NOT hardcoded; it is calculated from goals_profiles using the Mifflin-St Jeor formula (height, weight, age, sex → BMR, then multiplied by activity level multiplier). Macro splits adjust by goal: muscle building = higher protein target (~0.8–1g per lb bodyweight), weight loss = moderate deficit (300–500 cal below TDEE), maintain = at TDEE. This runs at goals setup completion and whenever the profile is updated. No personalized calorie goal = nutrition dashboard is meaningless.
-- **Calorie burn / net calories** — post-workout logging captures estimated calories burned (duration + workout type → estimated burn); nutrition dashboard shows both total calories eaten AND net calories (eaten minus burned); critical for accurate deficit/surplus tracking for weight goals
+- **Calorie & macro target calculation (TDEE)** — daily calorie goal is NOT hardcoded; it is calculated from goals_profiles using the Mifflin-St Jeor formula (height, weight, age, sex → BMR, then multiplied by activity level multiplier). Macro splits adjust by goal: muscle building = higher protein target (~0.8–1g per lb bodyweight), weight loss = moderate deficit, maintain = at TDEE. This runs at goals setup completion and whenever the profile is updated. No personalized calorie goal = nutrition dashboard is meaningless.
+- **Weight loss rate selector** — user picks their target pace: 0.5 / 1.0 / 1.5 / 2.0 / 2.5 lbs per week. The deficit is calculated from this (1 lb/week = ~500 cal/day deficit). Hard floors enforced regardless of selection: never below 1,200 cal/day for women, 1,500 cal/day for men — if the selected pace would push below that floor, warn the user and cap it. Also show a note that anything above 1.5 lbs/week increases the risk of muscle loss, nutrient deficiencies, and burnout. Surface a recalibration prompt after 2 weeks of consistent logging if actual weight change doesn't match predicted pace — this is how the system self-corrects rather than staying wrong forever.
+- **Calorie burn / net calories** — post-workout logging captures estimated calories burned using MET values by workout type applied to bodyweight and duration: strength training MET 3.5–5, moderate cardio MET 5–7, HIIT MET 8–10; ALWAYS use the LOW end of each MET range intentionally (underestimate, never overestimate — an overestimate causes someone to eat back calories they didn't actually burn and flatlines their deficit). Nutrition dashboard shows gross calories eaten AND net calories (eaten minus burned). Critical for accurate deficit/surplus tracking.
 - **Food logging** — calories, macros, micronutrients (B12, magnesium, potassium, vitamin D, iron, zinc, calcium, omega-3, fiber, sodium) tracked against RDVs; each meal entry includes a timestamp and meal type (breakfast/lunch/dinner/snack) so timing context is available for IF users and workout nutrition timing
 - **Barcode scanner** — scan packaging via phone camera, auto-populate from Open Food Facts; full nutrition preview shown before saving — user can manually add or edit any missing/incorrect fields before confirming
 - **Manual food entry** — full nutrition fields form when no barcode available
 - **My Foods library** — personal library of frequently eaten foods, organized by category, one-tap logging; user can add new foods, remove foods, and edit/update nutrition facts on any saved food at any time
-- **Supplement → nutrition integration** — supplements logged in the supplement tracker count toward micronutrient RDVs on the nutrition dashboard (e.g. taking vitamin D supplement contributes to daily vitamin D total); build both features with this connection in mind so data isn't siloed
-- **Daily nutrition dashboard** — calories eaten vs goal, net calories (eaten minus burned), macro ring charts, meal history by day, micronutrient progress bars against RDVs
+- **Supplement stack → nutrition integration** — supplements are NOT a daily check-off tracker; instead the user maintains a supplement stack (name, dose, timing, nutrient content) that feeds automatically into the nutrition dashboard. Creatine with BCAAs contributes to amino acid totals; vitamin D supplement counts toward vitamin D RDV; all supplements on their stack add to micronutrient totals passively every day without re-logging. AI can see the full supplement stack when generating recommendations. DB: `supplement_stack` table — user_id, name, dose, timing, nutrients JSONB (nutrient name → amount per dose). Build nutrition dashboard and supplement stack as connected from day one — do not silo them.
+- **Daily nutrition dashboard** — calories eaten vs goal, net calories (eaten minus burned), macro ring charts, meal history by day, micronutrient progress bars against RDVs (supplement contributions included)
 - **Nutrition history** — past days/weeks, average macros, trend charts; targets personalized using goals_profiles (dietary_prefs, weight goal, body composition)
 - **Vitamin/nutrient encyclopedia** — searchable AI-generated reference per nutrient
 
 ---
 
 ### Life Hub — Workouts (remaining)
-- **Post-workout logging** — opens with today's active plan pre-loaded (pulls from workout_plans JSONB for today's day_of_week); user fills in actual sets/reps/weight done per exercise — do NOT build as a blank form or nobody will use it; "Complete Workout" saves session, triggers AI check-in, and logs estimated calories burned (duration + workout type)
-- **Workout history** — past sessions with volume over time, PRs per exercise; PR = heaviest weight ever logged for that exercise; surface a PR badge on the workout complete screen when a new max is hit; show per-exercise PR history on the history page
-- **Yoga & stretching planner** — AI-generated rolling weekly plan (always shows 7 days ahead from today, e.g. if today is June 8 it shows June 8–15, updating each day); queries active workout_plans JSONB to determine muscle groups scheduled each day BEFORE generating stretches — arm day gets shoulder/bicep/tricep stretches, leg day gets hip flexor/quad/hamstring stretches, rest days get full-body recovery flows; includes pose names, hold duration, and form tips
-- **Stretching library** — organized by the muscle being stretched; click any stretch to open a popup with photo, hold duration, form tips, and common mistakes to avoid
+- **Post-workout logging** — opens with today's active plan pre-loaded (pulls from workout_plans JSONB for today's day_of_week); the log screen shows the planned sets/reps/weight from the plan as a visible reference right next to the input fields (e.g. "Plan: 3×10 @ 25 lbs" displayed beside the actual inputs) so the user never has to jump between pages mid-workout; user fills in actual sets/reps/weight done; "Complete Workout" saves session, triggers AI check-in, and logs estimated calories burned (duration + workout type using MET underestimate approach)
+- **Workout history** — past sessions with volume over time, PRs per exercise; PR = heaviest weight ever logged for that exercise (single definition — no 1RM/5RM complexity); surface a PR badge on the workout complete screen when a new max is hit; show per-exercise PR history on the workout history page
+- **Yoga & stretching planner** — AI-generated rolling weekly plan (always shows 7 days ahead from today); queries active workout_plans JSONB to determine muscle groups scheduled each day BEFORE generating stretches — arm day gets shoulder/bicep/tricep stretches, leg day gets hip flexor/quad/hamstring stretches, rest days get full-body recovery flows; includes pose name, hold duration, and form tips; re-generates when the active workout plan changes
+- **Yoga & stretching library** — organized by body region targeted (shoulders, chest, hips, hamstrings, quads, lower back, etc.); card/modal pattern same as exercise library; each entry has photo, hold duration, step-by-step form instructions, what to feel, and common mistakes to avoid
 
 ---
 
 ### Life Hub — Landing Page
 - **Wire overview cards** — connect all landing page cards with live data from every connected source (steps, HR, sleep, nutrition, check-in)
-- **Daily readiness score** — composite score shown on the Life Hub home; calculated from sleep quality, steps, resting HR, and nutrition completeness; gives the user a single at-a-glance number to understand how their body is doing today
+- **Daily readiness score** — composite 0–100 score on the Life Hub home; each of the 4 components contributes 0–25 points: sleep quality (0–25), steps vs daily goal (0–25), resting HR vs personal 30-day rolling baseline — not an absolute number, scored relative to the user's own typical HR so 55 bpm is "great" for one person and average for another (0–25), nutrition completeness — calories logged vs target + micronutrient coverage (0–25). Formula intentionally tunable — document the weights in code so they can be adjusted without re-discussing the formula from scratch.
 
 ---
 
@@ -252,6 +266,11 @@ Scale weight is a terrible progress indicator when building muscle + losing fat 
 - Exam countdown timer with target date
 - Advanced CCNA lab set (spanning tree deep dive, advanced OSPF, BGP intro)
 - PWA conversion (add to home screen, offline support)
+
+---
+
+### Settings — Reset Pattern (enforced rule)
+Every new Life Hub feature that generates loggable data **ships with a reset row in Settings → Data & Reset in the same build session**. Do not finish a feature and leave the reset for later. Features that will need reset rows when built: water_logs, supplement_stack, daily_checkins, body_measurements, weight_logs, nutrition food logs, workout sessions. Use the same button style and confirmation modal pattern already established in Phase 28.
 
 ---
 
