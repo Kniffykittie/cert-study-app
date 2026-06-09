@@ -83,8 +83,7 @@ export async function GET(req) {
   const range = searchParams.get('range') ?? 'today'
 
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data: tokenRow } = await supabase
@@ -193,8 +192,7 @@ export async function GET(req) {
 
 export async function POST(req) {
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data: tokenRow } = await supabase

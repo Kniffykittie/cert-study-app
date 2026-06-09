@@ -25,6 +25,10 @@ export default function SleepTrackerPage() {
   const handleMouseMove = useCallback((e) => setMousePos({ x: e.clientX, y: e.clientY }), [])
 
   async function load() {
+    const statusRes = await fetch('/api/health/status')
+    const status = await statusRes.json()
+    if (!status.connected) { setLoading(false); localStorage.removeItem('health_sleep'); return }
+
     const cached = localStorage.getItem('health_sleep')
     if (cached) { setData(JSON.parse(cached)); setLoading(false) }
 

@@ -10,6 +10,10 @@ export default function HealthPage() {
 
   useEffect(() => {
     async function load() {
+      const statusRes = await fetch('/api/health/status')
+      const status = await statusRes.json()
+      if (!status.connected) { setConnected(false); setLoading(false); localStorage.removeItem('health_overview'); return }
+
       const cached = localStorage.getItem('health_overview')
       if (cached) { setData(JSON.parse(cached)); setConnected(true); setLoading(false) }
 

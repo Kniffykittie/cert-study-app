@@ -547,6 +547,12 @@ Every new Life Hub feature that generates loggable data **ships with a reset row
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 30k - Complete
+Fix health data localStorage leaking across accounts:
+- Health overview/steps/sleep pages were reading from localStorage before confirming connection — test account saw owner's cached health data
+- Fixed: all three pages now check `/api/health/status` first; if not connected, clears the relevant localStorage keys and returns early
+- Also fixed `getSession()` → `getUser()` in both GET and POST handlers of `/api/health/sync/route.js`
+
 ### Phase 30j - Complete
 Invite system — full end-to-end:
 - `invite_codes` table with RLS (SELECT=public, INSERT=owner, UPDATE=authenticated+unused)

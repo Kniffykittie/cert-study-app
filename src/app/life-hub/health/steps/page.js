@@ -21,7 +21,14 @@ export default function StepTrackerPage() {
   function cacheKey(r) { return `health_steps_${r}` }
 
   async function fetchData(r) {
-    // Show cached data instantly, no loading spinner
+    const statusRes = await fetch('/api/health/status')
+    const status = await statusRes.json()
+    if (!status.connected) {
+      setLoading(false)
+      ;['today', 'yesterday', 'week'].forEach(k => localStorage.removeItem(cacheKey(k)))
+      return
+    }
+
     const cached = localStorage.getItem(cacheKey(r))
     if (cached) { setData(JSON.parse(cached)); setLoading(false) }
 
