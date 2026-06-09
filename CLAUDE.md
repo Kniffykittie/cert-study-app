@@ -79,6 +79,8 @@ src/
       chat/route.js                    General study chat (FloatingChat component); uses getUser() + is_disabled check
       wrong-answers/route.js           GET wrong answers by cert (deduped by question text)
       lab-doc-feedback/route.js        AI feedback on step documentation; uses getUser() + is_disabled check; prompt injection protected
+      owner/
+        verify-pin/route.js            POST — verifies owner PIN against OWNER_PIN_HASH env var; 3-attempt lockout for 1 hour; owner email check; module-level brute-force state
       lab-summary/route.js             AI lab completion summary (3 sections); uses getUser() + is_disabled check; prompt injection protected
       goals/
         generate-overview/route.js     POST — AI overview from goals_profiles; uses getUser() + is_disabled check; prompt injection protected; only called from handleFinish() on setup page

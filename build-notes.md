@@ -547,6 +547,14 @@ Every new Life Hub feature that generates loggable data **ships with a reset row
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 30h - Complete
+Owner PIN unlock in Settings:
+- New `/api/owner/verify-pin` POST route — bcrypt compares submitted PIN against `OWNER_PIN_HASH` env var; 3 wrong attempts triggers 1-hour lockout tracked in module-level state; owner email guard (403 for anyone else)
+- Settings → Security tab now shows an "Owner Access" card (purple border, owner-only) with PIN input field
+- Correct PIN → session unlocked for 4 hours via `sessionStorage` expiry; shows "Unlocked" state with Lock button
+- Wrong PIN → shows attempts remaining; 3rd failure shows countdown timer (MM:SS) until lockout expires
+- `OWNER_PIN_HASH` env var added to `.env.local`; Vercel deployment checklist updated in build-notes
+
 ### Phase 30g - Complete
 - Added `bcryptjs` dependency (for owner PIN and future per-user privacy PIN hashing)
 - Owner PIN set to bcrypt hash stored as `OWNER_PIN_HASH` environment variable in Vercel — plaintext never committed

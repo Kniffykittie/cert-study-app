@@ -4,7 +4,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
+const OWNER_EMAIL = 'sethproper40@yahoo.com'
 const ALLOWED_HEALTH_EMAIL = 'sethproper40@yahoo.com'
+const PIN_SESSION_KEY = 'ownerPinExpiry'
+const PIN_SESSION_HOURS = 4
 
 const CERTS = [
   { key: 'ccna', label: 'CCNA', color: 'var(--accent-blue)' },
@@ -42,6 +45,13 @@ export default function SettingsPage() {
   const [resetting, setResetting] = useState(false)
   const [resetMsg, setResetMsg] = useState('')
 
+  const [isOwner, setIsOwner] = useState(false)
+  const [ownerUnlocked, setOwnerUnlocked] = useState(false)
+  const [pinInput, setPinInput] = useState('')
+  const [pinSubmitting, setPinSubmitting] = useState(false)
+  const [pinError, setPinError] = useState('')
+  const [pinLockedSeconds, setPinLockedSeconds] = useState(0)
+
   const searchParams = useSearchParams()
 
   useEffect(() => {
@@ -56,6 +66,12 @@ export default function SettingsPage() {
         if (data.exam_dates) setExamDates({ ccna: '', 'network-plus': '', 'security-plus': '', ...data.exam_dates })
         if (data.daily_goal) setDailyGoal(data.daily_goal)
         if (data.default_cert) setDefaultCert(data.default_cert)
+      }
+
+      if (user.email.toLowerCase() === OWNER_EMAIL) {
+        setIsOwner(true)
+        const expiry = sessionStorage.getItem(PIN_SESSION_KEY)
+        if (expiry && Date.now() < parseInt(expiry)) setOwnerUnlocked(true)
       }
 
       if (user.email.toLowerCase() === ALLOWED_HEALTH_EMAIL) {
@@ -135,6 +151,44 @@ export default function SettingsPage() {
     await supabase.auth.signOut({ scope: 'global' })
     router.push('/login')
     router.refresh()
+  }
+
+  useEffect(() => {
+    if (pinLockedSeconds <= 0) return
+    const t = setInterval(() => setPinLockedSeconds(s => s <= 1 ? (clearInterval(t), 0) : s - 1), 1000)
+    return () => clearInterval(t)
+  }, [pinLockedSeconds > 0])
+
+  async function handleVerifyPin() {
+    if (!pinInput.trim()) return
+    setPinSubmitting(true)
+    setPinError('')
+    const res = await fetch('/api/owner/verify-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: pinInput }),
+    })
+    const json = await res.json()
+    setPinSubmitting(false)
+    if (json.ok) {
+      const expiry = Date.now() + PIN_SESSION_HOURS * 60 * 60 * 1000
+      sessionStorage.setItem(PIN_SESSION_KEY, String(expiry))
+      setOwnerUnlocked(true)
+      setPinInput('')
+    } else if (json.lockedSeconds) {
+      setPinLockedSeconds(json.lockedSeconds)
+      setPinError(json.error)
+      setPinInput('')
+    } else {
+      setPinError(json.error + (json.attemptsLeft != null ? ` (${json.attemptsLeft} attempt${json.attemptsLeft !== 1 ? 's' : ''} left)` : ''))
+    }
+  }
+
+  function handleLockOwner() {
+    sessionStorage.removeItem(PIN_SESSION_KEY)
+    setOwnerUnlocked(false)
+    setPinInput('')
+    setPinError('')
   }
 
   function daysUntil(dateStr) {
@@ -425,6 +479,65 @@ export default function SettingsPage() {
                 "Sign Out Everywhere" signs you out of all devices and sessions simultaneously.
               </p>
             </div>
+
+            {isOwner && (
+              <div style={{ backgroundColor: 'var(--surface)', border: `1px solid ${ownerUnlocked ? 'var(--accent-purple)' : 'var(--border)'}`, borderRadius: '10px', padding: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h2 style={{ color: 'var(--accent-purple)', fontSize: '14px', fontWeight: '600' }}>Owner Access</h2>
+                  {ownerUnlocked && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-purple)', fontSize: '12px', fontWeight: '600' }}>
+                      <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--accent-purple)', display: 'inline-block' }} />
+                      Unlocked · {PIN_SESSION_HOURS}h session
+                    </span>
+                  )}
+                </div>
+
+                {ownerUnlocked ? (
+                  <div>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>Owner tools are active for this session. Admin panel and additional controls coming in a later phase.</p>
+                    <button
+                      onClick={handleLockOwner}
+                      style={{ backgroundColor: 'transparent', border: '1px solid var(--accent-purple)', color: 'var(--accent-purple)', borderRadius: '8px', padding: '8px 18px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+                    >
+                      Lock Owner Access
+                    </button>
+                  </div>
+                ) : pinLockedSeconds > 0 ? (
+                  <div>
+                    <div style={{ backgroundColor: 'rgba(204,0,0,0.08)', border: '1px solid rgba(204,0,0,0.3)', borderRadius: '8px', padding: '12px 14px', marginBottom: '8px' }}>
+                      <div style={{ color: 'var(--error)', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Too many incorrect attempts</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+                        Try again in {Math.floor(pinLockedSeconds / 60)}m {pinLockedSeconds % 60}s
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '14px' }}>Enter your owner PIN to unlock admin controls for this session.</p>
+                    {pinError && <p style={{ color: 'var(--error)', fontSize: '13px', marginBottom: '10px' }}>{pinError}</p>}
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        value={pinInput}
+                        onChange={e => setPinInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleVerifyPin()}
+                        placeholder="Enter PIN"
+                        maxLength={8}
+                        style={{ width: '140px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '16px', outline: 'none', letterSpacing: '0.2em', textAlign: 'center' }}
+                      />
+                      <button
+                        onClick={handleVerifyPin}
+                        disabled={pinSubmitting || !pinInput.trim()}
+                        style={{ backgroundColor: 'var(--accent-purple)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: pinSubmitting || !pinInput.trim() ? 'not-allowed' : 'pointer', opacity: pinSubmitting || !pinInput.trim() ? 0.5 : 1 }}
+                      >
+                        {pinSubmitting ? 'Checking...' : 'Unlock'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {showHealthSection && (
               <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
