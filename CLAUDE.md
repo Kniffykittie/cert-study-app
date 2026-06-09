@@ -86,6 +86,11 @@ src/
         validate/route.js              GET ?code= — public; checks if code exists and unused
         redeem/route.js                POST — authenticated; marks invite code used_by + used_at
       lab-summary/route.js             AI lab completion summary (3 sections); uses getUser() + is_disabled check; prompt injection protected
+      delete-account/route.js          POST — full cascade delete across all tables + supabase admin auth user removal; uses getUser()
+      settings-pin/
+        set/route.js                   POST — bcrypt hash PIN and save to profiles.settings_pin_hash; uses getUser()
+        verify/route.js                POST — bcrypt compare PIN against stored hash; uses getUser()
+        remove/route.js                POST — verify current PIN then null out hash; uses getUser()
       goals/
         generate-overview/route.js     POST — AI overview from goals_profiles; uses getUser() + is_disabled check; prompt injection protected; only called from handleFinish() on setup page
       health/
@@ -171,7 +176,7 @@ src/
 | `question_templates` | Template library with variable_sets and is_retired flag |
 | `bookmarked_questions` | Bookmarks with reason, notes, and full question snapshot |
 | `flagged_questions` | User-reported question issues |
-| `profiles` | User display name, exam_dates JSONB, daily_goal INT, default_cert TEXT, is_disabled BOOLEAN (owner ban flag, checked in every AI route) |
+| `profiles` | User display name, exam_dates JSONB, daily_goal INT, default_cert TEXT, is_disabled BOOLEAN (owner ban flag, checked in every AI route), settings_pin_hash TEXT (bcrypt hash for Settings page Privacy PIN) |
 | `lab_progress` | Completed lab steps per user (user_id, lab_set_id, lab_id, step_id, completed_at) |
 | `lab_notes` | Per-lab freeform notes per user (user_id, lab_set_id, lab_id, notes, updated_at) |
 | `lab_timers` | Per-lab timer state — elapsed_seconds, is_running, last_started_at; unique per user+lab |

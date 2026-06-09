@@ -5,8 +5,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 const OWNER_EMAIL = 'sethproper40@yahoo.com'
-const ALLOWED_HEALTH_EMAIL = 'sethproper40@yahoo.com'
 const PIN_SESSION_KEY = 'ownerPinExpiry'
+const PRIVACY_PIN_SESSION_KEY = 'settingsPinUnlocked'
 const PIN_SESSION_HOURS = 4
 
 const CERTS = [
@@ -45,17 +45,38 @@ export default function SettingsPage() {
   const [resetting, setResetting] = useState(false)
   const [resetMsg, setResetMsg] = useState('')
 
+  // Owner PIN state
   const [isOwner, setIsOwner] = useState(false)
   const [ownerUnlocked, setOwnerUnlocked] = useState(false)
   const [pinInput, setPinInput] = useState('')
   const [pinSubmitting, setPinSubmitting] = useState(false)
   const [pinError, setPinError] = useState('')
   const [pinLockedSeconds, setPinLockedSeconds] = useState(0)
-
   const [inviteCodes, setInviteCodes] = useState([])
   const [inviteGenerating, setInviteGenerating] = useState(false)
   const [inviteMsg, setInviteMsg] = useState('')
   const [copiedCode, setCopiedCode] = useState('')
+
+  // Privacy PIN state
+  const [privacyPinSet, setPrivacyPinSet] = useState(false)
+  const [privacyPinGated, setPrivacyPinGated] = useState(false)
+  const [privacyPinInput, setPrivacyPinInput] = useState('')
+  const [privacyPinError, setPrivacyPinError] = useState('')
+  const [privacyPinChecking, setPrivacyPinChecking] = useState(false)
+  const [showSetPinModal, setShowSetPinModal] = useState(false)
+  const [showRemovePinModal, setShowRemovePinModal] = useState(false)
+  const [newPin, setNewPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [removePinInput, setRemovePinInput] = useState('')
+  const [pinModalError, setPinModalError] = useState('')
+  const [pinModalMsg, setPinModalMsg] = useState('')
+  const [pinModalLoading, setPinModalLoading] = useState(false)
+
+  // Account deletion state
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const searchParams = useSearchParams()
 
@@ -65,21 +86,25 @@ export default function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       setEmail(user.email)
-      const { data } = await supabase.from('profiles').select('display_name, exam_dates, daily_goal, default_cert').eq('id', user.id).single()
+      const { data } = await supabase.from('profiles').select('display_name, exam_dates, daily_goal, default_cert, settings_pin_hash').eq('id', user.id).single()
       if (data) {
         if (data.display_name) { setDisplayName(data.display_name); setSavedName(data.display_name) }
         if (data.exam_dates) setExamDates({ ccna: '', 'network-plus': '', 'security-plus': '', ...data.exam_dates })
         if (data.daily_goal) setDailyGoal(data.daily_goal)
         if (data.default_cert) setDefaultCert(data.default_cert)
+
+        // Privacy PIN gate
+        if (data.settings_pin_hash) {
+          setPrivacyPinSet(true)
+          const unlocked = sessionStorage.getItem(PRIVACY_PIN_SESSION_KEY)
+          if (!unlocked) setPrivacyPinGated(true)
+        }
       }
 
       if (user.email.toLowerCase() === OWNER_EMAIL) {
         setIsOwner(true)
         const expiry = sessionStorage.getItem(PIN_SESSION_KEY)
-        if (expiry && Date.now() < parseInt(expiry)) {
-          setOwnerUnlocked(true)
-          // fetchInviteCodes called after state settles via useEffect
-        }
+        if (expiry && Date.now() < parseInt(expiry)) setOwnerUnlocked(true)
       }
 
       setShowHealthSection(true)
@@ -169,7 +194,7 @@ export default function SettingsPage() {
     return () => clearInterval(t)
   }, [pinLockedSeconds > 0])
 
-  async function handleVerifyPin() {
+  async function handleVerifyOwnerPin() {
     if (!pinInput.trim()) return
     setPinSubmitting(true)
     setPinError('')
@@ -219,10 +244,7 @@ export default function SettingsPage() {
     const res = await fetch('/api/owner/generate-invite', { method: 'POST' })
     const json = await res.json()
     setInviteGenerating(false)
-    if (json.code) {
-      setInviteMsg(json.code)
-      fetchInviteCodes()
-    }
+    if (json.code) { setInviteMsg(json.code); fetchInviteCodes() }
   }
 
   function handleCopyCode(code) {
@@ -244,6 +266,123 @@ export default function SettingsPage() {
     return Math.ceil(diff / (1000 * 60 * 60 * 24))
   }
 
+  // Privacy PIN handlers
+  async function handlePrivacyPinUnlock() {
+    if (!privacyPinInput.trim()) return
+    setPrivacyPinChecking(true)
+    setPrivacyPinError('')
+    const res = await fetch('/api/settings-pin/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: privacyPinInput }),
+    })
+    setPrivacyPinChecking(false)
+    if (res.ok) {
+      sessionStorage.setItem(PRIVACY_PIN_SESSION_KEY, '1')
+      setPrivacyPinGated(false)
+      setPrivacyPinInput('')
+    } else {
+      setPrivacyPinError('Incorrect PIN. Try again.')
+      setPrivacyPinInput('')
+    }
+  }
+
+  async function handleSetPin() {
+    if (newPin.length < 4) { setPinModalError('PIN must be at least 4 digits.'); return }
+    if (newPin !== confirmPin) { setPinModalError('PINs do not match.'); return }
+    setPinModalLoading(true)
+    setPinModalError('')
+    const res = await fetch('/api/settings-pin/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: newPin }),
+    })
+    setPinModalLoading(false)
+    if (res.ok) {
+      setPrivacyPinSet(true)
+      sessionStorage.setItem(PRIVACY_PIN_SESSION_KEY, '1')
+      setShowSetPinModal(false)
+      setNewPin('')
+      setConfirmPin('')
+      setPinModalMsg('Privacy PIN set. Settings will be locked on your next visit.')
+      setTimeout(() => setPinModalMsg(''), 4000)
+    } else {
+      setPinModalError('Failed to set PIN. Try again.')
+    }
+  }
+
+  async function handleRemovePin() {
+    setPinModalLoading(true)
+    setPinModalError('')
+    const res = await fetch('/api/settings-pin/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: removePinInput }),
+    })
+    setPinModalLoading(false)
+    if (res.ok) {
+      setPrivacyPinSet(false)
+      sessionStorage.removeItem(PRIVACY_PIN_SESSION_KEY)
+      setShowRemovePinModal(false)
+      setRemovePinInput('')
+      setPinModalMsg('Privacy PIN removed.')
+      setTimeout(() => setPinModalMsg(''), 3000)
+    } else {
+      setPinModalError('Incorrect PIN.')
+    }
+  }
+
+  // Account deletion
+  async function handleDeleteAccount() {
+    if (deleteConfirmText !== 'DELETE') return
+    setDeleting(true)
+    setDeleteError('')
+    const res = await fetch('/api/delete-account', { method: 'POST' })
+    if (res.ok) {
+      router.push('/login')
+      router.refresh()
+    } else {
+      const json = await res.json()
+      setDeleteError(json.error || 'Deletion failed. Try again.')
+      setDeleting(false)
+    }
+  }
+
+  // Privacy PIN gate — shown before any page content
+  if (privacyPinGated) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: 'var(--background)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '36px 32px', maxWidth: '360px', width: '100%', textAlign: 'center' }}>
+          <div style={{ fontSize: '36px', marginBottom: '16px' }}>🔒</div>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Settings Locked</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>Enter your Privacy PIN to access Settings.</p>
+          {privacyPinError && <p style={{ color: 'var(--error)', fontSize: '13px', marginBottom: '12px' }}>{privacyPinError}</p>}
+          <input
+            type="password"
+            inputMode="numeric"
+            value={privacyPinInput}
+            onChange={e => setPrivacyPinInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handlePrivacyPinUnlock()}
+            placeholder="Enter PIN"
+            maxLength={12}
+            autoFocus
+            style={{ width: '100%', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 16px', color: 'var(--text-primary)', fontSize: '20px', outline: 'none', letterSpacing: '0.3em', textAlign: 'center', marginBottom: '12px', boxSizing: 'border-box' }}
+          />
+          <button
+            onClick={handlePrivacyPinUnlock}
+            disabled={privacyPinChecking || !privacyPinInput.trim()}
+            style={{ width: '100%', backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '12px', fontSize: '14px', fontWeight: '600', cursor: privacyPinChecking || !privacyPinInput.trim() ? 'not-allowed' : 'pointer', opacity: privacyPinChecking || !privacyPinInput.trim() ? 0.5 : 1 }}
+          >
+            {privacyPinChecking ? 'Checking...' : 'Unlock'}
+          </button>
+          <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '13px', marginTop: '16px', cursor: 'pointer', textDecoration: 'underline' }}>
+            Go back
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--background)', padding: '32px' }}>
       <div style={{ maxWidth: '640px', margin: '0 auto' }}>
@@ -259,18 +398,7 @@ export default function SettingsPage() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                border: 'none',
-                borderRadius: '7px',
-                fontSize: '13px',
-                fontWeight: activeTab === tab.key ? '600' : '400',
-                cursor: 'pointer',
-                backgroundColor: activeTab === tab.key ? 'var(--accent-blue)' : 'transparent',
-                color: activeTab === tab.key ? '#E8E8E8' : 'var(--text-secondary)',
-                transition: 'all 0.15s',
-              }}
+              style={{ flex: 1, padding: '8px 12px', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: activeTab === tab.key ? '600' : '400', cursor: 'pointer', backgroundColor: activeTab === tab.key ? 'var(--accent-blue)' : 'transparent', color: activeTab === tab.key ? '#E8E8E8' : 'var(--text-secondary)', transition: 'all 0.15s' }}
             >
               {tab.label}
             </button>
@@ -279,38 +407,52 @@ export default function SettingsPage() {
 
         {/* Account tab */}
         {activeTab === 'account' && (
-          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-            <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Account</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+              <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Account</h2>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Email</span>
-              <span style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{email || '—'}</span>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Plan</span>
-              <span style={{ color: 'var(--text-primary)', fontSize: '14px' }}>Personal</span>
-            </div>
-
-            <div>
-              <label style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Display Name</label>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={e => setDisplayName(e.target.value)}
-                  placeholder="Enter your name"
-                  style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }}
-                />
-                <button
-                  onClick={handleSaveName}
-                  disabled={saving || displayName === savedName}
-                  style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 18px', fontSize: '13px', fontWeight: '600', cursor: saving || displayName === savedName ? 'not-allowed' : 'pointer', opacity: saving || displayName === savedName ? 0.5 : 1 }}
-                >
-                  {saving ? 'Saving...' : saveMsg || 'Save'}
-                </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Email</span>
+                <span style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{email || '—'}</span>
               </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '6px' }}>This name appears in your greeting on the home screen.</p>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Plan</span>
+                <span style={{ color: 'var(--text-primary)', fontSize: '14px' }}>Personal</span>
+              </div>
+
+              <div>
+                <label style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Display Name</label>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={e => setDisplayName(e.target.value)}
+                    placeholder="Enter your name"
+                    style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }}
+                  />
+                  <button
+                    onClick={handleSaveName}
+                    disabled={saving || displayName === savedName}
+                    style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 18px', fontSize: '13px', fontWeight: '600', cursor: saving || displayName === savedName ? 'not-allowed' : 'pointer', opacity: saving || displayName === savedName ? 0.5 : 1 }}
+                  >
+                    {saving ? 'Saving...' : saveMsg || 'Save'}
+                  </button>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '6px' }}>This name appears in your greeting on the home screen.</p>
+              </div>
+            </div>
+
+            {/* Danger Zone */}
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid rgba(204,0,0,0.3)', borderRadius: '10px', padding: '20px' }}>
+              <h2 style={{ color: 'var(--error)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Danger Zone</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>Permanently delete your account and all associated data. This cannot be undone.</p>
+              <button
+                onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError('') }}
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '9px 20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+              >
+                Delete My Account
+              </button>
             </div>
           </div>
         )}
@@ -351,30 +493,17 @@ export default function SettingsPage() {
                 <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.05em' }}>DAILY QUESTION GOAL</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <input
-                    type="number"
-                    min={20}
-                    max={200}
-                    value={dailyGoal}
+                    type="number" min={20} max={200} value={dailyGoal}
                     onChange={e => setDailyGoal(Math.min(200, Math.max(20, parseInt(e.target.value) || 20)))}
                     style={{ width: '64px', backgroundColor: 'var(--background)', border: '1px solid var(--accent-blue)', borderRadius: '6px', padding: '4px 8px', color: 'var(--accent-blue)', fontSize: '16px', fontWeight: '700', outline: 'none', textAlign: 'center' }}
                   />
                   <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>/ day</span>
                 </div>
               </div>
-              <input
-                type="range"
-                min={20}
-                max={200}
-                step={5}
-                value={dailyGoal}
-                onChange={e => setDailyGoal(parseInt(e.target.value))}
-                style={{ width: '100%', accentColor: 'var(--accent-blue)', cursor: 'pointer' }}
-              />
+              <input type="range" min={20} max={200} step={5} value={dailyGoal} onChange={e => setDailyGoal(parseInt(e.target.value))} style={{ width: '100%', accentColor: 'var(--accent-blue)', cursor: 'pointer' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>20 — minimum</span>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-                  {dailyGoal <= 30 ? 'Light & steady' : dailyGoal <= 60 ? 'Solid daily habit' : dailyGoal <= 100 ? 'Serious grind' : 'Full exam crunch'}
-                </span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{dailyGoal <= 30 ? 'Light & steady' : dailyGoal <= 60 ? 'Solid daily habit' : dailyGoal <= 100 ? 'Serious grind' : 'Full exam crunch'}</span>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>200 — maximum</span>
               </div>
               <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Your streak tracker counts a day complete when you hit this goal.</p>
@@ -383,15 +512,9 @@ export default function SettingsPage() {
             <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
               <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', letterSpacing: '0.05em', marginBottom: '12px' }}>DEFAULT CERTIFICATION</div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <div onClick={() => setDefaultCert('')}
-                  style={{ padding: '8px 16px', backgroundColor: !defaultCert ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `1px solid ${!defaultCert ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '8px', color: !defaultCert ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontWeight: !defaultCert ? '600' : '400' }}>
-                  No preference
-                </div>
+                <div onClick={() => setDefaultCert('')} style={{ padding: '8px 16px', backgroundColor: !defaultCert ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `1px solid ${!defaultCert ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '8px', color: !defaultCert ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontWeight: !defaultCert ? '600' : '400' }}>No preference</div>
                 {CERTS.map(cert => (
-                  <div key={cert.key} onClick={() => setDefaultCert(cert.key)}
-                    style={{ padding: '8px 16px', backgroundColor: defaultCert === cert.key ? `${cert.color}18` : 'var(--background)', border: `1px solid ${defaultCert === cert.key ? cert.color : 'var(--border)'}`, borderRadius: '8px', color: defaultCert === cert.key ? cert.color : 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontWeight: defaultCert === cert.key ? '600' : '400' }}>
-                    {cert.label}
-                  </div>
+                  <div key={cert.key} onClick={() => setDefaultCert(cert.key)} style={{ padding: '8px 16px', backgroundColor: defaultCert === cert.key ? `${cert.color}18` : 'var(--background)', border: `1px solid ${defaultCert === cert.key ? cert.color : 'var(--border)'}`, borderRadius: '8px', color: defaultCert === cert.key ? cert.color : 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontWeight: defaultCert === cert.key ? '600' : '400' }}>{cert.label}</div>
                 ))}
               </div>
               <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Pre-selects this cert when you open Take a Test.</p>
@@ -399,11 +522,7 @@ export default function SettingsPage() {
 
             <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
               {prefSaveMsg && <span style={{ color: prefSaveMsg === 'Saved!' ? 'var(--success)' : 'var(--error)', fontSize: '13px' }}>{prefSaveMsg}</span>}
-              <button
-                onClick={handleSavePrefs}
-                disabled={prefSaving}
-                style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '13px', fontWeight: '600', cursor: prefSaving ? 'not-allowed' : 'pointer', opacity: prefSaving ? 0.5 : 1 }}
-              >
+              <button onClick={handleSavePrefs} disabled={prefSaving} style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '13px', fontWeight: '600', cursor: prefSaving ? 'not-allowed' : 'pointer', opacity: prefSaving ? 0.5 : 1 }}>
                 {prefSaving ? 'Saving...' : 'Save Preferences'}
               </button>
             </div>
@@ -505,28 +624,59 @@ export default function SettingsPage() {
         {/* Security tab */}
         {activeTab === 'security' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+            {/* Sign out */}
             <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-              <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Security</h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>Two-factor authentication and password change coming in a later phase.</p>
+              <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Sessions</h2>
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <button
-                  onClick={handleLogout}
-                  style={{ backgroundColor: 'var(--error-border)', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
-                >
+                <button onClick={handleLogout} style={{ backgroundColor: 'var(--error-border)', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
                   Sign Out
                 </button>
-                <button
-                  onClick={handleSignOutEverywhere}
-                  style={{ backgroundColor: 'transparent', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
-                >
+                <button onClick={handleSignOutEverywhere} style={{ backgroundColor: 'transparent', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
                   Sign Out Everywhere
                 </button>
               </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '10px' }}>
-                "Sign Out Everywhere" signs you out of all devices and sessions simultaneously.
-              </p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '10px' }}>"Sign Out Everywhere" signs you out of all devices and sessions simultaneously.</p>
             </div>
 
+            {/* Privacy PIN */}
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+              <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Privacy PIN</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>Lock Settings behind a PIN — protects against someone picking up your device and browsing your data.</p>
+
+              {pinModalMsg && (
+                <div style={{ backgroundColor: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.3)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px', fontSize: '13px', color: 'var(--success)' }}>
+                  {pinModalMsg}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: privacyPinSet ? 'var(--success)' : 'var(--border)' }} />
+                  <span style={{ color: privacyPinSet ? 'var(--success)' : 'var(--text-secondary)', fontSize: '14px', fontWeight: '600' }}>
+                    {privacyPinSet ? 'Enabled' : 'Not set'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => { setShowSetPinModal(true); setNewPin(''); setConfirmPin(''); setPinModalError('') }}
+                    style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '7px', padding: '7px 14px', fontSize: '13px', cursor: 'pointer' }}
+                  >
+                    {privacyPinSet ? 'Change PIN' : 'Set PIN'}
+                  </button>
+                  {privacyPinSet && (
+                    <button
+                      onClick={() => { setShowRemovePinModal(true); setRemovePinInput(''); setPinModalError('') }}
+                      style={{ backgroundColor: 'transparent', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '7px', padding: '7px 14px', fontSize: '13px', cursor: 'pointer' }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Owner Access (owner only) */}
             {isOwner && (
               <div style={{ backgroundColor: 'var(--surface)', border: `1px solid ${ownerUnlocked ? 'var(--accent-purple)' : 'var(--border)'}`, borderRadius: '10px', padding: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -542,21 +692,14 @@ export default function SettingsPage() {
                 {ownerUnlocked ? (
                   <div>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>Owner tools are active for this session. Admin panel coming in a later phase.</p>
-                    <button
-                      onClick={handleLockOwner}
-                      style={{ backgroundColor: 'transparent', border: '1px solid var(--accent-purple)', color: 'var(--accent-purple)', borderRadius: '8px', padding: '8px 18px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
-                    >
+                    <button onClick={handleLockOwner} style={{ backgroundColor: 'transparent', border: '1px solid var(--accent-purple)', color: 'var(--accent-purple)', borderRadius: '8px', padding: '8px 18px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
                       Lock Owner Access
                     </button>
                   </div>
                 ) : pinLockedSeconds > 0 ? (
-                  <div>
-                    <div style={{ backgroundColor: 'rgba(204,0,0,0.08)', border: '1px solid rgba(204,0,0,0.3)', borderRadius: '8px', padding: '12px 14px', marginBottom: '8px' }}>
-                      <div style={{ color: 'var(--error)', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Too many incorrect attempts</div>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-                        Try again in {Math.floor(pinLockedSeconds / 60)}m {pinLockedSeconds % 60}s
-                      </div>
-                    </div>
+                  <div style={{ backgroundColor: 'rgba(204,0,0,0.08)', border: '1px solid rgba(204,0,0,0.3)', borderRadius: '8px', padding: '12px 14px' }}>
+                    <div style={{ color: 'var(--error)', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Too many incorrect attempts</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Try again in {Math.floor(pinLockedSeconds / 60)}m {pinLockedSeconds % 60}s</div>
                   </div>
                 ) : (
                   <div>
@@ -564,20 +707,14 @@ export default function SettingsPage() {
                     {pinError && <p style={{ color: 'var(--error)', fontSize: '13px', marginBottom: '10px' }}>{pinError}</p>}
                     <div style={{ display: 'flex', gap: '10px' }}>
                       <input
-                        type="password"
-                        inputMode="numeric"
-                        value={pinInput}
+                        type="password" inputMode="numeric" value={pinInput}
                         onChange={e => setPinInput(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleVerifyPin()}
-                        placeholder="Enter PIN"
-                        maxLength={8}
+                        onKeyDown={e => e.key === 'Enter' && handleVerifyOwnerPin()}
+                        placeholder="Enter PIN" maxLength={8}
                         style={{ width: '140px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '16px', outline: 'none', letterSpacing: '0.2em', textAlign: 'center' }}
                       />
-                      <button
-                        onClick={handleVerifyPin}
-                        disabled={pinSubmitting || !pinInput.trim()}
-                        style={{ backgroundColor: 'var(--accent-purple)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: pinSubmitting || !pinInput.trim() ? 'not-allowed' : 'pointer', opacity: pinSubmitting || !pinInput.trim() ? 0.5 : 1 }}
-                      >
+                      <button onClick={handleVerifyOwnerPin} disabled={pinSubmitting || !pinInput.trim()}
+                        style={{ backgroundColor: 'var(--accent-purple)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: pinSubmitting || !pinInput.trim() ? 'not-allowed' : 'pointer', opacity: pinSubmitting || !pinInput.trim() ? 0.5 : 1 }}>
                         {pinSubmitting ? 'Checking...' : 'Unlock'}
                       </button>
                     </div>
@@ -586,6 +723,7 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {/* Invite Friends (owner unlocked only) */}
             {ownerUnlocked && (
               <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -593,43 +731,30 @@ export default function SettingsPage() {
                     <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '2px' }}>Invite Friends</h2>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Generate a one-time code and share it so someone can create an account.</p>
                   </div>
-                  <button
-                    onClick={handleGenerateInvite}
-                    disabled={inviteGenerating}
-                    style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: inviteGenerating ? 'not-allowed' : 'pointer', opacity: inviteGenerating ? 0.5 : 1, flexShrink: 0 }}
-                  >
+                  <button onClick={handleGenerateInvite} disabled={inviteGenerating}
+                    style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: inviteGenerating ? 'not-allowed' : 'pointer', opacity: inviteGenerating ? 0.5 : 1, flexShrink: 0 }}>
                     {inviteGenerating ? 'Generating...' : '+ New Code'}
                   </button>
                 </div>
-
                 {inviteCodes.length === 0 ? (
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', textAlign: 'center', padding: '16px 0' }}>No invite codes yet. Generate one above.</p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', textAlign: 'center', padding: '16px 0' }}>No invite codes yet.</p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {inviteCodes.map(invite => (
                       <div key={invite.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: 'var(--background)', border: `1px solid ${invite.used_by ? 'var(--border)' : 'rgba(0,128,255,0.3)'}`, borderRadius: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <span style={{ color: invite.used_by ? 'var(--text-secondary)' : 'var(--accent-blue)', fontFamily: 'monospace', fontSize: '15px', fontWeight: '700', letterSpacing: '0.1em', textDecoration: invite.used_by ? 'line-through' : 'none' }}>
-                            {invite.code}
-                          </span>
-                          {invite.used_by ? (
-                            <span style={{ color: 'var(--text-secondary)', fontSize: '11px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', padding: '2px 6px' }}>Used</span>
-                          ) : (
-                            <span style={{ color: 'var(--success)', fontSize: '11px', backgroundColor: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.3)', borderRadius: '4px', padding: '2px 6px' }}>Active</span>
-                          )}
+                          <span style={{ color: invite.used_by ? 'var(--text-secondary)' : 'var(--accent-blue)', fontFamily: 'monospace', fontSize: '15px', fontWeight: '700', letterSpacing: '0.1em', textDecoration: invite.used_by ? 'line-through' : 'none' }}>{invite.code}</span>
+                          {invite.used_by
+                            ? <span style={{ color: 'var(--text-secondary)', fontSize: '11px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', padding: '2px 6px' }}>Used</span>
+                            : <span style={{ color: 'var(--success)', fontSize: '11px', backgroundColor: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.3)', borderRadius: '4px', padding: '2px 6px' }}>Active</span>
+                          }
                         </div>
                         {!invite.used_by && (
                           <div style={{ display: 'flex', gap: '6px' }}>
-                            <button
-                              onClick={() => handleCopyCode(invite.code)}
-                              style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', cursor: 'pointer' }}
-                            >
+                            <button onClick={() => handleCopyCode(invite.code)} style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', cursor: 'pointer' }}>
                               {copiedCode === invite.code ? '✓ Copied' : 'Copy Code'}
                             </button>
-                            <button
-                              onClick={() => handleCopyLink(invite.code)}
-                              style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', cursor: 'pointer' }}
-                            >
+                            <button onClick={() => handleCopyLink(invite.code)} style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', cursor: 'pointer' }}>
                               {copiedCode === invite.code + '_link' ? '✓ Copied' : 'Copy Link'}
                             </button>
                           </div>
@@ -641,6 +766,7 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {/* Connected Apps */}
             {showHealthSection && (
               <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
                 <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Connected Apps</h2>
@@ -649,33 +775,20 @@ export default function SettingsPage() {
                     <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>❤️</div>
                     <div>
                       <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>Google Health</div>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
-                        {healthConnected ? `Connected ${healthConnectedAt ? `· since ${healthConnectedAt}` : ''}` : 'Steps, sleep, heart rate'}
-                      </div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{healthConnected ? `Connected${healthConnectedAt ? ` · since ${healthConnectedAt}` : ''}` : 'Steps, sleep, heart rate'}</div>
                     </div>
                   </div>
                   {healthConnected ? (
-                    <button
-                      onClick={handleDisconnectHealth}
-                      disabled={healthDisconnecting}
-                      style={{ backgroundColor: 'var(--error-border)', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: healthDisconnecting ? 'not-allowed' : 'pointer', opacity: healthDisconnecting ? 0.5 : 1 }}
-                    >
+                    <button onClick={handleDisconnectHealth} disabled={healthDisconnecting}
+                      style={{ backgroundColor: 'var(--error-border)', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: healthDisconnecting ? 'not-allowed' : 'pointer', opacity: healthDisconnecting ? 0.5 : 1 }}>
                       {healthDisconnecting ? 'Disconnecting...' : 'Disconnect'}
                     </button>
                   ) : (
-                    <a href="/api/health/connect"
-                      style={{ backgroundColor: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.4)', color: '#4285F4', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}
-                    >
-                      Connect
-                    </a>
+                    <a href="/api/health/connect" style={{ backgroundColor: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.4)', color: '#4285F4', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>Connect</a>
                   )}
                 </div>
-                {searchParams.get('health') === 'connected' && (
-                  <p style={{ color: 'var(--success)', fontSize: '12px', marginTop: '12px' }}>✓ Google Health connected successfully.</p>
-                )}
-                {searchParams.get('health') === 'error' && (
-                  <p style={{ color: 'var(--error)', fontSize: '12px', marginTop: '12px' }}>Failed to connect. Please try again.</p>
-                )}
+                {searchParams.get('health') === 'connected' && <p style={{ color: 'var(--success)', fontSize: '12px', marginTop: '12px' }}>✓ Google Health connected successfully.</p>}
+                {searchParams.get('health') === 'error' && <p style={{ color: 'var(--error)', fontSize: '12px', marginTop: '12px' }}>Failed to connect. Please try again.</p>}
               </div>
             )}
           </div>
@@ -693,13 +806,96 @@ export default function SettingsPage() {
               This will permanently delete all <strong style={{ color: 'var(--text-primary)' }}>{resetConfirm.label.toLowerCase()}</strong> for your account. This cannot be undone.
             </p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setResetConfirm(null)} disabled={resetting}
-                style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>
-                Cancel
-              </button>
-              <button onClick={handleReset} disabled={resetting}
-                style={{ backgroundColor: 'var(--error)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: resetting ? 'not-allowed' : 'pointer', opacity: resetting ? 0.6 : 1 }}>
+              <button onClick={() => setResetConfirm(null)} disabled={resetting} style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleReset} disabled={resetting} style={{ backgroundColor: 'var(--error)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: resetting ? 'not-allowed' : 'pointer', opacity: resetting ? 0.6 : 1 }}>
                 {resetting ? 'Resetting...' : 'Yes, Reset'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set / Change PIN modal */}
+      {showSetPinModal && (
+        <div onClick={() => !pinModalLoading && (setShowSetPinModal(false), setNewPin(''), setConfirmPin(''), setPinModalError(''))} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', maxWidth: '360px', width: '100%', padding: '28px' }}>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', marginBottom: '6px' }}>{privacyPinSet ? 'Change' : 'Set'} Privacy PIN</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>Must be at least 4 digits. This locks Settings on your next visit.</p>
+            {pinModalError && <p style={{ color: 'var(--error)', fontSize: '13px', marginBottom: '12px' }}>{pinModalError}</p>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+              <input
+                type="password" inputMode="numeric" value={newPin} onChange={e => setNewPin(e.target.value.replace(/\D/g, ''))}
+                placeholder="New PIN" maxLength={12} autoFocus
+                style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '11px 14px', color: 'var(--text-primary)', fontSize: '18px', outline: 'none', letterSpacing: '0.25em', textAlign: 'center' }}
+              />
+              <input
+                type="password" inputMode="numeric" value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+                onKeyDown={e => e.key === 'Enter' && handleSetPin()}
+                placeholder="Confirm PIN" maxLength={12}
+                style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '11px 14px', color: 'var(--text-primary)', fontSize: '18px', outline: 'none', letterSpacing: '0.25em', textAlign: 'center' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => { setShowSetPinModal(false); setNewPin(''); setConfirmPin(''); setPinModalError('') }} disabled={pinModalLoading}
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleSetPin} disabled={pinModalLoading || !newPin || !confirmPin}
+                style={{ backgroundColor: 'var(--accent-blue)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: pinModalLoading || !newPin || !confirmPin ? 'not-allowed' : 'pointer', opacity: pinModalLoading || !newPin || !confirmPin ? 0.5 : 1 }}>
+                {pinModalLoading ? 'Saving...' : 'Save PIN'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove PIN modal */}
+      {showRemovePinModal && (
+        <div onClick={() => !pinModalLoading && (setShowRemovePinModal(false), setRemovePinInput(''), setPinModalError(''))} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', maxWidth: '360px', width: '100%', padding: '28px' }}>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', marginBottom: '6px' }}>Remove Privacy PIN</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>Enter your current PIN to confirm removal.</p>
+            {pinModalError && <p style={{ color: 'var(--error)', fontSize: '13px', marginBottom: '12px' }}>{pinModalError}</p>}
+            <input
+              type="password" inputMode="numeric" value={removePinInput} onChange={e => setRemovePinInput(e.target.value.replace(/\D/g, ''))}
+              onKeyDown={e => e.key === 'Enter' && handleRemovePin()}
+              placeholder="Current PIN" maxLength={12} autoFocus
+              style={{ width: '100%', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '11px 14px', color: 'var(--text-primary)', fontSize: '18px', outline: 'none', letterSpacing: '0.25em', textAlign: 'center', marginBottom: '20px', boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => { setShowRemovePinModal(false); setRemovePinInput(''); setPinModalError('') }} disabled={pinModalLoading}
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleRemovePin} disabled={pinModalLoading || !removePinInput}
+                style={{ backgroundColor: 'var(--error)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: pinModalLoading || !removePinInput ? 'not-allowed' : 'pointer', opacity: pinModalLoading || !removePinInput ? 0.5 : 1 }}>
+                {pinModalLoading ? 'Removing...' : 'Remove PIN'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account modal */}
+      {showDeleteModal && (
+        <div onClick={() => !deleting && (setShowDeleteModal(false), setDeleteConfirmText(''), setDeleteError(''))} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--error)', borderRadius: '12px', maxWidth: '420px', width: '100%', padding: '28px' }}>
+            <div style={{ fontSize: '28px', marginBottom: '12px' }}>💀</div>
+            <h3 style={{ color: 'var(--error)', fontSize: '16px', fontWeight: '700', marginBottom: '8px' }}>Delete Your Account</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.6', marginBottom: '8px' }}>
+              This will <strong style={{ color: 'var(--text-primary)' }}>permanently delete</strong> your account and all associated data — study history, test scores, health data, workout plans, goals, and everything else.
+            </p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>
+              This <strong style={{ color: 'var(--error)' }}>cannot be undone</strong>. Type <strong style={{ color: 'var(--text-primary)', letterSpacing: '0.05em' }}>DELETE</strong> to confirm.
+            </p>
+            {deleteError && <p style={{ color: 'var(--error)', fontSize: '13px', marginBottom: '12px' }}>{deleteError}</p>}
+            <input
+              type="text" value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)}
+              placeholder="Type DELETE here" autoFocus
+              style={{ width: '100%', backgroundColor: 'var(--background)', border: `1px solid ${deleteConfirmText === 'DELETE' ? 'var(--error)' : 'var(--border)'}`, borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none', marginBottom: '20px', boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => { setShowDeleteModal(false); setDeleteConfirmText(''); setDeleteError('') }} disabled={deleting}
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleDeleteAccount} disabled={deleting || deleteConfirmText !== 'DELETE'}
+                style={{ backgroundColor: deleteConfirmText === 'DELETE' ? 'var(--error)' : 'transparent', border: '1px solid var(--error)', color: deleteConfirmText === 'DELETE' ? '#fff' : 'var(--error)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: deleting || deleteConfirmText !== 'DELETE' ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1, transition: 'all 0.15s' }}>
+                {deleting ? 'Deleting...' : 'Delete My Account'}
               </button>
             </div>
           </div>

@@ -219,6 +219,15 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 
 ## Phase Log
 
+### Phase 41 - Complete
+- **Account deletion** — Danger Zone card in Account tab; confirmation modal requires typing "DELETE"; `/api/delete-account` route wipes all user data across every table then calls Supabase admin to delete the auth user; requires `SUPABASE_SERVICE_ROLE_KEY` env var
+- **Privacy PIN** — optional Settings page lock; `settings_pin_hash TEXT` added to `profiles` via migration; full-page PIN gate shown before content if PIN is set and session not unlocked; Set/Change/Remove PIN modals in Security tab; bcrypt hash stored in DB (not env var); sessionStorage key `settingsPinUnlocked` tracks unlock state for the session
+- New routes: `delete-account/route.js`, `settings-pin/set`, `settings-pin/verify`, `settings-pin/remove`
+- **Test:** Set a PIN, navigate away, come back to Settings — should show lock screen. Enter wrong PIN → error. Correct PIN → unlocks. Go to Account tab → Delete My Account button in Danger Zone. Type DELETE → button activates.
+- **Note for Vercel:** Add `SUPABASE_SERVICE_ROLE_KEY` to environment variables (from Supabase project → Settings → API → service_role key — keep secret, never expose client-side)
+
+---
+
 ### Phase 40 - Complete
 - Template cycling: if bank runs short, loop back through pool re-rolling variables until requested count is met — user always gets full 25/50/etc. questions
 - `generate-questions/route.js`: added fill-remainder loop after initial distribution pass
