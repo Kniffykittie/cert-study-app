@@ -129,6 +129,11 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 30b - Complete
+Goals profile reset added for testing:
+- `src/app/api/reset/route.js`: added `goals_profile` scope — deletes `goals_profiles` row for the user
+- `src/app/settings/page.js`: Goals section added at the bottom of Data & Reset with a Reset button and confirmation modal
+
 ### Phase 30 - Complete
 Goals & Body Metrics — personalized profile that gates and powers all Life Hub AI:
 - Created `goals_profiles` Supabase table: goals TEXT[], height/weight/age/sex, activity_level, target_weight_lbs, timeline, notes, ai_overview; RLS user-scoped

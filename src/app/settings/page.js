@@ -369,7 +369,7 @@ export default function SettingsPage() {
                   Reset
                 </button>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
                 <div>
                   <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>Full Workout Reset</div>
                   <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Delete plan and fitness profile — restart the setup from scratch</div>
@@ -381,6 +381,23 @@ export default function SettingsPage() {
                   Reset All
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* Goals reset */}
+          <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>Goals</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+              <div>
+                <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>Goals Profile</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Delete goals profile and AI overview — returns to goals setup on next visit</div>
+              </div>
+              <button onClick={() => setResetConfirm({ scope: 'goals_profile', label: 'Goals profile' })}
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
+                Reset
+              </button>
             </div>
           </div>
         </div>

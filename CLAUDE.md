@@ -377,9 +377,10 @@ src/
 - All study data reset: same tables across all certs + `bookmarked_questions` + `flagged_questions`
 - Workout plan reset: deletes all `workout_plans` rows — keeps the fitness profile intact
 - Full workout reset: deletes `workout_plans` + `workout_profiles` — user returns to setup flow on next visit
+- Goals profile reset: deletes `goals_profiles` row — user returns to goals setup on next visit; triggers re-gating of workouts/nutrition
 - All resets gated behind a confirmation modal (⚠️ warning, explicit "Yes, Reset" button); cannot be triggered by accident
 - Success/error message shown inline after completion
-- API route: `POST /api/reset` with `{ scope: 'cert'|'all_study'|'workout_plan'|'workout_profile', cert? }`
+- API route: `POST /api/reset` with `{ scope: 'cert'|'all_study'|'workout_plan'|'workout_profile'|'goals_profile', cert? }`
 - **Pattern for new sections:** as new Life Hub features are built, add their reset row here with the same button style
 
 ### Exercise Library
