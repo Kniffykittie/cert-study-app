@@ -547,6 +547,13 @@ Every new Life Hub feature that generates loggable data **ships with a reset row
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 30n - Complete
+Lab summary rate limit tightened to 1/hr with wait time message:
+- `lab-summary` limit changed from 10 → 1 per hour
+- `rateLimit.js` now returns `waitMinutes` (minutes until top of next hour) when blocked
+- Lab summary route returns `{ error: 'rate_limited', waitMinutes }` on 429
+- Lab page shows "You must wait X minutes before completing another lab summary" with reassurance that progress is saved
+
 ### Phase 30m - Complete
 Rate limiting on all AI routes:
 - New `api_rate_limits` table tracking calls per user per route per hour window

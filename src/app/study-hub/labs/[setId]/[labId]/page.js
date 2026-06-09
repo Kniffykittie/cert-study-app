@@ -279,7 +279,11 @@ export default function LabPage() {
         }),
       })
       const data = await res.json()
-      setSummaryText(data.summary ?? 'Unable to generate summary.')
+      if (data.error === 'rate_limited') {
+        setSummaryText(`⏳ You must wait ${data.waitMinutes} minute${data.waitMinutes !== 1 ? 's' : ''} before completing another lab summary.\n\nYour progress is saved — come back when the timer resets.`)
+      } else {
+        setSummaryText(data.summary ?? 'Unable to generate summary.')
+      }
     } catch {
       setSummaryText('Unable to generate summary. Check your connection and try again.')
     }

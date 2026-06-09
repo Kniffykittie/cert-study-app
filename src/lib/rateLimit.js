@@ -3,9 +3,17 @@ const LIMITS = {
   'test-chat': 30,
   'generate-questions': 20,
   'lab-doc-feedback': 25,
-  'lab-summary': 10,
+  'lab-summary': 1,
   'goals/generate-overview': 5,
   'workouts/generate-plan': 3,
+}
+
+function minutesUntilNextHour() {
+  const now = new Date()
+  const next = new Date(now)
+  next.setMinutes(0, 0, 0)
+  next.setHours(next.getHours() + 1)
+  return Math.ceil((next - now) / 60000)
 }
 
 export async function checkRateLimit(supabase, userId, route) {
@@ -20,5 +28,5 @@ export async function checkRateLimit(supabase, userId, route) {
   if (error) return { allowed: true } // fail open — don't block on DB error
 
   const allowed = data <= limit
-  return { allowed, count: data, limit }
+  return { allowed, count: data, limit, waitMinutes: allowed ? 0 : minutesUntilNextHour() }
 }
