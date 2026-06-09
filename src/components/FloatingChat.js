@@ -24,8 +24,9 @@ function formatText(text) {
     } else if (line.trim() === '') {
       elements.push(<div key={i} style={{ height: '6px' }} />)
     } else {
+      const isBullet = line.trimStart().startsWith('- ') || line.trimStart().startsWith('• ')
       const parts = []
-      let remaining = line
+      let remaining = isBullet ? line.trimStart().slice(2) : line
       // Bold
       remaining = remaining.replace(/\*\*(.*?)\*\*/g, (_, m) => `__BOLD__${m}__ENDBOLD__`)
       // Inline code
@@ -46,11 +47,9 @@ function formatText(text) {
           parts.push(<span key={si}>{seg}</span>)
         }
       })
-      const isBullet = line.trimStart().startsWith('- ') || line.trimStart().startsWith('• ')
-      const content = isBullet ? parts.slice(1) : parts
       elements.push(
         isBullet
-          ? <div key={i} style={{ display: 'flex', gap: '6px', marginBottom: '3px' }}><span style={{ color: 'var(--accent-blue)', flexShrink: 0 }}>•</span><span style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5' }}>{content}</span></div>
+          ? <div key={i} style={{ display: 'flex', gap: '6px', marginBottom: '3px' }}><span style={{ color: 'var(--accent-blue)', flexShrink: 0 }}>•</span><span style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5' }}>{parts}</span></div>
           : <div key={i} style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6', marginBottom: '2px' }}>{parts}</div>
       )
     }

@@ -547,6 +547,11 @@ Every new Life Hub feature that generates loggable data **ships with a reset row
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 30q - Complete
+Fix FloatingChat empty bullet points:
+- `parts.slice(1)` was removing bullet content since the entire line including `- ` was one text segment
+- Fixed by stripping bullet prefix from the line before building parts, not after
+
 ### Phase 30p - Complete
 Color-coded lab doc feedback:
 - AI now returns `{ rating: 'good'|'partial'|'poor', feedback: '...' }` as JSON
