@@ -56,5 +56,15 @@ export async function POST(req) {
     return NextResponse.json({ ok: true })
   }
 
+  if (scope === 'body_measurements') {
+    await supabase.from('body_measurements').delete().eq('user_id', userId)
+    return NextResponse.json({ ok: true })
+  }
+
+  if (scope === 'daily_checkins') {
+    await supabase.from('daily_checkins').delete().eq('user_id', userId)
+    return NextResponse.json({ ok: true })
+  }
+
   return NextResponse.json({ error: 'Unknown scope' }, { status: 400 })
 }

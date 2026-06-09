@@ -75,9 +75,8 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `workout_profiles` | User's fitness profile — experience, goal, days_per_week, fitness stats, equipment, limitations, available_weights |
 | `workout_plans` | AI-generated weekly plans — plan JSONB (7 day objects), plan_notes, progression_notes, schedule JSONB, is_active |
 | `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, daily_steps, target_weight_lbs, timeline, notes, ai_overview; UNIQUE on user_id |
-| `body_measurements` | *(planned Phase 32)* Per-user dated body measurements — waist_in, hips_in, chest_in, left/right arm/thigh, neck_in; all NUMERIC nullable |
-| `weight_logs` | *(planned Phase 32)* Per-user dated scale weight entries — weight_lbs NUMERIC; one entry per user per day |
-| `daily_checkins` | *(planned Phase 33)* Energy + mood ratings per day — energy_level SMALLINT(1–5), mood_level SMALLINT(1–5), notes TEXT; UNIQUE on user_id + date |
+| `body_measurements` | Per-user dated body measurements — weight_lbs, waist_in, hips_in, chest_in, left/right arm/thigh, neck_in, notes; UNIQUE on user_id + date; RLS enabled |
+| `daily_checkins` | Energy + mood ratings per day — energy_level SMALLINT(1–5), mood_level SMALLINT(1–5), note TEXT; UNIQUE on user_id + date; RLS enabled |
 | `water_logs` | *(planned Phase 34)* Per-user water intake entries — logged_at TIMESTAMPTZ, amount_oz NUMERIC; aggregate to daily total in queries |
 | `supplement_stack` | *(planned Phase 35)* User's supplement list — name, dose, timing, nutrients JSONB, is_active; feeds micronutrient totals to nutrition dashboard passively |
 | `supplement_profiles` | *(planned Phase 35)* Cached AI-generated supplement info cards — keyed by normalized supplement name, shared across all users |
@@ -218,6 +217,23 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 ---
 
 ## Phase Log
+
+### Phase 48 - Complete
+- **Phase 33 — Daily Check-In widget** on Life Hub home (`/life-hub/page.js`) — energy + mood ratings (1–5 with labels), optional note, save/update today's entry; 28-day heatmap (green=good, blue=okay, yellow=low, grey=none); today outlined in accent-purple
+- New table `daily_checkins` with RLS; reset row added to Settings
+- Life Hub home page rebuilt — removed placeholder cards, added check-in widget and heatmap above hub navigation cards
+
+### Phase 47 - Complete
+- **Phase 32 — Body Measurements page** at `/life-hub/goals/measurements` — how-to measuring guide (collapsible), date picker, 9-field log form (weight/waist/hips/chest/neck/left+right arm/thigh), save with upsert on date conflict
+- History table with per-field delta indicators (▲/▼) vs previous entry; delete with confirm modal
+- Weight-over-time SVG line chart (no library) — shows last 30 entries
+- New table `body_measurements` with RLS; Measurements link added to Goals sidebar dropdown; reset row in Settings; delete-account cascade updated
+
+### Phase 46 - Complete
+- **Phase 31 — Goals Setup Step 4 "Your Context"** added to goals onboarding flow (was 3 steps, now 4)
+- Biggest Obstacles multi-select (8 options) + free-text overflow; Primary Motivations multi-select (8 options) + free-text; Why These Goals textarea; Dietary Preferences multi-select (9 options, "No Restrictions" is mutually exclusive) + free-text; Average Sleep hours input
+- All new fields saved to `goals_profiles` (8 new columns); all injected into AI overview prompt with `<user_input>` tags for prompt injection protection
+- `MultiChip` helper component inline in setup page for consistent chip styling
 
 ### Phase 45 - Complete
 - **Authenticator app name on 2FA login** — during 2FA enrollment in Settings, user picks their authenticator app (Google Authenticator, Authy, 1Password, Microsoft Authenticator, Other) via chip selector; saved to `profiles.authenticator_name`

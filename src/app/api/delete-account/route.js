@@ -29,6 +29,8 @@ export async function POST(req) {
     supabase.from('health_heart_rate_daily').delete().eq('user_id', userId),
     supabase.from('health_sleep_sessions').delete().eq('user_id', userId),
     supabase.from('manual_steps_daily').delete().eq('user_id', userId),
+    supabase.from('body_measurements').delete().eq('user_id', userId),
+    supabase.from('daily_checkins').delete().eq('user_id', userId),
     supabase.from('api_rate_limits').delete().eq('user_id', userId),
     ...(cards?.length ? [supabase.from('flashcard_progress').delete().eq('user_id', userId).in('flashcard_id', cards.map(c => c.id))] : []),
   ])

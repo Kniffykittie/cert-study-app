@@ -77,6 +77,7 @@ export default function LifeHubSidebar() {
             {goalsOpen && (
               <div style={{ paddingLeft: '12px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {navLink('My Goals', '/life-hub/goals')}
+                {navLink('Measurements', '/life-hub/goals/measurements')}
                 {navLink('Setup', '/life-hub/goals/setup')}
               </div>
             )}

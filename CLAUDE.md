@@ -114,14 +114,15 @@ src/
         generate-plan/route.js         AI workout plan generator; uses getUser() + is_disabled check; prompt injection protected on limitations + dumbbell_note fields
     life-hub/
       layout.js                        Life Hub layout with LifeHubSidebar
-      page.js                          Life Hub landing
+      page.js                          Life Hub landing — daily check-in widget (energy/mood 1–5, note, 28-day heatmap), hub navigation cards
       health/
         page.js                        Health Overview — steps today, avg heart rate, sleep last night
         steps/page.js                  Step Tracker — hourly/weekly bar charts, goal progress, fixed tooltip
         sleep/page.js                  Sleep Tracker — stage breakdown bar, timeline chart, no-data state
       goals/
         page.js                        Goals overview — AI overview panel, active goals chips, body metrics card (BMI + disclaimer + build label), lifestyle card (activity + daily steps + timeline), notes; Edit Goals button
-        setup/page.js                  3-step goals onboarding: Step 1 Goals (multi-select 8 options), Step 2 Your Body (height/weight/age/sex/body composition/target weight), Step 3 Starting Point (activity level + daily steps + timeline + notes); supports ?redirect= param; gates workouts/nutrition if incomplete
+        measurements/page.js           Body Measurements — how-to guide, log form (9 fields: weight/waist/hips/chest/neck/arms/thighs), history table with delta indicators, weight-over-time SVG chart
+        setup/page.js                  4-step goals onboarding: Step 1 Goals, Step 2 Your Body, Step 3 Starting Point, Step 4 Your Context (obstacles/motivations/why/diet/sleep); supports ?redirect= param
       workouts/
         page.js                        My Workout Plan — weekly plan cards sorted Mon-Sun, day reassignment, add/remove exercises with AI check-in, add/change cardio on rest days; gates on goals profile
         setup/page.js                  7-step onboarding: experience, goals (multi-select), days, schedule, fitness check, cardio preferences, equipment; gates on goals profile
@@ -201,7 +202,9 @@ src/
 | `exercises` | Exercise library — name, body_part, equipment, target, secondary_muscles[], instructions[], gif_url (nullable) |
 | `workout_profiles` | User's fitness profile — experience, goal, days_per_week, fitness stats, equipment, limitations, available_weights |
 | `workout_plans` | AI-generated weekly plans — plan JSONB (7 day objects), plan_notes, progression_notes, schedule JSONB, is_active |
-| `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, daily_steps, target_weight_lbs, timeline, notes, ai_overview; one row per user (UNIQUE on user_id) |
+| `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, daily_steps, target_weight_lbs, timeline, notes, ai_overview, biggest_obstacles TEXT[], biggest_obstacles_other, primary_motivations TEXT[], primary_motivations_other, why_goals, dietary_preferences TEXT[], dietary_preferences_other, sleep_hours NUMERIC; UNIQUE on user_id |
+| `body_measurements` | Per-user dated body measurements — weight_lbs, waist_in, hips_in, chest_in, left/right arm/thigh, neck_in; UNIQUE on user_id + date; RLS enabled |
+| `daily_checkins` | Energy + mood check-ins per day — energy_level SMALLINT(1–5), mood_level SMALLINT(1–5), note TEXT; UNIQUE on user_id + date; RLS enabled |
 | `api_rate_limits` | Per-user per-route per-hour call counts; incremented atomically via `increment_rate_limit` Postgres function |
 | `recovery_codes` | 2FA recovery codes — user_id, code_hash TEXT (bcrypt), used_at TIMESTAMPTZ (null = unused); generated on 2FA enrollment, displayed once; RLS: user SELECT/UPDATE own rows |
 | `invite_codes` | Owner-generated one-time signup codes — code (unique), created_by, used_by (nullable), used_at; RLS: SELECT=public, INSERT=owner, UPDATE=authenticated |
@@ -379,9 +382,9 @@ src/
 - Setup page `?redirect=<path>` param causes `handleFinish()` to route back to the intended destination
 - **Workout plan context**: `generate-plan/route.js` fetches `goals_profiles` at generation time and injects body/lifestyle context into the AI prompt
 - API: `/api/goals/generate-overview` — POST, any authenticated user, updates `ai_overview` column on their own row
-- **Planned Phase 31:** Add Step 3 "Your Context" — Biggest Obstacle(s) multi-select + free text, Primary Motivation multi-select + free text, Why These Goals open textarea, Dietary Preference multi-select + free text, Sleep Hours. New DB columns on `goals_profiles`.
-- **Planned Phase 32:** Body Measurements page at `/life-hub/goals/measurements` — measurement how-to guide, log form, history table with change indicators, line chart over time. New `body_measurements` table.
-- **Planned Phase 33:** Daily Check-In widget on Life Hub home — energy + mood rating, optional note, 28-day heatmap. New `daily_checkins` table.
+- **Phase 31 built:** Step 3 "Your Context" added to goals setup — Biggest Obstacles, Primary Motivations, Why These Goals (free text), Dietary Preferences, Sleep Hours; all saved to `goals_profiles` and injected into AI overview prompt
+- **Phase 32 built:** Body Measurements page at `/life-hub/goals/measurements` — how-to guide, log form (9 fields), history with delta indicators, weight-over-time SVG chart; reset row in Settings
+- **Phase 33 built:** Daily Check-In widget on Life Hub home (`/life-hub`) — energy + mood 1–5 ratings, optional note, 28-day heatmap (green/blue/yellow/grey); reset row in Settings
 - **Planned Phase 34:** Water intake tracker — daily goal, tap-to-add, progress ring, 7-day chart. New `water_logs` table.
 - **Planned Phase 35:** Supplement tracker — user supplement list, daily check-off, per-supplement streak + calendar heatmap, AI profile cards cached in `supplement_profiles`.
 
