@@ -324,12 +324,22 @@ Single-use invite codes — the cleanest way to control who gets in without manu
    - `NEXT_PUBLIC_SUPABASE_URL` — from Supabase project settings
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — from Supabase project settings
    - `ANTHROPIC_API_KEY` — from Anthropic console (secret, never public)
-   - `OWNER_PIN_HASH` — bcrypt hash of owner PIN (already set in `.env.local`)
+   - `OWNER_PIN_HASH` — SHA-256 hex hash of owner PIN (already set in `.env.local`)
+   - `SUPABASE_SERVICE_ROLE_KEY` — from Supabase project → Settings → API → service_role secret (used for account deletion and admin panel)
    - `GOOGLE_CLIENT_ID` — from Google Cloud Console (for Health OAuth)
    - `GOOGLE_CLIENT_SECRET` — from Google Cloud Console
-   - `NEXT_PUBLIC_SITE_URL` — the Vercel production URL (needed for OAuth redirects)
+   - `NEXT_PUBLIC_SITE_URL` — the Vercel production URL (needed for OAuth redirects and password reset)
 4. Deploy and verify all features work on the live URL
 5. Update Google OAuth redirect URIs in Google Cloud Console to include the Vercel URL
+
+**Post-deploy Supabase config (do these after first deploy, requires live URL):**
+- Supabase dashboard → Authentication → URL Configuration → add `https://yourdomain.com/update-password` to the **Redirect URLs** list — required for password reset emails to work
+- Supabase dashboard → Authentication → URL Configuration → set **Site URL** to your Vercel production URL
+
+**Features that must be tested on Vercel (cannot test locally):**
+- `/update-password` page — password reset email flow; click reset link from email → should land on the page, show the form, and update password successfully
+- Google Health OAuth — full connect/disconnect flow on live URL
+- Owner admin "Send Password Reset" button — sends real email to user
 
 ---
 
