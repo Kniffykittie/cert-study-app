@@ -326,9 +326,9 @@ Single-use invite codes — the cleanest way to control who gets in without manu
    - `ANTHROPIC_API_KEY` — from Anthropic console (secret, never public)
    - `OWNER_PIN_HASH` — SHA-256 hex hash of owner PIN (already set in `.env.local`)
    - `SUPABASE_SERVICE_ROLE_KEY` — from Supabase project → Settings → API → service_role secret (used for account deletion and admin panel)
-   - `GOOGLE_CLIENT_ID` — from Google Cloud Console (for Health OAuth)
-   - `GOOGLE_CLIENT_SECRET` — from Google Cloud Console
-   - `NEXT_PUBLIC_SITE_URL` — the Vercel production URL (needed for OAuth redirects and password reset)
+   - `GOOGLE_HEALTH_CLIENT_ID` — from Google Cloud Console (for Health OAuth)
+   - `GOOGLE_HEALTH_CLIENT_SECRET` — from Google Cloud Console
+   - `NEXT_PUBLIC_SITE_URL` — the Vercel production URL (needed for Google Health OAuth redirects and password reset emails)
 4. Deploy and verify all features work on the live URL
 5. Update Google OAuth redirect URIs in Google Cloud Console to include the Vercel URL
 

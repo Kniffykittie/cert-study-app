@@ -7,7 +7,7 @@ export async function GET(req) {
   const error = searchParams.get('error')
 
   if (error || !code) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/settings?health=error`)
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/settings?health=error`)
   }
 
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -17,7 +17,7 @@ export async function GET(req) {
       code,
       client_id: process.env.GOOGLE_HEALTH_CLIENT_ID,
       client_secret: process.env.GOOGLE_HEALTH_CLIENT_SECRET,
-      redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/health/callback`,
+      redirect_uri: `${process.env.NEXT_PUBLIC_SITE_URL}/api/health/callback`,
       grant_type: 'authorization_code',
     }),
   })
@@ -25,12 +25,12 @@ export async function GET(req) {
   const tokens = await tokenRes.json()
 
   if (!tokenRes.ok || !tokens.access_token) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/settings?health=error`)
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/settings?health=error`)
   }
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`)
+  if (!user) return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/login`)
 
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
 
@@ -42,5 +42,5 @@ export async function GET(req) {
     updated_at: new Date().toISOString(),
   })
 
-  return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/settings?health=connected`)
+  return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/settings?health=connected`)
 }

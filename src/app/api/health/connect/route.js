@@ -15,7 +15,7 @@ export async function GET() {
   const state = crypto.randomUUID()
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_HEALTH_CLIENT_ID,
-    redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/health/callback`,
+    redirect_uri: `${process.env.NEXT_PUBLIC_SITE_URL}/api/health/callback`,
     response_type: 'code',
     scope: SCOPES,
     access_type: 'offline',
