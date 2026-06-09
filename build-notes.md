@@ -127,6 +127,17 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 ## Phase Log
 *(Newest phase first)*
 
+### Phase 29 - Complete
+Shared flashcard decks + owner-only generation:
+- Flashcard decks are now shared across all users — cards are stored once (by the owner) and readable by everyone
+- Supabase RLS updated: `flashcards` SELECT policy changed to `true` (all authenticated users); write operations still require `auth.uid() = user_id`
+- `generate-flashcards/route.js`: owner-only gate (403 for non-owner); dedup check now queries all cards for that cert, not just owner's
+- `generate-templates/route.js`: owner-only gate (403 for non-owner)
+- `flashcards/page.js`: Generate Deck and Add 40 More buttons only render for the owner; non-owners see "No cards yet — check back soon" when deck is empty
+- `templates/page.js`: Generate Templates panel only renders for the owner; coverage table still visible to all
+- Reset route updated: per-cert and all_study resets now only delete `flashcard_progress` (user's own progress), never touch the shared `flashcards` table
+- Settings descriptions updated to say "flashcard progress" instead of "flashcards"
+
 ### Phase 28 - Complete
 Settings — Data & Reset section:
 - New section in Settings page between Connected Apps and Security

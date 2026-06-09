@@ -9,13 +9,22 @@ const CERTS = [
   { key: 'security-plus', label: 'Security+', full: 'CompTIA Security+', color: 'var(--error)', href: '/study-hub/flashcards/security-plus' },
 ]
 
+const OWNER_EMAIL = 'sethproper40@yahoo.com'
+
 export default function FlashcardsPage() {
   const [stats, setStats] = useState({})
   const [generating, setGenerating] = useState(null)
   const [loading, setLoading] = useState(true)
   const [weakDomains, setWeakDomains] = useState([])
+  const [isOwner, setIsOwner] = useState(false)
 
-  useEffect(() => { loadStats(); loadWeakDomains() }, [])
+  useEffect(() => { loadStats(); loadWeakDomains(); checkOwner() }, [])
+
+  async function checkOwner() {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user?.email?.toLowerCase() === OWNER_EMAIL) setIsOwner(true)
+  }
 
   async function loadStats() {
     const supabase = createClient()
@@ -73,7 +82,7 @@ export default function FlashcardsPage() {
     <div>
       <div style={{ marginBottom: '32px' }}>
         <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Flashcards</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Generate once, study forever. Cards are saved permanently — generating more adds to your deck without replacing anything.</p>
+        <p style={{ color: 'var(--text-secondary)' }}>Shared decks — every card available to all users. Your progress is tracked individually.</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
@@ -126,18 +135,24 @@ export default function FlashcardsPage() {
                       Study Flashcards →
                     </button>
                   </Link>
-                  <button onClick={() => addMoreCards(cert.key)} disabled={!!generating}
-                    style={{ backgroundColor: 'var(--background)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px', fontSize: '12px', cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.5 : 1 }}>
-                    {isGenerating ? 'Adding cards...' : '+ Add 40 More Cards'}
-                  </button>
+                  {isOwner && (
+                    <button onClick={() => addMoreCards(cert.key)} disabled={!!generating}
+                      style={{ backgroundColor: 'var(--background)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px', fontSize: '12px', cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.5 : 1 }}>
+                      {isGenerating ? 'Adding cards...' : '+ Add 40 More Cards'}
+                    </button>
+                  )}
                 </>
               ) : (
                 <>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>No deck yet. Generate your first 60 cards — takes about 30 seconds.</p>
-                  <button onClick={() => addMoreCards(cert.key)} disabled={!!generating}
-                    style={{ backgroundColor: cert.color, color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px', fontSize: '14px', fontWeight: '600', cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.5 : 1 }}>
-                    {isGenerating ? 'Generating...' : 'Generate Deck (60 cards)'}
-                  </button>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>
+                    {isOwner ? 'No deck yet. Generate your first 60 cards — takes about 30 seconds.' : 'No cards yet — check back soon.'}
+                  </p>
+                  {isOwner && (
+                    <button onClick={() => addMoreCards(cert.key)} disabled={!!generating}
+                      style={{ backgroundColor: cert.color, color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px', fontSize: '14px', fontWeight: '600', cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.5 : 1 }}>
+                      {isGenerating ? 'Generating...' : 'Generate Deck (60 cards)'}
+                    </button>
+                  )}
                 </>
               )}
             </div>

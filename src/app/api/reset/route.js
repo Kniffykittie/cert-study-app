@@ -10,25 +10,21 @@ export async function POST(req) {
   const { scope, cert } = await req.json()
 
   if (scope === 'cert' && cert) {
-    // Delete all data for one specific cert
+    // Reset study data for one cert — flashcard deck is shared, only reset this user's progress
+    const { data: cards } = await supabase.from('flashcards').select('id').eq('cert', cert)
     await Promise.all([
       supabase.from('question_answers').delete().eq('user_id', userId).eq('cert', cert),
       supabase.from('topic_performance').delete().eq('user_id', userId).eq('cert', cert),
       supabase.from('test_sessions').delete().eq('user_id', userId).eq('cert', cert),
       supabase.from('paused_tests').delete().eq('user_id', userId).eq('cert', cert),
+      ...(cards?.length ? [supabase.from('flashcard_progress').delete().eq('user_id', userId).in('flashcard_id', cards.map(c => c.id))] : []),
     ])
-    // Flashcard progress cascades from flashcards, so delete flashcards last
-    const { data: cards } = await supabase.from('flashcards').select('id').eq('user_id', userId).eq('cert', cert)
-    if (cards?.length) {
-      const ids = cards.map(c => c.id)
-      await supabase.from('flashcard_progress').delete().in('flashcard_id', ids)
-      await supabase.from('flashcards').delete().eq('user_id', userId).eq('cert', cert)
-    }
     return NextResponse.json({ ok: true })
   }
 
   if (scope === 'all_study') {
-    // Delete all study data across all certs
+    // Reset all study data — flashcard decks are shared, only reset this user's progress
+    const { data: cards } = await supabase.from('flashcards').select('id')
     await Promise.all([
       supabase.from('question_answers').delete().eq('user_id', userId),
       supabase.from('topic_performance').delete().eq('user_id', userId),
@@ -36,13 +32,8 @@ export async function POST(req) {
       supabase.from('paused_tests').delete().eq('user_id', userId),
       supabase.from('bookmarked_questions').delete().eq('user_id', userId),
       supabase.from('flagged_questions').delete().eq('user_id', userId),
+      ...(cards?.length ? [supabase.from('flashcard_progress').delete().eq('user_id', userId).in('flashcard_id', cards.map(c => c.id))] : []),
     ])
-    const { data: cards } = await supabase.from('flashcards').select('id').eq('user_id', userId)
-    if (cards?.length) {
-      const ids = cards.map(c => c.id)
-      await supabase.from('flashcard_progress').delete().in('flashcard_id', ids)
-      await supabase.from('flashcards').delete().eq('user_id', userId)
-    }
     return NextResponse.json({ ok: true })
   }
 

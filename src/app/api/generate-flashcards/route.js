@@ -11,18 +11,23 @@ const CARD_TOPICS = {
   'security-plus': `General Security Concepts (controls, cryptography basics, PKI), Threats Vulnerabilities & Mitigations (malware, attacks, threat intelligence), Security Architecture (network segmentation, cloud security, zero trust), Security Operations (IAM, endpoint security, incident response, SIEM), Security Program Management (risk management, compliance, frameworks, data privacy)`,
 }
 
+const OWNER_EMAIL = 'sethproper40@yahoo.com'
+
 export async function POST(request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  if (session.user.email.toLowerCase() !== OWNER_EMAIL) {
+    return Response.json({ error: 'Flashcard generation is managed by the app owner.' }, { status: 403 })
+  }
 
   const { cert } = await request.json()
   if (!CARD_TOPICS[cert]) return Response.json({ error: 'Invalid cert' }, { status: 400 })
 
   const certLabel = CERT_LABELS[cert]
 
-  // Fetch existing card fronts so we never duplicate
-  const { data: existing } = await supabase.from('flashcards').select('front').eq('user_id', user.id).eq('cert', cert)
+  // Fetch existing card fronts so we never duplicate (shared deck — no user_id filter)
+  const { data: existing } = await supabase.from('flashcards').select('front').eq('cert', cert)
   const existingFronts = (existing ?? []).map(c => c.front)
   const isFirstGeneration = existingFronts.length === 0
   const generateCount = isFirstGeneration ? 60 : 40
@@ -74,9 +79,9 @@ Rules:
     cards = JSON.parse(text.slice(0, lastBrace + 1) + ']')
   }
 
-  // Insert new cards — never delete existing ones
+  // Insert new cards into the shared deck (user_id = owner for traceability)
   const rows = cards.map(c => ({
-    user_id: user.id,
+    user_id: session.user.id,
     cert,
     front: c.front,
     back: c.back,

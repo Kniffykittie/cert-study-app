@@ -18,6 +18,8 @@ const CERTS = {
 }
 const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
 
+const OWNER_EMAIL = 'sethproper40@yahoo.com'
+
 export default function TemplatesPage() {
   const [counts, setCounts] = useState({})
   const [loading, setLoading] = useState(true)
@@ -27,8 +29,15 @@ export default function TemplatesPage() {
   const [selectedDifficulty, setSelectedDifficulty] = useState('hard')
   const [genCount, setGenCount] = useState(10)
   const [lastResult, setLastResult] = useState(null)
+  const [isOwner, setIsOwner] = useState(false)
 
-  useEffect(() => { loadCounts() }, [])
+  useEffect(() => { loadCounts(); checkOwner() }, [])
+
+  async function checkOwner() {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user?.email?.toLowerCase() === OWNER_EMAIL) setIsOwner(true)
+  }
 
   async function loadCounts() {
     const supabase = createClient()
@@ -89,8 +98,8 @@ export default function TemplatesPage() {
         ))}
       </div>
 
-      {/* Generator */}
-      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '24px' }}>
+      {/* Generator — owner only */}
+      {isOwner ? <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '24px' }}>
         <h2 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '600', marginBottom: '20px' }}>Generate Templates</h2>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
           <div>
@@ -151,7 +160,7 @@ export default function TemplatesPage() {
           {generating ? 'Generating... (~30s)' : 'Generate 5 Templates'}
         </button>
         <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Templates are added to the pool permanently. Generating more for the same domain adds to the existing set.</p>
-      </div>
+      </div> : null}
 
       {/* Coverage table */}
       {!loading && totalAll > 0 && (

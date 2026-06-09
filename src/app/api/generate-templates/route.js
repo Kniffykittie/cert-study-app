@@ -3,14 +3,19 @@ import { createClient } from '@/lib/supabase/server'
 
 const client = new Anthropic()
 
+const OWNER_EMAIL = 'sethproper40@yahoo.com'
+
 export async function POST(req) {
   try {
     const { cert, domain, difficulty = 'hard', count = 10 } = await req.json()
     if (!cert || !domain) return Response.json({ error: 'cert and domain required' }, { status: 400 })
 
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    if (session.user.email.toLowerCase() !== OWNER_EMAIL) {
+      return Response.json({ error: 'Template generation is managed by the app owner.' }, { status: 403 })
+    }
 
     // Fetch existing templates for this domain so Claude can avoid duplicates
     const { data: existing } = await supabase

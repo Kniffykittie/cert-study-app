@@ -328,7 +328,7 @@ export default function SettingsPage() {
                 <div key={cert.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
                   <div>
                     <div style={{ color: cert.color, fontSize: '13px', fontWeight: '600' }}>{cert.label}</div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Questions, scores, test history, flashcards</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Questions, scores, test history, flashcard progress</div>
                   </div>
                   <button onClick={() => setResetConfirm({ scope: 'cert', cert: cert.key, label: `${cert.label} study data` })}
                     style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
@@ -341,7 +341,7 @@ export default function SettingsPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
                 <div>
                   <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>All Certs</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Wipe all questions, scores, bookmarks, and flashcards</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Wipe all questions, scores, bookmarks, and flashcard progress</div>
                 </div>
                 <button onClick={() => setResetConfirm({ scope: 'all_study', label: 'All study data' })}
                   style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
