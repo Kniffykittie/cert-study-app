@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
+const OWNER_EMAIL = 'sethproper40@yahoo.com'
+
 export default function StudySession({ cert, label, color }) {
   const [cards, setCards] = useState([])
   const [progress, setProgress] = useState({})
@@ -21,8 +23,9 @@ export default function StudySession({ cert, label, color }) {
   const [saving, setSaving] = useState(false)
   const [browserOpen, setBrowserOpen] = useState(false)
   const [expandedCard, setExpandedCard] = useState(null)
+  const [isOwner, setIsOwner] = useState(false)
 
-  useEffect(() => { loadCards() }, [])
+  useEffect(() => { loadCards(); checkOwner() }, [])
 
   useEffect(() => {
     function handleKey(e) {
@@ -40,6 +43,12 @@ export default function StudySession({ cert, label, color }) {
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
   }, [flipped, sessionDone, addingCard, browserOpen])
+
+  async function checkOwner() {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user?.email?.toLowerCase() === OWNER_EMAIL) setIsOwner(true)
+  }
 
   async function loadCards() {
     const supabase = createClient()
@@ -160,10 +169,12 @@ export default function StudySession({ cert, label, color }) {
             style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>
             {browserOpen ? 'Hide Cards' : 'Browse All Cards'}
           </button>
-          <button onClick={() => setAddingCard(true)}
-            style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>
-            + Add Card
-          </button>
+          {isOwner && (
+            <button onClick={() => setAddingCard(true)}
+              style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>
+              + Add Card
+            </button>
+          )}
         </div>
       </div>
 
@@ -285,8 +296,8 @@ export default function StudySession({ cert, label, color }) {
         </div>
       )}
 
-      {/* Add Card Modal */}
-      {addingCard && (
+      {/* Add Card Modal — owner only */}
+      {addingCard && isOwner && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '32px', width: '90%', maxWidth: '480px' }}>
             <h2 style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700', marginBottom: '20px' }}>Add Your Own Card</h2>

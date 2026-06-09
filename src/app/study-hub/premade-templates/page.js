@@ -44,9 +44,12 @@ function findDuplicates(templates, approvedSet) {
   return pairs.sort((x, y) => y.score - x.score)
 }
 
+const OWNER_EMAIL = 'sethproper40@yahoo.com'
+
 export default function PremadeTemplatesPage() {
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
+  const [isOwner, setIsOwner] = useState(false)
   const [filterCert, setFilterCert] = useState('all')
   const [filterDifficulty, setFilterDifficulty] = useState('all')
   const [filterDomain, setFilterDomain] = useState('all')
@@ -60,7 +63,14 @@ export default function PremadeTemplatesPage() {
   useEffect(() => {
     load()
     setApprovedKeys(getApproved())
+    checkOwner()
   }, [])
+
+  async function checkOwner() {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user?.email?.toLowerCase() === OWNER_EMAIL) setIsOwner(true)
+  }
 
   async function load() {
     const supabase = createClient()
@@ -200,10 +210,12 @@ export default function PremadeTemplatesPage() {
                             )
                           })}
                         </div>
-                        <button onClick={() => retire(t.id)} disabled={retiring === t.id}
-                          style={{ width: '100%', backgroundColor: 'rgba(204,0,0,0.08)', border: '1px solid var(--error-border)', borderRadius: '6px', padding: '6px', fontSize: '12px', fontWeight: '600', color: 'var(--error)', cursor: retiring === t.id ? 'not-allowed' : 'pointer', opacity: retiring === t.id ? 0.5 : 1 }}>
-                          {retiring === t.id ? 'Retiring...' : 'Retire This One'}
-                        </button>
+                        {isOwner && (
+                          <button onClick={() => retire(t.id)} disabled={retiring === t.id}
+                            style={{ width: '100%', backgroundColor: 'rgba(204,0,0,0.08)', border: '1px solid var(--error-border)', borderRadius: '6px', padding: '6px', fontSize: '12px', fontWeight: '600', color: 'var(--error)', cursor: retiring === t.id ? 'not-allowed' : 'pointer', opacity: retiring === t.id ? 0.5 : 1 }}>
+                            {retiring === t.id ? 'Retiring...' : 'Retire This One'}
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -266,10 +278,12 @@ export default function PremadeTemplatesPage() {
                     <span style={{ color: CERT_COLORS[t.cert] ?? 'var(--accent-blue)', fontSize: '11px', fontWeight: '700' }}>{CERT_LABELS[t.cert]}</span>
                     <span style={{ color: diffColor[t.difficulty], fontSize: '11px', fontWeight: '600', textTransform: 'capitalize' }}>{t.difficulty}</span>
                     <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{t.domain}</span>
-                    <button onClick={() => restore(t.id)} disabled={retiring === t.id}
-                      style={{ marginLeft: 'auto', backgroundColor: 'rgba(0,128,255,0.08)', border: '1px solid var(--accent-blue)', borderRadius: '6px', padding: '3px 10px', fontSize: '11px', fontWeight: '600', color: 'var(--accent-blue)', cursor: retiring === t.id ? 'not-allowed' : 'pointer', opacity: retiring === t.id ? 0.5 : 1 }}>
-                      {retiring === t.id ? '...' : '↩ Restore'}
-                    </button>
+                    {isOwner && (
+                      <button onClick={() => restore(t.id)} disabled={retiring === t.id}
+                        style={{ marginLeft: 'auto', backgroundColor: 'rgba(0,128,255,0.08)', border: '1px solid var(--accent-blue)', borderRadius: '6px', padding: '3px 10px', fontSize: '11px', fontWeight: '600', color: 'var(--accent-blue)', cursor: retiring === t.id ? 'not-allowed' : 'pointer', opacity: retiring === t.id ? 0.5 : 1 }}>
+                        {retiring === t.id ? '...' : '↩ Restore'}
+                      </button>
+                    )}
                   </div>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5', margin: 0 }}>{t.question_template}</p>
                 </div>
@@ -379,7 +393,7 @@ export default function PremadeTemplatesPage() {
                             <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{t.variable_sets.length} variable set{t.variable_sets.length !== 1 ? 's' : ''} — question generates {t.variable_sets.length} unique variants</div>
                           </div>
                         )}
-                        {!t.is_retired && (
+                        {!t.is_retired && isOwner && (
                           <button onClick={() => retire(t.id)} disabled={retiring === t.id}
                             style={{ marginTop: '4px', backgroundColor: 'rgba(204,0,0,0.08)', border: '1px solid var(--error-border)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', fontWeight: '600', color: 'var(--error)', cursor: retiring === t.id ? 'not-allowed' : 'pointer', opacity: retiring === t.id ? 0.5 : 1 }}>
                             {retiring === t.id ? 'Retiring...' : 'Retire Template'}
