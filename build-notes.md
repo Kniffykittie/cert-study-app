@@ -219,6 +219,13 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 
 ## Phase Log
 
+### Phase 42 - Complete
+- **Owner Admin Panel** — User Management card in Security tab (visible when owner unlocked); lists all accounts with email, display name, join date, last seen, active/disabled status, PIN indicator; per-user actions: Enable/Disable, Force Logout, Send Password Reset, Clear PIN; owner's own row shown but actions disabled
+- **Brute force protection on /join** — `join_attempts` table + `check_join_rate_limit` Postgres function; 5 failed invite code attempts per IP per hour triggers 429 block; attempts (success/fail) recorded via service role client; IP read from x-forwarded-for header
+- New routes: `owner/admin/users`, `owner/admin/toggle-disable`, `owner/admin/force-logout`, `owner/admin/send-reset`, `owner/admin/clear-pin`; all owner-only via email check
+
+---
+
 ### Phase 41 - Complete
 - **Account deletion** — Danger Zone card in Account tab; confirmation modal requires typing "DELETE"; `/api/delete-account` route wipes all user data across every table then calls Supabase admin to delete the auth user; requires `SUPABASE_SERVICE_ROLE_KEY` env var
 - **Privacy PIN** — optional Settings page lock; `settings_pin_hash TEXT` added to `profiles` via migration; full-page PIN gate shown before content if PIN is set and session not unlocked; Set/Change/Remove PIN modals in Security tab; bcrypt hash stored in DB (not env var); sessionStorage key `settingsPinUnlocked` tracks unlock state for the session

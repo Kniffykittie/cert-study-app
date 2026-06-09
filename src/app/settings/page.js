@@ -72,6 +72,12 @@ export default function SettingsPage() {
   const [pinModalMsg, setPinModalMsg] = useState('')
   const [pinModalLoading, setPinModalLoading] = useState(false)
 
+  // Admin panel state
+  const [adminUsers, setAdminUsers] = useState([])
+  const [adminLoading, setAdminLoading] = useState(false)
+  const [adminActionMsg, setAdminActionMsg] = useState({}) // userId -> message
+  const [adminActionLoading, setAdminActionLoading] = useState({}) // userId+action -> bool
+
   // Account deletion state
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -185,8 +191,37 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
-    if (ownerUnlocked) fetchInviteCodes()
+    if (ownerUnlocked) { fetchInviteCodes(); fetchAdminUsers() }
   }, [ownerUnlocked])
+
+  async function fetchAdminUsers() {
+    setAdminLoading(true)
+    const res = await fetch('/api/owner/admin/users')
+    const json = await res.json()
+    setAdminLoading(false)
+    if (json.users) setAdminUsers(json.users)
+  }
+
+  async function adminAction(userId, action, body, label) {
+    const key = userId + action
+    setAdminActionLoading(prev => ({ ...prev, [key]: true }))
+    setAdminActionMsg(prev => ({ ...prev, [userId]: '' }))
+    const res = await fetch(`/api/owner/admin/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const json = await res.json()
+    setAdminActionLoading(prev => ({ ...prev, [key]: false }))
+    if (json.ok) {
+      setAdminActionMsg(prev => ({ ...prev, [userId]: `✓ ${label}` }))
+      setTimeout(() => setAdminActionMsg(prev => ({ ...prev, [userId]: '' })), 3000)
+      if (action === 'toggle-disable') fetchAdminUsers()
+    } else {
+      setAdminActionMsg(prev => ({ ...prev, [userId]: `✗ ${json.error}` }))
+      setTimeout(() => setAdminActionMsg(prev => ({ ...prev, [userId]: '' })), 4000)
+    }
+  }
 
   useEffect(() => {
     if (pinLockedSeconds <= 0) return
@@ -763,6 +798,91 @@ export default function SettingsPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Admin Panel (owner unlocked only) */}
+            {ownerUnlocked && (
+              <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--accent-purple)', borderRadius: '10px', padding: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <div>
+                    <h2 style={{ color: 'var(--accent-purple)', fontSize: '14px', fontWeight: '600', marginBottom: '2px' }}>User Management</h2>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>All accounts on this app.</p>
+                  </div>
+                  <button onClick={fetchAdminUsers} disabled={adminLoading}
+                    style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', cursor: adminLoading ? 'not-allowed' : 'pointer', opacity: adminLoading ? 0.5 : 1 }}>
+                    {adminLoading ? 'Loading...' : 'Refresh'}
+                  </button>
+                </div>
+
+                {adminUsers.length === 0 && !adminLoading && (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', textAlign: 'center', padding: '12px 0' }}>No users found.</p>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {adminUsers.map(u => {
+                    const isOwnerSelf = u.email.toLowerCase() === OWNER_EMAIL
+                    const key = (action) => u.id + action
+                    return (
+                      <div key={u.id} style={{ backgroundColor: 'var(--background)', border: `1px solid ${u.is_disabled ? 'rgba(204,0,0,0.3)' : 'var(--border)'}`, borderRadius: '8px', padding: '14px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                          <div>
+                            <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>
+                              {u.display_name || '—'}
+                              {isOwnerSelf && <span style={{ color: 'var(--accent-purple)', fontSize: '11px', marginLeft: '8px' }}>you</span>}
+                            </div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>{u.email}</div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '4px' }}>
+                              Joined {new Date(u.created_at).toLocaleDateString()}
+                              {u.last_sign_in_at && ` · Last seen ${new Date(u.last_sign_in_at).toLocaleDateString()}`}
+                              {u.has_pin && ' · 🔒 PIN set'}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '11px', fontWeight: '600', padding: '3px 8px', borderRadius: '4px', backgroundColor: u.is_disabled ? 'rgba(204,0,0,0.1)' : 'rgba(46,204,113,0.08)', border: `1px solid ${u.is_disabled ? 'rgba(204,0,0,0.3)' : 'rgba(46,204,113,0.3)'}`, color: u.is_disabled ? 'var(--error)' : 'var(--success)', flexShrink: 0 }}>
+                            {u.is_disabled ? 'Disabled' : 'Active'}
+                          </span>
+                        </div>
+
+                        {adminActionMsg[u.id] && (
+                          <div style={{ fontSize: '12px', color: adminActionMsg[u.id].startsWith('✓') ? 'var(--success)' : 'var(--error)', marginBottom: '8px' }}>
+                            {adminActionMsg[u.id]}
+                          </div>
+                        )}
+
+                        {!isOwnerSelf && (
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => adminAction(u.id, 'toggle-disable', { userId: u.id, disabled: !u.is_disabled }, u.is_disabled ? 'Account enabled' : 'Account disabled')}
+                              disabled={!!adminActionLoading[key('toggle-disable')]}
+                              style={{ backgroundColor: 'transparent', border: `1px solid ${u.is_disabled ? 'var(--success)' : 'var(--error)'}`, color: u.is_disabled ? 'var(--success)' : 'var(--error)', borderRadius: '5px', padding: '4px 10px', fontSize: '11px', cursor: adminActionLoading[key('toggle-disable')] ? 'not-allowed' : 'pointer', opacity: adminActionLoading[key('toggle-disable')] ? 0.5 : 1 }}>
+                              {u.is_disabled ? 'Enable' : 'Disable'}
+                            </button>
+                            <button
+                              onClick={() => adminAction(u.id, 'force-logout', { userId: u.id }, 'Signed out everywhere')}
+                              disabled={!!adminActionLoading[key('force-logout')]}
+                              style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '5px', padding: '4px 10px', fontSize: '11px', cursor: adminActionLoading[key('force-logout')] ? 'not-allowed' : 'pointer', opacity: adminActionLoading[key('force-logout')] ? 0.5 : 1 }}>
+                              Force Logout
+                            </button>
+                            <button
+                              onClick={() => adminAction(u.id, 'send-reset', { email: u.email }, 'Password reset email sent')}
+                              disabled={!!adminActionLoading[key('send-reset')]}
+                              style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '5px', padding: '4px 10px', fontSize: '11px', cursor: adminActionLoading[key('send-reset')] ? 'not-allowed' : 'pointer', opacity: adminActionLoading[key('send-reset')] ? 0.5 : 1 }}>
+                              Send Password Reset
+                            </button>
+                            {u.has_pin && (
+                              <button
+                                onClick={() => adminAction(u.id, 'clear-pin', { userId: u.id }, 'Privacy PIN cleared')}
+                                disabled={!!adminActionLoading[key('clear-pin')]}
+                                style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '5px', padding: '4px 10px', fontSize: '11px', cursor: adminActionLoading[key('clear-pin')] ? 'not-allowed' : 'pointer', opacity: adminActionLoading[key('clear-pin')] ? 0.5 : 1 }}>
+                                Clear PIN
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
 

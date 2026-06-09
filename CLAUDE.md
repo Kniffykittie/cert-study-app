@@ -82,8 +82,14 @@ src/
       owner/
         verify-pin/route.js            POST — verifies owner PIN against OWNER_PIN_HASH env var; 3-attempt lockout for 1 hour; owner email check; module-level brute-force state
         generate-invite/route.js       POST — owner only; generates random XXXX-XXXX invite code; inserts to invite_codes table
+        admin/
+          users/route.js               GET — owner only; lists all auth users + profile data (display_name, is_disabled, has_pin) via admin client
+          toggle-disable/route.js      POST — owner only; flips is_disabled on profiles; cannot self-disable
+          force-logout/route.js        POST — owner only; invalidates all sessions for a user via admin client
+          send-reset/route.js          POST — owner only; sends password reset email via admin client
+          clear-pin/route.js           POST — owner only; nulls out settings_pin_hash on profiles
       invite/
-        validate/route.js              GET ?code= — public; checks if code exists and unused
+        validate/route.js              GET ?code= — public; checks if code exists and unused; IP-based brute force protection (5 failed attempts/hr blocks IP); records attempts in join_attempts table
         redeem/route.js                POST — authenticated; marks invite code used_by + used_at
       lab-summary/route.js             AI lab completion summary (3 sections); uses getUser() + is_disabled check; prompt injection protected
       delete-account/route.js          POST — full cascade delete across all tables + supabase admin auth user removal; uses getUser()
@@ -192,6 +198,7 @@ src/
 | `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, daily_steps, target_weight_lbs, timeline, notes, ai_overview; one row per user (UNIQUE on user_id) |
 | `api_rate_limits` | Per-user per-route per-hour call counts; incremented atomically via `increment_rate_limit` Postgres function |
 | `invite_codes` | Owner-generated one-time signup codes — code (unique), created_by, used_by (nullable), used_at; RLS: SELECT=public, INSERT=owner, UPDATE=authenticated |
+| `join_attempts` | IP-based brute force tracking for /join — ip TEXT, attempted_at, success BOOLEAN; `check_join_rate_limit(ip)` Postgres function counts fails in last hour |
 | `manual_steps_daily` | Manual step count per user per day — user_id, date, steps; unique(user_id, date); shown on workouts page when Google Health not connected |
 
 ---
