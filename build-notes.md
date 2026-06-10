@@ -267,6 +267,19 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 44 - Complete
+- **Nutrient Encyclopedia** at `/life-hub/nutrition/encyclopedia` — 13 tracked nutrients (Vitamins, Minerals, Other) with full AI-generated profiles cached in `nutrient_profiles` table (shared across users)
+- **Gap Report card** — top 4 nutrient gaps from 30-day food log averages shown as clickable chips; only appears when 7+ days logged
+- **Low Energy banner** — if avg check-in energy ≤ 2.5 over last 14 days, surfaces fatigue-linked nutrients (Iron, B12, Vitamin D, Magnesium, B6) as quick-access chips
+- **Color-coded status grid** — each card shows LOW/MODERATE/GOOD/HIGH/SUPP badge + stacked intake bar (blue = food, purple = supplements); computed from 30-day food log averages + supplement stack
+- **Right-drawer detail panel** — opens on card click; shows: personalized intake bar (food vs supplement split), meal plan coverage for current week, workout correlation note (if training 2+x/week), goal relevance chips, AI profile (what it does, cool facts, deficiency signs, too much, food sources, supplement notes), synergies + competitors
+- **AI generation** — POST `/api/nutrition/encyclopedia/[nutrient]` generates structured JSON profile via Claude; cached in `nutrient_profiles` after first load; all subsequent views served from cache
+- **Data correlations**: food logs (30d avg), supplement stack (matched + unit-converted), goals_profiles (goal relevance), daily_checkins (energy signal), workout_logs (activity level), meal_plan_entries (weekly coverage)
+- **New DB table**: `nutrient_profiles` (shared, open SELECT/INSERT/UPDATE RLS)
+- **New data file**: `src/data/nutrients.js` — master list of 13 nutrients with metadata (slug, key, rdv, synergies, competitors, suppMatch, goalTags, etc.)
+- **New routes**: `GET /api/nutrition/encyclopedia`, `GET/POST /api/nutrition/encyclopedia/[nutrient]`
+- **Sidebar**: Encyclopedia link added to Nutrition dropdown
+
 ### Phase 43e - Complete
 - **Nutrition sidebar dropdown** — "Nutrition" in LifeHubSidebar is now a dropdown like Goals/Health/Workouts; children: "Food Log" (`/life-hub/nutrition`) and "Meal Plan" (`/life-hub/nutrition/meal-plan`); auto-opens when on any `/life-hub/nutrition*` route
 

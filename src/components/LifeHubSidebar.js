@@ -218,6 +218,7 @@ export default function LifeHubSidebar() {
               <div style={{ paddingLeft: '12px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {navLink('Food Log', '/life-hub/nutrition')}
                 {navLink('Meal Plan', '/life-hub/nutrition/meal-plan')}
+                {navLink('Encyclopedia', '/life-hub/nutrition/encyclopedia')}
               </div>
             )}
           </div>

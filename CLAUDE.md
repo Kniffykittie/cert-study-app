@@ -111,6 +111,8 @@ src/
         log/route.js                   GET ?date= today's entries; POST add entry (multiplies macros by servings); DELETE by id; uses getUser()
         my-foods/route.js              GET user's saved food library; POST save new food; DELETE by id; uses getUser()
         tdee-check/route.js            GET pending tdee_suggestion; POST calculates implied TDEE from food logs + weight measurements (needs 14+ days + 2+ measurements); PATCH accept (writes custom_tdee) or dismiss; uses getUser()
+        encyclopedia/route.js          GET aggregates user context (30d food avgs, supplement coverage, check-in energy signal, workout frequency, meal plan avgs, goals); used by encyclopedia page
+        encyclopedia/[nutrient]/route.js  GET cached AI profile from nutrient_profiles; POST generates via Claude and caches; uses getUser() + is_disabled check
       health/
         connect/route.js               Initiates Google Health OAuth (any authenticated user; add friend's Gmail as test user in Google Cloud Console)
         manual-steps/route.js          GET today's manual step count; POST to upsert — shown on workouts page when Google Health not connected
@@ -426,7 +428,8 @@ src/
 - **Phase 42 built:** Daily Brief fix (never regenerates same day); Weekly Meal Plan at `/life-hub/nutrition/meal-plan` — Mon–Sun grid, food search, AI insight analysis (per-day macros + micronutrients vs FDA DV, Claude returns 4–6 typed callouts); `meal_plans` + `meal_plan_entries` tables with RLS
 - **Phase 43 built:** TDEE calibration card (checks food logs + weight measurements, queues suggestion if implied TDEE diverges >150 cal, Accept applies custom_tdee override); Progress Photos (private Supabase Storage, JPEG/PNG/WebP magic byte validation, photo grid + lightbox on Measurements page, Reset in Settings); Monthly Wrap AI summary page (`/life-hub/monthly-wrap`) with month picker, stat cards, and cached AI narrative; all three in Life Hub home grid + sidebar
 - **Phase 43c built:** Monthly Wrap: auto-generates on 1st of month (background, LifeHubSidebar); history sidebar of all past wraps; current month blocked with "still in progress" state; GET without ?month= returns all months list
-- **Phase 43e built:** Nutrition sidebar dropdown — "Nutrition" is now a collapsible dropdown with "Food Log" and "Meal Plan" children; auto-opens on active nutrition routes
+- **Phase 43e built:** Nutrition sidebar dropdown — "Nutrition" is now a collapsible dropdown with "Food Log", "Meal Plan", and "Encyclopedia" children; auto-opens on active nutrition routes
+- **Phase 44 built:** Nutrient Encyclopedia at `/life-hub/nutrition/encyclopedia` — 13 tracked nutrients, AI profiles cached in `nutrient_profiles` (shared), Gap Report card, Low Energy banner from check-in data, color-coded status grid (food + supplement split bar), right-drawer detail panel (intake, meal plan coverage, workout note, goal chips, AI profile, synergies/competitors)
 
 ### Google Health Integration
 - OAuth flow restricted to owner account only (`sethproper40@yahoo.com`) — 403 for all others
