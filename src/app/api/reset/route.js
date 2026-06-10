@@ -74,5 +74,10 @@ export async function POST(req) {
     return NextResponse.json({ ok: true })
   }
 
+  if (scope === 'water_logs') {
+    await supabase.from('water_logs').delete().eq('user_id', userId)
+    return NextResponse.json({ ok: true })
+  }
+
   return NextResponse.json({ error: 'Unknown scope' }, { status: 400 })
 }

@@ -101,6 +101,7 @@ export default function LifeHubSidebar() {
             {navLink('Overview', '/life-hub/health')}
             {navLink('Step Tracker', '/life-hub/health/steps')}
             {navLink('Sleep Tracker', '/life-hub/health/sleep')}
+            {navLink('Water Tracker', '/life-hub/health/water')}
           </div>
         )}
       </div>

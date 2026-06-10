@@ -120,6 +120,7 @@ src/
         page.js                        Health Overview — steps today, avg heart rate, sleep last night
         steps/page.js                  Step Tracker — hourly/weekly bar charts, goal progress, fixed tooltip
         sleep/page.js                  Sleep Tracker — stage breakdown bar, timeline chart, no-data state
+        water/page.js                  Water Tracker — progress ring, quick-add buttons (8/12/16/20/32 oz + custom), today's log with remove, 7-day bar chart; goal stored in localStorage
       goals/
         page.js                        Goals overview — AI overview panel, active goals chips, body metrics card (BMI + disclaimer + build label), lifestyle card (activity + daily steps + timeline), notes; Edit Goals button
         measurements/page.js           Body Measurements — how-to guide, log form (9 fields: weight/waist/hips/chest/neck/arms/thighs), history table with delta indicators, weight-over-time SVG chart
@@ -168,7 +169,7 @@ src/
       security-plus-labs.js            Security+ lab set — 4 labs, 20 steps — all steps have document arrays
   components/
     StudyHubSidebar.js                 Nav sidebar with test-in-progress guard
-    LifeHubSidebar.js                  Life Hub nav — Goals dropdown (My Goals + Setup), Health dropdown (Overview/Steps/Sleep), Workouts dropdown (My Plan + Exercise Library); each auto-opens on active routes
+    LifeHubSidebar.js                  Life Hub nav — Goals dropdown (My Goals + Measurements + Setup), Health dropdown (Overview/Steps/Sleep/Water), Workouts dropdown (My Plan + Workout History + Exercise Library); each auto-opens on active routes
     BookmarkModal.js                   Bookmark reason + notes modal
     DailyStreak.js                     30q/day streak tracker with 28-day calendar heatmap
     DomainTrend.js                     Per-domain score trend SVG chart (no library)
@@ -213,6 +214,7 @@ src/
 | `invite_codes` | Owner-generated one-time signup codes — code (unique), created_by, used_by (nullable), used_at; RLS: SELECT=public, INSERT=owner, UPDATE=authenticated |
 | `join_attempts` | IP-based brute force tracking for /join — ip TEXT, attempted_at, success BOOLEAN; `check_join_rate_limit(ip)` Postgres function counts fails in last hour |
 | `manual_steps_daily` | Manual step count per user per day — user_id, date, steps; unique(user_id, date); shown on workouts page when Google Health not connected |
+| `water_logs` | Water intake entries — user_id, date, amount_oz NUMERIC(6,1), created_at; RLS enabled; one row per tap (not aggregated) |
 | `workout_logs` | One row per completed workout session — user_id, plan_id (nullable), day_of_week, day_label, duration_seconds, created_at; RLS enabled |
 | `workout_log_sets` | Individual sets per session — log_id, user_id, exercise_id (nullable), exercise_name, set_number, set_type (warmup/working/dropset), weight_lbs, reps, rep_range, created_at; RLS enabled |
 
@@ -390,7 +392,8 @@ src/
 - **Phase 31 built:** Step 3 "Your Context" added to goals setup — Biggest Obstacles, Primary Motivations, Why These Goals (free text), Dietary Preferences, Sleep Hours; all saved to `goals_profiles` and injected into AI overview prompt
 - **Phase 32 built:** Body Measurements page at `/life-hub/goals/measurements` — how-to guide, log form (9 fields), history with delta indicators, weight-over-time SVG chart; reset row in Settings
 - **Phase 33 built:** Daily Check-In widget on Life Hub home (`/life-hub`) — energy + mood 1–5 ratings, optional note, 28-day heatmap (green/blue/yellow/grey); reset row in Settings
-- **Planned Phase 34:** Water intake tracker — daily goal, tap-to-add, progress ring, 7-day chart. New `water_logs` table.
+- **Phase 34 built:** Water Tracker at `/life-hub/health/water` — progress ring, quick-add (8/12/16/20/32 oz + custom), today's log with remove, 7-day bar chart; goal persisted to localStorage; reset row in Settings
+- **Planned Phase 35:** Supplement tracker — user supplement list, daily check-off, per-supplement streak + calendar heatmap, AI profile cards cached in `supplement_profiles`.
 - **Planned Phase 35:** Supplement tracker — user supplement list, daily check-off, per-supplement streak + calendar heatmap, AI profile cards cached in `supplement_profiles`.
 
 ### Google Health Integration

@@ -79,7 +79,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `daily_checkins` | Energy + mood ratings per day — energy_level SMALLINT(1–5), mood_level SMALLINT(1–5), note TEXT; UNIQUE on user_id + date; RLS enabled |
 | `workout_logs` | One row per completed workout session — user_id, plan_id (nullable), day_of_week, day_label, duration_seconds, created_at; RLS enabled |
 | `workout_log_sets` | Individual sets per session — log_id, user_id, exercise_id (nullable), exercise_name, set_number, set_type (warmup/working/dropset), weight_lbs, reps, rep_range, created_at; RLS enabled |
-| `water_logs` | *(planned Phase 34)* Per-user water intake entries — logged_at TIMESTAMPTZ, amount_oz NUMERIC; aggregate to daily total in queries |
+| `water_logs` | Per-user water intake entries — user_id, date DATE, amount_oz NUMERIC(6,1), created_at; one row per add (not aggregated); RLS enabled |
 | `supplement_stack` | *(planned Phase 35)* User's supplement list — name, dose, timing, nutrients JSONB, is_active; feeds micronutrient totals to nutrition dashboard passively |
 | `supplement_profiles` | *(planned Phase 35)* Cached AI-generated supplement info cards — keyed by normalized supplement name, shared across all users |
 | `progress_photos` | *(planned Phase 32)* User progress photo gallery — photo_url, taken_at DATE, description TEXT |
@@ -219,6 +219,14 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 ---
 
 ## Phase Log
+
+### Phase 34 - Complete
+- **Water Tracker** at `/life-hub/health/water` — SVG progress ring showing % of daily goal, quick-add buttons (8/12/16/20/32 oz + custom input + Enter key), today's log list with per-entry remove, 7-day bar chart (green = goal met, blue = today, purple = past days)
+- **Daily goal** editable inline, persisted to localStorage (`water_goal_oz`); default 64 oz
+- New `water_logs` table: user_id, date, amount_oz NUMERIC(6,1), created_at; RLS enabled
+- Water Tracker link added to Health dropdown in LifeHubSidebar
+- Settings reset row added: "Water Log History" → scope `water_logs`
+- `/api/reset` updated with `water_logs` scope
 
 ### Phase 53 - Complete
 - **Exercise trainer chatbot** — inside the `?` detail modal, a "💬 Ask your trainer" section at the bottom; chat input + scrollable message bubbles; calls `/api/workouts/exercise-chat` (Haiku) with full exercise context in system prompt; multi-turn history maintained per modal open; user text wrapped in `<user_input>` tags
