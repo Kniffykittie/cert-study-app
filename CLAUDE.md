@@ -442,6 +442,12 @@ src/
 - 52 strength exercises (dumbbell + bodyweight) + 9 cardio exercises in Supabase `exercises` table; 18 added in Phase 52b await gif_url images
 - Images stored in `public/exercises/` as static assets
 - To add exercises: save image to `public/exercises/`, push, insert row into `exercises` table
+- To add images to the 18 Phase 52b exercises (or any exercise with `gif_url = NULL`): save the image file to `public/exercises/`, push, then run this in the Supabase dashboard SQL editor:
+  ```sql
+  UPDATE exercises SET gif_url = '/exercises/your-filename.gif' WHERE id = 'the-exercise-id';
+  ```
+  Example: `UPDATE exercises SET gif_url = '/exercises/dead-bug.gif' WHERE id = 'core-bw-dead-bug';`
+  The 18 IDs awaiting images: `arm-db-incline-curl`, `arm-db-zottman-curl`, `arm-db-preacher-curl`, `back-db-reverse-fly`, `back-bw-inverted-row`, `core-bw-crunch`, `core-db-side-bend`, `core-bw-leg-raise`, `core-bw-mountain-climber`, `core-bw-dead-bug`, `core-bw-hollow-hold`, `leg-db-goblet-squat`, `leg-db-step-up`, `leg-db-sumo-squat`, `leg-bw-hip-thrust`, `leg-bw-single-leg-dl`, `sho-db-rear-delt-fly`, `sho-db-push-press`
 
 ---
 
