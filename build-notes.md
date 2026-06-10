@@ -220,6 +220,11 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 
 ## Phase Log
 
+### Phase 52b - Complete
+- **18 missing exercises added to Supabase** — exercises referenced by AI workout plan but absent from the library; all inserted with full instructions, secondary muscles, body_part/equipment/target metadata; gif_url = NULL (awaiting images)
+- Missing exercises were: Incline Dumbbell Curl, Zottman Curl, Dumbbell Preacher Curl, Dumbbell Reverse Fly, Inverted Row, Crunch, Dumbbell Side Bend, Leg Raise, Mountain Climber (core version), Dead Bug, Hollow Body Hold, Goblet Squat, Dumbbell Step Up, Dumbbell Sumo Squat, Hip Thrust, Single Leg Deadlift, Rear Delt Fly, Dumbbell Push Press
+- To add images: save to `public/exercises/` and run `UPDATE exercises SET gif_url = '/exercises/<filename>' WHERE id = '<id>'`
+
 ### Phase 52 - Complete
 - **Root bug fix**: `workout_logs` table schema was missing `day_of_week`, `day_label`, `duration_seconds`, `plan_id` — all inserts were silently failing. Migration added those columns plus `is_partial`, `post_workout_difficulty`, `post_workout_energy`, `post_workout_note`
 - **"What is this?" button** — `?` icon next to every exercise name in active workout logger; fetches exercise from Supabase by name, shows full detail modal (image, muscles, instructions, form cues) without leaving the page; details pre-fetched on page load for instant popup

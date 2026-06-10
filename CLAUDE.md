@@ -439,7 +439,7 @@ src/
 - Sticky left muscle-group nav with counts; scrollable grouped sections; Cardio section at bottom
 - Cards: image thumbnail (140px) or 🏋️ placeholder; click opens detail modal
 - Detail modal: full-width image, muscle tags, numbered instructions, green "WHERE YOU SHOULD FEEL IT", red "DO NOT"
-- 34 strength exercises (dumbbell + bodyweight) + 9 cardio exercises in Supabase `exercises` table
+- 52 strength exercises (dumbbell + bodyweight) + 9 cardio exercises in Supabase `exercises` table; 18 added in Phase 52b await gif_url images
 - Images stored in `public/exercises/` as static assets
 - To add exercises: save image to `public/exercises/`, push, insert row into `exercises` table
 
