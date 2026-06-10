@@ -117,7 +117,7 @@ function DetailPanel({ slug, ctx, onClose }) {
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 198 }} />
-      <div style={{ position: 'fixed', right: 0, top: 0, height: '100vh', width: '420px', maxWidth: '100vw', backgroundColor: 'var(--surface)', borderLeft: '1px solid var(--border)', zIndex: 199, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'fixed', right: 0, top: 0, height: '100vh', width: '560px', maxWidth: '100vw', backgroundColor: 'var(--surface)', borderLeft: '1px solid var(--border)', zIndex: 199, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, backgroundColor: 'var(--surface)', zIndex: 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -202,7 +202,7 @@ function DetailPanel({ slug, ctx, onClose }) {
               {profile.deficiency_signs?.length > 0 && (
                 <Section title="⚠️ Signs You May Be Low">
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {profile.deficiency_signs.map((s, i) => <span key={i} style={{ fontSize: '12px', color: 'var(--error)', backgroundColor: 'rgba(204,0,0,0.1)', borderRadius: '5px', padding: '3px 8px' }}>{s}</span>)}
+                    {profile.deficiency_signs.map((s, i) => <span key={i} style={{ fontSize: '12px', color: 'var(--warning)', backgroundColor: 'rgba(241,196,15,0.12)', borderRadius: '5px', padding: '3px 8px' }}>{s}</span>)}
                   </div>
                 </Section>
               )}

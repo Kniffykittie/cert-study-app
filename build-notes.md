@@ -267,6 +267,9 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 44e - Complete
+- **UI tweaks**: Encyclopedia detail panel widened from 420px → 560px; deficiency signs changed from hard-to-read red (`var(--error)`) to gold/warning (`var(--warning)` with `rgba(241,196,15,0.12)` background)
+
 ### Phase 44d - Complete
 - **Debug**: Wrapped Claude API call in try/catch in encyclopedia `[nutrient]` route to surface actual error detail; increased `max_tokens` from 800→1200
 
