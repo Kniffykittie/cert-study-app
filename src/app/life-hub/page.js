@@ -119,6 +119,7 @@ export default function LifeHubPage() {
   // Brief state
   const [brief, setBrief] = useState(null)
   const [briefLoading, setBriefLoading] = useState(false)
+  const [briefGeneratedAt, setBriefGeneratedAt] = useState(null)
   const [briefExpanded, setBriefExpanded] = useState(false)
 
   const briefTriggered = useRef(false)
@@ -206,12 +207,14 @@ export default function LifeHubPage() {
         const json = await res.json()
         if (json.brief) {
           setBrief(json.brief)
+          setBriefGeneratedAt(new Date())
         } else {
-          // Generate in background
+          // No cache for today — generate once
           setBriefLoading(true)
           const genRes = await fetch('/api/life-hub/daily-brief', { method: 'POST' })
           const genJson = await genRes.json()
           setBrief(genJson.brief)
+          setBriefGeneratedAt(new Date())
           setBriefLoading(false)
         }
       }
@@ -240,14 +243,6 @@ export default function LifeHubPage() {
     setMicroInsight(insight)
   }
 
-  async function handleRefreshBrief() {
-    setBriefLoading(true)
-    setBrief(null)
-    const res = await fetch('/api/life-hub/daily-brief', { method: 'POST' })
-    const json = await res.json()
-    setBrief(json.brief)
-    setBriefLoading(false)
-  }
 
   const checkinContext = loaded ? getCheckinContext(ctx) : null
 
@@ -320,22 +315,14 @@ export default function LifeHubPage() {
 
       {/* Daily Brief */}
       <div style={{ backgroundColor: 'var(--surface)', border: `1px solid ${brief ? 'rgba(123,47,190,0.35)' : 'var(--border)'}`, borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: brief ? '12px' : '0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '18px' }}>🤖</span>
-            <div>
-              <div style={{ color: 'var(--accent-purple)', fontSize: '13px', fontWeight: '700' }}>Your Daily Brief</div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-                {briefLoading ? 'Analyzing your data...' : brief ? new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'Generating...'}
-              </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: brief ? '12px' : '0' }}>
+          <span style={{ fontSize: '18px' }}>🤖</span>
+          <div>
+            <div style={{ color: 'var(--accent-purple)', fontSize: '13px', fontWeight: '700' }}>Your Daily Brief</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+              {briefLoading ? 'Analyzing your data...' : briefGeneratedAt ? new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'Generating...'}
             </div>
           </div>
-          {brief && !briefLoading && (
-            <button onClick={handleRefreshBrief}
-              style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', cursor: 'pointer' }}>
-              ↻ Refresh
-            </button>
-          )}
         </div>
 
         {briefLoading && !brief && (

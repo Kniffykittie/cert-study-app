@@ -229,6 +229,9 @@ src/
 | `food_log_entries` | Individual food log entries per user/date/meal_slot — name, brand, serving_size_label, servings, all macro + micronutrient fields (already multiplied by servings), source, food_cache_id, my_food_id; RLS user-scoped |
 | `workout_logs` | One row per completed workout session — user_id, plan_id (nullable), day_of_week, day_label, duration_seconds, created_at; RLS enabled |
 | `workout_log_sets` | Individual sets per session — log_id, user_id, exercise_id (nullable), exercise_name, set_number, set_type (warmup/working/dropset), weight_lbs, reps, rep_range, created_at; RLS enabled |
+| `daily_briefs` | Cached AI daily brief — brief_text, data_snapshot JSONB; UNIQUE on user_id + date; generated once per day on first Life Hub visit; never regenerates same day automatically; RLS user-scoped |
+| `meal_plans` | Weekly meal plan headers — week_start DATE (always a Monday); UNIQUE on user_id + week_start; RLS user-scoped |
+| `meal_plan_entries` | Individual planned foods per day/slot — plan_id, day_of_week SMALLINT (0=Mon…6=Sun), meal_slot, name, servings, macros + iron/calcium/vitamin_d/magnesium/potassium; completely separate from food_log_entries (planning only); RLS user-scoped |
 
 ---
 

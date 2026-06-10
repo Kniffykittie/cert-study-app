@@ -631,13 +631,18 @@ export default function NutritionPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '14px' }}>
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
         {[{ key: 'log', label: 'Food Log' }, { key: 'myfoods', label: '⭐ Saved Foods' }, { key: 'supplements', label: 'Supplements' }].map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)}
             style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: activeTab === t.key ? '600' : '400', cursor: 'pointer', backgroundColor: activeTab === t.key ? 'var(--accent-blue)' : 'var(--surface)', color: activeTab === t.key ? '#E8E8E8' : 'var(--text-secondary)', transition: 'all 0.15s' }}>
             {t.label}
           </button>
         ))}
+        <Link href="/life-hub/nutrition/meal-plan" style={{ textDecoration: 'none', marginLeft: 'auto' }}>
+          <button style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '13px', fontWeight: '400', cursor: 'pointer', backgroundColor: 'var(--surface)', color: 'var(--text-secondary)' }}>
+            📅 Meal Plan →
+          </button>
+        </Link>
       </div>
 
       {/* Food Log Tab */}

@@ -266,6 +266,15 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 42 - Complete
+- **Daily Brief fix** — brief now strictly generates once per day; removed manual Refresh button; F5/navigation always serves cached brief; only generates on first visit of each new day
+- **Weekly Meal Plan** at `/life-hub/nutrition/meal-plan` — fully separate from food log (zero impact on logged values); Mon–Sun × breakfast/lunch/dinner/snack/other grid; prev/next week navigation; day totals (cal + protein) in column headers; today highlighted
+- **Food search in meal plan** — same food_cache + my_foods + Open Food Facts search; servings adjuster with live calorie preview; manual entry fallback
+- **"Analyze This Week" AI insights** — POST `/api/nutrition/meal-plan/analyze`; builds per-day nutrient breakdown (calories, protein, iron, calcium, sodium, fiber, vitamin D, magnesium, potassium vs FDA DV); Claude returns 4–6 typed callouts (warning/tip/praise/info) citing specific days and food names
+- **Nutrition page** — "📅 Meal Plan →" link added alongside tabs
+- **New DB tables**: `meal_plans` + `meal_plan_entries` (both with RLS)
+- **New routes**: `GET/POST /api/nutrition/meal-plan`, `POST/DELETE /api/nutrition/meal-plan/entry`, `POST /api/nutrition/meal-plan/analyze`
+
 ### Phase 41 - Complete
 - **Daily Brief** — AI-generated 3–4 sentence paragraph on Life Hub home, synthesizing ALL data: food trend (avg cal vs TDEE, protein hit rate), weight trend + delta, last workout, sleep last night, energy score trend, TDEE calibration hint if 14+ days of data diverge by >150 cal; cached in `daily_briefs` table; Refresh button for manual regeneration; skeleton loading state on first visit of the day; instant on return visits
 - **Smart Contextual Check-In** — replaces generic "how are you feeling" with questions that change based on what actually happened yesterday: post-leg-day asks "Leg Recovery / Can't walk → Totally fresh", under-target calories asks "Hunger & Energy / Starving → Fueled", short sleep asks "Mental Sharpness / Brain fog → Locked in", 3+ low-energy streak surfaces a warning note; same 1–5 scale stored in existing table columns
