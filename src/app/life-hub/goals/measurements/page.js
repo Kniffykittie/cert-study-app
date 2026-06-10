@@ -36,6 +36,7 @@ function todayDate() {
 
 export default function MeasurementsPage() {
   const [history, setHistory] = useState([])
+  const [heightInches, setHeightInches] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
@@ -50,9 +51,26 @@ export default function MeasurementsPage() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { data } = await supabase.from('body_measurements').select('*').eq('user_id', user.id).order('date', { ascending: false })
+    const [{ data }, { data: goalsProfile }] = await Promise.all([
+      supabase.from('body_measurements').select('*').eq('user_id', user.id).order('date', { ascending: false }),
+      supabase.from('goals_profiles').select('height_inches').eq('user_id', user.id).single(),
+    ])
     setHistory(data ?? [])
+    if (goalsProfile?.height_inches) setHeightInches(goalsProfile.height_inches)
     setLoading(false)
+  }
+
+  function calcBmi(weightLbs) {
+    if (!heightInches || !weightLbs) return null
+    return ((weightLbs / (heightInches * heightInches)) * 703).toFixed(1)
+  }
+
+  function bmiLabel(bmi) {
+    const b = parseFloat(bmi)
+    if (b < 18.5) return { text: 'Underweight', color: 'var(--warning)' }
+    if (b < 25) return { text: 'Normal', color: 'var(--success)' }
+    if (b < 30) return { text: 'Overweight', color: 'var(--warning)' }
+    return { text: 'Obese', color: 'var(--error)' }
   }
 
   async function handleSave() {
@@ -191,15 +209,20 @@ export default function MeasurementsPage() {
                     style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', opacity: 0.6 }}>✕ Delete</button>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                  {FIELDS.filter(f => row[f.key] != null).map(f => (
-                    <div key={f.key} style={{ backgroundColor: 'var(--background)', borderRadius: '6px', padding: '8px 10px' }}>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{f.label}</div>
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <span style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>{row[f.key]} <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '400' }}>{f.unit}</span></span>
-                        {idx === 0 && delta(f.key, row[f.key])}
+                  {FIELDS.filter(f => row[f.key] != null).map(f => {
+                    const bmi = f.key === 'weight_lbs' ? calcBmi(row[f.key]) : null
+                    const bl = bmi ? bmiLabel(bmi) : null
+                    return (
+                      <div key={f.key} style={{ backgroundColor: 'var(--background)', borderRadius: '6px', padding: '8px 10px' }}>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{f.label}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+                          <span style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>{row[f.key]} <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '400' }}>{f.unit}</span></span>
+                          {idx === 0 && delta(f.key, row[f.key])}
+                          {bmi && <span style={{ fontSize: '10px', color: bl.color, backgroundColor: `${bl.color}18`, borderRadius: '4px', padding: '1px 5px', fontWeight: '600' }}>BMI {bmi}</span>}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             ))}

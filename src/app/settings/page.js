@@ -786,56 +786,29 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                <div>
-                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>Body Measurements</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Delete all logged body measurements and weight entries</div>
+              <div style={{ marginTop: '12px' }}>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '10px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px', marginTop: '4px' }}>Health Tracking</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {[
+                    { scope: 'body_measurements', label: 'Body Measurements', desc: 'Delete all logged body measurements and weight entries' },
+                    { scope: 'daily_checkins', label: 'Daily Check-In History', desc: 'Delete all energy and mood check-in entries' },
+                    { scope: 'water_logs', label: 'Water Log History', desc: 'Delete all water intake entries' },
+                    { scope: 'supplement_stack', label: 'Supplement Stack', desc: 'Remove all supplements from your stack' },
+                  ].map(item => (
+                    <div key={item.scope} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                      <div>
+                        <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{item.label}</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>{item.desc}</div>
+                      </div>
+                      <button onClick={() => setResetConfirm({ scope: item.scope, label: item.label })}
+                        style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
+                        Reset
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                <button onClick={() => setResetConfirm({ scope: 'body_measurements', label: 'Body measurements' })}
-                  style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
-                  Reset
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                <div>
-                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>Daily Check-In History</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Delete all energy and mood check-in entries</div>
-                </div>
-                <button onClick={() => setResetConfirm({ scope: 'daily_checkins', label: 'Daily check-in history' })}
-                  style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
-                  Reset
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                <div>
-                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>Water Log History</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Delete all water intake entries</div>
-                </div>
-                <button onClick={() => setResetConfirm({ scope: 'water_logs', label: 'Water log history' })}
-                  style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
-                  Reset
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                <div>
-                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>Supplement Stack</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Remove all supplements from your stack</div>
-                </div>
-                <button onClick={() => setResetConfirm({ scope: 'supplement_stack', label: 'Supplement stack' })}
-                  style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--error)'; e.currentTarget.style.color = 'var(--error)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}>
-                  Reset
-                </button>
               </div>
             </div>
           </div>

@@ -15,7 +15,17 @@ export async function POST(req) {
   const { exercise, messages, userMessage } = await req.json()
   if (!exercise || !userMessage) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
 
-  const systemPrompt = `You are a knowledgeable personal trainer coaching someone mid-workout. They are asking about a specific exercise they are currently doing.
+  const { data: workoutProfile } = await supabase
+    .from('workout_profiles')
+    .select('experience, goal, limitations')
+    .eq('user_id', user.id)
+    .single()
+
+  const userContext = workoutProfile
+    ? `\nUser profile: Experience — ${workoutProfile.experience || 'not specified'}. Goal — ${workoutProfile.goal || 'not specified'}.${workoutProfile.limitations ? ` Limitations/injuries — ${workoutProfile.limitations}.` : ''}`
+    : ''
+
+  const systemPrompt = `You are a knowledgeable personal trainer coaching someone mid-workout. They are asking about a specific exercise they are currently doing.${userContext}
 
 Exercise: ${exercise.name}
 Equipment: ${exercise.equipment || 'bodyweight'}
@@ -23,7 +33,7 @@ Primary target: ${exercise.target || exercise.body_part}
 Secondary muscles: ${(exercise.secondary_muscles || []).join(', ') || 'none listed'}
 Instructions: ${(exercise.instructions || []).filter(s => !s.startsWith('You should feel') && !s.startsWith('Do NOT')).join(' ')}
 
-Answer questions about form, common mistakes, modifications, variations, breathing, injury prevention, or comparisons to alternatives. Be direct and practical — 2–4 sentences max unless the question genuinely needs more. You're talking to someone in the middle of a workout.`
+Tailor your advice to their experience level and goal. Answer questions about form, common mistakes, modifications, variations, breathing, injury prevention, or comparisons to alternatives. Be direct and practical — 2–4 sentences max unless the question genuinely needs more. You're talking to someone in the middle of a workout.`
 
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',

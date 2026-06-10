@@ -533,6 +533,13 @@ export default function LogWorkoutPage() {
           </div>
         )}
 
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--success)', marginBottom: 4 }}>🥗 Post-Workout Nutrition Window</div>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+            Aim for a meal or shake within <strong style={{ color: 'var(--text-primary)' }}>30–60 minutes</strong> — protein to repair muscle (0.3–0.5g/lb bodyweight) + carbs to restore glycogen. Creatine and whey are most effective taken now.
+          </p>
+        </div>
+
         <div style={{ display: 'flex', gap: 10 }}>
           <Link href="/life-hub/workouts" style={{ flex: 1, display: 'block', textAlign: 'center', padding: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-primary)', textDecoration: 'none', fontSize: 14 }}>← My Plan</Link>
           <Link href="/life-hub/workouts/history" style={{ flex: 1, display: 'block', textAlign: 'center', padding: '12px', background: 'var(--accent-blue)', borderRadius: 8, color: '#fff', textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>View History</Link>

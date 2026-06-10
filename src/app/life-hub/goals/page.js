@@ -44,13 +44,15 @@ export default function GoalsPage() {
   const router = useRouter()
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [regenerating, setRegenerating] = useState(false)
+  const [regenMsg, setRegenMsg] = useState('')
 
   useEffect(() => {
     async function load() {
       const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-      const { data } = await supabase.from('goals_profiles').select('*').eq('user_id', session.user.id).single()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('goals_profiles').select('*').eq('user_id', user.id).single()
       if (!data) {
         router.push('/life-hub/goals/setup')
         return
@@ -60,6 +62,30 @@ export default function GoalsPage() {
     }
     load()
   }, [router])
+
+  async function handleRegenerate() {
+    if (!profile) return
+    setRegenerating(true)
+    setRegenMsg('')
+    try {
+      const res = await fetch('/api/goals/generate-overview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile),
+      })
+      const json = await res.json()
+      if (json.overview) {
+        setProfile(prev => ({ ...prev, ai_overview: json.overview }))
+        setRegenMsg('Updated!')
+      } else {
+        setRegenMsg(json.error || 'Failed to regenerate.')
+      }
+    } catch {
+      setRegenMsg('Something went wrong.')
+    }
+    setRegenerating(false)
+    setTimeout(() => setRegenMsg(''), 4000)
+  }
 
   if (loading) return <div style={{ padding: '40px', color: 'var(--text-secondary)' }}>Loading...</div>
 
@@ -90,9 +116,18 @@ export default function GoalsPage() {
       {/* AI Overview */}
       {profile.ai_overview && (
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-            <span style={{ fontSize: '18px' }}>🤖</span>
-            <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Your Personalized Overview</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '18px' }}>🤖</span>
+              <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Your Personalized Overview</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {regenMsg && <span style={{ fontSize: '12px', color: regenMsg === 'Updated!' ? 'var(--success)' : 'var(--error)' }}>{regenMsg}</span>}
+              <button onClick={handleRegenerate} disabled={regenerating}
+                style={{ fontSize: '12px', color: 'var(--text-secondary)', background: 'none', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 10px', cursor: regenerating ? 'not-allowed' : 'pointer', opacity: regenerating ? 0.5 : 1 }}>
+                {regenerating ? '...' : '🔄 Regenerate'}
+              </button>
+            </div>
           </div>
           <p style={{ color: 'var(--text-primary)', fontSize: '15px', lineHeight: '1.7', margin: 0, whiteSpace: 'pre-wrap' }}>{profile.ai_overview}</p>
         </div>

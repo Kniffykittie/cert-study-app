@@ -1,18 +1,29 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
+
+const TIMING_LABELS = {
+  morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening',
+  with_meals: 'With Meals', pre_workout: 'Pre-Workout', post_workout: 'Post-Workout',
+}
 
 export default function NutritionPage() {
   const [goalsGated, setGoalsGated] = useState(false)
   const [checked, setChecked] = useState(false)
+  const [supplements, setSupplements] = useState([])
 
   useEffect(() => {
     async function checkGoals() {
       const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { setChecked(true); return }
-      const { data } = await supabase.from('goals_profiles').select('id').eq('user_id', session.user.id).single()
-      if (!data) setGoalsGated(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setChecked(true); return }
+      const [{ data: goalsData }, { data: suppData }] = await Promise.all([
+        supabase.from('goals_profiles').select('id').eq('user_id', user.id).single(),
+        supabase.from('supplement_stack').select('name, dose, timing, nutrients').eq('user_id', user.id).eq('is_active', true).order('created_at'),
+      ])
+      if (!goalsData) setGoalsGated(true)
+      setSupplements(suppData ?? [])
       setChecked(true)
     }
     checkGoals()
@@ -90,9 +101,38 @@ export default function NutritionPage() {
 
       {/* Supplements */}
       <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-        <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Supplements</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '12px' }}>Daily supplement tracking and consistency</p>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Add your supplements to start tracking daily consistency.</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', margin: 0 }}>Supplements</h2>
+          <Link href="/life-hub/goals/supplements" style={{ fontSize: '12px', color: 'var(--accent-purple)', textDecoration: 'none' }}>Manage →</Link>
+        </div>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '12px' }}>Your active supplement stack</p>
+        {supplements.length === 0 ? (
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>No supplements added yet. <Link href="/life-hub/goals/supplements" style={{ color: 'var(--accent-purple)' }}>Add your stack →</Link></p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {supplements.map((s, i) => {
+              const nutrients = s.nutrients ? Object.entries(s.nutrients) : []
+              return (
+                <div key={i} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <span style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{s.name}</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px', marginLeft: '8px' }}>{s.dose}</span>
+                    </div>
+                    <span style={{ fontSize: '11px', color: 'var(--accent-purple)', backgroundColor: 'rgba(167,139,250,0.12)', borderRadius: '4px', padding: '2px 7px', flexShrink: 0 }}>{TIMING_LABELS[s.timing] || s.timing}</span>
+                  </div>
+                  {nutrients.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                      {nutrients.map(([k, v]) => (
+                        <span key={k} style={{ fontSize: '10px', color: 'var(--text-secondary)', backgroundColor: 'var(--border)', borderRadius: '4px', padding: '2px 6px' }}>{k}: {v}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )

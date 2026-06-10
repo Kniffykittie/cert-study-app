@@ -399,6 +399,7 @@ src/
 - **Phase 33 built:** Daily Check-In widget on Life Hub home (`/life-hub`) — energy + mood 1–5 ratings, optional note, 28-day heatmap (green/blue/yellow/grey); reset row in Settings
 - **Phase 34 built:** Water Tracker at `/life-hub/health/water` — progress ring, quick-add (8/12/16/20/32 oz + custom), today's log with remove, 7-day bar chart; goal persisted to localStorage; reset row in Settings
 - **Phase 35 built:** Supplement Stack at `/life-hub/goals/supplements` — add/edit/remove supplements with name, dose, timing, optional nutrient content from label; 🤖 Info button generates and caches AI card per supplement (what it does, cool facts, deficiency signs, too much, food sources, timing, synergies, interactions); nutrient chips on each stack card; reset row in Settings
+- **Phase 36 built:** 7 cross-feature improvements — exercise chatbot knows workout profile (experience/goal/limitations); Goals AI overview has Regenerate button + supplement context; Body Measurements shows BMI chip per weight entry; Life Hub home has live stats strip (water/workouts/supplements); Nutrition page shows actual supplement stack with nutrients; Settings Goals section has consistent styling + "Health Tracking" sub-header; workout completion screen shows post-workout nutrition window tip
 
 ### Google Health Integration
 - OAuth flow restricted to owner account only (`sethproper40@yahoo.com`) — 403 for all others

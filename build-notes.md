@@ -263,6 +263,16 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 36 - Complete
+- **7 cross-feature improvements** to tie the Life Hub together more cohesively
+- **Exercise chatbot context** (`/api/workouts/exercise-chat`) — now fetches `workout_profiles` (experience, goal, limitations) and injects into the system prompt so Haiku tailors advice to the user's level
+- **Goals AI overview regenerate button** (`/life-hub/goals/page.js`) — 🔄 Regenerate button in the AI overview panel; also fixed `getSession` → `getUser` security issue; `generate-overview` route now pulls active supplements and injects into AI prompt for richer personalization
+- **BMI in Body Measurements history** (`/life-hub/goals/measurements/page.js`) — fetches `height_inches` from `goals_profiles` alongside measurements; calculates BMI per row and shows color-coded chip (Underweight/Normal/Overweight/Obese) next to weight in history
+- **Life Hub home live stats** (`/life-hub/page.js`) — stats strip above hub cards: Water Today (oz from today's water_logs), Workouts This Week (workout_logs since Monday), Active Supplements (supplement_stack count); each links to the relevant page
+- **Nutrition page supplement preview** (`/life-hub/nutrition/page.js`) — Supplements panel now shows actual stack with name, dose, timing badge, and nutrient chips instead of placeholder text; fixed `getSession` → `getUser`; added Manage link
+- **Settings Goals section restructure** (`/app/settings/page.js`) — Body Measurements, Daily Check-In, Water Log, and Supplement Stack now use consistent padded-box style matching Goals Profile, grouped under a "Health Tracking" sub-header
+- **Workout completion nutrition window hint** (`/life-hub/workouts/log/page.js`) — green info card before the action buttons: 30–60 min window, protein/carb guidance, creatine/whey note
+
 ### Phase 35 - Complete
 - **Supplement Stack** at `/life-hub/goals/supplements` — add/edit/remove supplements (name, dose, timing dropdown: morning/afternoon/evening/with meals/pre-workout/post-workout, optional nutrient content entered from the label)
 - **Nutrient content** stored as JSONB (nutrient → "amount unit"), displayed as green chips on each stack card

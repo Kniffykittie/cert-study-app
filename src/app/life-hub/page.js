@@ -28,6 +28,7 @@ export default function LifeHubPage() {
   const [saved, setSaved] = useState(false)
   const [checkins, setCheckins] = useState([])
   const [loaded, setLoaded] = useState(false)
+  const [liveStats, setLiveStats] = useState({ waterOz: null, workoutsThisWeek: null, supplementCount: null })
 
   useEffect(() => {
     async function load() {
@@ -35,15 +36,36 @@ export default function LifeHubPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const start = daysAgo(27)
-      const { data } = await supabase.from('daily_checkins').select('*').eq('user_id', user.id).gte('date', start).order('date', { ascending: false })
-      setCheckins(data ?? [])
-      const todayEntry = data?.find(r => r.date === today)
+
+      const weekStart = (() => {
+        const d = new Date()
+        const day = d.getDay()
+        d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      })()
+
+      const [{ data: checkinData }, { data: waterData }, { data: workoutData }, { data: suppData }] = await Promise.all([
+        supabase.from('daily_checkins').select('*').eq('user_id', user.id).gte('date', start).order('date', { ascending: false }),
+        supabase.from('water_logs').select('amount_oz').eq('user_id', user.id).gte('created_at', `${today}T00:00:00`),
+        supabase.from('workout_logs').select('id').eq('user_id', user.id).gte('created_at', `${weekStart}T00:00:00`),
+        supabase.from('supplement_stack').select('id').eq('user_id', user.id).eq('is_active', true),
+      ])
+
+      setCheckins(checkinData ?? [])
+      const todayEntry = checkinData?.find(r => r.date === today)
       if (todayEntry) {
         setEnergy(todayEntry.energy_level ?? 0)
         setMood(todayEntry.mood_level ?? 0)
         setNote(todayEntry.note ?? '')
         setSaved(true)
       }
+
+      const waterOz = (waterData ?? []).reduce((sum, r) => sum + parseFloat(r.amount_oz), 0)
+      setLiveStats({
+        waterOz: waterOz > 0 ? Math.round(waterOz) : 0,
+        workoutsThisWeek: (workoutData ?? []).length,
+        supplementCount: (suppData ?? []).length,
+      })
       setLoaded(true)
     }
     load()
@@ -167,6 +189,26 @@ export default function LifeHubPage() {
       <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
         <Heatmap />
       </div>
+
+      {/* Live Stats */}
+      {loaded && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '24px' }}>
+          {[
+            { label: 'Water Today', value: liveStats.waterOz > 0 ? `${liveStats.waterOz} oz` : '—', href: '/life-hub/health/water', color: 'var(--accent-blue)' },
+            { label: 'Workouts This Week', value: liveStats.workoutsThisWeek !== null ? liveStats.workoutsThisWeek : '—', href: '/life-hub/workouts/history', color: 'var(--success)' },
+            { label: 'Active Supplements', value: liveStats.supplementCount !== null ? liveStats.supplementCount : '—', href: '/life-hub/goals/supplements', color: 'var(--accent-purple)' },
+          ].map(s => (
+            <Link key={s.label} href={s.href} style={{ textDecoration: 'none' }}>
+              <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px 16px', textAlign: 'center' }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = s.color}
+                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                <div style={{ fontSize: '22px', fontWeight: '700', color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>{s.label}</div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Hub Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>

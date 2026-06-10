@@ -44,6 +44,12 @@ export async function POST(req) {
 
   const { goals, height_inches, weight_lbs, age, sex, body_composition, activity_level, activity_level_note, daily_steps, target_weight_lbs, timeline, notes, biggest_obstacles, biggest_obstacles_other, primary_motivations, primary_motivations_other, why_goals, dietary_preferences, dietary_preferences_other, sleep_hours } = await req.json()
 
+  const { data: supplementRows } = await supabase
+    .from('supplement_stack')
+    .select('name, dose, timing')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+
   const BODY_COMP_MAP = {
     lean_muscular: 'Lean & Muscular (6–17% body fat) — do NOT use BMI as a health indicator for this person',
     lean_toned: 'Lean & Toned (14–20% body fat)',
@@ -102,6 +108,7 @@ ${motivationsList.length ? `- Primary motivations: ${motivationsList.join(', ')}
 ${safeWhyGoals ? `- Why these goals (user's own words): ${safeWhyGoals}` : ''}
 ${dietList.length ? `- Dietary preferences: ${dietList.join(', ')}${safeDietOther ? ` + ${safeDietOther}` : ''}` : ''}
 ${safeNotes ? `- Additional notes (user-provided data): ${safeNotes}` : ''}
+${supplementRows?.length ? `- Current supplement stack: ${supplementRows.map(s => `${s.name} (${s.dose}, ${s.timing.replace(/_/g, ' ')})`).join(', ')}` : ''}
 
 Write a warm, motivating, and practical 3-paragraph overview:
 1. Acknowledge their specific goals and what achieving them will mean for their life
