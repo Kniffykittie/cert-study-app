@@ -241,9 +241,9 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ### Phase 34 — Water Tracker
 - Go to Life Hub → Health → Water Tracker
-- Tap a quick-add button (e.g. +16 oz) → progress ring should fill, entry should appear in Today's Log with a timestamp
+- Tap a quick-add button (e.g. +16 oz) → progress ring should fill, entry should appear in Today's Log with the current time
 - Tap × on an entry → ring should decrease by that amount
-- Type a custom amount and hit Enter or Add → should log correctly
+- Custom Entry section: enter an amount, change the time to something earlier (e.g. 8:00 AM), hit Add → entry should appear in Today's Log sorted by time, not at the bottom
 - Click "Edit goal", change the number, hit Save → ring percentage should recalculate; refresh the page → goal should still be the new value (localStorage)
 - The 7-day chart should show today's bar in blue; once goal is met the bar turns green
 - Settings → Data & Reset → "Water Log History" Reset button → confirm modal → entries should be deleted
@@ -253,7 +253,7 @@ Everything below was built but not yet tested by the user. Go through this list 
 ## Phase Log
 
 ### Phase 34 - Complete
-- **Water Tracker** at `/life-hub/health/water` — SVG progress ring showing % of daily goal, quick-add buttons (8/12/16/20/32 oz + custom input + Enter key), today's log list with per-entry remove, 7-day bar chart (green = goal met, blue = today, purple = past days)
+- **Water Tracker** at `/life-hub/health/water` — SVG progress ring showing % of daily goal, quick-add buttons (8/12/16/20/32 oz, logs at current time instantly), custom entry section with amount + editable time input (defaults to now, change it to backfill a past entry with the correct timestamp), today's log sorted chronologically with per-entry remove, 7-day bar chart (green = goal met, blue = today, purple = past days)
 - **Daily goal** editable inline, persisted to localStorage (`water_goal_oz`); default 64 oz
 - New `water_logs` table: user_id, date, amount_oz NUMERIC(6,1), created_at; RLS enabled
 - Water Tracker link added to Health dropdown in LifeHubSidebar

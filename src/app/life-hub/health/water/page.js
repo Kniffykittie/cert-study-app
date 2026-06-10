@@ -5,6 +5,11 @@ import { createClient } from '@/lib/supabase/client'
 const QUICK_ADD = [8, 12, 16, 20, 32]
 const DEFAULT_GOAL = 64
 
+function nowTimeString() {
+  const d = new Date()
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 function Ring({ pct }) {
   const r = 54
   const circ = 2 * Math.PI * r
@@ -30,6 +35,7 @@ export default function WaterPage() {
   const [editingGoal, setEditingGoal] = useState(false)
   const [goalInput, setGoalInput] = useState('')
   const [custom, setCustom] = useState('')
+  const [customTime, setCustomTime] = useState(nowTimeString())
   const [adding, setAdding] = useState(false)
   const [week, setWeek] = useState([])
   const [loading, setLoading] = useState(true)
@@ -41,11 +47,9 @@ export default function WaterPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    // Load saved goal from localStorage
     const savedGoal = localStorage.getItem('water_goal_oz')
     if (savedGoal) setGoal(parseInt(savedGoal))
 
-    // Today's logs
     const { data: todayLogs } = await supabase
       .from('water_logs')
       .select('id, amount_oz, created_at')
@@ -55,7 +59,6 @@ export default function WaterPage() {
 
     setLogs(todayLogs || [])
 
-    // 7-day history
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
     const startDate = sevenDaysAgo.toLocaleDateString('en-CA')
@@ -67,7 +70,6 @@ export default function WaterPage() {
       .gte('date', startDate)
       .lte('date', today)
 
-    // Aggregate by date
     const byDate = {}
     for (const row of weekData || []) {
       byDate[row.date] = (byDate[row.date] || 0) + parseFloat(row.amount_oz)
@@ -86,7 +88,8 @@ export default function WaterPage() {
 
   useEffect(() => { load() }, [load])
 
-  async function addWater(oz) {
+  // Quick-add: always logs at current time
+  async function addWaterNow(oz) {
     const parsed = parseFloat(oz)
     if (!parsed || parsed <= 0) return
     setAdding(true)
@@ -99,10 +102,38 @@ export default function WaterPage() {
       .single()
 
     if (data) {
-      setLogs(prev => [...prev, data])
+      setLogs(prev => [...prev, data].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)))
+      setWeek(prev => prev.map(d => d.date === today ? { ...d, oz: d.oz + parsed } : d))
+    }
+    setAdding(false)
+  }
+
+  // Custom add: uses the user-specified time
+  async function addWaterCustom() {
+    const parsed = parseFloat(custom)
+    if (!parsed || parsed <= 0) return
+    setAdding(true)
+
+    // Build a full ISO timestamp from today's date + the chosen time (local)
+    const [hours, minutes] = customTime.split(':').map(Number)
+    const ts = new Date()
+    ts.setHours(hours, minutes, 0, 0)
+    const isoTs = ts.toISOString()
+
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data } = await supabase
+      .from('water_logs')
+      .insert({ user_id: user.id, date: today, amount_oz: parsed, created_at: isoTs })
+      .select('id, amount_oz, created_at')
+      .single()
+
+    if (data) {
+      setLogs(prev => [...prev, data].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)))
       setWeek(prev => prev.map(d => d.date === today ? { ...d, oz: d.oz + parsed } : d))
     }
     setCustom('')
+    setCustomTime(nowTimeString())
     setAdding(false)
   }
 
@@ -151,15 +182,9 @@ export default function WaterPage() {
           <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
             {editingGoal ? (
               <>
-                <input
-                  type="number"
-                  value={goalInput}
-                  onChange={e => setGoalInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && saveGoal()}
-                  placeholder="oz"
-                  autoFocus
-                  style={{ width: 70, background: 'var(--background)', border: '1px solid var(--accent-blue)', borderRadius: 6, padding: '4px 8px', color: 'var(--text-primary)', fontSize: 13 }}
-                />
+                <input type="number" value={goalInput} onChange={e => setGoalInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && saveGoal()} placeholder="oz" autoFocus
+                  style={{ width: 70, background: 'var(--background)', border: '1px solid var(--accent-blue)', borderRadius: 6, padding: '4px 8px', color: 'var(--text-primary)', fontSize: 13 }} />
                 <button onClick={saveGoal} style={{ fontSize: 12, padding: '4px 10px', background: 'var(--accent-blue)', border: 'none', borderRadius: 6, color: '#fff', cursor: 'pointer' }}>Save</button>
                 <button onClick={() => setEditingGoal(false)} style={{ fontSize: 12, padding: '4px 10px', background: 'none', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-secondary)', cursor: 'pointer' }}>Cancel</button>
               </>
@@ -173,28 +198,37 @@ export default function WaterPage() {
         </div>
       </div>
 
-      {/* Quick add buttons */}
+      {/* Quick add */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 12 }}>Quick Add</div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 12 }}>Quick Add — logs at current time</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {QUICK_ADD.map(oz => (
-            <button key={oz} onClick={() => addWater(oz)} disabled={adding}
+            <button key={oz} onClick={() => addWaterNow(oz)} disabled={adding}
               style={{ padding: '10px 14px', background: 'var(--background)', border: '1px solid var(--accent-blue)', borderRadius: 8, color: 'var(--accent-blue)', fontSize: 13, fontWeight: 600, cursor: 'pointer', minWidth: 56 }}>
               +{oz} oz
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            type="number"
-            value={custom}
-            onChange={e => setCustom(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addWater(custom)}
-            placeholder="Custom oz..."
-            style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text-primary)', fontSize: 13 }}
-          />
-          <button onClick={() => addWater(custom)} disabled={!custom || adding}
-            style={{ padding: '8px 16px', background: custom ? 'var(--accent-blue)' : 'var(--border)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600, cursor: custom ? 'pointer' : 'default' }}>
+      </div>
+
+      {/* Custom entry with timestamp */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Custom Entry</div>
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>
+          Set a past time if you forgot to log something earlier
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input type="number" value={custom} onChange={e => setCustom(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addWaterCustom()}
+            placeholder="Amount (oz)"
+            style={{ flex: '1 1 90px', minWidth: 90, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text-primary)', fontSize: 13 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', flex: '1 1 100px', minWidth: 100 }}>
+            <span style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>🕐</span>
+            <input type="time" value={customTime} onChange={e => setCustomTime(e.target.value)}
+              style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: 13, outline: 'none', width: '100%', cursor: 'pointer' }} />
+          </div>
+          <button onClick={addWaterCustom} disabled={!custom || adding}
+            style={{ padding: '8px 16px', background: custom ? 'var(--accent-blue)' : 'var(--border)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600, cursor: custom ? 'pointer' : 'default', whiteSpace: 'nowrap' }}>
             Add
           </button>
         </div>
@@ -205,19 +239,26 @@ export default function WaterPage() {
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 10 }}>Today's Log</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {logs.map(l => (
-              <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ color: 'var(--accent-blue)', fontWeight: 600, fontSize: 14 }}>+{parseFloat(l.amount_oz) % 1 === 0 ? parseFloat(l.amount_oz) : parseFloat(l.amount_oz).toFixed(1)} oz</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                    {new Date(l.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                  </span>
-                  <button onClick={() => removeLog(l.id, parseFloat(l.amount_oz))}
-                    style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1 }}
-                    title="Remove">×</button>
+            {logs.map((l, i) => {
+              const logTime = new Date(l.created_at)
+              const insertedAt = new Date(l.created_at)
+              const timeLabel = logTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+              return (
+                <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: i < logs.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ color: 'var(--accent-blue)', fontWeight: 600, fontSize: 14 }}>
+                      +{parseFloat(l.amount_oz) % 1 === 0 ? parseFloat(l.amount_oz) : parseFloat(l.amount_oz).toFixed(1)} oz
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{timeLabel}</span>
+                    <button onClick={() => removeLog(l.id, parseFloat(l.amount_oz))}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1 }}
+                      title="Remove">×</button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
@@ -242,7 +283,6 @@ export default function WaterPage() {
             )
           })}
         </div>
-        {/* goal line label */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
           <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Goal: {goal} oz/day</span>
         </div>

@@ -120,7 +120,7 @@ src/
         page.js                        Health Overview — steps today, avg heart rate, sleep last night
         steps/page.js                  Step Tracker — hourly/weekly bar charts, goal progress, fixed tooltip
         sleep/page.js                  Sleep Tracker — stage breakdown bar, timeline chart, no-data state
-        water/page.js                  Water Tracker — progress ring, quick-add buttons (8/12/16/20/32 oz + custom), today's log with remove, 7-day bar chart; goal stored in localStorage
+        water/page.js                  Water Tracker — progress ring, quick-add buttons (8/12/16/20/32 oz + custom), today's log with remove, 7-day bar chart; goal stored in localStorage; custom entry section has editable time input (defaults to now) so past entries can be backfilled with the correct timestamp
       goals/
         page.js                        Goals overview — AI overview panel, active goals chips, body metrics card (BMI + disclaimer + build label), lifestyle card (activity + daily steps + timeline), notes; Edit Goals button
         measurements/page.js           Body Measurements — how-to guide, log form (9 fields: weight/waist/hips/chest/neck/arms/thighs), history table with delta indicators, weight-over-time SVG chart
