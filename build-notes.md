@@ -657,6 +657,20 @@ When the nutrition dashboard loads, it queries the user's supplement stack and a
 ---
 
 ### Life Hub — Nutrition (full build)
+- **API Decision — finalized:** Two-source lookup with Supabase caching layer. Open Food Facts is primary (free, no key, ODbL license allows permanent caching); Edamam is fallback (free tier 1,000 req/DAY, requires App ID + API key, data cannot be stored). Attribution: one Edamam badge in the Settings page Data Sources section satisfies their requirement for the entire app.
+
+- **Lookup flow:**
+  1. Check Supabase `food_cache` table first (barcodes + food names looked up before — instant, zero API calls)
+  2. Call Open Food Facts → if nutrition data present, save to `food_cache` permanently (ODbL allows this)
+  3. If OFF returns not found or empty nutrition → call Edamam → display result but do NOT store it (Edamam terms prohibit caching)
+  4. If both miss → show manual entry form
+  - Over time the local cache becomes the primary source; both external APIs get called less and less
+
+- **To get started — what you need to do before building:**
+  - **Open Food Facts:** Nothing. No signup, no key. Just need to set a `User-Agent` header in fetch calls like `MyApp/1.0 (your@email.com)`. Ready to use immediately.
+  - **Edamam:** Go to `developer.edamam.com` → click "Get an API key for free" → sign up for a free account → select "Food Database API" → you get an **App ID** and an **API Key**. Add both to your Vercel environment variables as `EDAMAM_APP_ID` and `EDAMAM_API_KEY`. That's it.
+  - Once you have the Edamam credentials, drop them in and the full nutrition phase can be built.
+
 - **Calorie & macro target calculation (TDEE)** — daily calorie goal is NOT hardcoded; it is calculated from goals_profiles using the Mifflin-St Jeor formula (height, weight, age, sex → BMR, then multiplied by activity level multiplier). Macro splits adjust by goal: muscle building = higher protein target (~0.8–1g per lb bodyweight), weight loss = moderate deficit, maintain = at TDEE. This runs at goals setup completion and whenever the profile is updated. No personalized calorie goal = nutrition dashboard is meaningless.
 - **Weight loss rate selector** — user picks their target pace: 0.5 / 1.0 / 1.5 / 2.0 / 2.5 lbs per week. The deficit is calculated from this (1 lb/week = ~500 cal/day deficit). Hard floors enforced regardless of selection: never below 1,200 cal/day for women, 1,500 cal/day for men — if the selected pace would push below that floor, warn the user and cap it. Also show a note that anything above 1.5 lbs/week increases the risk of muscle loss, nutrient deficiencies, and burnout. Surface a recalibration prompt after 2 weeks of consistent logging if actual weight change doesn't match predicted pace — this is how the system self-corrects rather than staying wrong forever.
 - **Calorie burn / net calories** — post-workout logging captures estimated calories burned using MET values by workout type applied to bodyweight and duration: strength training MET 3.5–5, moderate cardio MET 5–7, HIIT MET 8–10; ALWAYS use the LOW end of each MET range intentionally (underestimate, never overestimate — an overestimate causes someone to eat back calories they didn't actually burn and flatlines their deficit). Nutrition dashboard shows gross calories eaten AND net calories (eaten minus burned). Critical for accurate deficit/surplus tracking.
