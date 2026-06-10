@@ -220,6 +220,11 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 
 ## Phase Log
 
+### Phase 53 - Complete
+- **Exercise trainer chatbot** — inside the `?` detail modal, a "💬 Ask your trainer" section at the bottom; chat input + scrollable message bubbles; calls `/api/workouts/exercise-chat` (Haiku) with full exercise context in system prompt; multi-turn history maintained per modal open; user text wrapped in `<user_input>` tags
+- **Rest timer** — automatically starts a 90s countdown when a working set is marked complete; fixed bar above the bottom action bar; progress bar turns red at ≤10s; quick-select buttons (30s/60s/90s/2m) to override; ✕ dismiss button; timer clears on unmount
+- **New API route**: `src/app/api/workouts/exercise-chat/route.js` — POST, Haiku model, `max_tokens: 350`
+
 ### Phase 52b - Complete
 - **18 missing exercises added to Supabase** — exercises referenced by AI workout plan but absent from the library; all inserted with full instructions, secondary muscles, body_part/equipment/target metadata; gif_url = NULL (awaiting images)
 - Missing exercises were: Incline Dumbbell Curl, Zottman Curl, Dumbbell Preacher Curl, Dumbbell Reverse Fly, Inverted Row, Crunch, Dumbbell Side Bend, Leg Raise, Mountain Climber (core version), Dead Bug, Hollow Body Hold, Goblet Squat, Dumbbell Step Up, Dumbbell Sumo Squat, Hip Thrust, Single Leg Deadlift, Rear Delt Fly, Dumbbell Push Press

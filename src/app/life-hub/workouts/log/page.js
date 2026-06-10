@@ -41,10 +41,38 @@ function getDropsetNote(exerciseName, equipment) {
 }
 
 function ExerciseDetailModal({ exercise, onClose }) {
+  const [chatMessages, setChatMessages] = useState([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const chatEndRef = useRef(null)
+
   if (!exercise) return null
   const steps = (exercise.instructions || []).filter(s => !s.startsWith('You should feel') && !s.startsWith('Do NOT'))
   const feel = (exercise.instructions || []).find(s => s.startsWith('You should feel'))
   const doNot = (exercise.instructions || []).find(s => s.startsWith('Do NOT'))
+
+  async function sendChat() {
+    const msg = chatInput.trim()
+    if (!msg || chatLoading) return
+    const next = [...chatMessages, { role: 'user', content: msg }]
+    setChatMessages(next)
+    setChatInput('')
+    setChatLoading(true)
+    try {
+      const res = await fetch('/api/workouts/exercise-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ exercise, messages: chatMessages, userMessage: msg }),
+      })
+      const json = await res.json()
+      setChatMessages([...next, { role: 'assistant', content: json.reply || 'No response.' }])
+    } catch {
+      setChatMessages([...next, { role: 'assistant', content: 'Something went wrong. Try again.' }])
+    }
+    setChatLoading(false)
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+  }
+
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001, padding: '20px' }}>
       <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -79,7 +107,42 @@ function ExerciseDetailModal({ exercise, onClose }) {
             </div>
           )}
           {feel && <div style={{ backgroundColor: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.2)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--success)', marginBottom: '10px' }}>{feel}</div>}
-          {doNot && <div style={{ backgroundColor: 'rgba(204,0,0,0.08)', border: '1px solid rgba(204,0,0,0.2)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--error)' }}>{doNot}</div>}
+          {doNot && <div style={{ backgroundColor: 'rgba(204,0,0,0.08)', border: '1px solid rgba(204,0,0,0.2)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--error)', marginBottom: '14px' }}>{doNot}</div>}
+
+          {/* Trainer chat */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '14px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>💬 Ask your trainer</div>
+            {chatMessages.length > 0 && (
+              <div style={{ marginBottom: '10px', maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {chatMessages.map((m, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                    <div style={{ maxWidth: '85%', padding: '8px 12px', borderRadius: m.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px', backgroundColor: m.role === 'user' ? 'var(--accent-blue)' : 'var(--background)', border: m.role === 'assistant' ? '1px solid var(--border)' : 'none', color: m.role === 'user' ? '#fff' : 'var(--text-primary)', fontSize: '13px', lineHeight: '1.5' }}>
+                      {m.content}
+                    </div>
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                    <div style={{ padding: '8px 12px', borderRadius: '12px 12px 12px 2px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: '13px' }}>...</div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && sendChat()}
+                placeholder="Ask about form, feel, variations..."
+                style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px' }}
+              />
+              <button onClick={sendChat} disabled={!chatInput.trim() || chatLoading}
+                style={{ padding: '8px 14px', background: chatInput.trim() && !chatLoading ? 'var(--accent-blue)' : 'var(--border)', border: 'none', borderRadius: '8px', color: '#fff', cursor: chatInput.trim() && !chatLoading ? 'pointer' : 'default', fontSize: '13px', fontWeight: 600 }}>
+                {chatLoading ? '...' : 'Ask'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -182,13 +245,19 @@ export default function LogWorkoutPage() {
   const [resumingLogId, setResumingLogId] = useState(null)
 
   // Modals
-  const [detailModal, setDetailModal] = useState(null) // exercise detail
-  const [fetchingDetail, setFetchingDetail] = useState(null) // exercise name being fetched
+  const [detailModal, setDetailModal] = useState(null)
+  const [fetchingDetail, setFetchingDetail] = useState(null)
+
+  // Rest timer
+  const [restSecondsLeft, setRestSecondsLeft] = useState(0)
+  const [restActive, setRestActive] = useState(false)
+  const restIntervalRef = useRef(null)
+  const restTotalRef = useRef(0)
 
   useEffect(() => {
     if (!day) { router.push('/life-hub/workouts'); return }
     load()
-    return () => clearInterval(timerRef.current)
+    return () => { clearInterval(timerRef.current); clearInterval(restIntervalRef.current) }
   }, [day])
 
   useEffect(() => {
@@ -291,8 +360,38 @@ export default function LogWorkoutPage() {
     }))
   }
 
+  function startRest(seconds) {
+    clearInterval(restIntervalRef.current)
+    restTotalRef.current = seconds
+    setRestSecondsLeft(seconds)
+    setRestActive(true)
+    restIntervalRef.current = setInterval(() => {
+      setRestSecondsLeft(prev => {
+        if (prev <= 1) { clearInterval(restIntervalRef.current); setRestActive(false); return 0 }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  function dismissRest() {
+    clearInterval(restIntervalRef.current)
+    setRestActive(false)
+    setRestSecondsLeft(0)
+  }
+
   function toggleComplete(exIdx, setIdx) {
-    setExercises(prev => prev.map((ex, i) => i !== exIdx ? ex : { ...ex, sets: ex.sets.map((s, j) => j !== setIdx ? s : { ...s, completed: !s.completed }) }))
+    let wasCompleted = false
+    let setType = 'working'
+    setExercises(prev => prev.map((ex, i) => {
+      if (i !== exIdx) return ex
+      return { ...ex, sets: ex.sets.map((s, j) => {
+        if (j !== setIdx) return s
+        wasCompleted = s.completed
+        setType = s.set_type
+        return { ...s, completed: !s.completed }
+      })}
+    }))
+    if (!wasCompleted && setType === 'working') startRest(90)
   }
 
   function addSet(exIdx, type = 'working') {
@@ -552,6 +651,31 @@ export default function LogWorkoutPage() {
           <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>🏃 Cardio</div>
           <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
             {typeof dayPlan.cardio === 'string' ? dayPlan.cardio : `${dayPlan.cardio.exercise_name || ''}${dayPlan.cardio.duration_minutes ? ` — ${dayPlan.cardio.duration_minutes} min` : ''}${dayPlan.cardio.notes ? ` · ${dayPlan.cardio.notes}` : ''}`}
+          </div>
+        </div>
+      )}
+
+      {/* Rest timer bar */}
+      {restActive && (
+        <div style={{ position: 'fixed', bottom: 64, left: 0, right: 0, background: 'var(--surface)', borderTop: '1px solid var(--border)', padding: '10px 16px', zIndex: 99, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: restSecondsLeft <= 10 ? 'var(--error)' : 'var(--success)' }}>
+                ⏱ Rest — {restSecondsLeft}s
+              </span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[30, 60, 90, 120].map(s => (
+                  <button key={s} onClick={() => startRest(s)}
+                    style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: `1px solid ${restTotalRef.current === s ? 'var(--accent-blue)' : 'var(--border)'}`, background: restTotalRef.current === s ? 'rgba(96,165,250,0.15)' : 'var(--background)', color: restTotalRef.current === s ? 'var(--accent-blue)' : 'var(--text-secondary)', cursor: 'pointer' }}>
+                    {s >= 60 ? `${s/60}m` : `${s}s`}
+                  </button>
+                ))}
+                <button onClick={dismissRest} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-secondary)', cursor: 'pointer' }}>✕</button>
+              </div>
+            </div>
+            <div style={{ height: 4, background: 'var(--border)', borderRadius: 2 }}>
+              <div style={{ height: '100%', background: restSecondsLeft <= 10 ? 'var(--error)' : 'var(--success)', borderRadius: 2, width: `${(restSecondsLeft / restTotalRef.current) * 100}%`, transition: 'width 1s linear, background 0.3s' }} />
+            </div>
           </div>
         </div>
       )}
