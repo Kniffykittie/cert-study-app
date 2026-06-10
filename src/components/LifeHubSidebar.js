@@ -38,14 +38,39 @@ export default function LifeHubSidebar() {
 
   useEffect(() => {
     const lastMonth = getLastMonth()
-    const dismissKey = `wrap_notified_${lastMonth}`
-    if (localStorage.getItem(dismissKey)) return
-    if (pathname === '/life-hub/monthly-wrap') return
+    const today = new Date()
+    const isFirstOfMonth = today.getDate() === 1
+    const autoGenKey = `wrap_autogen_${lastMonth}`
 
-    fetch(`/api/life-hub/monthly-wrap?month=${lastMonth}`)
-      .then(r => r.json())
-      .then(d => { if (d.wrap) setWrapNotify(true) })
-      .catch(() => {})
+    async function checkAndNotify() {
+      // On the 1st of the month, auto-generate last month's wrap if not done yet
+      if (isFirstOfMonth && !localStorage.getItem(autoGenKey)) {
+        localStorage.setItem(autoGenKey, '1')
+        const check = await fetch(`/api/life-hub/monthly-wrap?month=${lastMonth}`).then(r => r.json()).catch(() => ({}))
+        if (!check.wrap) {
+          // Generate silently in background — don't await, don't block
+          fetch('/api/life-hub/monthly-wrap', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ month: lastMonth }),
+          }).then(() => {
+            if (pathname !== '/life-hub/monthly-wrap') setWrapNotify(true)
+          }).catch(() => {})
+          return
+        }
+      }
+
+      // Show notification if wrap exists and hasn't been dismissed this month
+      const dismissKey = `wrap_notified_${lastMonth}`
+      if (localStorage.getItem(dismissKey)) return
+      if (pathname === '/life-hub/monthly-wrap') return
+
+      fetch(`/api/life-hub/monthly-wrap?month=${lastMonth}`)
+        .then(r => r.json())
+        .then(d => { if (d.wrap) setWrapNotify(true) })
+        .catch(() => {})
+    }
+
+    checkAndNotify()
   }, [pathname])
 
   useEffect(() => {

@@ -267,6 +267,12 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 43c - Complete
+- **Monthly Wrap history sidebar** — all past wraps listed as clickable chips on the wrap page; selected month highlighted; manual month-picker capped at last month for browse; current month shows "still in progress" state instead of a Generate button
+- **Auto-generate on the 1st** — LifeHubSidebar checks on first visit of each month (tracked in `localStorage` as `wrap_autogen_YYYY-MM`); if last month's wrap doesn't exist, triggers POST silently and fires notification when done
+- **GET /api/life-hub/monthly-wrap (no ?month=)** — returns list of all months that have a wrap for the user; used by history sidebar
+- **One wrap per month enforced** — Generate button only shown for past months without an existing wrap; current month always blocked with informational state
+
 ### Phase 43b - Complete
 - **Monthly Wrap notification popup** — bottom-right toast appears on any Life Hub page when last month's wrap exists and user hasn't dismissed it this month; "Take me there →" navigates to wrap page; ✕ closes; dismissal stored in `localStorage` as `wrap_notified_YYYY-MM`; never shown if already on the wrap page
 

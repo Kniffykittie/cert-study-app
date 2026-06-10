@@ -12,6 +12,16 @@ export async function GET(req) {
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month') // YYYY-MM
 
+  // No month = return all wraps (just month + created_at for history list)
+  if (!month) {
+    const { data } = await supabase
+      .from('monthly_wraps')
+      .select('month, created_at')
+      .eq('user_id', user.id)
+      .order('month', { ascending: false })
+    return NextResponse.json({ months: (data || []).map(r => r.month) })
+  }
+
   const { data } = await supabase
     .from('monthly_wraps')
     .select('*')
