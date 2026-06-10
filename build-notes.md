@@ -267,6 +267,9 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 44f - Complete
+- **UI**: Encyclopedia detail panel widened again 560px → 680px per user request
+
 ### Phase 44e - Complete
 - **UI tweaks**: Encyclopedia detail panel widened from 420px → 560px; deficiency signs changed from hard-to-read red (`var(--error)`) to gold/warning (`var(--warning)` with `rgba(241,196,15,0.12)` background)
 

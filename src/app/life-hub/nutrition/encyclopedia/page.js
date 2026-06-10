@@ -117,7 +117,7 @@ function DetailPanel({ slug, ctx, onClose }) {
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 198 }} />
-      <div style={{ position: 'fixed', right: 0, top: 0, height: '100vh', width: '560px', maxWidth: '100vw', backgroundColor: 'var(--surface)', borderLeft: '1px solid var(--border)', zIndex: 199, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'fixed', right: 0, top: 0, height: '100vh', width: '680px', maxWidth: '100vw', backgroundColor: 'var(--surface)', borderLeft: '1px solid var(--border)', zIndex: 199, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, backgroundColor: 'var(--surface)', zIndex: 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
