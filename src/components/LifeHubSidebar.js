@@ -108,6 +108,7 @@ export default function LifeHubSidebar() {
       </div>
 
       {navLink('Nutrition', '/life-hub/nutrition')}
+      {navLink('Monthly Wrap', '/life-hub/monthly-wrap')}
 
       {/* Workouts dropdown */}
       {(() => {

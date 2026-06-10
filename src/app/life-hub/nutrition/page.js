@@ -428,6 +428,8 @@ export default function NutritionPage() {
   const [microOpen, setMicroOpen] = useState(false)
   const [todayWorkout, setTodayWorkout] = useState(null)
   const [copyingYesterday, setCopyingYesterday] = useState(false)
+  const [tdeeSuggestion, setTdeeSuggestion] = useState(null)
+  const [tdeeDismissed, setTdeeDismissed] = useState(false)
 
   const today = new Date().toISOString().split('T')[0]
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
@@ -455,6 +457,9 @@ export default function NutritionPage() {
       const [logData, foodsData] = await Promise.all([logRes.json(), foodsRes.json()])
       setEntries(logData.entries || [])
       setMyFoods(foodsData.foods || [])
+      fetch('/api/nutrition/tdee-check').then(r => r.json()).then(d => {
+        if (d.suggestion) setTdeeSuggestion(d.suggestion)
+      })
     }
     load()
   }, [])
@@ -481,6 +486,17 @@ export default function NutritionPage() {
   async function handleDeleteMyFood(id) {
     await fetch('/api/nutrition/my-foods', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     setMyFoods(prev => prev.filter(f => f.id !== id))
+  }
+
+  async function handleTdeeAction(action) {
+    if (!tdeeSuggestion) return
+    await fetch('/api/nutrition/tdee-check', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: tdeeSuggestion.id, action, suggested_tdee: tdeeSuggestion.suggested_tdee }),
+    })
+    setTdeeSuggestion(null)
+    if (action === 'accept') window.location.reload()
+    else setTdeeDismissed(true)
   }
 
   async function handleCopyYesterday() {
@@ -629,6 +645,35 @@ export default function NutritionPage() {
           </div>
         )}
       </div>
+
+      {/* TDEE Calibration Card */}
+      {tdeeSuggestion && !tdeeDismissed && (
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--warning)', borderRadius: '10px', padding: '16px 20px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '16px' }}>📊</span>
+                <span style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '14px' }}>Calorie Target Calibration</span>
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 8px', lineHeight: '1.5' }}>{tdeeSuggestion.reason}</p>
+              <div style={{ display: 'flex', gap: '16px', fontSize: '13px', flexWrap: 'wrap' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Current estimate: <strong style={{ color: 'var(--text-primary)' }}>{tdeeSuggestion.current_tdee} cal</strong></span>
+                <span style={{ color: 'var(--text-secondary)' }}>Data says: <strong style={{ color: 'var(--warning)' }}>{tdeeSuggestion.suggested_tdee} cal</strong></span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+              <button onClick={() => handleTdeeAction('accept')}
+                style={{ padding: '7px 14px', borderRadius: '7px', border: 'none', backgroundColor: 'var(--warning)', color: '#000', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                Update
+              </button>
+              <button onClick={() => handleTdeeAction('dismiss')}
+                style={{ padding: '7px 14px', borderRadius: '7px', border: '1px solid var(--border)', backgroundColor: 'transparent', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '4px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>

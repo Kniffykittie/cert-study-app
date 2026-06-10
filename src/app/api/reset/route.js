@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 export async function POST(req) {
@@ -91,6 +92,16 @@ export async function POST(req) {
 
   if (scope === 'my_foods') {
     await supabase.from('my_foods').delete().eq('user_id', userId)
+    return NextResponse.json({ ok: true })
+  }
+
+  if (scope === 'progress_photos') {
+    const { data: photos } = await supabase.from('progress_photos').select('storage_path').eq('user_id', userId)
+    if (photos?.length) {
+      const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+      await admin.storage.from('progress-photos').remove(photos.map(p => p.storage_path))
+    }
+    await supabase.from('progress_photos').delete().eq('user_id', userId)
     return NextResponse.json({ ok: true })
   }
 

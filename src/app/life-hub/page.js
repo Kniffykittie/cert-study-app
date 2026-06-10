@@ -453,6 +453,7 @@ export default function LifeHubPage() {
           { label: 'Goals', desc: 'Your health goals, body metrics, and AI overview.', href: '/life-hub/goals', color: 'var(--accent-purple)' },
           { label: 'Workouts', desc: 'Your weekly workout plan and exercise library.', href: '/life-hub/workouts', color: 'var(--accent-blue)' },
           { label: 'Nutrition', desc: 'Food log, macro tracking, and calorie targets.', href: '/life-hub/nutrition', color: 'var(--warning)' },
+          { label: 'Monthly Wrap', desc: 'AI summary of your month — workouts, energy, weight, and nutrition.', href: '/life-hub/monthly-wrap', color: 'var(--accent-purple)' },
         ].map(card => (
           <Link key={card.label} href={card.href} style={{ textDecoration: 'none' }}>
             <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', cursor: 'pointer', height: '100%', boxSizing: 'border-box' }}

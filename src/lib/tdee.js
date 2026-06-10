@@ -13,6 +13,7 @@ export function estimateBodyFatPct(bodyComp, sex) {
 
 export function calcTDEE(profile) {
   if (!profile?.weight_lbs) return null
+  if (profile.custom_tdee) return profile.custom_tdee
   const { weight_lbs, body_composition, sex, job_activity,
     exercise_types, exercise_days_per_week, exercise_duration_min,
     exercise_consistency, activity_level } = profile

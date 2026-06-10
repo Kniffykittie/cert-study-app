@@ -103,12 +103,14 @@ src/
         remove/route.js                POST — verify current PIN then null out hash; uses getUser()
       goals/
         generate-overview/route.js     POST — AI overview from goals_profiles; uses getUser() + is_disabled check; prompt injection protected; only called from handleFinish() on setup page
+        progress-photos/route.js       GET list with signed URLs (1hr); POST upload with magic byte validation + Supabase Storage; DELETE removes from Storage + DB; uses getUser() + is_disabled check
       supplements/
         generate-profile/route.js      POST — AI supplement info card (Sonnet); cached in supplement_profiles by normalized name (shared across users); uses getUser() + is_disabled check; supplement name wrapped in user_input tags
       nutrition/
         search/route.js                GET ?q= or ?barcode= — checks food_cache + my_foods first; falls back to Open Food Facts API; caches OFF results permanently (ODbL allows); uses getUser()
         log/route.js                   GET ?date= today's entries; POST add entry (multiplies macros by servings); DELETE by id; uses getUser()
         my-foods/route.js              GET user's saved food library; POST save new food; DELETE by id; uses getUser()
+        tdee-check/route.js            GET pending tdee_suggestion; POST calculates implied TDEE from food logs + weight measurements (needs 14+ days + 2+ measurements); PATCH accept (writes custom_tdee) or dismiss; uses getUser()
       health/
         connect/route.js               Initiates Google Health OAuth (any authenticated user; add friend's Gmail as test user in Google Cloud Console)
         manual-steps/route.js          GET today's manual step count; POST to upsert — shown on workouts page when Google Health not connected
@@ -119,9 +121,13 @@ src/
       workouts/
         generate-plan/route.js         AI workout plan generator; uses getUser() + is_disabled check; prompt injection protected on limitations + dumbbell_note fields
         exercise-chat/route.js         POST — mid-workout trainer chatbot (Haiku); exercise context in system prompt; user message wrapped in user_input tags; uses getUser() + is_disabled check
+      life-hub/
+        daily-brief/route.js           GET returns cached brief for today; POST gathers 10+ tables, calls Claude, caches; uses getUser() + is_disabled check
+        monthly-wrap/route.js          GET cached wrap for ?month=YYYY-MM; POST generates (6-table gather + Claude narrative), caches forever; uses getUser() + is_disabled check
     life-hub/
       layout.js                        Life Hub layout with LifeHubSidebar
-      page.js                          Life Hub landing — daily check-in widget (energy/mood 1–5, note, 28-day heatmap), hub navigation cards
+      page.js                          Life Hub landing — Daily Brief (AI paragraph, cached daily), Smart Contextual Check-In (adaptive question labels + micro-insight after save), 28-day heatmap, live stats strip, hub navigation cards (includes Monthly Wrap card)
+      monthly-wrap/page.js             Monthly Wrap — month picker, AI narrative card, stat grid (workouts/energy/mood/weight/calories/water); Generate button on first visit; cached forever per month
       health/
         page.js                        Health Overview — steps today, avg heart rate, sleep last night
         steps/page.js                  Step Tracker — hourly/weekly bar charts, goal progress, fixed tooltip
@@ -129,7 +135,7 @@ src/
         water/page.js                  Water Tracker — progress ring, quick-add buttons (8/12/16/20/32 oz + custom), today's log with remove, 7-day bar chart; goal stored in localStorage; custom entry section has editable time input (defaults to now) so past entries can be backfilled with the correct timestamp
       goals/
         page.js                        Goals overview — AI overview panel, active goals chips, body metrics card (BMI + disclaimer + build label), lifestyle card (activity + daily steps + timeline), notes; Edit Goals button
-        measurements/page.js           Body Measurements — how-to guide, log form (9 fields: weight/waist/hips/chest/neck/arms/thighs), history table with delta indicators, weight-over-time SVG chart
+        measurements/page.js           Body Measurements — how-to guide, log form (9 fields: weight/waist/hips/chest/neck/arms/thighs), history table with delta indicators, weight-over-time SVG chart; Progress Photos section (private Supabase Storage, lightbox, delete)
         supplements/page.js            Supplement Stack — add/edit/remove supplements (name, dose, timing, optional nutrient content from label); 🤖 Info button fetches AI-generated card per supplement (cached in supplement_profiles); nutrient chips shown on each card; empty state with explainer
         setup/page.js                  4-step goals onboarding: Step 1 Goals, Step 2 Your Body, Step 3 Starting Point, Step 4 Your Context (obstacles/motivations/why/diet/sleep); supports ?redirect= param
       workouts/
@@ -139,7 +145,8 @@ src/
         log/page.js                    Active workout logger — live timer, exercise cards with set rows (type badge cycles warmup/working/dropset, weight+reps inputs, ✓ complete, × remove), ? button opens exercise detail modal with trainer chatbot (Haiku, multi-turn), drop set contextual explanation per exercise type, add set/drop set, prev session hints, rest timer bar (auto-starts 90s on working set complete, 30s/60s/90s/2m quick buttons, dismissable), Pause (saves partial to DB + localStorage), fixed "Finish Workout" → post-workout check-in (difficulty/energy/note) → completion screen with stats + overload suggestions
         history/page.js                Workout history — all sessions expandable, PR section (heaviest working set per exercise ever), set chips colored by type
       nutrition/
-        page.js                        Nutrition dashboard — TDEE + macro targets from goals_profiles, calorie ring, food log by meal slot (breakfast/lunch/dinner/snack/other), food search via Open Food Facts + My Foods library, manual entry with save-to-library, Supplements tab; gates on goals profile
+        page.js                        Nutrition dashboard — TDEE + macro targets from goals_profiles, calorie ring, food log by meal slot (breakfast/lunch/dinner/snack/other), food search via Open Food Facts + My Foods library, manual entry with save-to-library, Supplements tab; TDEE calibration card (pending suggestion from tdee_suggestions); gates on goals profile
+        meal-plan/page.js              Weekly Meal Plan — Mon–Sun grid, meal slot rows, food search, AI insight analysis (typed callouts citing specific days and foods)
     join/
       page.js                          Invite-only signup — requires valid invite code + email + password; validates code, creates Supabase auth user, redeems code
     update-password/
@@ -232,6 +239,9 @@ src/
 | `daily_briefs` | Cached AI daily brief — brief_text, data_snapshot JSONB; UNIQUE on user_id + date; generated once per day on first Life Hub visit; never regenerates same day automatically; RLS user-scoped |
 | `meal_plans` | Weekly meal plan headers — week_start DATE (always a Monday); UNIQUE on user_id + week_start; RLS user-scoped |
 | `meal_plan_entries` | Individual planned foods per day/slot — plan_id, day_of_week SMALLINT (0=Mon…6=Sun), meal_slot, name, servings, macros + iron/calcium/vitamin_d/magnesium/potassium; completely separate from food_log_entries (planning only); RLS user-scoped |
+| `progress_photos` | User progress photo gallery — storage_path TEXT (Supabase Storage key), taken_date DATE, note TEXT; private bucket `progress-photos`; signed URLs (1hr expiry); magic byte validation (JPEG/PNG/WebP) on upload; RLS user-scoped |
+| `monthly_wraps` | Cached monthly AI wrap-up — month TEXT (YYYY-MM), report_data JSONB (aggregated stats), ai_narrative TEXT; generated once per month, never regenerates; UNIQUE on user_id+month; RLS user-scoped |
+| `tdee_suggestions` | TDEE calibration queue — suggested_tdee, current_tdee, implied_tdee, avg_calories_logged, weight_change_lbs, data_days, reason, status (pending/accepted/dismissed); RLS user-scoped |
 
 ---
 
@@ -413,6 +423,8 @@ src/
 - **Phase 37 built:** Fatigue signal on Workout Plan page (yellow callout when today's check-in energy ≤ 2); hydration reminder on Workout Log page (dismissible banner when water today < 50% of goal)
 - **Phase 41 built:** Daily Brief (AI paragraph synthesizing all data, cached daily in `daily_briefs` table) + Smart Contextual Check-In (questions adapt based on yesterday: leg day/calorie deficit/short sleep/low-energy streak) + Micro-Insight after saving (rule-based, instant, connects answer to actual data patterns)
 - **Phase 40 built:** Goals Setup rebuilt to 5 steps — new "Activity & Exercise" step replaces vague dropdown with specific questions (job type, exercise days/type/duration, consistency, calorie history); new "What Happens Now" closer shows live TDEE breakdown (BMR + NEAT + EAT + adaptation discount) and calibration system explanation; `src/lib/tdee.js` created as shared utility using Katch-McArdle formula; nutrition page updated to import from shared lib; `tdee_suggestions` table created for transparent calorie target updates
+- **Phase 42 built:** Daily Brief fix (never regenerates same day); Weekly Meal Plan at `/life-hub/nutrition/meal-plan` — Mon–Sun grid, food search, AI insight analysis (per-day macros + micronutrients vs FDA DV, Claude returns 4–6 typed callouts); `meal_plans` + `meal_plan_entries` tables with RLS
+- **Phase 43 built:** TDEE calibration card (checks food logs + weight measurements, queues suggestion if implied TDEE diverges >150 cal, Accept applies custom_tdee override); Progress Photos (private Supabase Storage, JPEG/PNG/WebP magic byte validation, photo grid + lightbox on Measurements page, Reset in Settings); Monthly Wrap AI summary page (`/life-hub/monthly-wrap`) with month picker, stat cards, and cached AI narrative; all three in Life Hub home grid + sidebar
 
 ### Google Health Integration
 - OAuth flow restricted to owner account only (`sethproper40@yahoo.com`) — 403 for all others

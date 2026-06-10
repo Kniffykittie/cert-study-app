@@ -44,8 +44,15 @@ export default function MeasurementsPage() {
   const [form, setForm] = useState(() => Object.fromEntries(FIELDS.map(f => [f.key, ''])))
   const [formDate, setFormDate] = useState(todayDate())
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [photos, setPhotos] = useState([])
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [photoNote, setPhotoNote] = useState('')
+  const [photoDate, setPhotoDate] = useState(todayDate())
+  const [photoMsg, setPhotoMsg] = useState('')
+  const [lightbox, setLightbox] = useState(null)
+  const [photoDeleteConfirm, setPhotoDeleteConfirm] = useState(null)
 
-  useEffect(() => { loadHistory() }, [])
+  useEffect(() => { loadHistory(); loadPhotos() }, [])
 
   async function loadHistory() {
     const supabase = createClient()
@@ -89,6 +96,43 @@ export default function MeasurementsPage() {
     setForm(Object.fromEntries(FIELDS.map(f => [f.key, ''])))
     setFormDate(todayDate())
     loadHistory()
+  }
+
+  async function loadPhotos() {
+    const res = await fetch('/api/goals/progress-photos')
+    const data = await res.json()
+    setPhotos(data.photos || [])
+  }
+
+  async function handlePhotoUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoUploading(true)
+    setPhotoMsg('')
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('taken_date', photoDate)
+    if (photoNote.trim()) fd.append('note', photoNote.trim())
+    const res = await fetch('/api/goals/progress-photos', { method: 'POST', body: fd })
+    const data = await res.json()
+    setPhotoUploading(false)
+    if (data.photo) {
+      setPhotos(prev => [data.photo, ...prev])
+      setPhotoNote('')
+      setPhotoDate(todayDate())
+      setPhotoMsg('Photo saved!')
+    } else {
+      setPhotoMsg(data.error || 'Upload failed')
+    }
+    setTimeout(() => setPhotoMsg(''), 3000)
+    e.target.value = ''
+  }
+
+  async function handlePhotoDelete(id) {
+    await fetch('/api/goals/progress-photos', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+    setPhotos(prev => prev.filter(p => p.id !== id))
+    setPhotoDeleteConfirm(null)
+    if (lightbox?.id === id) setLightbox(null)
   }
 
   async function handleDelete(id) {
@@ -234,6 +278,83 @@ export default function MeasurementsPage() {
         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
           <div style={{ fontSize: '32px', marginBottom: '12px' }}>📏</div>
           <p>No measurements logged yet. Log your first entry above.</p>
+        </div>
+      )}
+
+      {/* Progress Photos */}
+      <div style={{ marginTop: '32px' }}>
+        <h2 style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: '700', marginBottom: '12px' }}>Progress Photos</h2>
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
+            <div>
+              <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Date</label>
+              <input type="date" value={photoDate} onChange={e => setPhotoDate(e.target.value)}
+                style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }} />
+            </div>
+            <div style={{ flex: 1, minWidth: '160px' }}>
+              <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Note (optional)</label>
+              <input type="text" value={photoNote} onChange={e => setPhotoNote(e.target.value)} placeholder="e.g. Front, 8 weeks in"
+                style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }} />
+            </div>
+          </div>
+          <label style={{ display: 'inline-block', backgroundColor: 'var(--accent-purple)', color: '#fff', borderRadius: '8px', padding: '9px 20px', fontSize: '13px', fontWeight: '600', cursor: photoUploading ? 'not-allowed' : 'pointer', opacity: photoUploading ? 0.6 : 1 }}>
+            {photoUploading ? 'Uploading...' : '+ Add Photo'}
+            <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={handlePhotoUpload} disabled={photoUploading} />
+          </label>
+          {photoMsg && <span style={{ marginLeft: '12px', fontSize: '13px', color: photoMsg.includes('failed') || photoMsg.includes('Invalid') ? 'var(--error)' : 'var(--success)' }}>{photoMsg}</span>}
+        </div>
+
+        {photos.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
+            {photos.map(p => (
+              <div key={p.id} style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)', cursor: 'pointer', backgroundColor: 'var(--surface)' }}>
+                <img src={p.url} alt={p.note || formatDate(p.taken_date)} onClick={() => setLightbox(p)}
+                  style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }} />
+                <div style={{ padding: '6px 8px', backgroundColor: 'var(--surface)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-primary)', fontWeight: '600' }}>{formatDate(p.taken_date)}</div>
+                  {p.note && <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>{p.note}</div>}
+                </div>
+                <button onClick={(e) => { e.stopPropagation(); setPhotoDeleteConfirm(p.id) }}
+                  style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: '50%', width: '22px', height: '22px', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '28px', color: 'var(--text-secondary)', border: '1px dashed var(--border)', borderRadius: '10px' }}>
+            <div style={{ fontSize: '28px', marginBottom: '8px' }}>📷</div>
+            <p style={{ fontSize: '13px', margin: 0 }}>No progress photos yet. Photos are private and stored securely.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div onClick={() => setLightbox(null)} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ maxWidth: '500px', width: '100%' }}>
+            <img src={lightbox.url} alt="" style={{ width: '100%', borderRadius: '10px', display: 'block', maxHeight: '70vh', objectFit: 'contain' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+              <div>
+                <div style={{ color: '#fff', fontWeight: '600', fontSize: '14px' }}>{formatDate(lightbox.taken_date)}</div>
+                {lightbox.note && <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{lightbox.note}</div>}
+              </div>
+              <button onClick={() => setLightbox(null)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer', fontSize: '13px' }}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Photo delete confirm */}
+      {photoDeleteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '28px', maxWidth: '360px', width: '100%', textAlign: 'center' }}>
+            <p style={{ color: 'var(--text-primary)', fontSize: '15px', marginBottom: '20px' }}>Delete this photo permanently?</p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button onClick={() => handlePhotoDelete(photoDeleteConfirm)}
+                style={{ backgroundColor: 'var(--error)', border: 'none', color: '#fff', borderRadius: '8px', padding: '9px 20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Delete</button>
+              <button onClick={() => setPhotoDeleteConfirm(null)}
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '9px 20px', fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
+            </div>
+          </div>
         </div>
       )}
 

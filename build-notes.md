@@ -85,9 +85,10 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `food_cache` | Shared food lookup cache — barcode (unique index), search_name, full nutrition fields, source; Open Food Facts results cached permanently (ODbL allows); no RLS |
 | `my_foods` | User's personal saved food library — name, brand, serving_size_label, full macro fields; RLS enabled |
 | `food_log_entries` | Food log per user/date/meal_slot — name, brand, servings, macros already multiplied by servings, source, food_cache_id, my_food_id; RLS enabled |
-| `progress_photos` | *(planned Phase 32)* User progress photo gallery — photo_url, taken_at DATE, description TEXT |
-| `daily_briefs` | *(planned — Correlation Engine)* Cached daily "what should I do today" AI paragraph — keyed by user_id + date; regenerated once per day on first Life Hub load |
-| `monthly_wraps` | *(planned)* Cached monthly wrap-up reports — report_data JSONB (aggregated stats across both hubs), ai_narrative TEXT; generated once on first visit, never re-called; UNIQUE on user_id + month |
+| `progress_photos` | User progress photo gallery — storage_path TEXT, taken_date DATE, note TEXT; private Supabase Storage bucket `progress-photos`; signed URLs (1hr expiry); magic byte validation on upload; RLS enabled |
+| `daily_briefs` | Cached daily AI paragraph — brief_text TEXT, data_snapshot JSONB; UNIQUE on user_id + date; generated once per day on first Life Hub visit; RLS enabled |
+| `monthly_wraps` | Cached monthly wrap-up reports — report_data JSONB (aggregated stats), ai_narrative TEXT; generated once per month on first visit; UNIQUE on user_id + month; RLS enabled |
+| `tdee_suggestions` | AI-calibration queue — suggested_tdee, current_tdee, implied_tdee, avg_calories_logged, weight_change_lbs, data_days, reason TEXT, status (pending/accepted/dismissed); RLS enabled |
 | `nutrient_profiles` | *(planned)* Cached AI-generated nutrient encyclopedia entries — keyed by nutrient name, shared across all users; sections: what it does, cool facts, deficiency signs, toxicity, food sources, supplement notes |
 | `invite_codes` | *(planned)* Single-use invite codes — code TEXT UNIQUE, created_by, created_at, used_at TIMESTAMPTZ, used_by; null used_at = unused |
 | `api_rate_limits` | *(planned)* Per-user per-endpoint rate limiting — user_id, endpoint, call_count, window_start; checked at top of every AI route |
@@ -265,6 +266,14 @@ Everything below was built but not yet tested by the user. Go through this list 
 ---
 
 ## Phase Log
+
+### Phase 43 - Complete
+- **TDEE Calibration** — `goals_profiles.custom_tdee INT` column added; `calcTDEE()` checks this first; `/api/nutrition/tdee-check` (GET pending suggestion / POST calculate & queue if divergence >150 cal / PATCH accept or dismiss); calibration card on Nutrition page shows current vs implied TDEE with Accept/Dismiss buttons; `tdee_suggestions` table with RLS
+- **Progress Photos** — private Supabase Storage bucket `progress-photos`; `progress_photos` table with RLS; `/api/goals/progress-photos` (GET with signed URLs / POST with magic byte validation JPEG/PNG/WebP / DELETE); photo grid on Measurements page with date picker, optional note, lightbox modal; Reset row in Settings
+- **Monthly Wrap** — `/life-hub/monthly-wrap` page with month picker; `monthly_wraps` table (UNIQUE user_id+month, RLS); `/api/life-hub/monthly-wrap` (GET cached / POST generate from 6-table data gather + Claude narrative); stat cards (workouts, avg energy/mood, weight change, calories, water); cached forever, only generates once per month; Monthly Wrap card added to Life Hub home grid + Monthly Wrap link in LifeHubSidebar
+- **New DB tables**: `progress_photos`, `monthly_wraps` (custom_tdee column on `goals_profiles`, `tdee_suggestions` was pre-existing)
+- **New routes**: `/api/nutrition/tdee-check`, `/api/goals/progress-photos`, `/api/life-hub/monthly-wrap`
+- **Updated files**: `src/lib/tdee.js`, nutrition page, measurements page, Life Hub home, LifeHubSidebar, settings page, reset route
 
 ### Phase 42 - Complete
 - **Daily Brief fix** — brief now strictly generates once per day; removed manual Refresh button; F5/navigation always serves cached brief; only generates on first visit of each new day
