@@ -50,6 +50,7 @@ export default function WorkoutsPage() {
 
   const [completedTodayDays, setCompletedTodayDays] = useState(new Set())
   const [pausedWorkout, setPausedWorkout] = useState(null)
+  const [todayEnergy, setTodayEnergy] = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -67,17 +68,19 @@ export default function WorkoutsPage() {
 
     const today = new Date().toLocaleDateString('en-CA')
 
-    const [{ data: prof }, { data: planData }, { data: exercises }, { data: todayLogs }] = await Promise.all([
+    const [{ data: prof }, { data: planData }, { data: exercises }, { data: todayLogs }, { data: checkin }] = await Promise.all([
       supabase.from('workout_profiles').select('*').eq('user_id', session.user.id).single(),
       supabase.from('workout_plans').select('*').eq('user_id', session.user.id).eq('is_active', true).single(),
       supabase.from('exercises').select('id,name,body_part,equipment').in('equipment', ['dumbbell', 'body weight']).order('name'),
       supabase.from('workout_logs').select('day_of_week').eq('user_id', session.user.id).eq('is_partial', false).eq('date', today),
+      supabase.from('daily_checkins').select('energy_level').eq('user_id', session.user.id).eq('date', today).single(),
     ])
 
     setProfile(prof)
     setPlan(planData)
     setAllExercises(exercises ?? [])
     setCompletedTodayDays(new Set((todayLogs ?? []).map(l => l.day_of_week).filter(Boolean)))
+    if (checkin?.energy_level) setTodayEnergy(checkin.energy_level)
 
     // Check localStorage for paused workout
     try {
@@ -265,6 +268,18 @@ export default function WorkoutsPage() {
             <div style={{ backgroundColor: 'rgba(123,47,190,0.08)', border: '1px solid rgba(123,47,190,0.2)', borderRadius: '10px', padding: '16px 20px', marginBottom: '24px' }}>
               <div style={{ color: 'var(--accent-purple)', fontSize: '11px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '6px' }}>Your Plan</div>
               <p style={{ color: 'var(--text-primary)', fontSize: '14px', lineHeight: '1.6', margin: 0 }}>{plan.plan_notes}</p>
+            </div>
+          )}
+
+          {todayEnergy !== null && todayEnergy <= 2 && (
+            <div style={{ backgroundColor: 'rgba(241,196,15,0.08)', border: '1px solid rgba(241,196,15,0.3)', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+              <span style={{ fontSize: '18px', lineHeight: 1 }}>⚡</span>
+              <div>
+                <div style={{ color: 'var(--warning)', fontSize: '13px', fontWeight: '700', marginBottom: '3px' }}>Low Energy Today</div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0, lineHeight: 1.5 }}>
+                  Your check-in shows low energy. Consider a lighter session — reduce working weight 10–20%, skip drop sets, or swap a strength day for a walk or mobility work. Rest is part of the plan.
+                </p>
+              </div>
             </div>
           )}
 

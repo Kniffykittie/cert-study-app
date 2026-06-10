@@ -263,6 +263,10 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 37 - Complete
+- **Fatigue signal on Workout Plan page** (`/life-hub/workouts/page.js`) — fetches today's `daily_checkins.energy_level` alongside other load queries; if energy ≤ 2, shows a yellow ⚡ callout recommending lighter session, reduced weight, or mobility work
+- **Hydration reminder on Workout Log page** (`/life-hub/workouts/log/page.js`) — on mount, fetches today's water_logs sum + reads `water_goal_oz` from localStorage; if < 50% of goal, shows a dismissible 💧 banner telling the user to drink before they start
+
 ### Phase 36 - Complete
 - **7 cross-feature improvements** to tie the Life Hub together more cohesively
 - **Exercise chatbot context** (`/api/workouts/exercise-chat`) — now fetches `workout_profiles` (experience, goal, limitations) and injects into the system prompt so Haiku tailors advice to the user's level

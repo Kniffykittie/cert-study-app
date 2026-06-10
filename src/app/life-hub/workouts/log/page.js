@@ -254,6 +254,25 @@ export default function LogWorkoutPage() {
   const restIntervalRef = useRef(null)
   const restTotalRef = useRef(0)
 
+  // Hydration banner
+  const [hydrationWarning, setHydrationWarning] = useState(false)
+
+  useEffect(() => {
+    async function checkHydration() {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const today = new Date().toISOString().slice(0, 10)
+        const { data } = await supabase.from('water_logs').select('amount_oz').eq('user_id', user.id).gte('created_at', `${today}T00:00:00`)
+        const totalOz = (data ?? []).reduce((s, r) => s + parseFloat(r.amount_oz), 0)
+        const goalOz = parseInt(typeof window !== 'undefined' ? localStorage.getItem('water_goal_oz') || '64' : '64')
+        if (totalOz < goalOz * 0.5) setHydrationWarning(true)
+      } catch {}
+    }
+    checkHydration()
+  }, [])
+
   useEffect(() => {
     if (!day) { router.push('/life-hub/workouts'); return }
     load()
@@ -578,6 +597,16 @@ export default function LogWorkoutPage() {
           <div style={{ height: '100%', background: 'var(--accent-blue)', borderRadius: 3, width: `${totalSets ? (completedSets / totalSets) * 100 : 0}%`, transition: 'width 0.3s' }} />
         </div>
       </div>
+
+      {hydrationWarning && (
+        <div style={{ background: 'rgba(0,128,255,0.08)', border: '1px solid rgba(0,128,255,0.25)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 16 }}>💧</span>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>You're under 50% of your water goal. Drink before you start.</span>
+          </div>
+          <button onClick={() => setHydrationWarning(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1 }}>✕</button>
+        </div>
+      )}
 
       {/* Exercise cards */}
       {exercises.map((ex, exIdx) => {
