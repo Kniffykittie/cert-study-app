@@ -219,6 +219,9 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 ## Phase Log
 
 ### Phase 49 - Complete
+- **Fix:** generate-plan route referenced undefined `session.user.id` — route uses `getUser()` so corrected to `user.id`; this caused a 500 after the AI finished generating the plan
+
+
 - **Goals setup UX polish** — activity level selection now requires a forced free-text explanation ("describe a typical day"); canAdvance() on step 2 blocks until filled; saved to `goals_profiles.activity_level_note`; injected into AI overview prompt
 - **Body composition range badges** — restructured layout from right-floated badge to inline chip alongside label name, eliminating visual overlap at any screen width
 - **Step 4 section labels** — increased font to 15px and changed color to `var(--accent-purple)` for legibility; sub-labels remain 13px text-secondary

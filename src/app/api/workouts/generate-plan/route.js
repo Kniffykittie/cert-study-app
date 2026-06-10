@@ -223,10 +223,10 @@ Respond with ONLY valid JSON:
     return NextResponse.json({ error: 'Failed to parse plan from AI' }, { status: 500 })
   }
 
-  await supabase.from('workout_plans').update({ is_active: false }).eq('user_id', session.user.id)
+  await supabase.from('workout_plans').update({ is_active: false }).eq('user_id', user.id)
 
   const { error } = await supabase.from('workout_plans').insert({
-    user_id: session.user.id,
+    user_id: user.id,
     plan: planData.days,
     plan_notes: planData.plan_notes,
     progression_notes: planData.progression_notes,
