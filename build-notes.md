@@ -266,6 +266,14 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 41 - Complete
+- **Daily Brief** — AI-generated 3–4 sentence paragraph on Life Hub home, synthesizing ALL data: food trend (avg cal vs TDEE, protein hit rate), weight trend + delta, last workout, sleep last night, energy score trend, TDEE calibration hint if 14+ days of data diverge by >150 cal; cached in `daily_briefs` table; Refresh button for manual regeneration; skeleton loading state on first visit of the day; instant on return visits
+- **Smart Contextual Check-In** — replaces generic "how are you feeling" with questions that change based on what actually happened yesterday: post-leg-day asks "Leg Recovery / Can't walk → Totally fresh", under-target calories asks "Hunger & Energy / Starving → Fueled", short sleep asks "Mental Sharpness / Brain fog → Locked in", 3+ low-energy streak surfaces a warning note; same 1–5 scale stored in existing table columns
+- **Micro-Insight after saving** — rule-based, instant, no AI call; fires after check-in save; examples: "Your last 4 low-energy days all followed a calorie deficit — worth testing hitting your target today", "Energy at 4/5 — above your 7-day average of 2.8"
+- **TDEE calibration in brief** — brief generation calculates implied TDEE from weight change + avg calories logged; if diverges >150 cal from estimate, surfaces it naturally in the brief with both numbers
+- **New API route**: `GET/POST /api/life-hub/daily-brief`; GET checks cache, POST gathers all tables + calls Claude + caches result
+- **DB migration**: `daily_briefs` table with RLS
+
 ### Phase 40 - Complete
 - **Goals Setup rebuilt — 5 steps** (was 4): Your Goals → Your Body → Activity & Exercise → Your Context → What Happens Now
 - **New Step 2 "Activity & Exercise"** replaces the old activity dropdown with 6 specific questions:
