@@ -1,6 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+const ALL_NUTRITION_FIELDS = [
+  'calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg',
+  'saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg',
+  'iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg',
+  'vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg',
+]
+
 export async function GET(req) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -21,22 +28,19 @@ export async function POST(req) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { name, brand, serving_size_label, calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g, sodium_mg } = body
+  if (!body.name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
 
-  if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
+  const nutritionValues = {}
+  for (const field of ALL_NUTRITION_FIELDS) {
+    nutritionValues[field] = body[field] != null && body[field] !== '' ? Number(body[field]) : null
+  }
 
   const { data, error } = await supabase.from('my_foods').insert({
     user_id: user.id,
-    name: name.trim(),
-    brand: brand?.trim() || null,
-    serving_size_label: serving_size_label?.trim() || '1 serving',
-    calories: calories || null,
-    protein_g: protein_g || null,
-    carbs_g: carbs_g || null,
-    fat_g: fat_g || null,
-    fiber_g: fiber_g || null,
-    sugar_g: sugar_g || null,
-    sodium_mg: sodium_mg || null,
+    name: body.name.trim(),
+    brand: body.brand?.trim() || null,
+    serving_size_label: body.serving_size_label?.trim() || '1 serving',
+    ...nutritionValues,
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -16,6 +16,80 @@ const MEAL_SLOTS = [
   { key: 'other', label: 'Other', emoji: '🍽️' },
 ]
 
+// Daily Values (FDA)
+const DV = {
+  fiber_g: 28, sodium_mg: 2300, saturated_fat_g: 20, cholesterol_mg: 300,
+  potassium_mg: 4700, calcium_mg: 1300, iron_mg: 18, magnesium_mg: 420,
+  zinc_mg: 11, vitamin_a_mcg: 900, vitamin_c_mg: 90, vitamin_d_mcg: 20,
+  vitamin_b12_mcg: 2.4, vitamin_b6_mg: 1.7, folate_mcg: 400,
+}
+
+const MICRO_GROUPS = [
+  {
+    label: 'Fats & Cholesterol',
+    items: [
+      { key: 'saturated_fat_g', label: 'Saturated Fat', unit: 'g', warn: true },
+      { key: 'trans_fat_g', label: 'Trans Fat', unit: 'g', warn: true, noDV: true },
+      { key: 'cholesterol_mg', label: 'Cholesterol', unit: 'mg', warn: true },
+    ],
+  },
+  {
+    label: 'Minerals',
+    items: [
+      { key: 'sodium_mg', label: 'Sodium', unit: 'mg', warn: true },
+      { key: 'potassium_mg', label: 'Potassium', unit: 'mg' },
+      { key: 'calcium_mg', label: 'Calcium', unit: 'mg' },
+      { key: 'iron_mg', label: 'Iron', unit: 'mg' },
+      { key: 'magnesium_mg', label: 'Magnesium', unit: 'mg' },
+      { key: 'zinc_mg', label: 'Zinc', unit: 'mg' },
+    ],
+  },
+  {
+    label: 'Vitamins',
+    items: [
+      { key: 'vitamin_a_mcg', label: 'Vitamin A', unit: 'mcg' },
+      { key: 'vitamin_c_mg', label: 'Vitamin C', unit: 'mg' },
+      { key: 'vitamin_d_mcg', label: 'Vitamin D', unit: 'mcg' },
+      { key: 'vitamin_b12_mcg', label: 'Vitamin B12', unit: 'mcg' },
+      { key: 'vitamin_b6_mg', label: 'Vitamin B6', unit: 'mg' },
+      { key: 'folate_mcg', label: 'Folate', unit: 'mcg' },
+    ],
+  },
+]
+
+// Workout calorie bonus — conservative, goal-adjusted
+function calcWorkoutBonus(workout, goals) {
+  if (!workout || workout.is_partial) return { bonus: 0, reason: '' }
+  const weightKg = (goals?.weight_lbs || 150) * 0.453592
+  const hours = (workout.duration_seconds || 0) / 3600
+  if (hours < 0.15) return { bonus: 0, reason: '' }
+  // MET: weight training = 4.0 (moderate). We don't inflate this.
+  const grossBurn = Math.round(4.0 * weightKg * hours)
+  const goalsList = (goals?.goals || []).map(g => g.toLowerCase())
+  const wantsLose = goalsList.some(g => g.includes('lose') || g.includes('weight'))
+  const wantsMuscle = goalsList.some(g => g.includes('muscle') || g.includes('strength'))
+  let fraction, reason
+  if (wantsLose && wantsMuscle) {
+    fraction = 0.40
+    reason = '40% returned — preserves your weight loss deficit while fueling recovery'
+  } else if (wantsLose) {
+    fraction = 0.35
+    reason = '35% returned — preserves your calorie deficit for weight loss'
+  } else if (wantsMuscle) {
+    fraction = 0.75
+    reason = '75% returned — supports muscle repair and growth'
+  } else {
+    fraction = 0.65
+    reason = '65% returned for general fitness maintenance'
+  }
+  // Cap at 400 so no one gets an unreasonable windfall
+  const bonus = Math.min(400, Math.max(0, Math.round(grossBurn * fraction)))
+  const duration = workout.duration_seconds >= 3600
+    ? `${Math.floor(workout.duration_seconds / 3600)}h ${Math.round((workout.duration_seconds % 3600) / 60)}m`
+    : `${Math.round(workout.duration_seconds / 60)}m`
+  return { bonus, reason, grossBurn, duration }
+}
+
 function calcTDEE(goals) {
   if (!goals) return null
   const { weight_lbs, height_inches, age, sex, activity_level } = goals
@@ -25,56 +99,57 @@ function calcTDEE(goals) {
   const bmr = sex === 'male'
     ? 10 * weightKg + 6.25 * heightCm - 5 * age + 5
     : 10 * weightKg + 6.25 * heightCm - 5 * age - 161
-  const multipliers = { sedentary: 1.2, lightly_active: 1.375, moderately_active: 1.55, very_active: 1.725, extra_active: 1.9 }
-  const mult = multipliers[activity_level] || 1.375
+  const mult = { sedentary: 1.2, lightly_active: 1.375, moderately_active: 1.55, very_active: 1.725, extra_active: 1.9 }[activity_level] || 1.375
   return Math.round(bmr * mult)
 }
 
 function calcMacros(tdee, goals) {
   if (!tdee || !goals) return { protein: 0, carbs: 0, fat: 0 }
-  const weightLbs = goals.weight_lbs || 150
-  const protein = Math.round(weightLbs * 0.82)
+  const protein = Math.round((goals.weight_lbs || 150) * 0.82)
   const fat = Math.round(tdee * 0.25 / 9)
   const carbs = Math.round((tdee - protein * 4 - fat * 9) / 4)
   return { protein, carbs, fat }
 }
 
-function MacroBar({ value, goal, color }) {
+function MacroBar({ value, goal, color, warn }) {
   const pct = goal > 0 ? Math.min(100, Math.round((value / goal) * 100)) : 0
+  const over = goal > 0 && value > goal
+  const barColor = warn && over ? 'var(--error)' : color
   return (
     <div>
-      <div style={{ height: '6px', backgroundColor: 'var(--border)', borderRadius: '3px', marginTop: '6px' }}>
-        <div style={{ height: '100%', width: `${pct}%`, backgroundColor: color, borderRadius: '3px', transition: 'width 0.3s' }} />
-      </div>
-      <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '3px' }}>
-        {value} / {goal} {pct >= 100 ? '✓' : `(${pct}%)`}
+      <div style={{ height: '5px', backgroundColor: 'var(--border)', borderRadius: '3px', marginTop: '5px' }}>
+        <div style={{ height: '100%', width: `${pct}%`, backgroundColor: barColor, borderRadius: '3px', transition: 'width 0.3s' }} />
       </div>
     </div>
   )
 }
 
-function SearchModal({ slot, onClose, onAdd }) {
+// Search modal with saved foods quick-select and full micronutrient entry
+function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
-  const [myFoods, setMyFoods] = useState([])
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState(null)
   const [servings, setServings] = useState('1')
   const [manualMode, setManualMode] = useState(false)
-  const [manual, setManual] = useState({ name: '', brand: '', serving_size_label: '1 serving', calories: '', protein_g: '', carbs_g: '', fat_g: '', fiber_g: '', sugar_g: '', sodium_mg: '' })
+  const [manual, setManual] = useState({
+    name: '', brand: '', serving_size_label: '1 serving',
+    calories: '', protein_g: '', carbs_g: '', fat_g: '', fiber_g: '', sugar_g: '', sodium_mg: '',
+    saturated_fat_g: '', trans_fat_g: '', cholesterol_mg: '', potassium_mg: '', calcium_mg: '',
+    iron_mg: '', magnesium_mg: '', zinc_mg: '', vitamin_a_mcg: '', vitamin_c_mg: '',
+    vitamin_d_mcg: '', vitamin_b12_mcg: '', vitamin_b6_mg: '', folate_mcg: '',
+  })
   const [saveToLib, setSaveToLib] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [savingFood, setSavingFood] = useState(null)
   const inputRef = useRef(null)
   const debounceRef = useRef(null)
 
   useEffect(() => { inputRef.current?.focus() }, [])
 
-  useEffect(() => {
-    fetch('/api/nutrition/my-foods').then(r => r.json()).then(d => setMyFoods(d.foods || []))
-  }, [])
-
   function handleQueryChange(val) {
     setQuery(val)
+    setSelected(null)
     clearTimeout(debounceRef.current)
     if (!val.trim()) { setResults([]); return }
     debounceRef.current = setTimeout(async () => {
@@ -84,6 +159,13 @@ function SearchModal({ slot, onClose, onAdd }) {
       setResults(data.results || [])
       setSearching(false)
     }, 500)
+  }
+
+  async function handleQuickSave(food, e) {
+    e.stopPropagation()
+    setSavingFood(food.id || food.name)
+    await onSaveFood(food)
+    setSavingFood(null)
   }
 
   async function handleAdd() {
@@ -99,144 +181,173 @@ function SearchModal({ slot, onClose, onAdd }) {
       }
     }
     const sv = parseFloat(servings) || 1
-    await onAdd({
-      meal_slot: slot,
-      name: food.name,
-      brand: food.brand || null,
-      serving_size_label: food.serving_size_label || '1 serving',
-      servings: sv,
-      calories: food.calories || null,
-      protein_g: food.protein_g || null,
-      carbs_g: food.carbs_g || null,
-      fat_g: food.fat_g || null,
-      fiber_g: food.fiber_g || null,
-      sugar_g: food.sugar_g || null,
-      sodium_mg: food.sodium_mg || null,
-      source: food._source || food.source || 'off',
-      food_cache_id: food._source === 'my_foods' ? null : (food.id || null),
-      my_food_id: food._source === 'my_foods' ? food.id : null,
-    })
+    const entry = { meal_slot: slot, servings: sv, source: food._source || food.source || 'off' }
+    // Copy all nutrition fields, multiplied by servings handled in API
+    for (const k of ['name','brand','serving_size_label','calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg',
+      'saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg',
+      'vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg']) {
+      entry[k] = food[k] ?? null
+    }
+    entry.food_cache_id = food._source === 'my_foods' ? null : (food.id || null)
+    entry.my_food_id = food._source === 'my_foods' ? food.id : null
+    await onAdd(entry)
     setSaving(false)
     onClose()
   }
 
-  const mf = query ? myFoods.filter(f => f.name.toLowerCase().includes(query.toLowerCase())) : myFoods
+  const filteredMyFoods = query ? myFoods.filter(f => f.name.toLowerCase().includes(query.toLowerCase())) : myFoods
+  const mealLabel = MEAL_SLOTS.find(m => m.key === slot)
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', width: '100%', maxWidth: '520px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '20px 20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', width: '100%', maxWidth: '540px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+
+        <div style={{ padding: '18px 20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', margin: 0 }}>
-            Log Food — {MEAL_SLOTS.find(m => m.key === slot)?.emoji} {MEAL_SLOTS.find(m => m.key === slot)?.label}
+            {mealLabel?.emoji} {mealLabel?.label}
           </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '22px', cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
 
         {!manualMode ? (
           <>
-            <div style={{ padding: '16px 20px 12px' }}>
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={e => handleQueryChange(e.target.value)}
-                placeholder="Search food name or brand..."
-                style={{ width: '100%', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '14px', boxSizing: 'border-box' }}
-              />
+            <div style={{ padding: '14px 20px 10px' }}>
+              <input ref={inputRef} value={query} onChange={e => handleQueryChange(e.target.value)}
+                placeholder="Search food name, brand..."
+                style={{ width: '100%', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '14px', boxSizing: 'border-box' }} />
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
-              {searching && <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Searching...</p>}
-
-              {mf.length > 0 && !query && (
+              {/* My Foods — always visible, filtered when searching */}
+              {filteredMyFoods.length > 0 && (
                 <div style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>My Foods</div>
-                  {mf.map(f => (
-                    <FoodRow key={f.id} food={{ ...f, _source: 'my_foods' }} selected={selected?.id === f.id} onSelect={setSelected} />
+                  <div style={{ fontSize: '11px', color: 'var(--accent-purple)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px', fontWeight: '600' }}>⭐ Saved Foods</div>
+                  {filteredMyFoods.map(f => (
+                    <FoodRow key={f.id} food={{ ...f, _source: 'my_foods' }} selected={selected?.id === f.id && selected?._source === 'my_foods'} onSelect={setSelected} isSaved />
                   ))}
                 </div>
               )}
 
+              {/* Search results */}
+              {searching && <p style={{ color: 'var(--text-secondary)', fontSize: '13px', padding: '4px 0' }}>Searching...</p>}
               {results.length > 0 && (
                 <div style={{ marginBottom: '12px' }}>
-                  {query && mf.length > 0 && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>My Foods</div>}
-                  {query && mf.map(f => (
-                    <FoodRow key={f.id} food={{ ...f, _source: 'my_foods' }} selected={selected?.id === f.id} onSelect={setSelected} />
-                  ))}
-                  {query && results.length > 0 && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '8px 0 6px' }}>Database Results</div>}
+                  {query && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Results</div>}
                   {results.map((f, i) => (
-                    <FoodRow key={f.id || i} food={f} selected={selected?.id === f.id} onSelect={setSelected} />
+                    <FoodRow key={f.id || i} food={f} selected={selected?.id === f.id && selected?._source !== 'my_foods'} onSelect={setSelected}
+                      onSave={handleQuickSave} savingId={savingFood} />
                   ))}
                 </div>
               )}
 
-              {!searching && query && results.length === 0 && mf.length === 0 && (
-                <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>No results found.</p>
+              {!searching && query && results.length === 0 && filteredMyFoods.length === 0 && (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>No results. Try entering manually below.</p>
+              )}
+              {!query && myFoods.length === 0 && (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Type to search, or enter food manually.</p>
               )}
             </div>
 
             {selected && (
               <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{selected.name}</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{selected.serving_size_label || '1 serving'}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selected.name}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                    {selected.serving_size_label || '1 serving'}
+                    {selected.calories ? ` · ${Math.round(selected.calories * (parseFloat(servings) || 1))} kcal` : ''}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Servings:</span>
-                  <input
-                    type="number" min="0.25" step="0.25" value={servings}
-                    onChange={e => setServings(e.target.value)}
-                    style={{ width: '60px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }}
-                  />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Servings</span>
+                  <input type="number" min="0.25" step="0.25" value={servings} onChange={e => setServings(e.target.value)}
+                    style={{ width: '56px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
                 </div>
                 <button onClick={handleAdd} disabled={saving}
-                  style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
-                  {saving ? 'Adding...' : '+ Add'}
+                  style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: saving ? 0.6 : 1, flexShrink: 0 }}>
+                  {saving ? '...' : '+ Add'}
                 </button>
               </div>
             )}
 
-            <div style={{ padding: '12px 20px', borderTop: selected ? 'none' : '1px solid var(--border)' }}>
+            <div style={{ padding: '10px 20px 16px', borderTop: selected ? 'none' : '1px solid var(--border)' }}>
               <button onClick={() => setManualMode(true)}
-                style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer', width: '100%' }}>
+                style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', width: '100%' }}>
                 + Enter manually
               </button>
             </div>
           </>
         ) : (
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 20px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          // Manual entry — all fields
+          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px 20px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 14px' }}>Fill in what you know — everything except Name is optional.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {[
-                { key: 'name', label: 'Name *', type: 'text', placeholder: 'e.g. Greek Yogurt' },
-                { key: 'brand', label: 'Brand', type: 'text', placeholder: 'e.g. Chobani' },
-                { key: 'serving_size_label', label: 'Serving Size', type: 'text', placeholder: 'e.g. 1 cup (227g)' },
-                { key: 'calories', label: 'Calories', type: 'number', placeholder: '0' },
-                { key: 'protein_g', label: 'Protein (g)', type: 'number', placeholder: '0' },
-                { key: 'carbs_g', label: 'Carbs (g)', type: 'number', placeholder: '0' },
-                { key: 'fat_g', label: 'Fat (g)', type: 'number', placeholder: '0' },
-                { key: 'fiber_g', label: 'Fiber (g)', type: 'number', placeholder: '0' },
-                { key: 'sodium_mg', label: 'Sodium (mg)', type: 'number', placeholder: '0' },
-              ].map(({ key, label, type, placeholder }) => (
-                <div key={key} style={{ display: 'grid', gridTemplateColumns: '130px 1fr', alignItems: 'center', gap: '12px' }}>
-                  <label style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{label}</label>
-                  <input type={type} value={manual[key]} placeholder={placeholder}
-                    onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
-                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px' }}
-                  />
+                { key: 'name', label: 'Name *' }, { key: 'brand', label: 'Brand' },
+                { key: 'serving_size_label', label: 'Serving Size' },
+              ].map(({ key, label }) => (
+                <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
+                  <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
+                  <input type="text" value={manual[key]} placeholder={key === 'serving_size_label' ? '1 cup (240ml)' : ''} onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
+                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
                 </div>
               ))}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
-                <input type="checkbox" id="savelib" checked={saveToLib} onChange={e => setSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)' }} />
-                <label htmlFor="savelib" style={{ color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>Save to My Foods library</label>
+              <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Main Macros</div>
+              {[
+                { key: 'calories', label: 'Calories' }, { key: 'protein_g', label: 'Protein (g)' },
+                { key: 'carbs_g', label: 'Carbs (g)' }, { key: 'fat_g', label: 'Fat (g)' },
+                { key: 'fiber_g', label: 'Fiber (g)' }, { key: 'sugar_g', label: 'Sugar (g)' },
+              ].map(({ key, label }) => (
+                <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
+                  <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
+                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
+                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                </div>
+              ))}
+              <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Fats & Cholesterol</div>
+              {[
+                { key: 'saturated_fat_g', label: 'Saturated Fat (g)' }, { key: 'trans_fat_g', label: 'Trans Fat (g)' }, { key: 'cholesterol_mg', label: 'Cholesterol (mg)' },
+              ].map(({ key, label }) => (
+                <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
+                  <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
+                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
+                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                </div>
+              ))}
+              <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Minerals</div>
+              {[
+                { key: 'sodium_mg', label: 'Sodium (mg)' }, { key: 'potassium_mg', label: 'Potassium (mg)' },
+                { key: 'calcium_mg', label: 'Calcium (mg)' }, { key: 'iron_mg', label: 'Iron (mg)' },
+                { key: 'magnesium_mg', label: 'Magnesium (mg)' }, { key: 'zinc_mg', label: 'Zinc (mg)' },
+              ].map(({ key, label }) => (
+                <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
+                  <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
+                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
+                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                </div>
+              ))}
+              <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Vitamins</div>
+              {[
+                { key: 'vitamin_a_mcg', label: 'Vitamin A (mcg)' }, { key: 'vitamin_c_mg', label: 'Vitamin C (mg)' },
+                { key: 'vitamin_d_mcg', label: 'Vitamin D (mcg)' }, { key: 'vitamin_b12_mcg', label: 'Vitamin B12 (mcg)' },
+                { key: 'vitamin_b6_mg', label: 'Vitamin B6 (mg)' }, { key: 'folate_mcg', label: 'Folate (mcg)' },
+              ].map(({ key, label }) => (
+                <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
+                  <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
+                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
+                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                </div>
+              ))}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
+                <input type="checkbox" id="savelib" checked={saveToLib} onChange={e => setSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '16px', height: '16px' }} />
+                <label htmlFor="savelib" style={{ color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>⭐ Save to My Foods library</label>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '18px' }}>
               <button onClick={() => setManualMode(false)}
-                style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                ← Back
-              </button>
+                style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>← Back</button>
               <button onClick={handleAdd} disabled={!manual.name.trim() || saving}
                 style={{ flex: 2, backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: (!manual.name.trim() || saving) ? 0.5 : 1 }}>
-                {saving ? 'Adding...' : '+ Add to Log'}
+                {saving ? '...' : '+ Add to Log'}
               </button>
             </div>
           </div>
@@ -246,23 +357,78 @@ function SearchModal({ slot, onClose, onAdd }) {
   )
 }
 
-function FoodRow({ food, selected, onSelect }) {
+function FoodRow({ food, selected, onSelect, isSaved, onSave, savingId }) {
   const cal = food.calories ? Math.round(food.calories) : '?'
-  const p = food.protein_g ? Math.round(food.protein_g) : '?'
+  const p = food.protein_g ? `${Math.round(food.protein_g)}g P` : null
+  const f = food.fat_g ? `${Math.round(food.fat_g)}g F` : null
+  const isSavingThis = savingId === (food.id || food.name)
   return (
     <div onClick={() => onSelect(food)}
-      style={{ padding: '10px 12px', borderRadius: '8px', marginBottom: '4px', cursor: 'pointer', backgroundColor: selected ? 'rgba(0,128,255,0.12)' : 'var(--background)', border: selected ? '1px solid var(--accent-blue)' : '1px solid transparent', transition: 'background 0.1s' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
-          {food.brand && <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{food.brand}</div>}
-          <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{food.serving_size_label || '1 serving'}</div>
-        </div>
-        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '12px' }}>
-          <div style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '700' }}>{cal} kcal</div>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{p}g protein</div>
+      style={{ padding: '10px 12px', borderRadius: '8px', marginBottom: '3px', cursor: 'pointer', backgroundColor: selected ? 'rgba(0,128,255,0.12)' : 'var(--background)', border: selected ? '1px solid var(--accent-blue)' : '1px solid transparent', display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
+        <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+          {food.brand ? `${food.brand} · ` : ''}{food.serving_size_label || '1 serving'}
+          {p ? ` · ${p}` : ''}{f ? ` · ${f}` : ''}
         </div>
       </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+        <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '700', minWidth: '54px', textAlign: 'right' }}>{cal} kcal</span>
+        {!isSaved && onSave && (
+          <button onClick={e => onSave(food, e)} title="Save to My Foods"
+            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '6px', padding: '3px 7px', fontSize: '12px', cursor: 'pointer', color: 'var(--text-secondary)', opacity: isSavingThis ? 0.5 : 1 }}>
+            {isSavingThis ? '...' : '⭐'}
+          </button>
+        )}
+        {isSaved && <span style={{ fontSize: '10px', color: 'var(--accent-purple)', backgroundColor: 'rgba(167,139,250,0.12)', borderRadius: '4px', padding: '2px 6px' }}>saved</span>}
+      </div>
+    </div>
+  )
+}
+
+function MicroNutrientPanel({ totals }) {
+  const hasAnyData = MICRO_GROUPS.some(g => g.items.some(item => totals[item.key] > 0))
+  if (!hasAnyData) return (
+    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>
+      Micronutrient data will appear here once you log foods from the database. Manually entered foods require you to fill in the values.
+    </p>
+  )
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {MICRO_GROUPS.map(group => (
+        <div key={group.label}>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px', fontWeight: '600' }}>{group.label}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px' }}>
+            {group.items.map(item => {
+              const val = totals[item.key] || 0
+              const dv = DV[item.key]
+              const pct = dv ? Math.min(100, Math.round((val / dv) * 100)) : null
+              const over = dv && val > dv
+              const barColor = item.warn && over ? 'var(--error)' : item.warn ? 'var(--warning)' : 'var(--accent-blue)'
+              return (
+                <div key={item.key} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{item.label}</span>
+                    {pct !== null && <span style={{ fontSize: '10px', color: over && item.warn ? 'var(--error)' : 'var(--text-secondary)' }}>{pct}% DV</span>}
+                  </div>
+                  <div style={{ color: over && item.warn ? 'var(--error)' : 'var(--text-primary)', fontSize: '15px', fontWeight: '700', marginTop: '2px' }}>
+                    {val < 1 && val > 0 ? val.toFixed(2) : Math.round(val)}<span style={{ fontSize: '10px', fontWeight: '400', color: 'var(--text-secondary)', marginLeft: '2px' }}>{item.unit}</span>
+                  </div>
+                  {item.noDV ? (
+                    <div style={{ fontSize: '10px', color: val > 0 ? 'var(--error)' : 'var(--text-secondary)', marginTop: '3px' }}>
+                      {val > 0 ? '⚠ Aim for 0' : 'None logged ✓'}
+                    </div>
+                  ) : dv ? (
+                    <div style={{ height: '4px', backgroundColor: 'var(--border)', borderRadius: '2px', marginTop: '6px' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, backgroundColor: barColor, borderRadius: '2px', transition: 'width 0.3s' }} />
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -273,37 +439,42 @@ export default function NutritionPage() {
   const [goals, setGoals] = useState(null)
   const [supplements, setSupplements] = useState([])
   const [entries, setEntries] = useState([])
-  const [logModal, setLogModal] = useState(null) // meal_slot key
-  const [myFoodsOpen, setMyFoodsOpen] = useState(false)
   const [myFoods, setMyFoods] = useState([])
+  const [logModal, setLogModal] = useState(null)
   const [activeTab, setActiveTab] = useState('log')
+  const [microOpen, setMicroOpen] = useState(false)
+  const [todayWorkout, setTodayWorkout] = useState(null)
+  const [copyingYesterday, setCopyingYesterday] = useState(false)
+
+  const today = new Date().toISOString().split('T')[0]
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
 
   useEffect(() => {
     async function load() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setChecked(true); return }
-      const [{ data: goalsData }, { data: suppData }] = await Promise.all([
+      const [{ data: goalsData }, { data: suppData }, { data: workoutData }] = await Promise.all([
         supabase.from('goals_profiles').select('*').eq('user_id', user.id).single(),
         supabase.from('supplement_stack').select('name, dose, timing, nutrients').eq('user_id', user.id).eq('is_active', true).order('created_at'),
+        // Fetch today's completed (non-partial) workout
+        supabase.from('workout_logs').select('duration_seconds, is_partial, day_label').eq('user_id', user.id).gte('created_at', today).is('is_partial', false).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       ])
       if (!goalsData) { setGoalsGated(true); setChecked(true); return }
       setGoals(goalsData)
       setSupplements(suppData ?? [])
+      setTodayWorkout(workoutData || null)
       setChecked(true)
-      // Load today's log
-      const res = await fetch('/api/nutrition/log')
-      const data = await res.json()
-      setEntries(data.entries || [])
+      const [logRes, foodsRes] = await Promise.all([
+        fetch('/api/nutrition/log'),
+        fetch('/api/nutrition/my-foods'),
+      ])
+      const [logData, foodsData] = await Promise.all([logRes.json(), foodsRes.json()])
+      setEntries(logData.entries || [])
+      setMyFoods(foodsData.foods || [])
     }
     load()
   }, [])
-
-  async function loadMyFoods() {
-    const res = await fetch('/api/nutrition/my-foods')
-    const data = await res.json()
-    setMyFoods(data.foods || [])
-  }
 
   async function handleAddEntry(entry) {
     const res = await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry) })
@@ -316,9 +487,28 @@ export default function NutritionPage() {
     setEntries(prev => prev.filter(e => e.id !== id))
   }
 
+  async function handleSaveToMyFoods(food) {
+    // Don't re-save if already in My Foods
+    if (food._source === 'my_foods') return
+    const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(food) })
+    const data = await res.json()
+    if (data.food) setMyFoods(prev => [...prev, data.food].sort((a, b) => a.name.localeCompare(b.name)))
+  }
+
   async function handleDeleteMyFood(id) {
     await fetch('/api/nutrition/my-foods', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     setMyFoods(prev => prev.filter(f => f.id !== id))
+  }
+
+  async function handleCopyYesterday() {
+    setCopyingYesterday(true)
+    const res = await fetch('/api/nutrition/log', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ copy_from_date: yesterday, target_date: today }),
+    })
+    const data = await res.json()
+    if (data.entries?.length) setEntries(prev => [...prev, ...data.entries])
+    setCopyingYesterday(false)
   }
 
   if (!checked) return null
@@ -329,7 +519,7 @@ export default function NutritionPage() {
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
         <h2 style={{ color: 'var(--text-primary)', fontSize: '20px', fontWeight: '700', marginBottom: '10px' }}>Complete your Goals Setup first</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
-          This page uses your personal goals profile to calculate your calorie and macro targets. Take 2 minutes to set it up — you only do it once.
+          Nutrition targets are calculated from your height, weight, age, and activity level. Takes 2 minutes and only done once.
         </p>
         <a href="/life-hub/goals/setup?redirect=/life-hub/nutrition"
           style={{ display: 'inline-block', backgroundColor: 'var(--accent-purple)', color: '#fff', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', textDecoration: 'none' }}>
@@ -341,71 +531,81 @@ export default function NutritionPage() {
 
   const tdee = calcTDEE(goals)
   const macros = calcMacros(tdee, goals)
+  const { bonus: workoutBonus, reason: bonusReason, grossBurn, duration: workoutDuration } = calcWorkoutBonus(todayWorkout, goals)
+  const effectiveTarget = tdee ? tdee + workoutBonus : null
 
-  const totals = entries.reduce((acc, e) => ({
-    calories: acc.calories + (e.calories || 0),
-    protein_g: acc.protein_g + (e.protein_g || 0),
-    carbs_g: acc.carbs_g + (e.carbs_g || 0),
-    fat_g: acc.fat_g + (e.fat_g || 0),
-    fiber_g: acc.fiber_g + (e.fiber_g || 0),
-  }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 })
+  const totals = entries.reduce((acc, e) => {
+    for (const k of ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg',
+      'saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg',
+      'magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg']) {
+      acc[k] = (acc[k] || 0) + (e[k] || 0)
+    }
+    return acc
+  }, {})
 
-  const remaining = tdee ? Math.round(tdee - totals.calories) : null
-  const calPct = tdee ? Math.min(100, Math.round((totals.calories / tdee) * 100)) : 0
+  const remaining = effectiveTarget ? Math.round(effectiveTarget - (totals.calories || 0)) : null
+  const calPct = effectiveTarget ? Math.min(100, Math.round(((totals.calories || 0) / effectiveTarget) * 100)) : 0
+  const overBudget = remaining !== null && remaining < 0
 
   return (
     <div>
       {logModal && (
-        <SearchModal slot={logModal} onClose={() => setLogModal(null)} onAdd={handleAddEntry} />
+        <SearchModal slot={logModal} onClose={() => setLogModal(null)} onAdd={handleAddEntry}
+          myFoods={myFoods} onSaveFood={handleSaveToMyFoods} />
       )}
 
-      <div style={{ marginBottom: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Nutrition</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Track meals, macros, and supplements.</p>
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Track meals, macros, and every nutrient that matters.</p>
         </div>
       </div>
 
-      {/* Calorie Ring + Summary */}
-      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap' }}>
+      {/* Calorie + Macro Summary */}
+      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '28px', flexWrap: 'wrap' }}>
           {/* Calorie ring */}
-          <div style={{ flexShrink: 0, position: 'relative', width: '100px', height: '100px' }}>
-            <svg viewBox="0 0 100 100" style={{ width: '100px', height: '100px', transform: 'rotate(-90deg)' }}>
+          <div style={{ flexShrink: 0, position: 'relative', width: '96px', height: '96px' }}>
+            <svg viewBox="0 0 100 100" style={{ width: '96px', height: '96px', transform: 'rotate(-90deg)' }}>
               <circle cx="50" cy="50" r="42" fill="none" stroke="var(--border)" strokeWidth="10" />
-              <circle cx="50" cy="50" r="42" fill="none" stroke="var(--accent-blue)" strokeWidth="10"
+              <circle cx="50" cy="50" r="42" fill="none" stroke={overBudget ? 'var(--error)' : 'var(--accent-blue)'} strokeWidth="10"
                 strokeDasharray={`${2 * Math.PI * 42}`}
                 strokeDashoffset={`${2 * Math.PI * 42 * (1 - calPct / 100)}`}
                 strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.5s' }} />
             </svg>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ color: 'var(--accent-blue)', fontSize: '20px', fontWeight: '700', lineHeight: 1 }}>{Math.round(totals.calories)}</div>
+              <div style={{ color: overBudget ? 'var(--error)' : 'var(--accent-blue)', fontSize: '18px', fontWeight: '700', lineHeight: 1 }}>{Math.round(totals.calories || 0)}</div>
               <div style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>kcal</div>
             </div>
           </div>
 
-          {/* Macro breakdown */}
+          {/* Right side */}
           <div style={{ flex: 1, minWidth: '200px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '2px' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Daily Target</span>
-              <span style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{tdee ? `${tdee} kcal` : '—'}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Target</span>
+              <span style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>
+                {effectiveTarget ? `${effectiveTarget} kcal` : '—'}
+                {workoutBonus > 0 && <span style={{ color: 'var(--success)', fontSize: '11px', marginLeft: '6px' }}>+{workoutBonus} workout</span>}
+              </span>
             </div>
-            {remaining !== null && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '12px' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Remaining</span>
-                <span style={{ color: remaining >= 0 ? 'var(--success)' : 'var(--error)', fontSize: '13px', fontWeight: '600' }}>{remaining >= 0 ? remaining : `+${Math.abs(remaining)}`} kcal</span>
-              </div>
-            )}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Remaining</span>
+              <span style={{ color: remaining === null ? 'var(--text-secondary)' : overBudget ? 'var(--error)' : 'var(--success)', fontSize: '13px', fontWeight: '600' }}>
+                {remaining === null ? '—' : overBudget ? `${Math.abs(remaining)} over` : `${remaining} kcal`}
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px' }}>
               {[
-                { label: 'Protein', value: Math.round(totals.protein_g), goal: macros.protein, unit: 'g', color: 'var(--success)' },
-                { label: 'Carbs', value: Math.round(totals.carbs_g), goal: macros.carbs, unit: 'g', color: 'var(--warning)' },
-                { label: 'Fat', value: Math.round(totals.fat_g), goal: macros.fat, unit: 'g', color: 'var(--accent-purple)' },
+                { label: 'Protein', value: Math.round(totals.protein_g || 0), goal: macros.protein, unit: 'g', color: 'var(--success)' },
+                { label: 'Carbs', value: Math.round(totals.carbs_g || 0), goal: macros.carbs, unit: 'g', color: 'var(--warning)' },
+                { label: 'Fat', value: Math.round(totals.fat_g || 0), goal: macros.fat, unit: 'g', color: 'var(--accent-purple)' },
+                { label: 'Fiber', value: Math.round(totals.fiber_g || 0), goal: 28, unit: 'g', color: 'var(--accent-blue)' },
               ].map(m => (
                 <div key={m.label}>
-                  <div style={{ color: m.color, fontSize: '16px', fontWeight: '700' }}>{m.value}<span style={{ fontSize: '11px', fontWeight: '400' }}>{m.unit}</span></div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{m.label}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>{m.label}</div>
+                  <div style={{ color: m.color, fontSize: '15px', fontWeight: '700' }}>{m.value}<span style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: '400' }}>{m.unit}</span></div>
                   <MacroBar value={m.value} goal={m.goal} color={m.color} />
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '10px', marginTop: '2px' }}>/ {m.goal}{m.unit}</div>
                 </div>
               ))}
             </div>
@@ -413,10 +613,44 @@ export default function NutritionPage() {
         </div>
       </div>
 
+      {/* Workout bonus callout */}
+      {workoutBonus > 0 && (
+        <div style={{ backgroundColor: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.25)', borderRadius: '8px', padding: '12px 16px', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '18px' }}>🏋️</span>
+            <div>
+              <div style={{ color: 'var(--success)', fontSize: '13px', fontWeight: '600' }}>
+                {todayWorkout?.day_label || 'Today\'s workout'} ({workoutDuration}) added +{workoutBonus} kcal to your target
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>
+                Est. ~{grossBurn} kcal burned · {bonusReason}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Micronutrient expandable */}
+      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', marginBottom: '16px', overflow: 'hidden' }}>
+        <button onClick={() => setMicroOpen(o => !o)}
+          style={{ width: '100%', background: 'none', border: 'none', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', color: 'var(--text-primary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '14px', fontWeight: '600' }}>Full Nutrition Breakdown</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Sodium, Vitamins, Minerals & more</span>
+          </div>
+          <span style={{ fontSize: '11px', color: 'var(--text-secondary)', transform: microOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
+        </button>
+        {microOpen && (
+          <div style={{ padding: '0 20px 20px' }}>
+            <MicroNutrientPanel totals={totals} />
+          </div>
+        )}
+      </div>
+
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '16px' }}>
-        {[{ key: 'log', label: 'Food Log' }, { key: 'myfoods', label: 'My Foods' }, { key: 'supplements', label: 'Supplements' }].map(t => (
-          <button key={t.key} onClick={() => { setActiveTab(t.key); if (t.key === 'myfoods') loadMyFoods() }}
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '14px' }}>
+        {[{ key: 'log', label: 'Food Log' }, { key: 'myfoods', label: '⭐ Saved Foods' }, { key: 'supplements', label: 'Supplements' }].map(t => (
+          <button key={t.key} onClick={() => setActiveTab(t.key)}
             style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: activeTab === t.key ? '600' : '400', cursor: 'pointer', backgroundColor: activeTab === t.key ? 'var(--accent-blue)' : 'var(--surface)', color: activeTab === t.key ? '#E8E8E8' : 'var(--text-secondary)', transition: 'all 0.15s' }}>
             {t.label}
           </button>
@@ -425,67 +659,76 @@ export default function NutritionPage() {
 
       {/* Food Log Tab */}
       {activeTab === 'log' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {MEAL_SLOTS.map(slot => {
-            const slotEntries = entries.filter(e => e.meal_slot === slot.key)
-            const slotCals = slotEntries.reduce((s, e) => s + (e.calories || 0), 0)
-            return (
-              <div key={slot.key} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px 20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: slotEntries.length > 0 ? '12px' : '0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '16px' }}>{slot.emoji}</span>
-                    <span style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>{slot.label}</span>
-                    {slotCals > 0 && <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{Math.round(slotCals)} kcal</span>}
+        <div>
+          {/* Copy yesterday */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+            <button onClick={handleCopyYesterday} disabled={copyingYesterday}
+              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', opacity: copyingYesterday ? 0.5 : 1 }}>
+              {copyingYesterday ? 'Copying...' : '📋 Copy from yesterday'}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {MEAL_SLOTS.map(slot => {
+              const slotEntries = entries.filter(e => e.meal_slot === slot.key)
+              const slotCals = slotEntries.reduce((s, e) => s + (e.calories || 0), 0)
+              return (
+                <div key={slot.key} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px 18px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: slotEntries.length ? '10px' : '0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '15px' }}>{slot.emoji}</span>
+                      <span style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>{slot.label}</span>
+                      {slotCals > 0 && <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{Math.round(slotCals)} kcal</span>}
+                    </div>
+                    <button onClick={() => setLogModal(slot.key)}
+                      style={{ backgroundColor: 'rgba(0,128,255,0.12)', color: 'var(--accent-blue)', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                      + Add
+                    </button>
                   </div>
-                  <button onClick={() => setLogModal(slot.key)}
-                    style={{ backgroundColor: 'rgba(0,128,255,0.12)', color: 'var(--accent-blue)', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
-                    + Add
-                  </button>
-                </div>
-                {slotEntries.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {slotEntries.map(e => (
-                      <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--background)', borderRadius: '8px', padding: '8px 12px' }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.name}</div>
-                          <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-                            {e.servings !== 1 ? `${e.servings}× ` : ''}{e.serving_size_label || '1 serving'}
-                            {e.protein_g ? ` · ${Math.round(e.protein_g)}g protein` : ''}
-                            {e.carbs_g ? ` · ${Math.round(e.carbs_g)}g carbs` : ''}
-                            {e.fat_g ? ` · ${Math.round(e.fat_g)}g fat` : ''}
+                  {slotEntries.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {slotEntries.map(e => (
+                        <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--background)', borderRadius: '8px', padding: '8px 12px' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.name}</div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                              {e.servings !== 1 ? `${e.servings}× ` : ''}{e.serving_size_label || '1 serving'}
+                              {e.protein_g ? ` · ${Math.round(e.protein_g)}g P` : ''}
+                              {e.carbs_g ? ` · ${Math.round(e.carbs_g)}g C` : ''}
+                              {e.fat_g ? ` · ${Math.round(e.fat_g)}g F` : ''}
+                              {e.sodium_mg ? ` · ${Math.round(e.sodium_mg)}mg Na` : ''}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: '8px' }}>
+                            <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '600' }}>{e.calories ? Math.round(e.calories) : '?'} kcal</span>
+                            <button onClick={() => handleRemoveEntry(e.id)}
+                              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '17px', cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>×</button>
                           </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: '8px' }}>
-                          <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '600' }}>{e.calories ? Math.round(e.calories) : '?'} kcal</span>
-                          <button onClick={() => handleRemoveEntry(e.id)}
-                            style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>×</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {slotEntries.length === 0 && (
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '8px 0 0' }}>Nothing logged yet.</p>
-                )}
-              </div>
-            )
-          })}
+                      ))}
+                    </div>
+                  )}
+                  {slotEntries.length === 0 && (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '6px 0 0' }}>Nothing logged yet.</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
-      {/* My Foods Tab */}
+      {/* Saved Foods Tab */}
       {activeTab === 'myfoods' && (
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <div>
-              <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', margin: 0 }}>My Foods Library</h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '4px 0 0' }}>Saved foods for quick one-click logging</p>
-            </div>
+          <div style={{ marginBottom: '12px' }}>
+            <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', margin: '0 0 4px' }}>Saved Foods</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>Foods you've saved for quick logging. Hit ⭐ on any search result to add here.</p>
           </div>
           {myFoods.length === 0 ? (
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>No saved foods yet. When logging food, check "Save to My Foods" to add it here.</p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Nothing saved yet. Search for a food and tap ⭐ to save it, or check "Save to My Foods" when entering manually.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {myFoods.map(f => (
                 <div key={f.id} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ flex: 1 }}>
@@ -510,15 +753,15 @@ export default function NutritionPage() {
       {/* Supplements Tab */}
       {activeTab === 'supplements' && (
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <div>
-              <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', margin: 0 }}>Supplement Stack</h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '4px 0 0' }}>Your active supplements</p>
+              <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', margin: '0 0 4px' }}>Supplement Stack</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>Your active supplements</p>
             </div>
             <Link href="/life-hub/goals/supplements" style={{ fontSize: '12px', color: 'var(--accent-purple)', textDecoration: 'none' }}>Manage →</Link>
           </div>
           {supplements.length === 0 ? (
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>No supplements added yet. <Link href="/life-hub/goals/supplements" style={{ color: 'var(--accent-purple)' }}>Add your stack →</Link></p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>No supplements added. <Link href="/life-hub/goals/supplements" style={{ color: 'var(--accent-purple)' }}>Add your stack →</Link></p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {supplements.map((s, i) => {
@@ -547,10 +790,9 @@ export default function NutritionPage() {
         </div>
       )}
 
-      {/* TDEE note */}
       {tdee && (
         <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '16px', textAlign: 'center' }}>
-          Calorie target calculated from your goals profile · <Link href="/life-hub/goals/setup" style={{ color: 'var(--accent-purple)' }}>Update goals</Link>
+          Calorie target from Mifflin-St Jeor formula · <Link href="/life-hub/goals/setup" style={{ color: 'var(--accent-purple)' }}>Update goals</Link>
         </p>
       )}
     </div>

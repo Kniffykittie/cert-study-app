@@ -224,9 +224,9 @@ src/
 | `water_logs` | Water intake entries — user_id, date, amount_oz NUMERIC(6,1), created_at; RLS enabled; one row per tap (not aggregated) |
 | `supplement_stack` | User's active supplements — name, dose, timing (morning/afternoon/evening/with_meals/pre_workout/post_workout), nutrients JSONB (nutrient→"amount unit"), is_active; RLS enabled |
 | `supplement_profiles` | Cached AI supplement info cards — supplement_name (unique, normalized lowercase), ai_profile JSONB, generated_at; shared across all users; SELECT/INSERT/UPDATE open to all authenticated users |
-| `food_cache` | Shared cached food lookup results — barcode (unique), search_name, full nutrition fields, source ('off'); Open Food Facts results cached permanently per ODbL license; no RLS (shared read) |
-| `my_foods` | User's personal saved food library — name, brand, serving_size_label, full macro fields; RLS user-scoped |
-| `food_log_entries` | Individual food log entries per user/date/meal_slot — name, brand, serving_size_label, servings, all macro fields (already multiplied by servings), source, food_cache_id, my_food_id; RLS user-scoped |
+| `food_cache` | Shared cached food lookup results — barcode (unique), search_name, full nutrition fields (macros + 14 micronutrients), source ('off'); Open Food Facts results cached permanently per ODbL license; no RLS (shared read) |
+| `my_foods` | User's personal saved food library — name, brand, serving_size_label, full macro + micronutrient fields; RLS user-scoped |
+| `food_log_entries` | Individual food log entries per user/date/meal_slot — name, brand, serving_size_label, servings, all macro + micronutrient fields (already multiplied by servings), source, food_cache_id, my_food_id; RLS user-scoped |
 | `workout_logs` | One row per completed workout session — user_id, plan_id (nullable), day_of_week, day_label, duration_seconds, created_at; RLS enabled |
 | `workout_log_sets` | Individual sets per session — log_id, user_id, exercise_id (nullable), exercise_name, set_number, set_type (warmup/working/dropset), weight_lbs, reps, rep_range, created_at; RLS enabled |
 

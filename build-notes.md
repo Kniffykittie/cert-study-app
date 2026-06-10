@@ -266,6 +266,18 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 39 - Complete
+- **Full micronutrient tracking** — 14 new columns added to `food_cache`, `my_foods`, `food_log_entries`: saturated fat, trans fat, cholesterol, potassium, calcium, iron, magnesium, zinc, vitamins A/C/D/B12/B6, folate
+- **Open Food Facts mapping updated** — search route now extracts all micronutrients; minerals stored as g in OFF are converted to mg; vitamins converted to mcg/mg; prefers per-serving values, falls back to per-100g
+- **Full Nutrition Breakdown panel** — collapsible section on nutrition page; shows all 14 micros in groups (Fats & Cholesterol, Minerals, Vitamins) with % Daily Value bars; warn/red color when sodium, saturated fat, cholesterol, or trans fat exceed DV; trans fat shows "Aim for 0" instead of DV bar
+- **⭐ Saved Foods system** — ⭐ button on every search result instantly saves to My Foods without leaving the modal; My Foods renamed to "Saved Foods" tab with updated explainer; saved foods always show first in search modal under "Saved Foods" header
+- **Copy from yesterday** — button at top of Food Log tab; copies all of yesterday's food entries to today in one tap; useful for consistent meal patterns
+- **Workout calorie bonus** — fetches today's completed (non-partial) workout from `workout_logs`; calculates bonus calories using MET 4.0 × weight_kg × hours; goal-adjusted return: lose weight 35%, lose + muscle 40%, muscle/strength 75%, general 65%; capped at 400 kcal; shows green callout with workout name, duration, gross burn, and reason for the return fraction
+- **Manual entry expanded** — all 14 micronutrient fields added to manual entry form, organized into sections (Main Macros, Fats & Cholesterol, Minerals, Vitamins)
+- **Fiber added to main macro row** — fiber now shows alongside protein/carbs/fat in the top summary with its own progress bar (DV: 28g)
+- **Sodium shown inline on food log entries** — each logged food row shows sodium mg alongside P/C/F for quick awareness
+- **DB migration**: `nutrition_micronutrients` — ALTER TABLE on all 3 nutrition tables
+
 ### Phase 38 - Complete
 - **Full Nutrition Dashboard** — replaced placeholder with working nutrition tracking page
 - **TDEE + macro targets** calculated from `goals_profiles` (Mifflin-St Jeor BMR × activity multiplier); protein = 0.82g/lb bodyweight, fat = 25% of TDEE, carbs = remainder

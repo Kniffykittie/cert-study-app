@@ -1,6 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+const MICRO_FIELDS = [
+  'saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg',
+  'iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg',
+  'vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg',
+]
+
 export async function GET(req) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -25,24 +31,52 @@ export async function POST(req) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { date, meal_slot, name, brand, serving_size_label, servings, calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g, sodium_mg, source, food_cache_id, my_food_id } = body
+
+  // Bulk copy from another date
+  if (body.copy_from_date) {
+    const { data: source } = await supabase
+      .from('food_log_entries')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('date', body.copy_from_date)
+    if (!source?.length) return NextResponse.json({ entries: [] })
+    const toInsert = source.map(({ id, created_at, date: _d, ...rest }) => ({
+      ...rest,
+      date: body.target_date || new Date().toISOString().split('T')[0],
+    }))
+    const { data: inserted } = await supabase.from('food_log_entries').insert(toInsert).select()
+    return NextResponse.json({ entries: inserted || [] })
+  }
+
+  const { date, meal_slot, name, brand, serving_size_label, servings, calories, protein_g, carbs_g, fat_g,
+    fiber_g, sugar_g, sodium_mg, source, food_cache_id, my_food_id, ...rest } = body
+  const sv = servings || 1
+
+  // Multiply all nutrients by servings
+  function mult(val) { return val != null ? val * sv : null }
+
+  const microValues = {}
+  for (const field of MICRO_FIELDS) {
+    microValues[field] = rest[field] != null ? rest[field] * sv : null
+  }
 
   const { data, error } = await supabase.from('food_log_entries').insert({
     user_id: user.id,
     date: date || new Date().toISOString().split('T')[0],
     meal_slot: meal_slot || 'other',
     name, brand, serving_size_label,
-    servings: servings || 1,
-    calories: calories ? calories * (servings || 1) : null,
-    protein_g: protein_g ? protein_g * (servings || 1) : null,
-    carbs_g: carbs_g ? carbs_g * (servings || 1) : null,
-    fat_g: fat_g ? fat_g * (servings || 1) : null,
-    fiber_g: fiber_g ? fiber_g * (servings || 1) : null,
-    sugar_g: sugar_g ? sugar_g * (servings || 1) : null,
-    sodium_mg: sodium_mg ? sodium_mg * (servings || 1) : null,
+    servings: sv,
+    calories: mult(calories),
+    protein_g: mult(protein_g),
+    carbs_g: mult(carbs_g),
+    fat_g: mult(fat_g),
+    fiber_g: mult(fiber_g),
+    sugar_g: mult(sugar_g),
+    sodium_mg: mult(sodium_mg),
     source: source || 'manual',
     food_cache_id: food_cache_id || null,
     my_food_id: my_food_id || null,
+    ...microValues,
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
