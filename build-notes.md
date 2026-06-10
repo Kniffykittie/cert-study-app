@@ -218,6 +218,38 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 
 ---
 
+## Untested — Needs QA
+
+Everything below was built but not yet tested by the user. Go through this list top to bottom when you have time.
+
+### Phase 52b — Exercise Library additions
+- Open Exercise Library (`/life-hub/workouts/exercises`) and confirm these 18 exercises appear: Incline Dumbbell Curl, Zottman Curl, Dumbbell Preacher Curl, Dumbbell Reverse Fly, Inverted Row, Crunch, Dumbbell Side Bend, Leg Raise, Mountain Climber, Dead Bug, Hollow Body Hold, Goblet Squat, Dumbbell Step Up, Dumbbell Sumo Squat, Hip Thrust, Single Leg Deadlift, Rear Delt Fly, Dumbbell Push Press
+- Click each one — detail modal should open with instructions, muscle tags, and a 🏋️ placeholder (no image yet)
+
+### Phase 52 — Active Workout Logger features
+- **"What is this?" button**: tap `?` next to any exercise during a workout — detail modal should open instantly (pre-fetched) or after a brief fetch
+- **Drop set info box**: cycle a set type to "Drop Set" — purple info box should appear below that row with exercise-specific guidance
+- **Post-workout check-in modal**: tap "🏁 Finish Workout" — modal should appear asking Difficulty + Energy + optional note before saving
+- **Pause + Resume**: tap ⏸ Pause mid-workout → confirm it redirects to plan and shows "▶ Resume Workout"; tap Resume → confirm elapsed time and sets are restored; finish the resumed workout → confirms it saves to history as one session
+- **Same-day gate**: complete a workout for a day → return to plan page → that day's button should show green "✓ Done Today" (not a link)
+- **Stale pause cleanup**: pause a workout, wait until the next day, return to plan page → "▶ Resume Workout" should be gone; the partial session should still appear in history
+- **Workout history**: after completing any workout, go to `/life-hub/workouts/history` → session should appear with duration, volume, sets, and difficulty/energy badges if filled in
+
+### Phase 53 — Trainer chatbot + Rest timer
+- **Trainer chatbot**: during a workout, tap `?` on any exercise → scroll to bottom of modal → ask a question (e.g. "How do I know if I'm doing this right?") → should get a trainer-style reply within a few seconds; send a follow-up to confirm multi-turn works
+- **Rest timer**: mark any working set ✓ complete → rest timer bar should appear above the bottom buttons with a 90s countdown; let it reach 0 → bar auto-dismisses; test the 30s/60s/90s/2m quick buttons; test ✕ to dismiss early
+
+### Phase 34 — Water Tracker
+- Go to Life Hub → Health → Water Tracker
+- Tap a quick-add button (e.g. +16 oz) → progress ring should fill, entry should appear in Today's Log with a timestamp
+- Tap × on an entry → ring should decrease by that amount
+- Type a custom amount and hit Enter or Add → should log correctly
+- Click "Edit goal", change the number, hit Save → ring percentage should recalculate; refresh the page → goal should still be the new value (localStorage)
+- The 7-day chart should show today's bar in blue; once goal is met the bar turns green
+- Settings → Data & Reset → "Water Log History" Reset button → confirm modal → entries should be deleted
+
+---
+
 ## Phase Log
 
 ### Phase 34 - Complete
