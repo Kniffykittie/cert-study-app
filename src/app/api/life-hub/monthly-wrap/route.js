@@ -9,17 +9,20 @@ export async function GET(req) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Account creation month in YYYY-MM format
+  const accountSince = user.created_at.slice(0, 7)
+
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month') // YYYY-MM
 
-  // No month = return all wraps (just month + created_at for history list)
+  // No month = return all wraps + account_since
   if (!month) {
     const { data } = await supabase
       .from('monthly_wraps')
       .select('month, created_at')
       .eq('user_id', user.id)
       .order('month', { ascending: false })
-    return NextResponse.json({ months: (data || []).map(r => r.month) })
+    return NextResponse.json({ months: (data || []).map(r => r.month), account_since: accountSince })
   }
 
   const { data } = await supabase
@@ -42,6 +45,15 @@ export async function POST(req) {
 
   const { month } = await req.json() // YYYY-MM
   if (!month) return NextResponse.json({ error: 'month required' }, { status: 400 })
+
+  // Block months before account existed
+  const accountSince = user.created_at.slice(0, 7)
+  if (month < accountSince) return NextResponse.json({ error: 'Month predates account creation' }, { status: 400 })
+
+  // Block current month — wraps are only for completed months
+  const now = new Date()
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  if (month >= currentMonth) return NextResponse.json({ error: 'Can only generate wraps for completed months' }, { status: 400 })
 
   // Check cache
   const { data: cached } = await supabase.from('monthly_wraps').select('*').eq('user_id', user.id).eq('month', month).single()

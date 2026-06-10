@@ -267,6 +267,11 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 43d - Complete
+- **Monthly Wrap account-age guard** — POST route blocks months before `user.created_at` (YYYY-MM) and blocks current month server-side; GET (no ?month) now returns `account_since` alongside months list
+- **Page respects account_since** — browse picker has `min=account_since`; pre-account months show "Your account was created in X, so there's nothing to summarize before that" instead of a Generate button
+- **Sidebar auto-generate guard** — checks `user.created_at` before triggering background generation; skips entirely if last month predates account creation
+
 ### Phase 43c - Complete
 - **Monthly Wrap history sidebar** — all past wraps listed as clickable chips on the wrap page; selected month highlighted; manual month-picker capped at last month for browse; current month shows "still in progress" state instead of a Generate button
 - **Auto-generate on the 1st** — LifeHubSidebar checks on first visit of each month (tracked in `localStorage` as `wrap_autogen_YYYY-MM`); if last month's wrap doesn't exist, triggers POST silently and fires notification when done

@@ -24,14 +24,19 @@ export default function MonthlyWrapPage() {
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [history, setHistory] = useState([]) // list of YYYY-MM strings that have a wrap
+  const [accountSince, setAccountSince] = useState(null)
 
   const currentMonth = getCurrentMonth()
   const isCurrentMonth = month === currentMonth
+  const isPreAccount = accountSince && month < accountSince
 
   useEffect(() => {
     fetch('/api/life-hub/monthly-wrap')
       .then(r => r.json())
-      .then(d => setHistory(d.months || []))
+      .then(d => {
+        setHistory(d.months || [])
+        if (d.account_since) setAccountSince(d.account_since)
+      })
       .catch(() => {})
   }, [])
 
@@ -84,7 +89,8 @@ export default function MonthlyWrapPage() {
         {/* Divider + manual month picker for viewing any month */}
         <div style={{ borderTop: '1px solid var(--border)', marginTop: '14px', paddingTop: '14px' }}>
           <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>Browse</div>
-          <input type="month" value={month} onChange={e => setMonth(e.target.value)} max={getLastMonth()}
+          <input type="month" value={month} onChange={e => setMonth(e.target.value)}
+            min={accountSince || undefined} max={getLastMonth()}
             style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '12px', outline: 'none' }} />
         </div>
       </div>
@@ -98,7 +104,15 @@ export default function MonthlyWrapPage() {
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Monthly health summary</p>
         </div>
 
-        {isCurrentMonth ? (
+        {isPreAccount ? (
+          <div style={{ textAlign: 'center', padding: '48px 32px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px' }}>
+            <div style={{ fontSize: '36px', marginBottom: '14px' }}>🗓️</div>
+            <h2 style={{ color: 'var(--text-primary)', fontSize: '17px', fontWeight: '700', marginBottom: '8px' }}>No data for {monthLabel(month)}</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6', margin: 0 }}>
+              Your account was created in {monthLabel(accountSince)}, so there's nothing to summarize before that.
+            </p>
+          </div>
+        ) : isCurrentMonth ? (
           <div style={{ textAlign: 'center', padding: '48px 32px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px' }}>
             <div style={{ fontSize: '36px', marginBottom: '14px' }}>⏳</div>
             <h2 style={{ color: 'var(--text-primary)', fontSize: '17px', fontWeight: '700', marginBottom: '8px' }}>Month still in progress</h2>

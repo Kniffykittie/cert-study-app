@@ -43,12 +43,20 @@ export default function LifeHubSidebar() {
     const autoGenKey = `wrap_autogen_${lastMonth}`
 
     async function checkAndNotify() {
+      // Get account creation month to guard against pre-account generation
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const accountSince = user.created_at.slice(0, 7)
+
+      // Last month must be at or after account creation — no point generating otherwise
+      if (lastMonth < accountSince) return
+
       // On the 1st of the month, auto-generate last month's wrap if not done yet
       if (isFirstOfMonth && !localStorage.getItem(autoGenKey)) {
         localStorage.setItem(autoGenKey, '1')
         const check = await fetch(`/api/life-hub/monthly-wrap?month=${lastMonth}`).then(r => r.json()).catch(() => ({}))
         if (!check.wrap) {
-          // Generate silently in background — don't await, don't block
           fetch('/api/life-hub/monthly-wrap', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ month: lastMonth }),
