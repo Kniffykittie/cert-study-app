@@ -10,7 +10,7 @@ export async function GET(req, { params }) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { nutrient: slug } = params
+  const { nutrient: slug } = await params
   if (!NUTRIENT_BY_SLUG[slug]) return NextResponse.json({ error: 'Unknown nutrient' }, { status: 404 })
 
   const { data } = await supabase
@@ -30,7 +30,7 @@ export async function POST(req, { params }) {
   const { data: profile } = await supabase.from('profiles').select('is_disabled').eq('id', user.id).single()
   if (profile?.is_disabled) return NextResponse.json({ error: 'Account disabled' }, { status: 403 })
 
-  const { nutrient: slug } = params
+  const { nutrient: slug } = await params
   const nutrient = NUTRIENT_BY_SLUG[slug]
   if (!nutrient) return NextResponse.json({ error: 'Unknown nutrient' }, { status: 404 })
 

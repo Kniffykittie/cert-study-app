@@ -89,7 +89,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `daily_briefs` | Cached daily AI paragraph — brief_text TEXT, data_snapshot JSONB; UNIQUE on user_id + date; generated once per day on first Life Hub visit; RLS enabled |
 | `monthly_wraps` | Cached monthly wrap-up reports — report_data JSONB (aggregated stats), ai_narrative TEXT; generated once per month on first visit; UNIQUE on user_id + month; RLS enabled |
 | `tdee_suggestions` | AI-calibration queue — suggested_tdee, current_tdee, implied_tdee, avg_calories_logged, weight_change_lbs, data_days, reason TEXT, status (pending/accepted/dismissed); RLS enabled |
-| `nutrient_profiles` | *(planned)* Cached AI-generated nutrient encyclopedia entries — keyed by nutrient name, shared across all users; sections: what it does, cool facts, deficiency signs, toxicity, food sources, supplement notes |
+| `nutrient_profiles` | Cached AI-generated nutrient encyclopedia entries — nutrient_key (unique slug), ai_profile JSONB; shared across all authenticated users (open SELECT/INSERT/UPDATE RLS); generated on first view, cached forever |
 | `invite_codes` | *(planned)* Single-use invite codes — code TEXT UNIQUE, created_by, created_at, used_at TIMESTAMPTZ, used_by; null used_at = unused |
 | `api_rate_limits` | *(planned)* Per-user per-endpoint rate limiting — user_id, endpoint, call_count, window_start; checked at top of every AI route |
 | `recovery_codes` | *(planned)* 2FA recovery codes — user_id, code_hash TEXT, used_at TIMESTAMPTZ (null = unused); generated once on 2FA enrollment |
@@ -266,6 +266,9 @@ Everything below was built but not yet tested by the user. Go through this list 
 ---
 
 ## Phase Log
+
+### Phase 44b - Complete
+- **Fix**: `params` must be awaited in Next.js App Router dynamic route handlers — `const { nutrient: slug } = await params` in both GET and POST of `/api/nutrition/encyclopedia/[nutrient]/route.js`
 
 ### Phase 44 - Complete
 - **Nutrient Encyclopedia** at `/life-hub/nutrition/encyclopedia` — 13 tracked nutrients (Vitamins, Minerals, Other) with full AI-generated profiles cached in `nutrient_profiles` table (shared across users)
