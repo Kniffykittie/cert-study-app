@@ -267,6 +267,9 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 43e - Complete
+- **Nutrition sidebar dropdown** — "Nutrition" in LifeHubSidebar is now a dropdown like Goals/Health/Workouts; children: "Food Log" (`/life-hub/nutrition`) and "Meal Plan" (`/life-hub/nutrition/meal-plan`); auto-opens when on any `/life-hub/nutrition*` route
+
 ### Phase 43d - Complete
 - **Monthly Wrap account-age guard** — POST route blocks months before `user.created_at` (YYYY-MM) and blocks current month server-side; GET (no ?month) now returns `account_since` alongside months list
 - **Page respects account_since** — browse picker has `min=account_since`; pre-account months show "Your account was created in X, so there's nothing to summarize before that" instead of a Generate button

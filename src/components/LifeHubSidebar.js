@@ -21,6 +21,7 @@ export default function LifeHubSidebar() {
   const [healthOpen, setHealthOpen] = useState(false)
   const [workoutsOpen, setWorkoutsOpen] = useState(false)
   const [goalsOpen, setGoalsOpen] = useState(false)
+  const [nutritionOpen, setNutritionOpen] = useState(false)
   const [wrapNotify, setWrapNotify] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
@@ -85,6 +86,7 @@ export default function LifeHubSidebar() {
     if (pathname.startsWith('/life-hub/health')) setHealthOpen(true)
     if (pathname.startsWith('/life-hub/workouts')) setWorkoutsOpen(true)
     if (pathname.startsWith('/life-hub/goals')) setGoalsOpen(true)
+    if (pathname.startsWith('/life-hub/nutrition')) setNutritionOpen(true)
   }, [pathname])
 
   function dismissWrap() {
@@ -198,7 +200,30 @@ export default function LifeHubSidebar() {
         )}
       </div>
 
-      {navLink('Nutrition', '/life-hub/nutrition')}
+      {/* Nutrition dropdown */}
+      {(() => {
+        const nutritionActive = pathname.startsWith('/life-hub/nutrition')
+        return (
+          <div>
+            <div
+              onClick={() => setNutritionOpen(o => !o)}
+              style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: nutritionActive && !nutritionOpen ? 'rgba(123,47,190,0.12)' : 'transparent', color: nutritionActive ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: nutritionActive ? '600' : '400', borderLeft: nutritionActive ? '2px solid var(--accent-purple)' : '2px solid transparent' }}
+              onMouseEnter={e => { if (!nutritionActive) e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.08)' }}
+              onMouseLeave={e => { if (!nutritionActive) e.currentTarget.style.backgroundColor = nutritionActive && !nutritionOpen ? 'rgba(123,47,190,0.12)' : 'transparent' }}
+            >
+              <span>Nutrition</span>
+              <span style={{ fontSize: '10px', transition: 'transform 0.2s', display: 'inline-block', transform: nutritionOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+            </div>
+            {nutritionOpen && (
+              <div style={{ paddingLeft: '12px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {navLink('Food Log', '/life-hub/nutrition')}
+                {navLink('Meal Plan', '/life-hub/nutrition/meal-plan')}
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
       {navLink('Monthly Wrap', '/life-hub/monthly-wrap')}
 
       {/* Workouts dropdown */}

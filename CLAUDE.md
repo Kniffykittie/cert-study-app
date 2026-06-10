@@ -426,6 +426,7 @@ src/
 - **Phase 42 built:** Daily Brief fix (never regenerates same day); Weekly Meal Plan at `/life-hub/nutrition/meal-plan` — Mon–Sun grid, food search, AI insight analysis (per-day macros + micronutrients vs FDA DV, Claude returns 4–6 typed callouts); `meal_plans` + `meal_plan_entries` tables with RLS
 - **Phase 43 built:** TDEE calibration card (checks food logs + weight measurements, queues suggestion if implied TDEE diverges >150 cal, Accept applies custom_tdee override); Progress Photos (private Supabase Storage, JPEG/PNG/WebP magic byte validation, photo grid + lightbox on Measurements page, Reset in Settings); Monthly Wrap AI summary page (`/life-hub/monthly-wrap`) with month picker, stat cards, and cached AI narrative; all three in Life Hub home grid + sidebar
 - **Phase 43c built:** Monthly Wrap: auto-generates on 1st of month (background, LifeHubSidebar); history sidebar of all past wraps; current month blocked with "still in progress" state; GET without ?month= returns all months list
+- **Phase 43e built:** Nutrition sidebar dropdown — "Nutrition" is now a collapsible dropdown with "Food Log" and "Meal Plan" children; auto-opens on active nutrition routes
 
 ### Google Health Integration
 - OAuth flow restricted to owner account only (`sethproper40@yahoo.com`) — 403 for all others
