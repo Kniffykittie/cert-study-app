@@ -267,6 +267,9 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 44d - Complete
+- **Debug**: Wrapped Claude API call in try/catch in encyclopedia `[nutrient]` route to surface actual error detail; increased `max_tokens` from 800→1200
+
 ### Phase 44c - Complete
 - **Fix**: Added `export const maxDuration = 120` to `/api/nutrition/encyclopedia/[nutrient]/route.js` — route was hitting the default serverless timeout (~10s) during Claude API call, causing 500 errors on profile generation
 
