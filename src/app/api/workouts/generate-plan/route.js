@@ -107,11 +107,20 @@ export async function POST(req) {
   }
   const availableCardio = cardioOptionsArray.filter(c => c !== 'none').map(c => cardioMap[c] || c)
 
+  const cardioPlacementRules = `
+CARDIO PLACEMENT RULES (non-negotiable):
+- NEVER place high-impact cardio (HIIT, jump rope, shadow boxing) the day after a leg workout — legs need 48h recovery.
+- NEVER place shadow boxing or upper-body cardio the day after a back/rear-delt or shoulder-heavy workout — those muscles are still recovering.
+- Safe cardio on the day after legs: walking or stationary bike only.
+- Safe cardio on the day after upper body pulling (back/biceps): walking, stair climbing, or stationary bike only.
+- HIIT and jump rope are only appropriate on days with at least one full rest day before AND after, or on completely independent rest days.
+- When in doubt, place cardio on days furthest from the adjacent workout days.`
+
   const cardioNote = wantsWeightLoss && !hasNoCardio
-    ? `CARDIO REQUIREMENT: Because weight loss is a goal, add cardio using ONLY these options the client has chosen: ${availableCardio.join(', ')}. Place cardio on ${wantsMuscle ? 'rest days only (to preserve lifting energy)' : 'workout days after lifting OR on rest days'}. Never suggest cardio the client did not select.`
+    ? `CARDIO REQUIREMENT: Because weight loss is a goal, add cardio using ONLY these options the client has chosen: ${availableCardio.join(', ')}. Place cardio on ${wantsMuscle ? 'rest days only (to preserve lifting energy)' : 'workout days after lifting OR on rest days'}. Never suggest cardio the client did not select.${cardioPlacementRules}`
     : hasNoCardio
       ? 'CLIENT PREFERS NO CARDIO — do not add any cardio recommendations anywhere.'
-      : `CLIENT HAS THESE CARDIO OPTIONS AVAILABLE: ${availableCardio.join(', ')}. Only add cardio if it genuinely fits their goals.`
+      : `CLIENT HAS THESE CARDIO OPTIONS AVAILABLE: ${availableCardio.join(', ')}. Only add cardio if it genuinely fits their goals.${cardioPlacementRules}`
 
   const GOAL_LABELS_MAP = {
     lose_weight: 'Lose Weight', build_muscle: 'Build Muscle', improve_endurance: 'Improve Endurance',
@@ -153,7 +162,7 @@ CLIENT PROFILE:
 - Pull-up bar available: ${has_pullup_bar ? 'Yes, max pull-ups: ' + (pullup_count >= 0 ? pullup_count : 0) : 'No — do NOT include pull-up bar exercises'}
 - Ab roller available: ${has_ab_roller ? 'Yes' : 'No — do NOT include ab roller exercises'}
 - Max bodyweight squats: ${squat_count}
-- Available dumbbells (as pairs): ${dumbbell_pairs}${safeDumbbellNote ? '. Additional note: ' + safeDumbbellNote : ''}
+- Available dumbbells (each = one pair): ${Array.isArray(dumbbell_pairs) && dumbbell_pairs.length ? dumbbell_pairs.map(w => w + ' lbs').join(', ') : (dumbbell_pairs || 'not specified')}${safeDumbbellNote ? '. Additional note: ' + safeDumbbellNote : ''}
 - Limitations/injuries: ${safeLimitations}
 
 ${cardioNote}

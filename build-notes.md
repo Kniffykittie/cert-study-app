@@ -218,6 +218,11 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 
 ## Phase Log
 
+### Phase 50 - Complete
+- **Workout plan cardio placement rules** — added explicit non-negotiable rules to generate-plan prompt: no HIIT/jump rope/shadow boxing the day after legs or back/rear-delt workouts; walking/bike only after those; HIIT only on isolated rest days
+- **Dumbbell input redesign** — replaced free-text field with chip-based tag input: type a weight, press Enter or "+ Add", chip appears (e.g. "40 lbs ×"); weights stored as numeric array sorted ascending; each chip = one pair; "bodyweight only" path via notes field; canAdvance requires at least one chip or bodyweight note
+- Prompt updated to receive dumbbell weights as typed array instead of raw string
+
 ### Phase 49 - Complete
 - **Fix:** generate-plan route referenced undefined `session.user.id` — route uses `getUser()` so corrected to `user.id`; this caused a 500 after the AI finished generating the plan
 

@@ -41,6 +41,7 @@ export default function WorkoutSetupPage() {
     checkGoals()
   }, [])
   const [generating, setGenerating] = useState(false)
+  const [dumbbellInput, setDumbbellInput] = useState('')
   const [form, setForm] = useState({
     experience: '',
     goals: [],
@@ -51,7 +52,7 @@ export default function WorkoutSetupPage() {
     squat_count: '',
     has_pullup_bar: null,
     has_ab_roller: null,
-    dumbbell_pairs: '',
+    dumbbell_pairs: [],
     dumbbell_note: '',
     cardio_options: [],
     limitations: '',
@@ -94,7 +95,7 @@ export default function WorkoutSetupPage() {
     if (s === 'schedule') return form.workout_days.length === form.days_per_week
     if (s === 'fitness') return form.pushup_count !== '' && form.squat_count !== '' && form.has_pullup_bar !== null && form.has_ab_roller !== null
     if (s === 'cardio') return form.cardio_options.length > 0
-    if (s === 'equipment') return !!form.dumbbell_pairs.trim()
+    if (s === 'equipment') return form.dumbbell_pairs.length > 0 || form.dumbbell_note.trim().toLowerCase().includes('bodyweight')
     if (s === 'limitations') return !!form.limitations.trim()
     return true
   }
@@ -120,7 +121,7 @@ export default function WorkoutSetupPage() {
       pushup_count: parseInt(form.pushup_count) || 0,
       pullup_count: form.has_pullup_bar ? (parseInt(form.pullup_count) || 0) : -1,
       squat_count: parseInt(form.squat_count) || 0,
-      available_weights: `Pairs: ${form.dumbbell_pairs}${form.dumbbell_note ? '. Note: ' + form.dumbbell_note : ''}. Cardio: ${form.cardio_options.join(', ')}`,
+      available_weights: `Dumbbell pairs: ${form.dumbbell_pairs.length ? form.dumbbell_pairs.map(w => w + ' lbs').join(', ') : 'none listed'}${form.dumbbell_note ? '. Note: ' + form.dumbbell_note : ''}`,
       limitations: form.limitations,
       updated_at: new Date().toISOString(),
     }
@@ -332,19 +333,60 @@ export default function WorkoutSetupPage() {
         )}
 
         {current.id === 'equipment' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ backgroundColor: 'rgba(0,128,255,0.08)', border: '1px solid rgba(0,128,255,0.2)', borderRadius: '8px', padding: '12px 14px', fontSize: '13px', color: 'var(--text-primary)', lineHeight: '1.6' }}>
-              <strong style={{ color: 'var(--accent-blue)' }}>Important:</strong> List the weights you have as <strong>pairs</strong>. For example, if you have two 20 lb dumbbells, write "20". If you have one dumbbell that adjusts, note the range.
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div>
-              <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Dumbbell weights (as pairs)</div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '8px' }}>e.g. "10, 20, 30, 40 lbs" or "adjustable 5–52.5 lbs" or "just bodyweight"</div>
-              <input value={form.dumbbell_pairs} onChange={e => set('dumbbell_pairs', e.target.value)} placeholder="e.g. 15, 25, 35 lbs"
-                style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 14px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', width: '100%', boxSizing: 'border-box' }} />
+              <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>What dumbbell weights do you own?</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '12px', lineHeight: '1.5' }}>
+                Add each weight you have <strong style={{ color: 'var(--text-primary)' }}>as a pair</strong> (e.g. if you own two 40 lb dumbbells, add "40"). Add one at a time.
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                <input
+                  type="number"
+                  value={dumbbellInput}
+                  onChange={e => setDumbbellInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && dumbbellInput.trim()) {
+                      const val = parseFloat(dumbbellInput)
+                      if (!isNaN(val) && val > 0 && !form.dumbbell_pairs.includes(val)) {
+                        set('dumbbell_pairs', [...form.dumbbell_pairs, val].sort((a, b) => a - b))
+                      }
+                      setDumbbellInput('')
+                    }
+                  }}
+                  placeholder="e.g. 40"
+                  min="1" max="200" step="2.5"
+                  style={{ width: '120px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                />
+                <button type="button"
+                  onClick={() => {
+                    const val = parseFloat(dumbbellInput)
+                    if (!isNaN(val) && val > 0 && !form.dumbbell_pairs.includes(val)) {
+                      set('dumbbell_pairs', [...form.dumbbell_pairs, val].sort((a, b) => a - b))
+                    }
+                    setDumbbellInput('')
+                  }}
+                  disabled={!dumbbellInput.trim()}
+                  style={{ backgroundColor: 'var(--accent-purple)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 18px', fontSize: '14px', fontWeight: '600', cursor: dumbbellInput.trim() ? 'pointer' : 'not-allowed', opacity: dumbbellInput.trim() ? 1 : 0.4 }}>
+                  + Add
+                </button>
+              </div>
+              {form.dumbbell_pairs.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {form.dumbbell_pairs.map(w => (
+                    <div key={w} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(123,47,190,0.12)', border: '1px solid var(--accent-purple)', borderRadius: '20px', padding: '5px 12px' }}>
+                      <span style={{ color: 'var(--accent-purple)', fontSize: '13px', fontWeight: '600' }}>{w} lbs</span>
+                      <button type="button" onClick={() => set('dumbbell_pairs', form.dumbbell_pairs.filter(x => x !== w))}
+                        style={{ background: 'none', border: 'none', color: 'var(--accent-purple)', cursor: 'pointer', fontSize: '14px', padding: '0', lineHeight: 1 }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontStyle: 'italic' }}>No weights added yet. Add at least one, or note "bodyweight only" below.</div>
+              )}
             </div>
             <div>
               <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Anything else to note? <span style={{ color: 'var(--text-secondary)', fontWeight: '400' }}>(optional)</span></div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '8px' }}>e.g. "only one of each weight", "no bench, just floor", "have a bench"</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '8px' }}>e.g. "bodyweight only", "have a bench", "only one of each weight", "adjustable 5–52.5 lbs"</div>
               <input value={form.dumbbell_note} onChange={e => set('dumbbell_note', e.target.value)} placeholder="optional notes..."
                 style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 14px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', width: '100%', boxSizing: 'border-box' }} />
             </div>
