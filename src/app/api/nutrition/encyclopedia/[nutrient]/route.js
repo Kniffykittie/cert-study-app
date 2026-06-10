@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { NUTRIENT_BY_SLUG } from '@/data/nutrients'
 
 const client = new Anthropic()
+export const maxDuration = 120
 
 export async function GET(req, { params }) {
   const supabase = await createClient()
