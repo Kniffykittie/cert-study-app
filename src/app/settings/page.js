@@ -794,6 +794,8 @@ export default function SettingsPage() {
                     { scope: 'daily_checkins', label: 'Daily Check-In History', desc: 'Delete all energy and mood check-in entries' },
                     { scope: 'water_logs', label: 'Water Log History', desc: 'Delete all water intake entries' },
                     { scope: 'supplement_stack', label: 'Supplement Stack', desc: 'Remove all supplements from your stack' },
+                    { scope: 'food_log', label: 'Food Log History', desc: 'Delete all logged food entries' },
+                    { scope: 'my_foods', label: 'My Foods Library', desc: 'Delete all saved custom foods' },
                   ].map(item => (
                     <div key={item.scope} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
                       <div>

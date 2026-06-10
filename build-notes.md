@@ -82,6 +82,9 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `water_logs` | Per-user water intake entries — user_id, date DATE, amount_oz NUMERIC(6,1), created_at; one row per add (not aggregated); RLS enabled |
 | `supplement_stack` | User's active supplements — name, dose, timing, nutrients JSONB (nutrient→"amount unit"), is_active BOOLEAN; RLS enabled |
 | `supplement_profiles` | Cached AI supplement info cards — supplement_name (unique normalized), ai_profile JSONB, generated_at; shared across all authenticated users |
+| `food_cache` | Shared food lookup cache — barcode (unique index), search_name, full nutrition fields, source; Open Food Facts results cached permanently (ODbL allows); no RLS |
+| `my_foods` | User's personal saved food library — name, brand, serving_size_label, full macro fields; RLS enabled |
+| `food_log_entries` | Food log per user/date/meal_slot — name, brand, servings, macros already multiplied by servings, source, food_cache_id, my_food_id; RLS enabled |
 | `progress_photos` | *(planned Phase 32)* User progress photo gallery — photo_url, taken_at DATE, description TEXT |
 | `daily_briefs` | *(planned — Correlation Engine)* Cached daily "what should I do today" AI paragraph — keyed by user_id + date; regenerated once per day on first Life Hub load |
 | `monthly_wraps` | *(planned)* Cached monthly wrap-up reports — report_data JSONB (aggregated stats across both hubs), ai_narrative TEXT; generated once on first visit, never re-called; UNIQUE on user_id + month |
@@ -262,6 +265,21 @@ Everything below was built but not yet tested by the user. Go through this list 
 ---
 
 ## Phase Log
+
+### Phase 38 - Complete
+- **Full Nutrition Dashboard** — replaced placeholder with working nutrition tracking page
+- **TDEE + macro targets** calculated from `goals_profiles` (Mifflin-St Jeor BMR × activity multiplier); protein = 0.82g/lb bodyweight, fat = 25% of TDEE, carbs = remainder
+- **Calorie ring** — SVG progress ring showing kcal logged vs daily target; remaining kcal shown in green (surplus in red)
+- **Macro progress bars** — protein/carbs/fat each with fill bar and logged/goal counts
+- **Food log by meal slot** — Breakfast/Lunch/Dinner/Snack/Other sections; each has "+ Add" button, entry list with macros, × remove
+- **Food search modal** — debounced search (500ms) → checks `food_cache` + `my_foods` first → Open Food Facts fallback; results show name, brand, serving, kcal, protein; click to select, adjust servings, add to log
+- **Manual entry** — "Enter manually" path with all nutrition fields; "Save to My Foods library" checkbox
+- **My Foods tab** — user's personal saved food library; foods saved via manual entry checkbox appear here; can delete entries
+- **Supplements tab** — same stack view as before, moved into tabbed layout
+- **New API routes**: `nutrition/search`, `nutrition/log`, `nutrition/my-foods`
+- **New DB tables**: `food_cache` (shared, no RLS), `my_foods` (RLS user-scoped), `food_log_entries` (RLS user-scoped)
+- **Reset rows** added to Settings: "Food Log History" (scope `food_log`) and "My Foods Library" (scope `my_foods`)
+- **Delete account cascade** updated: `food_log_entries`, `my_foods`, `water_logs`, `supplement_stack` added
 
 ### Phase 37 - Complete
 - **Fatigue signal on Workout Plan page** (`/life-hub/workouts/page.js`) — fetches today's `daily_checkins.energy_level` alongside other load queries; if energy ≤ 2, shows a yellow ⚡ callout recommending lighter session, reduced weight, or mobility work

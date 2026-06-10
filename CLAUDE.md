@@ -105,6 +105,10 @@ src/
         generate-overview/route.js     POST — AI overview from goals_profiles; uses getUser() + is_disabled check; prompt injection protected; only called from handleFinish() on setup page
       supplements/
         generate-profile/route.js      POST — AI supplement info card (Sonnet); cached in supplement_profiles by normalized name (shared across users); uses getUser() + is_disabled check; supplement name wrapped in user_input tags
+      nutrition/
+        search/route.js                GET ?q= or ?barcode= — checks food_cache + my_foods first; falls back to Open Food Facts API; caches OFF results permanently (ODbL allows); uses getUser()
+        log/route.js                   GET ?date= today's entries; POST add entry (multiplies macros by servings); DELETE by id; uses getUser()
+        my-foods/route.js              GET user's saved food library; POST save new food; DELETE by id; uses getUser()
       health/
         connect/route.js               Initiates Google Health OAuth (any authenticated user; add friend's Gmail as test user in Google Cloud Console)
         manual-steps/route.js          GET today's manual step count; POST to upsert — shown on workouts page when Google Health not connected
@@ -135,7 +139,7 @@ src/
         log/page.js                    Active workout logger — live timer, exercise cards with set rows (type badge cycles warmup/working/dropset, weight+reps inputs, ✓ complete, × remove), ? button opens exercise detail modal with trainer chatbot (Haiku, multi-turn), drop set contextual explanation per exercise type, add set/drop set, prev session hints, rest timer bar (auto-starts 90s on working set complete, 30s/60s/90s/2m quick buttons, dismissable), Pause (saves partial to DB + localStorage), fixed "Finish Workout" → post-workout check-in (difficulty/energy/note) → completion screen with stats + overload suggestions
         history/page.js                Workout history — all sessions expandable, PR section (heaviest working set per exercise ever), set chips colored by type
       nutrition/
-        page.js                        Nutrition (placeholder) — gates on goals profile
+        page.js                        Nutrition dashboard — TDEE + macro targets from goals_profiles, calorie ring, food log by meal slot (breakfast/lunch/dinner/snack/other), food search via Open Food Facts + My Foods library, manual entry with save-to-library, Supplements tab; gates on goals profile
     join/
       page.js                          Invite-only signup — requires valid invite code + email + password; validates code, creates Supabase auth user, redeems code
     update-password/
@@ -220,6 +224,9 @@ src/
 | `water_logs` | Water intake entries — user_id, date, amount_oz NUMERIC(6,1), created_at; RLS enabled; one row per tap (not aggregated) |
 | `supplement_stack` | User's active supplements — name, dose, timing (morning/afternoon/evening/with_meals/pre_workout/post_workout), nutrients JSONB (nutrient→"amount unit"), is_active; RLS enabled |
 | `supplement_profiles` | Cached AI supplement info cards — supplement_name (unique, normalized lowercase), ai_profile JSONB, generated_at; shared across all users; SELECT/INSERT/UPDATE open to all authenticated users |
+| `food_cache` | Shared cached food lookup results — barcode (unique), search_name, full nutrition fields, source ('off'); Open Food Facts results cached permanently per ODbL license; no RLS (shared read) |
+| `my_foods` | User's personal saved food library — name, brand, serving_size_label, full macro fields; RLS user-scoped |
+| `food_log_entries` | Individual food log entries per user/date/meal_slot — name, brand, serving_size_label, servings, all macro fields (already multiplied by servings), source, food_cache_id, my_food_id; RLS user-scoped |
 | `workout_logs` | One row per completed workout session — user_id, plan_id (nullable), day_of_week, day_label, duration_seconds, created_at; RLS enabled |
 | `workout_log_sets` | Individual sets per session — log_id, user_id, exercise_id (nullable), exercise_name, set_number, set_type (warmup/working/dropset), weight_lbs, reps, rep_range, created_at; RLS enabled |
 
