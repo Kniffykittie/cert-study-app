@@ -1,15 +1,29 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+
+function getLastMonth() {
+  const now = new Date()
+  const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
+  const m = now.getMonth() === 0 ? 12 : now.getMonth()
+  return `${y}-${String(m).padStart(2, '0')}`
+}
+
+function monthLabel(ym) {
+  const [y, m] = ym.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+}
 
 export default function LifeHubSidebar() {
   const [displayName, setDisplayName] = useState('')
   const [healthOpen, setHealthOpen] = useState(false)
   const [workoutsOpen, setWorkoutsOpen] = useState(false)
   const [goalsOpen, setGoalsOpen] = useState(false)
+  const [wrapNotify, setWrapNotify] = useState(false)
   const pathname = usePathname()
+  const router = useRouter()
 
   useEffect(() => {
     async function fetchProfile() {
@@ -23,10 +37,32 @@ export default function LifeHubSidebar() {
   }, [])
 
   useEffect(() => {
+    const lastMonth = getLastMonth()
+    const dismissKey = `wrap_notified_${lastMonth}`
+    if (localStorage.getItem(dismissKey)) return
+    if (pathname === '/life-hub/monthly-wrap') return
+
+    fetch(`/api/life-hub/monthly-wrap?month=${lastMonth}`)
+      .then(r => r.json())
+      .then(d => { if (d.wrap) setWrapNotify(true) })
+      .catch(() => {})
+  }, [pathname])
+
+  useEffect(() => {
     if (pathname.startsWith('/life-hub/health')) setHealthOpen(true)
     if (pathname.startsWith('/life-hub/workouts')) setWorkoutsOpen(true)
     if (pathname.startsWith('/life-hub/goals')) setGoalsOpen(true)
   }, [pathname])
+
+  function dismissWrap() {
+    localStorage.setItem(`wrap_notified_${getLastMonth()}`, '1')
+    setWrapNotify(false)
+  }
+
+  function goToWrap() {
+    dismissWrap()
+    router.push('/life-hub/monthly-wrap')
+  }
 
   const initial = displayName ? displayName[0].toUpperCase() : '?'
 
@@ -45,7 +81,29 @@ export default function LifeHubSidebar() {
   const healthActive = pathname.startsWith('/life-hub/health')
 
   return (
-    <aside style={{ width: '220px', minHeight: '100vh', backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '16px 12px', gap: '4px', flexShrink: 0 }}>
+    <>
+      {/* Monthly Wrap notification */}
+      {wrapNotify && (
+        <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 500, backgroundColor: 'var(--surface)', border: '1px solid var(--accent-purple)', borderRadius: '14px', padding: '18px 20px', maxWidth: '300px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '20px' }}>📅</span>
+              <span style={{ color: 'var(--accent-purple)', fontWeight: '700', fontSize: '14px' }}>Monthly Wrap is Ready</span>
+            </div>
+            <button onClick={dismissWrap}
+              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1, padding: '0 0 0 8px', flexShrink: 0 }}>✕</button>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 14px', lineHeight: '1.5' }}>
+            Your {monthLabel(getLastMonth())} summary is ready — workouts, energy, weight, and your AI wrap-up.
+          </p>
+          <button onClick={goToWrap}
+            style={{ width: '100%', backgroundColor: 'var(--accent-purple)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+            Take me there →
+          </button>
+        </div>
+      )}
+
+      <aside style={{ width: '220px', minHeight: '100vh', backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '16px 12px', gap: '4px', flexShrink: 0 }}>
       <div style={{ backgroundColor: '#0A0A0A', borderRadius: '8px', padding: '8px 12px', marginBottom: '8px', textAlign: 'center', fontWeight: '700', fontSize: '20px', color: 'var(--accent-purple)' }}>
         CSA
       </div>
@@ -144,5 +202,6 @@ export default function LifeHubSidebar() {
         </Link>
       </div>
     </aside>
+    </>
   )
 }

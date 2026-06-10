@@ -267,6 +267,9 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 43b - Complete
+- **Monthly Wrap notification popup** — bottom-right toast appears on any Life Hub page when last month's wrap exists and user hasn't dismissed it this month; "Take me there →" navigates to wrap page; ✕ closes; dismissal stored in `localStorage` as `wrap_notified_YYYY-MM`; never shown if already on the wrap page
+
 ### Phase 43 - Complete
 - **TDEE Calibration** — `goals_profiles.custom_tdee INT` column added; `calcTDEE()` checks this first; `/api/nutrition/tdee-check` (GET pending suggestion / POST calculate & queue if divergence >150 cal / PATCH accept or dismiss); calibration card on Nutrition page shows current vs implied TDEE with Accept/Dismiss buttons; `tdee_suggestions` table with RLS
 - **Progress Photos** — private Supabase Storage bucket `progress-photos`; `progress_photos` table with RLS; `/api/goals/progress-photos` (GET with signed URLs / POST with magic byte validation JPEG/PNG/WebP / DELETE); photo grid on Measurements page with date picker, optional note, lightbox modal; Reset row in Settings
