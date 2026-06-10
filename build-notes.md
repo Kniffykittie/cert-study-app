@@ -77,6 +77,8 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, daily_steps, target_weight_lbs, timeline, notes, ai_overview; UNIQUE on user_id |
 | `body_measurements` | Per-user dated body measurements — weight_lbs, waist_in, hips_in, chest_in, left/right arm/thigh, neck_in, notes; UNIQUE on user_id + date; RLS enabled |
 | `daily_checkins` | Energy + mood ratings per day — energy_level SMALLINT(1–5), mood_level SMALLINT(1–5), note TEXT; UNIQUE on user_id + date; RLS enabled |
+| `workout_logs` | One row per completed workout session — user_id, plan_id (nullable), day_of_week, day_label, duration_seconds, created_at; RLS enabled |
+| `workout_log_sets` | Individual sets per session — log_id, user_id, exercise_id (nullable), exercise_name, set_number, set_type (warmup/working/dropset), weight_lbs, reps, rep_range, created_at; RLS enabled |
 | `water_logs` | *(planned Phase 34)* Per-user water intake entries — logged_at TIMESTAMPTZ, amount_oz NUMERIC; aggregate to daily total in queries |
 | `supplement_stack` | *(planned Phase 35)* User's supplement list — name, dose, timing, nutrients JSONB, is_active; feeds micronutrient totals to nutrition dashboard passively |
 | `supplement_profiles` | *(planned Phase 35)* Cached AI-generated supplement info cards — keyed by normalized supplement name, shared across all users |
@@ -217,6 +219,19 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 ---
 
 ## Phase Log
+
+### Phase 51 - Complete
+- **Workout Logging system** — active workout page, workout history, progressive overload detection
+- `src/app/life-hub/workouts/log/page.js` — active workout UI: live timer (pause/resume), exercise cards with set rows (type badge cycling warmup/working/dropset, weight lbs + reps inputs, ✓ complete toggle, × remove), add set / add drop set buttons, previous session summary chips, cardio block, fixed bottom "Finish Workout" button; redirects to completion screen
+- Completion screen: duration + total volume stats, progressive overload suggestions panel, nav to history or plan
+- `src/app/life-hub/workouts/history/page.js` — full history list (newest first), expandable log cards with sets grouped by exercise (colored chips by type), PR section showing heaviest working set per exercise
+- `src/app/api/workouts/log/route.js` — GET `?day=` returns prev session summary per exercise; POST saves log + sets, runs progressive overload detection (3 consecutive sessions at topReps same weight → suggestion)
+- `src/app/api/workouts/history/route.js` — GET returns all logs with sets, totalVolume, PR map
+- Sidebar: "Workout History" link added under Workouts dropdown
+- Settings: "Workout Log History" reset row added (scope `workout_logs`)
+- Reset route: `workout_logs` scope deletes both `workout_log_sets` and `workout_logs`
+- Delete-account: `workout_log_sets` + `workout_logs` added to cascade
+- Generate-plan prompt: added IMPORTANT note clarifying dumbbell_pairs = weights OWNED not necessarily working weights; weight_suggestion should be conservative based on experience
 
 ### Phase 50 - Complete
 - **Workout plan cardio placement rules** — added explicit non-negotiable rules to generate-plan prompt: no HIIT/jump rope/shadow boxing the day after legs or back/rear-delt workouts; walking/bike only after those; HIIT only on isolated rest days

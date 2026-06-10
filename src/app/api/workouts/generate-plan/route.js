@@ -163,6 +163,7 @@ CLIENT PROFILE:
 - Ab roller available: ${has_ab_roller ? 'Yes' : 'No — do NOT include ab roller exercises'}
 - Max bodyweight squats: ${squat_count}
 - Available dumbbells (each = one pair): ${Array.isArray(dumbbell_pairs) && dumbbell_pairs.length ? dumbbell_pairs.map(w => w + ' lbs').join(', ') : (dumbbell_pairs || 'not specified')}${safeDumbbellNote ? '. Additional note: ' + safeDumbbellNote : ''}
+  IMPORTANT: These are the weights OWNED — not the weights the user can necessarily lift for every exercise. A person who owns 40 lb pairs does NOT necessarily curl 40 lbs. Set weight_suggestion conservatively based on the exercise and experience level; the user will log actual weights during workouts.
 - Limitations/injuries: ${safeLimitations}
 
 ${cardioNote}

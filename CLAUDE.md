@@ -127,6 +127,8 @@ src/
         page.js                        My Workout Plan — weekly plan cards sorted Mon-Sun, day reassignment, add/remove exercises with AI check-in, add/change cardio on rest days; gates on goals profile
         setup/page.js                  7-step onboarding: experience, goals (multi-select), days, schedule, fitness check, cardio preferences, equipment; gates on goals profile
         exercises/page.js              Exercise Library — sticky muscle-group nav, scrollable grouped sections, image cards, detail modal with form cues, Cardio section
+        log/page.js                    Active workout logger — live timer, exercise cards with set rows (type badge cycles warmup/working/dropset, weight+reps inputs, ✓ complete, × remove), add set/drop set, prev session hints, fixed "Finish Workout" → completion screen with overload suggestions
+        history/page.js                Workout history — all sessions expandable, PR section (heaviest working set per exercise ever), set chips colored by type
       nutrition/
         page.js                        Nutrition (placeholder) — gates on goals profile
     join/
@@ -210,6 +212,8 @@ src/
 | `invite_codes` | Owner-generated one-time signup codes — code (unique), created_by, used_by (nullable), used_at; RLS: SELECT=public, INSERT=owner, UPDATE=authenticated |
 | `join_attempts` | IP-based brute force tracking for /join — ip TEXT, attempted_at, success BOOLEAN; `check_join_rate_limit(ip)` Postgres function counts fails in last hour |
 | `manual_steps_daily` | Manual step count per user per day — user_id, date, steps; unique(user_id, date); shown on workouts page when Google Health not connected |
+| `workout_logs` | One row per completed workout session — user_id, plan_id (nullable), day_of_week, day_label, duration_seconds, created_at; RLS enabled |
+| `workout_log_sets` | Individual sets per session — log_id, user_id, exercise_id (nullable), exercise_name, set_number, set_type (warmup/working/dropset), weight_lbs, reps, rep_range, created_at; RLS enabled |
 
 ---
 
@@ -425,9 +429,10 @@ src/
 - Workout plan reset: deletes all `workout_plans` rows — keeps the fitness profile intact
 - Full workout reset: deletes `workout_plans` + `workout_profiles` — user returns to setup flow on next visit
 - Goals profile reset: deletes `goals_profiles` row — user returns to goals setup on next visit; triggers re-gating of workouts/nutrition
+- Workout log history reset: deletes `workout_logs` + `workout_log_sets` — PRs and session history gone
 - All resets gated behind a confirmation modal (⚠️ warning, explicit "Yes, Reset" button); cannot be triggered by accident
 - Success/error message shown inline after completion
-- API route: `POST /api/reset` with `{ scope: 'cert'|'all_study'|'workout_plan'|'workout_profile'|'goals_profile', cert? }`
+- API route: `POST /api/reset` with `{ scope: 'cert'|'all_study'|'workout_plan'|'workout_profile'|'goals_profile'|'workout_logs', cert? }`
 - **Pattern for new sections:** as new Life Hub features are built, add their reset row here with the same button style
 
 ### Exercise Library

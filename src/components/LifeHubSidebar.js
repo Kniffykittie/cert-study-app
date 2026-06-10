@@ -124,6 +124,7 @@ export default function LifeHubSidebar() {
             {workoutsOpen && (
               <div style={{ paddingLeft: '12px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {navLink('My Plan', '/life-hub/workouts')}
+                {navLink('Workout History', '/life-hub/workouts/history')}
                 {navLink('Exercise Library', '/life-hub/workouts/exercises')}
               </div>
             )}
