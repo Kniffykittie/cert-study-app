@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { calcTDEE, tdeeBreakdown } from '@/lib/tdee'
 
 const GOALS = [
   { key: 'lose_weight', label: 'Lose Weight', desc: 'Reduce body fat and reach a healthier weight', icon: '🔥' },
@@ -14,11 +15,40 @@ const GOALS = [
   { key: 'flexibility', label: 'More Flexibility', desc: 'Improve mobility, posture, and reduce stiffness', icon: '🤸' },
 ]
 
-const ACTIVITY_LEVELS = [
-  { key: 'sedentary', label: 'Sedentary', desc: 'Desk job, car commute, minimal walking. Under 5k steps/day. Little to no planned exercise.' },
-  { key: 'lightly_active', label: 'Lightly Active', desc: 'Some daily movement — occasional walks, light errands. ~5k–8k steps/day. 0–1 workouts/week.' },
-  { key: 'moderately_active', label: 'Moderately Active', desc: 'Regular movement throughout the day, active commute, or 2–3 gym sessions/week. ~8k–12k steps/day.' },
-  { key: 'very_active', label: 'Very Active', desc: 'High daily movement — 12k+ steps, physical job, or dedicated training 4+ days/week. Could be one or the other.' },
+const JOB_ACTIVITY_OPTIONS = [
+  { key: 'desk', label: 'Desk / Seated', desc: 'Office job, driving, working from home. Mostly sitting all day.', icon: '💻' },
+  { key: 'feet', label: 'On My Feet', desc: 'Retail, teaching, standing work. Up and moving but not physically demanding.', icon: '🧍' },
+  { key: 'moving', label: 'Constantly Moving', desc: 'Construction, warehouse, landscaping, nursing. Physical demands all day.', icon: '🔧' },
+  { key: 'mixed', label: 'Mix of Both', desc: 'Part desk, part active. Hard to put in one box.', icon: '🔄' },
+]
+
+const EXERCISE_DAYS = [
+  { key: 0, label: '0', sublabel: 'None' },
+  { key: 2, label: '1–2', sublabel: 'days/week' },
+  { key: 3, label: '3–4', sublabel: 'days/week' },
+  { key: 5, label: '5+', sublabel: 'days/week' },
+]
+
+const EXERCISE_TYPES = [
+  { key: 'weights', label: 'Weights / Lifting', desc: 'Barbell, dumbbells, machines, bodyweight strength' },
+  { key: 'cardio', label: 'Cardio', desc: 'Running, cycling, swimming, rowing, HIIT' },
+  { key: 'both', label: 'Both', desc: 'Strength training + cardio sessions' },
+  { key: 'light', label: 'Light Activity Only', desc: 'Walks, yoga, stretching, recreational sports' },
+]
+
+const EXERCISE_DURATION = [
+  { key: 20, label: 'Under 30 min' },
+  { key: 37, label: '30–45 min' },
+  { key: 52, label: '45–60 min' },
+  { key: 75, label: '60–90 min' },
+  { key: 105, label: '90+ min' },
+]
+
+const EXERCISE_CONSISTENCY = [
+  { key: 'just_starting', label: 'Just Starting', desc: "Brand new or getting back into it" },
+  { key: 'months_1_3', label: 'A Few Months', desc: '1–3 months of regular training' },
+  { key: 'months_6', label: '6+ Months', desc: 'Solid routine, your body has adapted' },
+  { key: 'year_plus', label: 'Over a Year', desc: 'Consistent for 12+ months' },
 ]
 
 const TIMELINES = [
@@ -94,7 +124,23 @@ const DIETARY_PREFS = [
 
 const PICKY_KEYS = new Set(['picky_eater', 'very_picky_eater'])
 
-const STEPS = ['Your Goals', 'Your Body', 'Starting Point', 'Your Context']
+const STEPS = ['Your Goals', 'Your Body', 'Activity & Exercise', 'Your Context', 'What Happens Now']
+
+function ChipSelect({ options, selected, onSelect, multi = false }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+      {options.map(opt => {
+        const active = multi ? (selected || []).includes(opt.key) : selected === opt.key
+        return (
+          <button key={opt.key} type="button" onClick={() => onSelect(opt.key)}
+            style={{ padding: '7px 14px', borderRadius: '20px', fontSize: '13px', cursor: 'pointer', border: `1px solid ${active ? 'var(--accent-purple)' : 'var(--border)'}`, backgroundColor: active ? 'rgba(123,47,190,0.12)' : 'var(--surface)', color: active ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: active ? '600' : '400' }}>
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function GoalsSetupPage() {
   const router = useRouter()
@@ -115,14 +161,19 @@ export default function GoalsSetupPage() {
   const [age, setAge] = useState('')
   const [sex, setSex] = useState('')
   const [bodyComposition, setBodyComposition] = useState('')
-  // Step 2
-  const [activityLevel, setActivityLevel] = useState('')
-  const [activityLevelNote, setActivityLevelNote] = useState('')
-  const [dailySteps, setDailySteps] = useState('')
+  // Step 2 — Activity & Exercise
+  const [jobActivity, setJobActivity] = useState('')
+  const [exerciseDays, setExerciseDays] = useState(null)
+  const [exerciseTypes, setExerciseTypes] = useState([])
+  const [exerciseDuration, setExerciseDuration] = useState(null)
+  const [exerciseConsistency, setExerciseConsistency] = useState('')
+  const [hasTrackedCalories, setHasTrackedCalories] = useState(null)
+  const [calorieHistoryNote, setCalorieHistoryNote] = useState('')
+  // Step 2 also has target/timeline/notes
   const [targetWeight, setTargetWeight] = useState('')
   const [timeline, setTimeline] = useState('')
   const [notes, setNotes] = useState('')
-  // Step 3
+  // Step 3 — Your Context
   const [biggestObstacles, setBiggestObstacles] = useState([])
   const [biggestObstaclesOther, setBiggestObstaclesOther] = useState('')
   const [primaryMotivations, setPrimaryMotivations] = useState([])
@@ -145,9 +196,12 @@ export default function GoalsSetupPage() {
         if (data.age) setAge(String(data.age))
         if (data.sex) setSex(data.sex)
         if (data.body_composition) setBodyComposition(data.body_composition)
-        if (data.activity_level) setActivityLevel(data.activity_level)
-        if (data.activity_level_note) setActivityLevelNote(data.activity_level_note)
-        if (data.daily_steps) setDailySteps(String(data.daily_steps))
+        if (data.job_activity) setJobActivity(data.job_activity)
+        if (data.exercise_days_per_week != null) setExerciseDays(data.exercise_days_per_week)
+        if (data.exercise_types?.length) setExerciseTypes(data.exercise_types)
+        if (data.exercise_duration_min != null) setExerciseDuration(data.exercise_duration_min)
+        if (data.exercise_consistency) setExerciseConsistency(data.exercise_consistency)
+        if (data.calorie_history_note) { setHasTrackedCalories(true); setCalorieHistoryNote(data.calorie_history_note) }
         if (data.target_weight_lbs) setTargetWeight(String(data.target_weight_lbs))
         if (data.timeline) setTimeline(data.timeline)
         if (data.notes) setNotes(data.notes)
@@ -183,16 +237,35 @@ export default function GoalsSetupPage() {
     })
   }
 
+  function toggleExerciseType(key) {
+    if (key === 'both' || key === 'light') {
+      setExerciseTypes(prev => prev.includes(key) ? [] : [key])
+      return
+    }
+    setExerciseTypes(prev => {
+      const without = prev.filter(k => k !== 'both' && k !== 'light')
+      return without.includes(key) ? without.filter(k => k !== key) : [...without, key]
+    })
+  }
+
   function getBodyCompOptions() {
     if (sex === 'Male') return BODY_COMP_OPTIONS.Male
     if (sex === 'Female') return BODY_COMP_OPTIONS.Female
     return BODY_COMP_OPTIONS.default
   }
 
+  const exercisesAtAll = exerciseDays !== 0 && exerciseDays !== null
+
   function canAdvance() {
     if (step === 0) return selectedGoals.length > 0
     if (step === 1) return true
-    if (step === 2) return !!activityLevel && !!activityLevelNote.trim() && !!timeline
+    if (step === 2) {
+      if (!jobActivity) return false
+      if (exerciseDays === null) return false
+      if (exercisesAtAll && (!exerciseTypes.length || !exerciseDuration || !exerciseConsistency)) return false
+      if (!exercisesAtAll && !exerciseConsistency) return false
+      return !!timeline
+    }
     if (step === 3) return true
     return false
   }
@@ -205,25 +278,22 @@ export default function GoalsSetupPage() {
     setStep(s => s + 1)
   }
 
-  async function handleFinish() {
-    setSaving(true)
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
-
+  function buildProfileData(userId) {
     const heightInches = (heightFt || heightIn) ? (parseFloat(heightFt || 0) * 12 + parseFloat(heightIn || 0)) : null
-
-    const profileData = {
-      user_id: session.user.id,
+    return {
+      user_id: userId,
       goals: selectedGoals,
       height_inches: heightInches,
       weight_lbs: weightLbs ? parseFloat(weightLbs) : null,
       age: age ? parseInt(age) : null,
       sex: sex || null,
       body_composition: bodyComposition || null,
-      activity_level: activityLevel,
-      activity_level_note: activityLevelNote.trim() || null,
-      daily_steps: dailySteps ? parseInt(dailySteps) : null,
+      job_activity: jobActivity || null,
+      exercise_types: exercisesAtAll ? exerciseTypes : [],
+      exercise_days_per_week: exerciseDays ?? 0,
+      exercise_duration_min: exercisesAtAll ? exerciseDuration : null,
+      exercise_consistency: exerciseConsistency || null,
+      calorie_history_note: (hasTrackedCalories && calorieHistoryNote.trim()) ? calorieHistoryNote.trim() : null,
       target_weight_lbs: targetWeight ? parseFloat(targetWeight) : null,
       timeline,
       notes: notes || null,
@@ -237,10 +307,16 @@ export default function GoalsSetupPage() {
       sleep_hours: sleepHours ? parseFloat(sleepHours) : null,
       updated_at: new Date().toISOString(),
     }
+  }
 
+  async function handleFinishContext() {
+    setSaving(true)
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const profileData = buildProfileData(session.user.id)
     await supabase.from('goals_profiles').upsert(profileData, { onConflict: 'user_id' })
     setSaving(false)
-
     setGeneratingOverview(true)
     await fetch('/api/goals/generate-overview', {
       method: 'POST',
@@ -248,28 +324,25 @@ export default function GoalsSetupPage() {
       body: JSON.stringify(profileData),
     })
     setGeneratingOverview(false)
-
-    router.push(redirect)
+    setStep(4)
   }
 
   const wantsWeightChange = selectedGoals.includes('lose_weight') || selectedGoals.includes('build_muscle')
   const bodyCompOptions = getBodyCompOptions()
 
-  function MultiChip({ items, selected, onToggle }) {
-    return (
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-        {items.map(item => {
-          const active = selected.includes(item.key)
-          return (
-            <button key={item.key} type="button" onClick={() => onToggle(item.key)}
-              style={{ padding: '7px 14px', borderRadius: '20px', fontSize: '13px', cursor: 'pointer', border: `1px solid ${active ? 'var(--accent-purple)' : 'var(--border)'}`, backgroundColor: active ? 'rgba(123,47,190,0.12)' : 'var(--surface)', color: active ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: active ? '600' : '400' }}>
-              {item.label}
-            </button>
-          )
-        })}
-      </div>
-    )
+  // Build preview profile for TDEE breakdown on step 4
+  const previewProfile = {
+    weight_lbs: weightLbs ? parseFloat(weightLbs) : null,
+    body_composition: bodyComposition,
+    sex,
+    job_activity: jobActivity,
+    exercise_types: exerciseTypes,
+    exercise_days_per_week: exerciseDays ?? 0,
+    exercise_duration_min: exerciseDuration,
+    exercise_consistency: exerciseConsistency,
   }
+  const tdee = calcTDEE(previewProfile)
+  const breakdown = tdeeBreakdown(previewProfile)
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--background)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 16px' }}>
@@ -316,7 +389,7 @@ export default function GoalsSetupPage() {
         {step === 1 && (
           <div>
             <h2 style={{ color: 'var(--text-primary)', fontSize: '17px', fontWeight: '700', marginBottom: '6px' }}>Tell us about yourself</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>Used to personalize calorie targets, workout intensity, and health recommendations. All optional.</p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>Used to calculate your baseline metabolism. All optional, but the more you fill in, the more accurate your calorie target will be.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
               <div>
@@ -390,51 +463,136 @@ export default function GoalsSetupPage() {
           </div>
         )}
 
-        {/* Step 2 — Starting Point */}
+        {/* Step 2 — Activity & Exercise */}
         {step === 2 && (
           <div>
-            <h2 style={{ color: 'var(--text-primary)', fontSize: '17px', fontWeight: '700', marginBottom: '6px' }}>Your starting point</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>Helps the AI set the right intensity and pacing for your plan.</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <h2 style={{ color: 'var(--text-primary)', fontSize: '17px', fontWeight: '700', marginBottom: '6px' }}>Activity & Exercise</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>Specific answers here make your calorie target far more accurate than a generic slider.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
 
               <div>
-                <label style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '10px' }}>CURRENT ACTIVITY LEVEL</label>
+                <label style={{ color: 'var(--accent-purple)', fontSize: '14px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>
+                  What does your day look like when you're <em>not</em> exercising? <span style={{ color: 'var(--error)' }}>*</span>
+                </label>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '12px', lineHeight: '1.5' }}>Think about your job or typical daily routine — not your workouts.</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {ACTIVITY_LEVELS.map(a => (
-                    <button key={a.key} onClick={() => setActivityLevel(a.key)}
-                      style={{ backgroundColor: activityLevel === a.key ? 'rgba(123,47,190,0.12)' : 'var(--surface)', border: `1px solid ${activityLevel === a.key ? 'var(--accent-purple)' : 'var(--border)'}`, borderRadius: '10px', padding: '12px 16px', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  {JOB_ACTIVITY_OPTIONS.map(opt => (
+                    <button key={opt.key} onClick={() => setJobActivity(opt.key)}
+                      style={{ backgroundColor: jobActivity === opt.key ? 'rgba(123,47,190,0.12)' : 'var(--surface)', border: `1px solid ${jobActivity === opt.key ? 'var(--accent-purple)' : 'var(--border)'}`, borderRadius: '10px', padding: '12px 16px', textAlign: 'left', cursor: 'pointer', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: '20px', flexShrink: 0 }}>{opt.icon}</span>
                       <div>
-                        <div style={{ color: activityLevel === a.key ? 'var(--accent-purple)' : 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{a.label}</div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>{a.desc}</div>
+                        <div style={{ color: jobActivity === opt.key ? 'var(--accent-purple)' : 'var(--text-primary)', fontSize: '13px', fontWeight: '600', marginBottom: '2px' }}>{opt.label}</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.4' }}>{opt.desc}</div>
                       </div>
-                      {activityLevel === a.key && <span style={{ color: 'var(--accent-purple)', fontSize: '16px' }}>✓</span>}
+                      {jobActivity === opt.key && <span style={{ marginLeft: 'auto', color: 'var(--accent-purple)', fontSize: '14px', flexShrink: 0 }}>✓</span>}
                     </button>
                   ))}
-                  {activityLevel && (
-                    <div style={{ marginTop: '4px' }}>
-                      <label style={{ color: 'var(--accent-purple)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>
-                        Describe what a typical day actually looks like for you. <span style={{ color: 'var(--error)' }}>*</span>
-                      </label>
-                      <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '8px', lineHeight: '1.5' }}>
-                        Be specific — job type, how much you walk, any sports or hobbies, how often you actually work out. This helps the AI avoid guessing.
-                      </p>
-                      <textarea value={activityLevelNote} onChange={e => setActivityLevelNote(e.target.value)}
-                        placeholder="e.g. I sit at a desk 8+ hrs/day, drive to work, take my dog on a 20 min walk most evenings. I go to the gym maybe once a week but don't have a real routine."
-                        rows={3}
-                        style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--surface)', border: `1px solid ${activityLevelNote.trim() ? 'var(--accent-purple)' : 'var(--border)'}`, borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
-                    </div>
-                  )}
                 </div>
               </div>
 
               <div>
-                <label style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>AVERAGE DAILY STEPS <span style={{ fontWeight: '400' }}>(optional)</span></label>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '10px', lineHeight: '1.5' }}>From your phone, watch, or rough estimate. Helps the AI understand your real movement level beyond the gym.</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <input type="number" value={dailySteps} onChange={e => setDailySteps(e.target.value)} placeholder="e.g. 15000" min="0" max="50000"
-                    style={{ width: '140px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>steps / day</span>
+                <label style={{ color: 'var(--accent-purple)', fontSize: '14px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>
+                  How many days per week do you do intentional exercise? <span style={{ color: 'var(--error)' }}>*</span>
+                </label>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '12px' }}>Gym sessions, runs, classes — anything planned and purposeful.</p>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {EXERCISE_DAYS.map(d => (
+                    <button key={d.key} onClick={() => setExerciseDays(d.key)}
+                      style={{ padding: '10px 18px', textAlign: 'center', borderRadius: '10px', cursor: 'pointer', border: `1px solid ${exerciseDays === d.key ? 'var(--accent-purple)' : 'var(--border)'}`, backgroundColor: exerciseDays === d.key ? 'rgba(123,47,190,0.12)' : 'var(--surface)', minWidth: '64px' }}>
+                      <div style={{ color: exerciseDays === d.key ? 'var(--accent-purple)' : 'var(--text-primary)', fontSize: '15px', fontWeight: '700' }}>{d.label}</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{d.sublabel}</div>
+                    </button>
+                  ))}
                 </div>
+              </div>
+
+              {exercisesAtAll && (
+                <>
+                  <div>
+                    <label style={{ color: 'var(--accent-purple)', fontSize: '14px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>
+                      What type of exercise? <span style={{ color: 'var(--error)' }}>*</span>
+                    </label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                      {EXERCISE_TYPES.map(opt => {
+                        const active = exerciseTypes.includes(opt.key)
+                        return (
+                          <button key={opt.key} onClick={() => toggleExerciseType(opt.key)}
+                            style={{ backgroundColor: active ? 'rgba(123,47,190,0.12)' : 'var(--surface)', border: `1px solid ${active ? 'var(--accent-purple)' : 'var(--border)'}`, borderRadius: '8px', padding: '10px 14px', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ color: active ? 'var(--accent-purple)' : 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{opt.label}</div>
+                              <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>{opt.desc}</div>
+                            </div>
+                            {active && <span style={{ color: 'var(--accent-purple)', fontSize: '14px', marginLeft: '10px', flexShrink: 0 }}>✓</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ color: 'var(--accent-purple)', fontSize: '14px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>
+                      How long per session on average? <span style={{ color: 'var(--error)' }}>*</span>
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {EXERCISE_DURATION.map(d => (
+                        <button key={d.key} onClick={() => setExerciseDuration(d.key)}
+                          style={{ padding: '8px 14px', borderRadius: '20px', fontSize: '13px', cursor: 'pointer', border: `1px solid ${exerciseDuration === d.key ? 'var(--accent-purple)' : 'var(--border)'}`, backgroundColor: exerciseDuration === d.key ? 'rgba(123,47,190,0.12)' : 'var(--surface)', color: exerciseDuration === d.key ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: exerciseDuration === d.key ? '600' : '400' }}>
+                          {d.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label style={{ color: 'var(--accent-purple)', fontSize: '14px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>
+                  How long have you been doing this consistently? <span style={{ color: 'var(--error)' }}>*</span>
+                </label>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '12px', lineHeight: '1.5' }}>
+                  The longer you've been active, the more efficient your metabolism becomes — your body adapts over time.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                  {EXERCISE_CONSISTENCY.map(opt => (
+                    <button key={opt.key} onClick={() => setExerciseConsistency(opt.key)}
+                      style={{ backgroundColor: exerciseConsistency === opt.key ? 'rgba(123,47,190,0.12)' : 'var(--surface)', border: `1px solid ${exerciseConsistency === opt.key ? 'var(--accent-purple)' : 'var(--border)'}`, borderRadius: '8px', padding: '10px 14px', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ color: exerciseConsistency === opt.key ? 'var(--accent-purple)' : 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{opt.label}</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>{opt.desc}</div>
+                      </div>
+                      {exerciseConsistency === opt.key && <span style={{ color: 'var(--accent-purple)', fontSize: '14px' }}>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ color: 'var(--accent-purple)', fontSize: '14px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>Have you tracked calories before?</label>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '12px', lineHeight: '1.5' }}>
+                  If you have real-world experience, sharing it helps calibrate your starting target. This is gold.
+                </p>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                  {[{ key: true, label: 'Yes, I have' }, { key: false, label: 'No, not really' }].map(opt => (
+                    <button key={String(opt.key)} onClick={() => setHasTrackedCalories(opt.key)}
+                      style={{ padding: '9px 20px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', border: `1px solid ${hasTrackedCalories === opt.key ? 'var(--accent-purple)' : 'var(--border)'}`, backgroundColor: hasTrackedCalories === opt.key ? 'rgba(123,47,190,0.12)' : 'var(--surface)', color: hasTrackedCalories === opt.key ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: hasTrackedCalories === opt.key ? '600' : '400' }}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {hasTrackedCalories && (
+                  <div>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '8px', lineHeight: '1.5' }}>
+                      What did you learn? Share any patterns you noticed — even rough estimates are helpful.
+                    </p>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '11px', fontStyle: 'italic', marginBottom: '8px', lineHeight: '1.5' }}>
+                      e.g. "When I ate around 1,800 calories I slowly lost weight. At 2,200 I maintained. When I ate less than 1,500 I felt terrible and binged on weekends."
+                    </p>
+                    <textarea value={calorieHistoryNote} onChange={e => setCalorieHistoryNote(e.target.value)}
+                      placeholder="Tell us what you noticed..."
+                      rows={3}
+                      style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--surface)', border: `1px solid ${calorieHistoryNote.trim() ? 'var(--accent-purple)' : 'var(--border)'}`, borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+                  </div>
+                )}
               </div>
 
               {wantsWeightChange && (
@@ -482,7 +640,7 @@ export default function GoalsSetupPage() {
 
               <div>
                 <label style={{ color: 'var(--accent-purple)', fontSize: '15px', fontWeight: '700', display: 'block', marginBottom: '10px' }}>Biggest Obstacles <span style={{ fontWeight: '400', fontSize: '13px', color: 'var(--text-secondary)' }}>(select all that apply)</span></label>
-                <MultiChip items={OBSTACLES} selected={biggestObstacles} onToggle={key => toggleItem(biggestObstacles, setBiggestObstacles, key)} />
+                <ChipSelect options={OBSTACLES} selected={biggestObstacles} onSelect={key => toggleItem(biggestObstacles, setBiggestObstacles, key)} multi />
                 {biggestObstacles.length > 0 && (
                   <input type="text" value={biggestObstaclesOther} onChange={e => setBiggestObstaclesOther(e.target.value)}
                     placeholder="Anything else? (optional)"
@@ -492,7 +650,7 @@ export default function GoalsSetupPage() {
 
               <div>
                 <label style={{ color: 'var(--accent-purple)', fontSize: '15px', fontWeight: '700', display: 'block', marginBottom: '10px' }}>Primary Motivations <span style={{ fontWeight: '400', fontSize: '13px', color: 'var(--text-secondary)' }}>(what drives you?)</span></label>
-                <MultiChip items={MOTIVATIONS} selected={primaryMotivations} onToggle={key => toggleItem(primaryMotivations, setPrimaryMotivations, key)} />
+                <ChipSelect options={MOTIVATIONS} selected={primaryMotivations} onSelect={key => toggleItem(primaryMotivations, setPrimaryMotivations, key)} multi />
                 {primaryMotivations.length > 0 && (
                   <input type="text" value={primaryMotivationsOther} onChange={e => setPrimaryMotivationsOther(e.target.value)}
                     placeholder="Anything else? (optional)"
@@ -510,17 +668,17 @@ export default function GoalsSetupPage() {
 
               <div>
                 <label style={{ color: 'var(--accent-purple)', fontSize: '15px', fontWeight: '700', display: 'block', marginBottom: '10px' }}>Dietary Preferences <span style={{ fontWeight: '400', fontSize: '13px', color: 'var(--text-secondary)' }}>(select all that apply)</span></label>
-                <MultiChip items={DIETARY_PREFS} selected={dietaryPreferences} onToggle={toggleDiet} />
+                <ChipSelect options={DIETARY_PREFS} selected={dietaryPreferences} onSelect={toggleDiet} multi />
                 {dietaryPreferences.some(k => PICKY_KEYS.has(k)) && (
                   <div style={{ marginTop: '10px' }}>
                     <label style={{ color: 'var(--accent-purple)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>
                       Tell us what you actually eat and won't eat. <span style={{ color: 'var(--error)' }}>*</span>
                     </label>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '8px', lineHeight: '1.5' }}>
-                      Be specific — list foods you like, foods you avoid, and anything you absolutely refuse. The AI can't help if it doesn't know.
+                      Be specific — list foods you like, foods you avoid, and anything you absolutely refuse.
                     </p>
                     <textarea value={dietaryPreferencesOther} onChange={e => setDietaryPreferencesOther(e.target.value)}
-                      placeholder="e.g. I'll eat chicken, rice, eggs, and apples. I won't touch vegetables, fish, or anything spicy. I basically live on a very limited rotation."
+                      placeholder="e.g. I'll eat chicken, rice, eggs, and apples. I won't touch vegetables, fish, or anything spicy."
                       rows={3}
                       style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--surface)', border: `1px solid ${dietaryPreferencesOther.trim() ? 'var(--accent-purple)' : 'var(--border)'}`, borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
                   </div>
@@ -545,6 +703,94 @@ export default function GoalsSetupPage() {
           </div>
         )}
 
+        {/* Step 4 — What Happens Now */}
+        {step === 4 && (
+          <div>
+            <h2 style={{ color: 'var(--text-primary)', fontSize: '17px', fontWeight: '700', marginBottom: '6px' }}>Here's what we calculated</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>
+              Your calorie target is a smart starting estimate — it gets more accurate the more you use the app.
+            </p>
+
+            {tdee ? (
+              <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--accent-purple)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{ color: 'var(--accent-purple)', fontSize: '36px', fontWeight: '800' }}>{tdee.toLocaleString()}</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>calories / day (estimated TDEE)</span>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '16px' }}>Total Daily Energy Expenditure — what your body burns on an average day.</p>
+
+                {breakdown && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 14px' }}>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', marginBottom: '2px' }}>BASE METABOLISM (BMR)</div>
+                        <div style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700' }}>{breakdown.bmr.toLocaleString()} cal</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Calories at complete rest</div>
+                      </div>
+                      <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 14px' }}>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', marginBottom: '2px' }}>DAILY MOVEMENT (NEAT)</div>
+                        <div style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700' }}>+{breakdown.neatCal.toLocaleString()} cal</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>From your job & lifestyle</div>
+                      </div>
+                      <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 14px' }}>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', marginBottom: '2px' }}>EXERCISE (EAT)</div>
+                        <div style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700' }}>+{breakdown.exerciseCalPerDay.toLocaleString()} cal/day</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Spread across the week</div>
+                      </div>
+                      {breakdown.discountPct > 0 && (
+                        <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 14px' }}>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', marginBottom: '2px' }}>METABOLIC ADAPTATION</div>
+                          <div style={{ color: 'var(--warning)', fontSize: '16px', fontWeight: '700' }}>−{breakdown.discountPct}%</div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Body efficiency after {breakdown.discountPct >= 12 ? '1+ year' : breakdown.discountPct >= 7 ? '6+ months' : '1–3 months'}</div>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 14px' }}>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', marginBottom: '2px' }}>LEAN MASS USED</div>
+                      <div style={{ color: 'var(--text-primary)', fontSize: '13px' }}>{breakdown.leanMassKg} kg lean mass ({breakdown.bfPct}% estimated body fat)</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>Using Katch-McArdle formula — more accurate than BMI-based methods</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px', textAlign: 'center' }}>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Add your weight and activity details to see your estimated calorie target.</p>
+              </div>
+            )}
+
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+              <h3 style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: '700', marginBottom: '4px' }}>📈 This number gets smarter over time</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6', marginBottom: '16px' }}>
+                Right now this is a formula-based estimate. It's a solid starting point — but <strong style={{ color: 'var(--text-primary)' }}>your real number comes from your data.</strong> After 2 weeks of consistent logging, the app can calculate what you're actually burning based on real weight changes and food intake.
+              </p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6', marginBottom: '16px' }}>
+                <strong style={{ color: 'var(--text-primary)' }}>Nothing changes without you approving it.</strong> When there's enough data for a calibrated estimate, you'll see a review card — you decide whether to update your target.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {[
+                  { icon: '⚖️', text: 'Weigh yourself once a week, same conditions', key: 'weight' },
+                  { icon: '🍽️', text: 'Log your food — even rough estimates count', key: 'food' },
+                  { icon: '💪', text: 'Log your workouts when you complete them', key: 'workouts' },
+                  { icon: '📊', text: 'Check in daily — energy + mood takes 5 seconds', key: 'checkin' },
+                ].map(item => (
+                  <div key={item.key} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '16px', flexShrink: 0 }}>{item.icon}</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5' }}>{item.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: 'rgba(123,47,190,0.08)', border: '1px solid rgba(123,47,190,0.25)', borderRadius: '10px', padding: '16px', marginBottom: '4px' }}>
+              <p style={{ color: 'var(--accent-purple)', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>The more consistent you are, the more accurate it gets.</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.5' }}>
+                Most calorie apps give you a number and leave you to figure out if it's right. This one watches your results and tells you. Treat the first 2 weeks as an experiment.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Nav */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '32px' }}>
           <button onClick={() => setStep(s => s - 1)} disabled={step === 0}
@@ -552,15 +798,22 @@ export default function GoalsSetupPage() {
             ← Back
           </button>
           <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{step + 1} of {STEPS.length}</span>
-          {step < STEPS.length - 1 ? (
+          {step < 3 && (
             <button onClick={handleNext} disabled={!canAdvance()}
               style={{ backgroundColor: 'var(--accent-purple)', border: 'none', color: '#fff', borderRadius: '8px', padding: '11px 24px', fontSize: '14px', fontWeight: '600', cursor: canAdvance() ? 'pointer' : 'not-allowed', opacity: canAdvance() ? 1 : 0.4 }}>
               Next →
             </button>
-          ) : (
-            <button onClick={handleFinish} disabled={saving || generatingOverview}
+          )}
+          {step === 3 && (
+            <button onClick={handleFinishContext} disabled={saving || generatingOverview}
               style={{ backgroundColor: 'var(--accent-purple)', border: 'none', color: '#fff', borderRadius: '8px', padding: '11px 24px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', opacity: (saving || generatingOverview) ? 0.6 : 1 }}>
-              {generatingOverview ? 'Building your profile...' : saving ? 'Saving...' : 'Finish Setup ✓'}
+              {generatingOverview ? 'Building your profile...' : saving ? 'Saving...' : 'Save & Continue →'}
+            </button>
+          )}
+          {step === 4 && (
+            <button onClick={() => router.push(redirect)}
+              style={{ backgroundColor: 'var(--accent-purple)', border: 'none', color: '#fff', borderRadius: '8px', padding: '11px 24px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+              Got it, let's go →
             </button>
           )}
         </div>

@@ -266,6 +266,22 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 40 - Complete
+- **Goals Setup rebuilt — 5 steps** (was 4): Your Goals → Your Body → Activity & Exercise → Your Context → What Happens Now
+- **New Step 2 "Activity & Exercise"** replaces the old activity dropdown with 6 specific questions:
+  1. Job/day type — 4 concrete options with descriptions (desk, on feet, constantly moving, mixed)
+  2. Days/week of intentional exercise — 0, 1–2, 3–4, 5+ chips
+  3. Exercise type — weights, cardio, both, light (shown only if exercising)
+  4. Session duration — 5 duration chips (shown only if exercising)
+  5. How long been consistent — just starting / a few months / 6+ months / over a year
+  6. Calorie tracking history — yes/no; if yes: textarea with example prompts
+- **New Step 4 "What Happens Now"** — shows live TDEE breakdown (BMR / NEAT / EAT / adaptation discount), accuracy checklist (weigh weekly, log food, log workouts, daily check-in), and explanation of the calibration system
+- **Save happens on step 3 → step 4 is info-only** — user hits "Got it, let's go →" to navigate to destination
+- **`/src/lib/tdee.js` created** — shared utility with `calcTDEE()`, `calcMacros()`, `tdeeBreakdown()`, `estimateBodyFatPct()`; uses Katch-McArdle formula (BMR from lean mass via body fat estimate), NEAT from job type, EAT from exercise MET values, metabolic adaptation discount
+- **Nutrition page updated** — imports `calcTDEE`/`calcMacros` from shared lib instead of inline Mifflin-St Jeor
+- **DB migration applied**: `goals_activity_detail_and_tdee_suggestions` — added 6 new columns to `goals_profiles` (job_activity, exercise_types[], exercise_days_per_week, exercise_duration_min, exercise_consistency, calorie_history_note); created `tdee_suggestions` table with RLS
+- **`tdee_suggestions` table** — queued when calibration check triggers after 14+ days of data; columns: suggested_tdee, current_tdee, data_days, avg_calories_logged, weight_change_lbs, implied_tdee, reason, status (pending/accepted/dismissed)
+
 ### Phase 39 - Complete
 - **Full micronutrient tracking** — 14 new columns added to `food_cache`, `my_foods`, `food_log_entries`: saturated fat, trans fat, cholesterol, potassium, calcium, iron, magnesium, zinc, vitamins A/C/D/B12/B6, folate
 - **Open Food Facts mapping updated** — search route now extracts all micronutrients; minerals stored as g in OFF are converted to mg; vitamins converted to mcg/mg; prefers per-serving values, falls back to per-100g

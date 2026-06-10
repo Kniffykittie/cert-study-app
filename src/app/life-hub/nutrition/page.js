@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { calcTDEE as calcTDEEShared, calcMacros as calcMacrosShared } from '@/lib/tdee'
 
 const TIMING_LABELS = {
   morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening',
@@ -90,26 +91,8 @@ function calcWorkoutBonus(workout, goals) {
   return { bonus, reason, grossBurn, duration }
 }
 
-function calcTDEE(goals) {
-  if (!goals) return null
-  const { weight_lbs, height_inches, age, sex, activity_level } = goals
-  if (!weight_lbs || !height_inches || !age || !sex) return null
-  const weightKg = weight_lbs * 0.453592
-  const heightCm = height_inches * 2.54
-  const bmr = sex === 'male'
-    ? 10 * weightKg + 6.25 * heightCm - 5 * age + 5
-    : 10 * weightKg + 6.25 * heightCm - 5 * age - 161
-  const mult = { sedentary: 1.2, lightly_active: 1.375, moderately_active: 1.55, very_active: 1.725, extra_active: 1.9 }[activity_level] || 1.375
-  return Math.round(bmr * mult)
-}
-
-function calcMacros(tdee, goals) {
-  if (!tdee || !goals) return { protein: 0, carbs: 0, fat: 0 }
-  const protein = Math.round((goals.weight_lbs || 150) * 0.82)
-  const fat = Math.round(tdee * 0.25 / 9)
-  const carbs = Math.round((tdee - protein * 4 - fat * 9) / 4)
-  return { protein, carbs, fat }
-}
+function calcTDEE(goals) { return calcTDEEShared(goals) }
+function calcMacros(tdee, goals) { return calcMacrosShared(tdee, goals) }
 
 function MacroBar({ value, goal, color, warn }) {
   const pct = goal > 0 ? Math.min(100, Math.round((value / goal) * 100)) : 0
