@@ -6,6 +6,15 @@ import Link from 'next/link'
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
+const EX_GROUPS = [
+  { label: 'Arms', parts: ['upper arms', 'lower arms', 'forearms'] },
+  { label: 'Back', parts: ['back'] },
+  { label: 'Chest', parts: ['chest'] },
+  { label: 'Core', parts: ['waist'] },
+  { label: 'Legs', parts: ['upper legs', 'lower legs', 'calves'] },
+  { label: 'Shoulders', parts: ['shoulders'] },
+]
+
 function focusColor(focus) {
   if (!focus) return 'var(--accent-purple)'
   const f = focus.toLowerCase()
@@ -32,11 +41,15 @@ export default function WorkoutsPage() {
   const [aiCheckinLoading, setAiCheckinLoading] = useState(false)
   const [cardioModal, setCardioModal] = useState(null) // dayIndex
   const [cardioExercises, setCardioExercises] = useState([])
+  const [exDetailModal, setExDetailModal] = useState(null) // exercise detail popup
   const [healthConnected, setHealthConnected] = useState(null)
   const [stepsToday, setStepsToday] = useState(0)
   const [stepsInput, setStepsInput] = useState('')
   const [stepsSaving, setStepsSaving] = useState(false)
   const [stepsSaved, setStepsSaved] = useState(false)
+
+  const [completedTodayDays, setCompletedTodayDays] = useState(new Set())
+  const [pausedWorkout, setPausedWorkout] = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -52,15 +65,29 @@ export default function WorkoutsPage() {
       return
     }
 
-    const [{ data: prof }, { data: planData }, { data: exercises }] = await Promise.all([
+    const today = new Date().toLocaleDateString('en-CA')
+
+    const [{ data: prof }, { data: planData }, { data: exercises }, { data: todayLogs }] = await Promise.all([
       supabase.from('workout_profiles').select('*').eq('user_id', session.user.id).single(),
       supabase.from('workout_plans').select('*').eq('user_id', session.user.id).eq('is_active', true).single(),
       supabase.from('exercises').select('id,name,body_part,equipment').in('equipment', ['dumbbell', 'body weight']).order('name'),
+      supabase.from('workout_logs').select('day_of_week').eq('user_id', session.user.id).eq('is_partial', false).eq('date', today),
     ])
 
     setProfile(prof)
     setPlan(planData)
     setAllExercises(exercises ?? [])
+    setCompletedTodayDays(new Set((todayLogs ?? []).map(l => l.day_of_week).filter(Boolean)))
+
+    // Check localStorage for paused workout
+    try {
+      const stored = localStorage.getItem('paused_workout')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed.date === today) setPausedWorkout(parsed)
+        else localStorage.removeItem('paused_workout')
+      }
+    } catch {}
 
     const { data: cardio } = await supabase.from('exercises').select('id,name,body_part').eq('body_part', 'cardio').order('name')
     setCardioExercises(cardio ?? [])
@@ -301,10 +328,21 @@ export default function WorkoutsPage() {
                           style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '8px', fontSize: '12px', cursor: 'pointer' }}>
                           + Add Exercise
                         </button>
-                        <Link href={`/life-hub/workouts/log?day=${encodeURIComponent(day.day_of_week)}`}
-                          style={{ flex: 2, display: 'block', textAlign: 'center', backgroundColor: 'var(--accent-purple)', color: '#fff', borderRadius: '8px', padding: '8px', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>
-                          Start Workout
-                        </Link>
+                        {completedTodayDays.has(day.day_of_week) ? (
+                          <div style={{ flex: 2, textAlign: 'center', backgroundColor: 'rgba(46,204,113,0.12)', border: '1px solid rgba(46,204,113,0.3)', color: 'var(--success)', borderRadius: '8px', padding: '8px', fontSize: '13px', fontWeight: '600' }}>
+                            ✓ Done Today
+                          </div>
+                        ) : pausedWorkout?.day === day.day_of_week ? (
+                          <Link href={`/life-hub/workouts/log?day=${encodeURIComponent(day.day_of_week)}`}
+                            style={{ flex: 2, display: 'block', textAlign: 'center', backgroundColor: 'rgba(167,139,250,0.15)', border: '1px solid var(--accent-purple)', color: 'var(--accent-purple)', borderRadius: '8px', padding: '8px', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>
+                            ▶ Resume Workout
+                          </Link>
+                        ) : (
+                          <Link href={`/life-hub/workouts/log?day=${encodeURIComponent(day.day_of_week)}`}
+                            style={{ flex: 2, display: 'block', textAlign: 'center', backgroundColor: 'var(--accent-purple)', color: '#fff', borderRadius: '8px', padding: '8px', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>
+                            Start Workout
+                          </Link>
+                        )}
                       </div>
                     </div>
                   )}
@@ -331,15 +369,66 @@ export default function WorkoutsPage() {
               <button onClick={() => setExerciseModal(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer' }}>✕</button>
             </div>
             <div style={{ overflowY: 'auto', padding: '12px' }}>
-              {allExercises.map(ex => (
-                <button key={ex.id} onClick={() => addExercise(ex)}
-                  style={{ width: '100%', padding: '10px 14px', marginBottom: '6px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-purple)'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
-                  <span style={{ color: 'var(--text-primary)', fontSize: '13px', textTransform: 'capitalize' }}>{ex.name}</span>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'capitalize' }}>{ex.body_part}</span>
-                </button>
-              ))}
+              {EX_GROUPS.map(group => {
+                const groupExercises = allExercises.filter(ex => group.parts.includes(ex.body_part))
+                if (!groupExercises.length) return null
+                return (
+                  <div key={group.label} style={{ marginBottom: '16px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--accent-purple)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '4px 4px 8px', borderBottom: '1px solid var(--border)', marginBottom: '6px' }}>
+                      {group.label} <span style={{ color: 'var(--text-secondary)', fontWeight: '400' }}>({groupExercises.length})</span>
+                    </div>
+                    {groupExercises.map(ex => (
+                      <div key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                        <button onClick={() => addExercise(ex)}
+                          style={{ flex: 1, padding: '9px 12px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                          onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-purple)'}
+                          onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                          <span style={{ color: 'var(--text-primary)', fontSize: '13px', textTransform: 'capitalize' }}>{ex.name}</span>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'capitalize' }}>{ex.equipment}</span>
+                        </button>
+                        <button onClick={() => setExDetailModal(ex)} title="What is this exercise?"
+                          style={{ width: '28px', height: '28px', flexShrink: 0, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>?</button>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Exercise detail popup (from Add Exercise modal ? button) */}
+      {exDetailModal && (
+        <div onClick={() => setExDetailModal(null)} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+            {exDetailModal.gif_url
+              ? <img src={exDetailModal.gif_url} alt={exDetailModal.name} style={{ width: '100%', height: '200px', objectFit: 'cover', backgroundColor: '#111', borderRadius: '12px 12px 0 0', display: 'block' }} />
+              : <div style={{ width: '100%', height: '80px', backgroundColor: '#111', borderRadius: '12px 12px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>🏋️</div>
+            }
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px 8px' }}>
+              <h2 style={{ color: 'var(--text-primary)', fontSize: '17px', fontWeight: '700', textTransform: 'capitalize', margin: 0 }}>{exDetailModal.name}</h2>
+              <button onClick={() => setExDetailModal(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ padding: '0 18px 18px' }}>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                {[{ label: exDetailModal.body_part, color: 'var(--accent-blue)' }, { label: exDetailModal.equipment, color: 'var(--accent-purple)' }, { label: exDetailModal.target, color: 'var(--success)' }].filter(t => t.label).map((t, i) => (
+                  <span key={i} style={{ fontSize: '12px', color: t.color, backgroundColor: 'var(--background)', border: `1px solid ${t.color}`, borderRadius: '6px', padding: '2px 8px', textTransform: 'capitalize' }}>{t.label}</span>
+                ))}
+              </div>
+              {exDetailModal.instructions?.length > 0 && (() => {
+                const steps = (exDetailModal.instructions || []).filter(s => !s.startsWith('You should feel') && !s.startsWith('Do NOT'))
+                const feel = (exDetailModal.instructions || []).find(s => s.startsWith('You should feel'))
+                const doNot = (exDetailModal.instructions || []).find(s => s.startsWith('Do NOT'))
+                return (
+                  <div>
+                    {steps.length > 0 && <ol style={{ margin: '0 0 12px', padding: '0 0 0 18px' }}>{steps.map((step, i) => <li key={i} style={{ color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6', marginBottom: '6px' }}>{step}</li>)}</ol>}
+                    {feel && <div style={{ backgroundColor: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.2)', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', color: 'var(--success)', marginBottom: '8px' }}>{feel}</div>}
+                    {doNot && <div style={{ backgroundColor: 'rgba(204,0,0,0.08)', border: '1px solid rgba(204,0,0,0.2)', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', color: 'var(--error)' }}>{doNot}</div>}
+                  </div>
+                )
+              })()}
+              <button onClick={() => setExDetailModal(null)} style={{ width: '100%', marginTop: '14px', padding: '10px', background: 'var(--accent-purple)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>← Back to Exercise List</button>
             </div>
           </div>
         </div>

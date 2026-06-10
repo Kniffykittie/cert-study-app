@@ -124,10 +124,10 @@ src/
         measurements/page.js           Body Measurements — how-to guide, log form (9 fields: weight/waist/hips/chest/neck/arms/thighs), history table with delta indicators, weight-over-time SVG chart
         setup/page.js                  4-step goals onboarding: Step 1 Goals, Step 2 Your Body, Step 3 Starting Point, Step 4 Your Context (obstacles/motivations/why/diet/sleep); supports ?redirect= param
       workouts/
-        page.js                        My Workout Plan — weekly plan cards sorted Mon-Sun, day reassignment, add/remove exercises with AI check-in, add/change cardio on rest days; gates on goals profile
+        page.js                        My Workout Plan — weekly plan cards sorted Mon-Sun, day reassignment, add/remove exercises with AI check-in, add/change cardio on rest days; Start Workout / ▶ Resume Workout / ✓ Done Today button logic per day; Add Exercise modal grouped by muscle group with ? detail popup; gates on goals profile
         setup/page.js                  7-step onboarding: experience, goals (multi-select), days, schedule, fitness check, cardio preferences, equipment; gates on goals profile
         exercises/page.js              Exercise Library — sticky muscle-group nav, scrollable grouped sections, image cards, detail modal with form cues, Cardio section
-        log/page.js                    Active workout logger — live timer, exercise cards with set rows (type badge cycles warmup/working/dropset, weight+reps inputs, ✓ complete, × remove), add set/drop set, prev session hints, fixed "Finish Workout" → completion screen with overload suggestions
+        log/page.js                    Active workout logger — live timer, exercise cards with set rows (type badge cycles warmup/working/dropset, weight+reps inputs, ✓ complete, × remove), ? button opens exercise detail modal, drop set contextual explanation per exercise type, add set/drop set, prev session hints, Pause (saves partial to DB + localStorage), fixed "Finish Workout" → post-workout check-in (difficulty/energy/note) → completion screen with stats + overload suggestions
         history/page.js                Workout history — all sessions expandable, PR section (heaviest working set per exercise ever), set chips colored by type
       nutrition/
         page.js                        Nutrition (placeholder) — gates on goals profile

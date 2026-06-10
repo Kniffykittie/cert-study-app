@@ -220,6 +220,20 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 
 ## Phase Log
 
+### Phase 52 - Complete
+- **Root bug fix**: `workout_logs` table schema was missing `day_of_week`, `day_label`, `duration_seconds`, `plan_id` — all inserts were silently failing. Migration added those columns plus `is_partial`, `post_workout_difficulty`, `post_workout_energy`, `post_workout_note`
+- **"What is this?" button** — `?` icon next to every exercise name in active workout logger; fetches exercise from Supabase by name, shows full detail modal (image, muscles, instructions, form cues) without leaving the page; details pre-fetched on page load for instant popup
+- **Drop set contextual explanation** — when set type is cycled to Drop Set, a purple info box appears below that row explaining exactly what the drop set means for that specific exercise. Dumbbell: reduce weight 20–30% immediately. Bodyweight: exercise-specific (push-up variations, inverted rows for pull-ups, bench dips for dips, etc.)
+- **Post-workout check-in modal** — appears after "Finish Workout" click before saving: Difficulty 1–5 (Very Easy → Brutal) + Energy 1–5 (Exhausted → Energized) + optional note. Skip button available. Ratings saved to `workout_logs` and shown on completion screen
+- **Pause workout** — Pause button in bottom bar: saves full exercise state + elapsed time to localStorage; POSTs partial log to DB (`is_partial=true`), stores log_id. Returns to plan page
+- **Resume workout** — on plan page load, checks localStorage for today's paused workout → shows "▶ Resume Workout" button instead of "Start Workout"; on log page load, restores exercises + elapsed + log_id; finish uses PATCH instead of POST to update the existing partial log
+- **Same-day completion gate** — plan page queries `workout_logs` for today's completed (non-partial) logs; day cards already done show green "✓ Done Today" (not a link)
+- **Stale pause cleanup** — if paused workout in localStorage is from a previous day, it's auto-cleared on plan page load; partial DB entry stays in history
+- **Expanded completion screen** — now shows 4 stat cards: Duration, Total Volume, Sets Completed (done/total), Exercises; + difficulty/energy badges from post-workout check-in
+- **Add Exercise modal grouped** — exercises now grouped by muscle group with section headers (Arms, Back, Chest, Core, Legs, Shoulders) instead of flat list
+- **"?" button in Add Exercise modal** — `?` icon next to each exercise opens full detail popup (at higher z-index); "← Back to Exercise List" button returns to the modal
+- **PATCH route** — `PATCH /api/workouts/log` updates a partial log on resume completion (replaces all sets, clears is_partial, adds post-workout fields, runs overload detection)
+
 ### Phase 51 - Complete
 - **Workout Logging system** — active workout page, workout history, progressive overload detection
 - `src/app/life-hub/workouts/log/page.js` — active workout UI: live timer (pause/resume), exercise cards with set rows (type badge cycling warmup/working/dropset, weight lbs + reps inputs, ✓ complete toggle, × remove), add set / add drop set buttons, previous session summary chips, cardio block, fixed bottom "Finish Workout" button; redirects to completion screen
