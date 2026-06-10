@@ -88,7 +88,11 @@ const DIETARY_PREFS = [
   { key: 'high_protein', label: 'High Protein Focus' },
   { key: 'halal', label: 'Halal' },
   { key: 'kosher', label: 'Kosher' },
+  { key: 'picky_eater', label: '🙄 Picky Eater' },
+  { key: 'very_picky_eater', label: '😤 Very Picky Eater' },
 ]
+
+const PICKY_KEYS = new Set(['picky_eater', 'very_picky_eater'])
 
 const STEPS = ['Your Goals', 'Your Body', 'Starting Point', 'Your Context']
 
@@ -113,6 +117,7 @@ export default function GoalsSetupPage() {
   const [bodyComposition, setBodyComposition] = useState('')
   // Step 2
   const [activityLevel, setActivityLevel] = useState('')
+  const [activityLevelNote, setActivityLevelNote] = useState('')
   const [dailySteps, setDailySteps] = useState('')
   const [targetWeight, setTargetWeight] = useState('')
   const [timeline, setTimeline] = useState('')
@@ -141,6 +146,7 @@ export default function GoalsSetupPage() {
         if (data.sex) setSex(data.sex)
         if (data.body_composition) setBodyComposition(data.body_composition)
         if (data.activity_level) setActivityLevel(data.activity_level)
+        if (data.activity_level_note) setActivityLevelNote(data.activity_level_note)
         if (data.daily_steps) setDailySteps(String(data.daily_steps))
         if (data.target_weight_lbs) setTargetWeight(String(data.target_weight_lbs))
         if (data.timeline) setTimeline(data.timeline)
@@ -186,7 +192,7 @@ export default function GoalsSetupPage() {
   function canAdvance() {
     if (step === 0) return selectedGoals.length > 0
     if (step === 1) return true
-    if (step === 2) return !!activityLevel && !!timeline
+    if (step === 2) return !!activityLevel && !!activityLevelNote.trim() && !!timeline
     if (step === 3) return true
     return false
   }
@@ -216,6 +222,7 @@ export default function GoalsSetupPage() {
       sex: sex || null,
       body_composition: bodyComposition || null,
       activity_level: activityLevel,
+      activity_level_note: activityLevelNote.trim() || null,
       daily_steps: dailySteps ? parseInt(dailySteps) : null,
       target_weight_lbs: targetWeight ? parseFloat(targetWeight) : null,
       timeline,
@@ -365,14 +372,14 @@ export default function GoalsSetupPage() {
                     const active = bodyComposition === opt.key
                     return (
                       <button key={opt.key} onClick={() => setBodyComposition(active ? '' : opt.key)}
-                        style={{ backgroundColor: isHolyShit ? (active ? 'rgba(204,0,0,0.12)' : 'rgba(204,0,0,0.04)') : (active ? 'rgba(123,47,190,0.12)' : 'var(--surface)'), border: `1px solid ${isHolyShit ? (active ? 'var(--error)' : 'var(--error-border)') : (active ? 'var(--accent-purple)' : 'var(--border)')}`, borderRadius: '8px', padding: '10px 14px', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ color: isHolyShit ? 'var(--error)' : (active ? 'var(--accent-purple)' : 'var(--text-primary)'), fontSize: '13px', fontWeight: '600' }}>{opt.label}</div>
-                          <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>{opt.desc}</div>
+                        style={{ backgroundColor: isHolyShit ? (active ? 'rgba(204,0,0,0.12)' : 'rgba(204,0,0,0.04)') : (active ? 'rgba(123,47,190,0.12)' : 'var(--surface)'), border: `1px solid ${isHolyShit ? (active ? 'var(--error)' : 'var(--error-border)') : (active ? 'var(--accent-purple)' : 'var(--border)')}`, borderRadius: '8px', padding: '10px 14px', textAlign: 'left', cursor: 'pointer', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px', flexWrap: 'wrap' }}>
+                          <span style={{ color: isHolyShit ? 'var(--error)' : (active ? 'var(--accent-purple)' : 'var(--text-primary)'), fontSize: '13px', fontWeight: '600' }}>{opt.label}</span>
+                          <span style={{ fontSize: '11px', color: isHolyShit ? 'var(--error)' : 'var(--text-secondary)', fontWeight: '600', backgroundColor: 'var(--background)', padding: '1px 7px', borderRadius: '10px', border: `1px solid ${isHolyShit ? 'var(--error-border)' : 'var(--border)'}`, whiteSpace: 'nowrap' }}>
+                            {opt.range}
+                          </span>
                         </div>
-                        <span style={{ fontSize: '12px', color: isHolyShit ? 'var(--error)' : 'var(--text-secondary)', fontWeight: '600', backgroundColor: 'var(--background)', padding: '2px 8px', borderRadius: '10px', border: `1px solid ${isHolyShit ? 'var(--error-border)' : 'var(--border)'}`, flexShrink: 0 }}>
-                          {opt.range}
-                        </span>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{opt.desc}</div>
                       </button>
                     )
                   })}
@@ -403,6 +410,20 @@ export default function GoalsSetupPage() {
                       {activityLevel === a.key && <span style={{ color: 'var(--accent-purple)', fontSize: '16px' }}>✓</span>}
                     </button>
                   ))}
+                  {activityLevel && (
+                    <div style={{ marginTop: '4px' }}>
+                      <label style={{ color: 'var(--accent-purple)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>
+                        Describe what a typical day actually looks like for you. <span style={{ color: 'var(--error)' }}>*</span>
+                      </label>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '8px', lineHeight: '1.5' }}>
+                        Be specific — job type, how much you walk, any sports or hobbies, how often you actually work out. This helps the AI avoid guessing.
+                      </p>
+                      <textarea value={activityLevelNote} onChange={e => setActivityLevelNote(e.target.value)}
+                        placeholder="e.g. I sit at a desk 8+ hrs/day, drive to work, take my dog on a 20 min walk most evenings. I go to the gym maybe once a week but don't have a real routine."
+                        rows={3}
+                        style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--surface)', border: `1px solid ${activityLevelNote.trim() ? 'var(--accent-purple)' : 'var(--border)'}`, borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -460,7 +481,7 @@ export default function GoalsSetupPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
               <div>
-                <label style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '10px' }}>BIGGEST OBSTACLES <span style={{ fontWeight: '400' }}>(select all that apply)</span></label>
+                <label style={{ color: 'var(--accent-purple)', fontSize: '15px', fontWeight: '700', display: 'block', marginBottom: '10px' }}>Biggest Obstacles <span style={{ fontWeight: '400', fontSize: '13px', color: 'var(--text-secondary)' }}>(select all that apply)</span></label>
                 <MultiChip items={OBSTACLES} selected={biggestObstacles} onToggle={key => toggleItem(biggestObstacles, setBiggestObstacles, key)} />
                 {biggestObstacles.length > 0 && (
                   <input type="text" value={biggestObstaclesOther} onChange={e => setBiggestObstaclesOther(e.target.value)}
@@ -470,7 +491,7 @@ export default function GoalsSetupPage() {
               </div>
 
               <div>
-                <label style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '10px' }}>PRIMARY MOTIVATIONS <span style={{ fontWeight: '400' }}>(what drives you?)</span></label>
+                <label style={{ color: 'var(--accent-purple)', fontSize: '15px', fontWeight: '700', display: 'block', marginBottom: '10px' }}>Primary Motivations <span style={{ fontWeight: '400', fontSize: '13px', color: 'var(--text-secondary)' }}>(what drives you?)</span></label>
                 <MultiChip items={MOTIVATIONS} selected={primaryMotivations} onToggle={key => toggleItem(primaryMotivations, setPrimaryMotivations, key)} />
                 {primaryMotivations.length > 0 && (
                   <input type="text" value={primaryMotivationsOther} onChange={e => setPrimaryMotivationsOther(e.target.value)}
@@ -480,7 +501,7 @@ export default function GoalsSetupPage() {
               </div>
 
               <div>
-                <label style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '8px' }}>WHY THESE GOALS? <span style={{ fontWeight: '400' }}>(optional)</span></label>
+                <label style={{ color: 'var(--accent-purple)', fontSize: '15px', fontWeight: '700', display: 'block', marginBottom: '8px' }}>Why These Goals? <span style={{ fontWeight: '400', fontSize: '13px', color: 'var(--text-secondary)' }}>(optional)</span></label>
                 <textarea value={whyGoals} onChange={e => setWhyGoals(e.target.value)}
                   placeholder="In your own words — what's driving this for you right now?"
                   rows={3}
@@ -488,9 +509,23 @@ export default function GoalsSetupPage() {
               </div>
 
               <div>
-                <label style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '10px' }}>DIETARY PREFERENCES <span style={{ fontWeight: '400' }}>(select all that apply)</span></label>
+                <label style={{ color: 'var(--accent-purple)', fontSize: '15px', fontWeight: '700', display: 'block', marginBottom: '10px' }}>Dietary Preferences <span style={{ fontWeight: '400', fontSize: '13px', color: 'var(--text-secondary)' }}>(select all that apply)</span></label>
                 <MultiChip items={DIETARY_PREFS} selected={dietaryPreferences} onToggle={toggleDiet} />
-                {dietaryPreferences.length > 0 && !dietaryPreferences.includes('no_restrictions') && (
+                {dietaryPreferences.some(k => PICKY_KEYS.has(k)) && (
+                  <div style={{ marginTop: '10px' }}>
+                    <label style={{ color: 'var(--accent-purple)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>
+                      Tell us what you actually eat and won't eat. <span style={{ color: 'var(--error)' }}>*</span>
+                    </label>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '8px', lineHeight: '1.5' }}>
+                      Be specific — list foods you like, foods you avoid, and anything you absolutely refuse. The AI can't help if it doesn't know.
+                    </p>
+                    <textarea value={dietaryPreferencesOther} onChange={e => setDietaryPreferencesOther(e.target.value)}
+                      placeholder="e.g. I'll eat chicken, rice, eggs, and apples. I won't touch vegetables, fish, or anything spicy. I basically live on a very limited rotation."
+                      rows={3}
+                      style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--surface)', border: `1px solid ${dietaryPreferencesOther.trim() ? 'var(--accent-purple)' : 'var(--border)'}`, borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+                  </div>
+                )}
+                {dietaryPreferences.length > 0 && !dietaryPreferences.includes('no_restrictions') && !dietaryPreferences.some(k => PICKY_KEYS.has(k)) && (
                   <input type="text" value={dietaryPreferencesOther} onChange={e => setDietaryPreferencesOther(e.target.value)}
                     placeholder="Allergies, other restrictions... (optional)"
                     style={{ marginTop: '10px', width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }} />
@@ -498,7 +533,7 @@ export default function GoalsSetupPage() {
               </div>
 
               <div>
-                <label style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '8px' }}>AVERAGE SLEEP <span style={{ fontWeight: '400' }}>(optional)</span></label>
+                <label style={{ color: 'var(--accent-purple)', fontSize: '15px', fontWeight: '700', display: 'block', marginBottom: '8px' }}>Average Sleep <span style={{ fontWeight: '400', fontSize: '13px', color: 'var(--text-secondary)' }}>(optional)</span></label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <input type="number" value={sleepHours} onChange={e => setSleepHours(e.target.value)} placeholder="e.g. 7" min="2" max="14" step="0.5"
                     style={{ width: '100px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />

@@ -202,7 +202,7 @@ src/
 | `exercises` | Exercise library — name, body_part, equipment, target, secondary_muscles[], instructions[], gif_url (nullable) |
 | `workout_profiles` | User's fitness profile — experience, goal, days_per_week, fitness stats, equipment, limitations, available_weights |
 | `workout_plans` | AI-generated weekly plans — plan JSONB (7 day objects), plan_notes, progression_notes, schedule JSONB, is_active |
-| `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, daily_steps, target_weight_lbs, timeline, notes, ai_overview, biggest_obstacles TEXT[], biggest_obstacles_other, primary_motivations TEXT[], primary_motivations_other, why_goals, dietary_preferences TEXT[], dietary_preferences_other, sleep_hours NUMERIC; UNIQUE on user_id |
+| `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, activity_level_note TEXT, daily_steps, target_weight_lbs, timeline, notes, ai_overview, biggest_obstacles TEXT[], biggest_obstacles_other, primary_motivations TEXT[], primary_motivations_other, why_goals, dietary_preferences TEXT[], dietary_preferences_other, sleep_hours NUMERIC; UNIQUE on user_id |
 | `body_measurements` | Per-user dated body measurements — weight_lbs, waist_in, hips_in, chest_in, left/right arm/thigh, neck_in; UNIQUE on user_id + date; RLS enabled |
 | `daily_checkins` | Energy + mood check-ins per day — energy_level SMALLINT(1–5), mood_level SMALLINT(1–5), note TEXT; UNIQUE on user_id + date; RLS enabled |
 | `api_rate_limits` | Per-user per-route per-hour call counts; incremented atomically via `increment_rate_limit` Postgres function |

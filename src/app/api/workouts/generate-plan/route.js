@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { checkRateLimit } from '@/lib/rateLimit'
 
+export const maxDuration = 120
+
 const client = new Anthropic()
 
 const EXERCISE_LIST = [
@@ -156,8 +158,8 @@ CLIENT PROFILE:
 
 ${cardioNote}
 
-AVAILABLE EXERCISES (use ONLY exercises where equipment matches what the client has):
-${JSON.stringify(filteredExercises, null, 2)}
+AVAILABLE EXERCISES (use ONLY these — reference by id):
+${filteredExercises.map(e => `${e.id} | ${e.name} | ${e.muscle}`).join('\n')}
 
 Create a weekly plan. The workout days are: ${workoutDaysList.join(', ')}. The remaining days of the week are rest days.
 

@@ -42,7 +42,7 @@ export async function POST(req) {
   const { allowed } = await checkRateLimit(supabase, user.id, 'goals/generate-overview')
   if (!allowed) return NextResponse.json({ error: 'Rate limit reached — try again next hour.' }, { status: 429 })
 
-  const { goals, height_inches, weight_lbs, age, sex, body_composition, activity_level, daily_steps, target_weight_lbs, timeline, notes, biggest_obstacles, biggest_obstacles_other, primary_motivations, primary_motivations_other, why_goals, dietary_preferences, dietary_preferences_other, sleep_hours } = await req.json()
+  const { goals, height_inches, weight_lbs, age, sex, body_composition, activity_level, activity_level_note, daily_steps, target_weight_lbs, timeline, notes, biggest_obstacles, biggest_obstacles_other, primary_motivations, primary_motivations_other, why_goals, dietary_preferences, dietary_preferences_other, sleep_hours } = await req.json()
 
   const BODY_COMP_MAP = {
     lean_muscular: 'Lean & Muscular (6–17% body fat) — do NOT use BMI as a health indicator for this person',
@@ -93,7 +93,7 @@ THEIR PROFILE:
 - Height: ${heightFt ?? 'not provided'}
 - Weight: ${weight_lbs ? weight_lbs + ' lbs' : 'not provided'}${bmi ? ` (BMI: ${bmi} — use body composition descriptor below as the more accurate indicator)` : ''}
 - Body composition: ${body_composition ? (BODY_COMP_MAP[body_composition] || body_composition) : 'not provided'}
-- Activity level: ${ACTIVITY_LABELS[activity_level] ?? activity_level ?? 'not provided'}${daily_steps ? ` — averages ~${daily_steps.toLocaleString()} steps/day` : ''}
+- Activity level: ${ACTIVITY_LABELS[activity_level] ?? activity_level ?? 'not provided'}${daily_steps ? ` — averages ~${daily_steps.toLocaleString()} steps/day` : ''}${activity_level_note ? `\n- Activity description (user's own words): <user_input>${activity_level_note}</user_input>` : ''}
 ${target_weight_lbs ? `- Target weight: ${target_weight_lbs} lbs` : ''}
 ${timeline ? `- Timeline: ${TIMELINE_LABELS[timeline] ?? timeline}` : ''}
 ${sleep_hours ? `- Average sleep: ${sleep_hours} hours/night` : ''}

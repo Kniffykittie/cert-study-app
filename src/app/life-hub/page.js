@@ -75,7 +75,7 @@ export default function LifeHubPage() {
     return (
       <div>
         <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Last 28 Days</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '280px' }}>
           {days.map(date => {
             const entry = checkinMap[date]
             const isToday = date === today
@@ -86,7 +86,7 @@ export default function LifeHubPage() {
             else if (avg >= 1) bg = 'var(--warning)'
             return (
               <div key={date} title={entry ? `${date}: Energy ${ENERGY_LABELS[entry.energy_level] || '—'}, Mood ${MOOD_LABELS[entry.mood_level] || '—'}` : date}
-                style={{ aspectRatio: '1', borderRadius: '3px', backgroundColor: bg, outline: isToday ? '2px solid var(--accent-purple)' : 'none', outlineOffset: '1px', opacity: entry ? 1 : 0.35 }} />
+                style={{ width: '22px', height: '22px', borderRadius: '3px', backgroundColor: bg, outline: isToday ? '2px solid var(--accent-purple)' : 'none', outlineOffset: '1px', opacity: entry ? 1 : 0.35, flexShrink: 0 }} />
             )
           })}
         </div>

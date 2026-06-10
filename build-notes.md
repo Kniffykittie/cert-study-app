@@ -218,6 +218,14 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 
 ## Phase Log
 
+### Phase 49 - Complete
+- **Goals setup UX polish** — activity level selection now requires a forced free-text explanation ("describe a typical day"); canAdvance() on step 2 blocks until filled; saved to `goals_profiles.activity_level_note`; injected into AI overview prompt
+- **Body composition range badges** — restructured layout from right-floated badge to inline chip alongside label name, eliminating visual overlap at any screen width
+- **Step 4 section labels** — increased font to 15px and changed color to `var(--accent-purple)` for legibility; sub-labels remain 13px text-secondary
+- **Dietary preferences** — added "Picky Eater" and "Very Picky Eater" options; selecting either forces a required "what you eat / won't eat" explanation textarea (purple border when filled)
+- **Heatmap size** — reduced from full-width 7-col grid to fixed 22px cells with flexWrap, maxWidth 280px
+- **Workout plan generation timeout** — added `export const maxDuration = 120` to generate-plan route; compressed exercise list format in prompt (from full JSON to compact `id | name | muscle` lines) to reduce AI response time; added "⏳ This usually takes 30–60 seconds" message in setup UI while generating
+
 ### Phase 48 - Complete
 - **Phase 33 — Daily Check-In widget** on Life Hub home (`/life-hub/page.js`) — energy + mood ratings (1–5 with labels), optional note, save/update today's entry; 28-day heatmap (green=good, blue=okay, yellow=low, grey=none); today outlined in accent-purple
 - New table `daily_checkins` with RLS; reset row added to Settings

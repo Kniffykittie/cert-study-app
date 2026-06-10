@@ -365,10 +365,17 @@ export default function WorkoutSetupPage() {
           Back
         </button>
         {isLast ? (
-          <button onClick={handleFinish} disabled={!canAdvance() || generating}
-            style={{ backgroundColor: 'var(--accent-purple)', border: 'none', color: '#fff', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '700', cursor: !canAdvance() || generating ? 'not-allowed' : 'pointer', opacity: !canAdvance() || generating ? 0.5 : 1 }}>
-            {generating ? '✨ Building your plan...' : '✨ Generate My Plan'}
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+            {generating && (
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', textAlign: 'right', maxWidth: '260px', lineHeight: '1.5' }}>
+                ⏳ This usually takes 30–60 seconds — your plan is being built. Don't navigate away.
+              </p>
+            )}
+            <button onClick={handleFinish} disabled={!canAdvance() || generating}
+              style={{ backgroundColor: 'var(--accent-purple)', border: 'none', color: '#fff', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '700', cursor: !canAdvance() || generating ? 'not-allowed' : 'pointer', opacity: !canAdvance() || generating ? 0.5 : 1 }}>
+              {generating ? '✨ Building your plan...' : '✨ Generate My Plan'}
+            </button>
+          </div>
         ) : (
           <button onClick={handleNext} disabled={!canAdvance()}
             style={{ backgroundColor: 'var(--accent-purple)', border: 'none', color: '#fff', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: !canAdvance() ? 'not-allowed' : 'pointer', opacity: !canAdvance() ? 0.5 : 1 }}>
