@@ -80,8 +80,8 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `workout_logs` | One row per completed workout session — user_id, plan_id (nullable), day_of_week, day_label, duration_seconds, created_at; RLS enabled |
 | `workout_log_sets` | Individual sets per session — log_id, user_id, exercise_id (nullable), exercise_name, set_number, set_type (warmup/working/dropset), weight_lbs, reps, rep_range, created_at; RLS enabled |
 | `water_logs` | Per-user water intake entries — user_id, date DATE, amount_oz NUMERIC(6,1), created_at; one row per add (not aggregated); RLS enabled |
-| `supplement_stack` | *(planned Phase 35)* User's supplement list — name, dose, timing, nutrients JSONB, is_active; feeds micronutrient totals to nutrition dashboard passively |
-| `supplement_profiles` | *(planned Phase 35)* Cached AI-generated supplement info cards — keyed by normalized supplement name, shared across all users |
+| `supplement_stack` | User's active supplements — name, dose, timing, nutrients JSONB (nutrient→"amount unit"), is_active BOOLEAN; RLS enabled |
+| `supplement_profiles` | Cached AI supplement info cards — supplement_name (unique normalized), ai_profile JSONB, generated_at; shared across all authenticated users |
 | `progress_photos` | *(planned Phase 32)* User progress photo gallery — photo_url, taken_at DATE, description TEXT |
 | `daily_briefs` | *(planned — Correlation Engine)* Cached daily "what should I do today" AI paragraph — keyed by user_id + date; regenerated once per day on first Life Hub load |
 | `monthly_wraps` | *(planned)* Cached monthly wrap-up reports — report_data JSONB (aggregated stats across both hubs), ai_narrative TEXT; generated once on first visit, never re-called; UNIQUE on user_id + month |
@@ -222,6 +222,17 @@ Single-use invite codes — the cleanest way to control who gets in without manu
 
 Everything below was built but not yet tested by the user. Go through this list top to bottom when you have time.
 
+### Phase 35 — Supplement Stack
+- Go to Life Hub → Goals → Supplements
+- Tap "+ Add" → fill in name (e.g. "Magnesium Glycinate"), dose (e.g. "400mg"), timing (Evening), add a nutrient row: "Magnesium" / "400" / "mg" → tap "Add to Stack"
+- Supplement card should appear with the dose badge, timing badge, and green Magnesium chip
+- Tap "🤖 Info" — loading state should appear, then a full AI info card with all sections (what it does, cool facts, deficiency signs, too much, food sources, timing, synergies, interactions)
+- Close and re-open Info on the same supplement — should load instantly (cached)
+- Tap "Edit" on a card → change the dose → save → card should reflect the update
+- Tap × on a card → it should disappear from the list
+- Settings → Data & Reset → "Supplement Stack" Reset → confirm → all supplements removed
+- Add a supplement with no nutrient rows filled in → AI Info card should still generate successfully
+
 ### Phase 52b — Exercise Library additions
 - Open Exercise Library (`/life-hub/workouts/exercises`) and confirm these 18 exercises appear: Incline Dumbbell Curl, Zottman Curl, Dumbbell Preacher Curl, Dumbbell Reverse Fly, Inverted Row, Crunch, Dumbbell Side Bend, Leg Raise, Mountain Climber, Dead Bug, Hollow Body Hold, Goblet Squat, Dumbbell Step Up, Dumbbell Sumo Squat, Hip Thrust, Single Leg Deadlift, Rear Delt Fly, Dumbbell Push Press
 - Click each one — detail modal should open with instructions, muscle tags, and a 🏋️ placeholder (no image yet)
@@ -251,6 +262,17 @@ Everything below was built but not yet tested by the user. Go through this list 
 ---
 
 ## Phase Log
+
+### Phase 35 - Complete
+- **Supplement Stack** at `/life-hub/goals/supplements` — add/edit/remove supplements (name, dose, timing dropdown: morning/afternoon/evening/with meals/pre-workout/post-workout, optional nutrient content entered from the label)
+- **Nutrient content** stored as JSONB (nutrient → "amount unit"), displayed as green chips on each stack card
+- **🤖 Info button** per supplement — calls `/api/supplements/generate-profile` which generates a structured AI card via Sonnet and caches it in `supplement_profiles` by normalized name; subsequent loads are instant (cached); card sections: what it does, cool facts, deficiency signs, too much, food sources, typical dose, best timing, pairs well with, interactions & cautions
+- **Edit modal** — inline editing of any supplement's name, dose, timing, and nutrients
+- **Remove** soft-deletes via `is_active = false` (data preserved for future analytics)
+- New tables: `supplement_stack` (RLS user-scoped), `supplement_profiles` (shared cache, all authenticated users can read/write)
+- Supplements link added to Goals dropdown in LifeHubSidebar
+- Settings reset row: "Supplement Stack" → scope `supplement_stack`
+- `/api/reset` updated with `supplement_stack` scope
 
 ### Phase 34 - Complete
 - **Water Tracker** at `/life-hub/health/water` — SVG progress ring showing % of daily goal, quick-add buttons (8/12/16/20/32 oz, logs at current time instantly), custom entry section with amount + editable time input (defaults to now, change it to backfill a past entry with the correct timestamp), today's log sorted chronologically with per-entry remove, 7-day bar chart (green = goal met, blue = today, purple = past days)

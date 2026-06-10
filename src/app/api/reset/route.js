@@ -79,5 +79,10 @@ export async function POST(req) {
     return NextResponse.json({ ok: true })
   }
 
+  if (scope === 'supplement_stack') {
+    await supabase.from('supplement_stack').delete().eq('user_id', userId)
+    return NextResponse.json({ ok: true })
+  }
+
   return NextResponse.json({ error: 'Unknown scope' }, { status: 400 })
 }

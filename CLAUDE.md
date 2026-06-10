@@ -103,6 +103,8 @@ src/
         remove/route.js                POST — verify current PIN then null out hash; uses getUser()
       goals/
         generate-overview/route.js     POST — AI overview from goals_profiles; uses getUser() + is_disabled check; prompt injection protected; only called from handleFinish() on setup page
+      supplements/
+        generate-profile/route.js      POST — AI supplement info card (Sonnet); cached in supplement_profiles by normalized name (shared across users); uses getUser() + is_disabled check; supplement name wrapped in user_input tags
       health/
         connect/route.js               Initiates Google Health OAuth (any authenticated user; add friend's Gmail as test user in Google Cloud Console)
         manual-steps/route.js          GET today's manual step count; POST to upsert — shown on workouts page when Google Health not connected
@@ -124,6 +126,7 @@ src/
       goals/
         page.js                        Goals overview — AI overview panel, active goals chips, body metrics card (BMI + disclaimer + build label), lifestyle card (activity + daily steps + timeline), notes; Edit Goals button
         measurements/page.js           Body Measurements — how-to guide, log form (9 fields: weight/waist/hips/chest/neck/arms/thighs), history table with delta indicators, weight-over-time SVG chart
+        supplements/page.js            Supplement Stack — add/edit/remove supplements (name, dose, timing, optional nutrient content from label); 🤖 Info button fetches AI-generated card per supplement (cached in supplement_profiles); nutrient chips shown on each card; empty state with explainer
         setup/page.js                  4-step goals onboarding: Step 1 Goals, Step 2 Your Body, Step 3 Starting Point, Step 4 Your Context (obstacles/motivations/why/diet/sleep); supports ?redirect= param
       workouts/
         page.js                        My Workout Plan — weekly plan cards sorted Mon-Sun, day reassignment, add/remove exercises with AI check-in, add/change cardio on rest days; Start Workout / ▶ Resume Workout / ✓ Done Today button logic per day; Add Exercise modal grouped by muscle group with ? detail popup; gates on goals profile
@@ -169,7 +172,7 @@ src/
       security-plus-labs.js            Security+ lab set — 4 labs, 20 steps — all steps have document arrays
   components/
     StudyHubSidebar.js                 Nav sidebar with test-in-progress guard
-    LifeHubSidebar.js                  Life Hub nav — Goals dropdown (My Goals + Measurements + Setup), Health dropdown (Overview/Steps/Sleep/Water), Workouts dropdown (My Plan + Workout History + Exercise Library); each auto-opens on active routes
+    LifeHubSidebar.js                  Life Hub nav — Goals dropdown (My Goals + Measurements + Supplements + Setup), Health dropdown (Overview/Steps/Sleep/Water), Workouts dropdown (My Plan + Workout History + Exercise Library); each auto-opens on active routes
     BookmarkModal.js                   Bookmark reason + notes modal
     DailyStreak.js                     30q/day streak tracker with 28-day calendar heatmap
     DomainTrend.js                     Per-domain score trend SVG chart (no library)
@@ -215,6 +218,8 @@ src/
 | `join_attempts` | IP-based brute force tracking for /join — ip TEXT, attempted_at, success BOOLEAN; `check_join_rate_limit(ip)` Postgres function counts fails in last hour |
 | `manual_steps_daily` | Manual step count per user per day — user_id, date, steps; unique(user_id, date); shown on workouts page when Google Health not connected |
 | `water_logs` | Water intake entries — user_id, date, amount_oz NUMERIC(6,1), created_at; RLS enabled; one row per tap (not aggregated) |
+| `supplement_stack` | User's active supplements — name, dose, timing (morning/afternoon/evening/with_meals/pre_workout/post_workout), nutrients JSONB (nutrient→"amount unit"), is_active; RLS enabled |
+| `supplement_profiles` | Cached AI supplement info cards — supplement_name (unique, normalized lowercase), ai_profile JSONB, generated_at; shared across all users; SELECT/INSERT/UPDATE open to all authenticated users |
 | `workout_logs` | One row per completed workout session — user_id, plan_id (nullable), day_of_week, day_label, duration_seconds, created_at; RLS enabled |
 | `workout_log_sets` | Individual sets per session — log_id, user_id, exercise_id (nullable), exercise_name, set_number, set_type (warmup/working/dropset), weight_lbs, reps, rep_range, created_at; RLS enabled |
 
@@ -393,8 +398,7 @@ src/
 - **Phase 32 built:** Body Measurements page at `/life-hub/goals/measurements` — how-to guide, log form (9 fields), history with delta indicators, weight-over-time SVG chart; reset row in Settings
 - **Phase 33 built:** Daily Check-In widget on Life Hub home (`/life-hub`) — energy + mood 1–5 ratings, optional note, 28-day heatmap (green/blue/yellow/grey); reset row in Settings
 - **Phase 34 built:** Water Tracker at `/life-hub/health/water` — progress ring, quick-add (8/12/16/20/32 oz + custom), today's log with remove, 7-day bar chart; goal persisted to localStorage; reset row in Settings
-- **Planned Phase 35:** Supplement tracker — user supplement list, daily check-off, per-supplement streak + calendar heatmap, AI profile cards cached in `supplement_profiles`.
-- **Planned Phase 35:** Supplement tracker — user supplement list, daily check-off, per-supplement streak + calendar heatmap, AI profile cards cached in `supplement_profiles`.
+- **Phase 35 built:** Supplement Stack at `/life-hub/goals/supplements` — add/edit/remove supplements with name, dose, timing, optional nutrient content from label; 🤖 Info button generates and caches AI card per supplement (what it does, cool facts, deficiency signs, too much, food sources, timing, synergies, interactions); nutrient chips on each stack card; reset row in Settings
 
 ### Google Health Integration
 - OAuth flow restricted to owner account only (`sethproper40@yahoo.com`) — 403 for all others
