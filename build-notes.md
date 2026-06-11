@@ -267,6 +267,11 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 47c - Complete
+- **Full nutrition fields on drink log modal** — calories, water content (oz), and caffeine shown directly; expandable "Add more nutrients" section reveals sodium, sugar, protein, carbs, fat, potassium, vitamin C; all pre-populated from Open Food Facts data when available; values saved per-serving and multiplied by servings count on log
+- **Full nutrition fields on saved drink edit modal** — expanded from 5 to 10 fields: name, serving size, calories, water, caffeine, sodium, sugar, protein, carbs, fat, potassium, vitamin C; `openEditSavedModal` populates all fields from existing DB row; `saveEditSavedDrink` sends all new fields in PUT body
+- **food_log_entries SELECT expanded** — drink entries query now fetches all macro + key micro fields (protein_g, carbs_g, fat_g, sugar_g, sodium_mg, potassium_mg, vitamin_c_mg) for accurate log display and future edit modal use
+
 ### Phase 47b - Complete
 - **Edit logged drink entries** — ✏️ button on each drink in Today's Log opens edit modal; can change name, servings, calories/caffeine/water per serving; PATCH `/api/nutrition/log` endpoint added
 - **Manage saved drinks** — "Manage" toggle next to "My Drinks" shows list with Edit + Delete per drink; Edit modal covers name, serving size, calories, caffeine, water content; PUT `/api/nutrition/my-foods` endpoint added
