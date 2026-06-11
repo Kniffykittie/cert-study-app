@@ -378,7 +378,242 @@ function FoodRow({ food, selected, onSelect, isSaved, onSave, savingId }) {
   )
 }
 
-function MicroNutrientPanel({ totals }) {
+const MEAL_NUTRITION_KEYS = [
+  'calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg',
+  'saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg',
+  'iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg',
+  'vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg',
+  'caffeine_mg','water_g','omega3_g','vitamin_k_mcg','choline_mg',
+]
+
+function MealBuilderModal({ onClose, onSave }) {
+  const [mealName, setMealName] = useState('')
+  const [servingsInMeal, setServingsInMeal] = useState('4')
+  const [ingredients, setIngredients] = useState([])
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState([])
+  const [searching, setSearching] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const debounceRef = useRef(null)
+
+  function handleQueryChange(val) {
+    setQuery(val)
+    clearTimeout(debounceRef.current)
+    if (!val.trim()) { setResults([]); return }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true)
+      const res = await fetch(`/api/nutrition/search?q=${encodeURIComponent(val)}`)
+      const data = await res.json()
+      setResults(data.results || [])
+      setSearching(false)
+    }, 400)
+  }
+
+  function addIngredient(food) {
+    setIngredients(prev => [...prev, { food, qty: '1', id: Date.now() }])
+    setQuery('')
+    setResults([])
+  }
+
+  function removeIngredient(id) {
+    setIngredients(prev => prev.filter(i => i.id !== id))
+  }
+
+  function updateQty(id, val) {
+    setIngredients(prev => prev.map(i => i.id === id ? { ...i, qty: val } : i))
+  }
+
+  const totals = ingredients.reduce((acc, { food, qty }) => {
+    const sv = parseFloat(qty) || 1
+    for (const k of MEAL_NUTRITION_KEYS) {
+      if (food[k] != null) acc[k] = (acc[k] || 0) + food[k] * sv
+    }
+    return acc
+  }, {})
+
+  async function handleSave() {
+    if (!mealName.trim() || ingredients.length === 0) return
+    setSaving(true)
+    const n = parseFloat(servingsInMeal) || 1
+    const perServing = {}
+    for (const k of MEAL_NUTRITION_KEYS) {
+      perServing[k] = totals[k] != null ? Math.round((totals[k] / n) * 100) / 100 : null
+    }
+    const body = {
+      name: mealName.trim(),
+      serving_size_label: `1/${n === 1 ? '' : Math.round(n)} of recipe`,
+      ...perServing,
+    }
+    const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const data = await res.json()
+    if (data.food) onSave(data.food)
+    setSaving(false)
+    onClose()
+  }
+
+  const canSave = mealName.trim() && ingredients.length > 0 && parseFloat(servingsInMeal) > 0
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', width: '100%', maxWidth: '560px', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
+
+        {/* Header */}
+        <div style={{ padding: '18px 20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          <div>
+            <h2 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', margin: '0 0 2px' }}>🍳 Create a Meal</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>Add all ingredients, set how many portions it makes — then log 1 serving = your portion.</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '22px', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px' }}>
+
+          {/* Meal name + servings */}
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 180px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>Meal Name *</label>
+              <input value={mealName} onChange={e => setMealName(e.target.value)} placeholder="e.g. Pasta Bolognese"
+                style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px' }} />
+            </div>
+            <div style={{ flex: '0 0 auto' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>Servings in whole recipe</label>
+              <input type="number" value={servingsInMeal} onChange={e => setServingsInMeal(e.target.value)} min="1" step="1"
+                style={{ width: '72px', backgroundColor: 'var(--background)', border: '1px solid var(--accent-blue)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }} />
+            </div>
+          </div>
+
+          {/* Ingredient search */}
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Add Ingredients</label>
+            <input value={query} onChange={e => handleQueryChange(e.target.value)} placeholder="Search ingredient — chicken breast, onion, olive oil..."
+              style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '13px' }} />
+            {searching && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Searching...</div>}
+            {results.length > 0 && (
+              <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px', maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                {results.map((food, i) => (
+                  <button key={i} onClick={() => addIngredient(food)}
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', background: 'var(--background)', border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%', borderBottom: i < results.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500' }}>{food.name}</div>
+                      {food.brand && <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{food.brand}</div>}
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{food.serving_size_label || '1 serving'}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center' }}>
+                      {food.calories != null && <span style={{ fontSize: '12px', color: 'var(--accent-blue)', fontWeight: '600' }}>{Math.round(food.calories)} cal</span>}
+                      <span style={{ fontSize: '12px', color: 'var(--success)', fontWeight: '600' }}>+ Add</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Ingredient list */}
+          {ingredients.length > 0 && (
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Ingredients ({ingredients.length})</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                {ingredients.map(({ food, qty, id }) => {
+                  const sv = parseFloat(qty) || 1
+                  const cal = food.calories != null ? Math.round(food.calories * sv) : null
+                  const p = food.protein_g != null ? Math.round(food.protein_g * sv) : null
+                  return (
+                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', backgroundColor: 'var(--background)', borderRadius: '8px' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                          {food.serving_size_label || '1 serving'}
+                          {cal != null ? ` · ${cal} cal` : ''}
+                          {p != null ? ` · ${p}g P` : ''}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>×</span>
+                        <input type="number" value={qty} onChange={e => updateQty(id, e.target.value)} min="0.1" step="0.5"
+                          style={{ width: '52px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 6px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
+                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>srv</span>
+                      </div>
+                      <button onClick={() => removeIngredient(id)}
+                        style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', padding: '0 2px', flexShrink: 0 }}>×</button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Totals */}
+          {ingredients.length > 0 && (
+            <div style={{ backgroundColor: 'var(--background)', borderRadius: '10px', padding: '14px 16px', marginBottom: '4px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                {parseFloat(servingsInMeal) > 1 ? `Whole recipe  ·  Per serving (÷${servingsInMeal})` : 'Whole recipe'}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+                {[
+                  { label: 'Calories', key: 'calories', unit: '', color: 'var(--accent-blue)' },
+                  { label: 'Protein', key: 'protein_g', unit: 'g', color: 'var(--success)' },
+                  { label: 'Carbs', key: 'carbs_g', unit: 'g', color: 'var(--warning)' },
+                  { label: 'Fat', key: 'fat_g', unit: 'g', color: 'var(--accent-purple)' },
+                ].map(m => {
+                  const total = totals[m.key]
+                  const n = parseFloat(servingsInMeal) || 1
+                  const per = total != null ? Math.round(total / n) : null
+                  return (
+                    <div key={m.key}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{m.label}</div>
+                      <div style={{ fontSize: '15px', fontWeight: '700', color: m.color }}>
+                        {total != null ? Math.round(total) : '—'}<span style={{ fontSize: '10px', fontWeight: '400', color: 'var(--text-secondary)' }}>{m.unit}</span>
+                      </div>
+                      {n > 1 && per != null && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{per}{m.unit}/srv</div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              {totals.sodium_mg != null && (
+                <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                  Sodium: {Math.round(totals.sodium_mg)}mg total
+                  {parseFloat(servingsInMeal) > 1 && ` · ${Math.round(totals.sodium_mg / parseFloat(servingsInMeal))}mg/serving`}
+                </div>
+              )}
+              <div style={{ marginTop: '8px', padding: '6px 10px', background: 'rgba(0,128,255,0.06)', borderRadius: '6px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                Saved as 1 serving = 1/{parseFloat(servingsInMeal) || 1} of this recipe. Log 0.5 servings if you ate half a portion, 2 if you had two portions.
+              </div>
+            </div>
+          )}
+
+          {ingredients.length === 0 && (
+            <div style={{ color: 'var(--text-secondary)', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>
+              Search for ingredients above to get started.
+            </div>
+          )}
+        </div>
+
+        {/* Save button */}
+        <div style={{ padding: '12px 20px 20px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+          {!canSave && (
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '8px' }}>
+              {!mealName.trim() ? 'Add a meal name to save' : ingredients.length === 0 ? 'Add at least one ingredient to save' : ''}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={handleSave} disabled={!canSave || saving}
+              style={{ flex: 1, padding: '11px', backgroundColor: canSave ? 'var(--accent-blue)' : 'var(--border)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: '600', cursor: canSave ? 'pointer' : 'default', opacity: saving ? 0.6 : 1 }}>
+              {saving ? 'Saving...' : '⭐ Save to My Foods'}
+            </button>
+            <button onClick={onClose}
+              style={{ padding: '11px 18px', background: 'none', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer' }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
   const hasAnyData = MICRO_GROUPS.some(g => g.items.some(item => totals[item.key] > 0))
   if (!hasAnyData) return (
     <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>
@@ -434,6 +669,7 @@ export default function NutritionPage() {
   const [myFoods, setMyFoods] = useState([])
   const [logModal, setLogModal] = useState(null)
   const [libraryModal, setLibraryModal] = useState(false)
+  const [mealBuilderModal, setMealBuilderModal] = useState(false)
   const [activeTab, setActiveTab] = useState('log')
   const [microOpen, setMicroOpen] = useState(false)
   const [todayWorkout, setTodayWorkout] = useState(null)
@@ -568,6 +804,11 @@ export default function NutritionPage() {
             if (prev.find(f => f.id === food.id)) return prev
             return [...prev, food].sort((a, b) => a.name.localeCompare(b.name))
           })} libraryOnly />
+      )}
+      {mealBuilderModal && (
+        <MealBuilderModal onClose={() => setMealBuilderModal(false)} onSave={food => {
+          setMyFoods(prev => [...prev, food].sort((a, b) => a.name.localeCompare(b.name)))
+        }} />
       )}
 
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -710,8 +951,12 @@ export default function NutritionPage() {
       {/* Food Log Tab */}
       {activeTab === 'log' && (
         <div>
-          {/* Copy yesterday */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+          {/* Copy yesterday + Create meal */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+            <button onClick={() => setMealBuilderModal(true)}
+              style={{ background: 'none', border: '1px solid rgba(167,139,250,0.4)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', color: 'var(--accent-purple)', cursor: 'pointer', fontWeight: '500' }}>
+              🍳 Create a Meal
+            </button>
             <button onClick={handleCopyYesterday} disabled={copyingYesterday}
               style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', opacity: copyingYesterday ? 0.5 : 1 }}>
               {copyingYesterday ? 'Copying...' : '📋 Copy from yesterday'}
@@ -776,10 +1021,16 @@ export default function NutritionPage() {
               <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', margin: '0 0 4px' }}>Saved Foods</h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>Save foods here to log them instantly — no searching needed.</p>
             </div>
-            <button onClick={() => setLibraryModal(true)}
-              style={{ backgroundColor: 'rgba(167,139,250,0.12)', color: 'var(--accent-purple)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '8px', padding: '7px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>
-              + Add to Library
-            </button>
+            <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+              <button onClick={() => setMealBuilderModal(true)}
+                style={{ backgroundColor: 'rgba(167,139,250,0.08)', color: 'var(--accent-purple)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: '8px', padding: '7px 12px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                🍳 Create Meal
+              </button>
+              <button onClick={() => setLibraryModal(true)}
+                style={{ backgroundColor: 'rgba(167,139,250,0.12)', color: 'var(--accent-purple)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '8px', padding: '7px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                + Add Food
+              </button>
+            </div>
           </div>
           {myFoods.length === 0 ? (
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Nothing saved yet. Search for a food and tap ⭐ to save it, or check "Save to My Foods" when entering manually.</p>
