@@ -613,7 +613,7 @@ function MealBuilderModal({ onClose, onSave }) {
   )
 }
 
-
+function MicroNutrientPanel({ totals }) {
   const hasAnyData = MICRO_GROUPS.some(g => g.items.some(item => totals[item.key] > 0))
   if (!hasAnyData) return (
     <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>

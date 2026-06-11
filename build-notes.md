@@ -269,6 +269,7 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ### Phase 47e - Complete
 - **Create a Meal** — `MealBuilderModal` component on nutrition page; search and add ingredients with per-ingredient serving qty (can type 0.5 for half a serving, 3 for three); live macro totals shown for whole recipe + per serving; meal name + "servings in whole recipe" field (e.g. 4 = the recipe feeds 4); saves to `my_foods` as per-serving nutrition (total ÷ servings); from then on, logging 1 serving = 1 portion, 0.25 = a quarter, etc.; accessible via "🍳 Create a Meal" button in food log tab header and "🍳 Create Meal" button on Saved Foods tab; built on existing `my_foods` + `food_log_entries` infrastructure — no new DB tables needed
+- **Fix**: `MicroNutrientPanel` function declaration accidentally dropped during MealBuilderModal insert — restored
 
 ### Phase 47d - Complete
 - **Add to My Foods Library** (nutrition page) — "+ Add to Library" button on Saved Foods tab; opens SearchModal in `libraryOnly` mode; search results show ⭐ Save button, manual entry has "Save to Library" submit; saving adds to library without creating a log entry; keeps modal open for rapid bulk entry (clears form after each manual save)
