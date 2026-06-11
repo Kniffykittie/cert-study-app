@@ -706,7 +706,7 @@ export default function DrinksHydrationPage() {
       )}
 
       {/* Drink Timing Chart */}
-      {combinedLog.length > 0 && (() => {
+      {allEntries.length > 0 && (() => {
         const hourlyOz = Array(24).fill(0)
         for (const l of waterLogs) {
           const h = new Date(l.created_at).getHours()
