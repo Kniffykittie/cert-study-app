@@ -649,7 +649,263 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ---
 
-### Phase 31 — Goals Setup: Depth Fields
+### Phase 45 — Drinks & Hydration (Full Expansion)
+
+*Expands the water tracker into a complete Drinks & Hydration system. Hydration becomes a first-class data point that feeds every existing feature — daily brief, monthly wrap, symptom checker, nutrition dashboard, encyclopedia, workout signals, and check-in. Built so it gracefully handles users who don't log anything (hydration score still computable from food water content and contextual signals) and rewards users who do log everything with genuinely unique insights no other app surfaces.*
+
+---
+
+#### Part 1 — Page Redesign: Water Tracker → Drinks & Hydration
+
+**URL stays the same:** `/life-hub/health/water`
+**Sidebar label changes:** "Water Tracker" → "Drinks & Hydration"
+
+**Two distinct entry types on one page:**
+
+**Water (top section — stays dead simple)**
+- Quick-add buttons unchanged: +8 / +12 / +16 / +20 / +32 oz + Custom
+- Still logged to `water_logs` table
+- One-tap, no friction, no nutrition fields
+- Water itself can be saved as a "saved drink" (e.g. "16oz bottle", "8oz glass") so tapping a saved chip logs the right amount without pressing a size button
+
+**Beverages (new section below water)**
+- "Your Saved Drinks" — horizontal scrollable chips of previously saved drinks; tap any chip to log it instantly (same UX as quick-add water buttons)
+- "+ Add a Drink" button — opens search modal (reuses existing food search; filtered/biased toward beverages; full Open Food Facts beverage catalog)
+- Search results show drink-specific data: calories, caffeine, sodium, sugar prominently
+- On select: servings adjuster (e.g. "1 can / 2 cans"), then "Log Drink"
+- "Save to My Drinks" checkbox on log screen so it becomes a chip forever
+- Beverages logged as `food_log_entries` with `meal_slot = 'drink'` — calories/sodium/caffeine count toward daily nutrition totals automatically; no separate system needed
+- Water (0 cal) can also be logged this way as a saved drink — same end result as the quick-add section
+
+**Today's Full Drink Log (unified list)**
+- Single chronological list showing both water entries (from `water_logs`) and beverages (from `food_log_entries` where `meal_slot = 'drink'`)
+- Water entries show: time + oz
+- Beverage entries show: time + name + oz equivalent + calories + caffeine if nonzero
+- × remove on each entry
+
+---
+
+#### Part 2 — The Stacked Hydration Ring
+
+**Three-segment progress ring (replaces current single-color ring):**
+- **Segment 1 — Blue:** Pure water from `water_logs`
+- **Segment 2 — Lighter blue / cyan:** Beverages from drink-slot food entries (water equivalent: coffee/tea/soda ~90-95% water by volume; energy drinks ~90%)
+- **Segment 3 — Green:** Water from food (`water_g` field on food_log_entries, sourced from Open Food Facts `water_100g` field)
+
+**Hover tooltip on ring** (desktop) / tap to expand (mobile):
+```
+Total Hydration: 58oz / 72oz
+  💧 Water logged:    32oz
+  🥤 Beverages:       14oz
+  🍎 From food:        ~12oz
+  ☕ Caffeine offset:  -2oz est.
+```
+- Caffeine offset shown only when caffeine intake > 200mg; estimated at ~0.5oz net loss per 100mg above threshold (conservative, not alarmist)
+- "From food" only shows when food logs exist for the day
+
+**Center of ring shows:** Total oz + label ("Well Hydrated" / "On Track" / "Drink More" / "Dehydrated") based on hydration score (see Part 4)
+
+---
+
+#### Part 3 — Dynamic Hydration Goal
+
+**Goal is no longer static.** Base goal stored as user preference (moves from localStorage to `goals_profiles.water_goal_oz INT DEFAULT 64`). Each day the displayed target adjusts based on:
+
+1. **Sodium intake** (from food_log_entries): Every 500mg sodium above 2,000mg adds ~8oz to the daily goal. High sodium increases water retention need and thirst. Cap adjustment at +32oz.
+   - Example: 3,500mg sodium today → base 64oz + 24oz = 88oz goal
+   
+2. **Workout logged today** (from workout_logs): If a workout exists for today (non-partial), add 16oz. If duration > 60 min, add 24oz.
+   - Example: 75-min workout → +24oz
+
+3. **Season** (current month): June–August → +8oz to base (heat/sweat factor); November–February → base unchanged
+
+**Dynamic goal is shown with a tooltip explaining why it changed:**
+> "Your goal is higher today: +24oz for your workout, +16oz for high sodium intake."
+
+**The base goal (64oz default) is still user-editable** via the same inline edit as before.
+
+---
+
+#### Part 4 — Hydration Score (1–100)
+
+*A single number that synthesizes all hydration inputs and feeds every other feature. Replaces the raw oz number as the primary way the rest of the app talks about hydration.*
+
+**Formula (computed server-side at `/api/life-hub/hydration-score` or included in existing context fetches):**
+
+```
+base_pct = total_hydration_oz / dynamic_goal_oz × 100
+
+adjustments:
+  - timing_bonus: +5 if hydration is spread across ≥4 time windows (not back-loaded)
+  - electrolyte_penalty: −10 if (sodium > 3500mg AND water < 50% of goal)
+  - electrolyte_penalty: −5 if (potassium < 50% of RDV AND water > 90% of goal) — dilution risk
+  - caffeine_penalty: −5 if caffeine > 500mg
+
+score = clamp(base_pct + adjustments, 0, 100)
+```
+
+**Score → label mapping:**
+- 80–100: Well Hydrated
+- 60–79: On Track
+- 40–59: Drink More
+- 0–39: Dehydrated
+
+**Score stored in `daily_checkins` as a new column `hydration_score SMALLINT`** — computed once per day on first Life Hub visit (same pattern as daily brief cache). This makes it available for trend analysis without re-querying all the raw tables.
+
+---
+
+#### Part 5 — Electrolyte Balance Indicator
+
+*Displayed alongside the ring as a small status row. Not a complex panel — just a quick signal.*
+
+**Three states:**
+- ✅ **Balanced** — water intake adequate relative to sodium/potassium/magnesium levels
+- ⚠️ **Sodium high, drink more** — sodium > 3,000mg AND water < 60% of goal; explains that sodium pulls water from cells and increases need
+- ⚠️ **Well hydrated but low electrolytes** — water > 90% of goal but potassium < 40% RDV or sodium < 1,000mg; explains that drinking a lot of plain water without electrolytes can dilute them (more common in athletes)
+
+**Shown as a single-line chip below the ring:**
+> ⚠️ High sodium today — your body needs extra water to balance it · [See Sodium →]
+
+Clicking "See Sodium →" opens the Sodium detail panel in the Nutrient Encyclopedia.
+
+**Only shown when food logs exist (5+ days or today's log has entries).** Otherwise hidden — don't show an empty/broken state.
+
+---
+
+#### Part 6 — Drink Timing Visualization
+
+*Below today's log: a 24-hour bar chart showing when hydration happened.*
+
+- Same concept as hourly step chart on the Steps page
+- Each bar = one hour; height = oz logged in that hour (all sources combined)
+- Color: blue for water, lighter for beverages, green tint when food is the main contributor in that hour
+- Goal line = daily goal / 16 (ideal oz per waking hour if spread across 16 hours)
+- "Peak hydration" label on the tallest bar
+
+**Smart callout beneath chart (rule-based, no AI):**
+- If >60% of hydration is logged after 6pm: *"Most of your hydration is late in the day — spreading it earlier improves absorption and reduces nighttime bathroom trips."*
+- If nothing logged between 10am–2pm: *"There's a gap in the middle of your day — afternoon dehydration is a common trigger for 2-3pm energy crashes."*
+- If well distributed: *"Good pacing throughout the day."*
+
+---
+
+#### Part 7 — DB Changes Required
+
+**Existing tables to alter:**
+```sql
+-- food_cache
+ALTER TABLE food_cache ADD COLUMN water_g NUMERIC(8,2);
+ALTER TABLE food_cache ADD COLUMN caffeine_mg NUMERIC(8,2);
+
+-- my_foods
+ALTER TABLE my_foods ADD COLUMN water_g NUMERIC(8,2);
+ALTER TABLE my_foods ADD COLUMN caffeine_mg NUMERIC(8,2);
+ALTER TABLE my_foods ADD COLUMN is_drink BOOLEAN DEFAULT false;
+
+-- food_log_entries
+ALTER TABLE food_log_entries ADD COLUMN water_g NUMERIC(8,2);
+ALTER TABLE food_log_entries ADD COLUMN caffeine_mg NUMERIC(8,2);
+-- meal_slot = 'drink' is just a string value; no schema change needed
+
+-- goals_profiles
+ALTER TABLE goals_profiles ADD COLUMN water_goal_oz INT DEFAULT 64;
+
+-- daily_checkins
+ALTER TABLE daily_checkins ADD COLUMN hydration_score SMALLINT;
+```
+
+**Open Food Facts mapping updates (in `/api/nutrition/search/route.js`):**
+- Extract `water_100g` from OFF response → store as `water_g` per serving (water_100g / 100 × serving_size_g × servings)
+- Extract `caffeine_100mg` (note: OFF stores caffeine as mg per 100g, field name varies — check `nutriments.caffeine_100g`) → store as `caffeine_mg` per serving
+
+**Note on existing cached foods:** Existing `food_cache` rows won't have these fields populated. They'll be null. The hydration ring simply shows "—" for food water content on those entries rather than breaking. As new foods are searched they'll populate.
+
+---
+
+#### Part 8 — Integrations Into Existing Features
+
+**Daily Brief** (`/api/life-hub/daily-brief/route.js`)
+- Add yesterday's hydration score to the data snapshot gathered before calling Claude
+- Add yesterday's caffeine total to the snapshot
+- Claude prompt updated to reference these: *"Hydration score yesterday: 48/100 (Drink More). Caffeine: 520mg."*
+- Brief should mention hydration when score < 60 or when caffeine > 400mg
+- Example brief language: *"Your hydration was low yesterday at 48/100 — you logged 28oz against a 72oz goal adjusted for your workout. That level of dehydration mimics fatigue and can amplify any nutrient gaps you have."*
+
+**Monthly Wrap** (`/api/life-hub/monthly-wrap/route.js`)
+- Add to the 6-table data gather: average hydration score for the month, avg caffeine, best hydration day, worst hydration day, % of days where score ≥ 60
+- Add `hydration_score` stat card to the monthly wrap page (alongside workouts/energy/mood/weight/calories/water)
+- AI narrative updated to reference hydration patterns — especially if there's correlation between low hydration days and low energy check-ins
+
+**Symptom Checker** (encyclopedia page)
+- Add a special `hydration` result card to `computeResults()` — not a nutrient from NUTRIENTS array but a custom card
+- Triggers when ≥2 of these symptoms selected: `tired_after_sleep`, `brain_fog`, `afternoon_crash`, `headaches`, `feel_weak`, `night_cramps`
+- Card content: *"Before checking your nutrient levels — dehydration is the most commonly overlooked cause of these exact symptoms. It's the cheapest thing to rule out first."*
+- If user has water log data: shows their 7-day average hydration score right in the card
+- If no data: shows *"You haven't been logging water — try drinking 2 large glasses and see if these symptoms improve before digging into supplements"*
+- Links to `/life-hub/health/water` (Drinks & Hydration page)
+
+**Nutrient Encyclopedia — Electrolyte Detail Panels**
+- Sodium, Potassium, Magnesium detail panels gain a hydration context note when water log data is available
+- Sodium: if water score < 60 AND sodium is high → *"You're high on sodium but low on hydration — sodium pulls water from cells and you need more fluids than usual today"*
+- Potassium: if water score > 80 AND potassium is low → *"Drinking a lot of water without enough potassium can dilute electrolytes — make sure you're getting both"*
+- Magnesium: general note that magnesium is better absorbed when adequately hydrated
+
+**Workout Fatigue Signal** (workout plan page)
+- Currently fires when energy check-in ≤ 2
+- Add hydration to the signal: also fire (yellow callout) when yesterday's hydration score < 45, even if energy check-in is okay
+- Combined signal when both are low: *"Low energy check-in AND low hydration yesterday — consider a lighter session or prioritize drinking before you start"*
+
+**Workout Log Page — Hydration Reminder Banner**
+- Currently checks water_logs sum vs localStorage goal (< 50% → shows banner)
+- Update to use hydration score instead: if today's score < 40, show banner
+- Banner updated to mention source: *"You're at 28oz today — including from beverages and food, you're about 40% of your adjusted goal. Drink before you start."*
+
+**Daily Check-In — Contextual Hydration Question**
+- Do NOT add hydration as a permanent third question — keep check-in lean
+- Instead: if hydration score for today is < 40 by the time of check-in, add a contextual one-tap question: *"Your hydration looks low today — how are you feeling? [Fine / A bit off / Definitely feel it]"*
+- This response stored as a note on the daily_checkins row (appended to existing `note` field with a hydration prefix)
+- If hydration score ≥ 60: no question shown, check-in stays at energy + mood only
+
+**Nutrition Page**
+- Add a "Beverages" section to the food log (same as Breakfast/Lunch/Dinner/Snack/Other) — meal_slot = 'drink' entries appear here
+- Show total caffeine for the day as a line in the micronutrient breakdown panel (alongside sodium, fiber etc.)
+- Show total beverage calories counted toward the ring (they already count since they're food_log_entries, but make it visible)
+
+---
+
+#### Part 9 — Caffeine Tracking Specifically
+
+*Caffeine deserves special treatment because of its interactions with sleep, energy, and supplements.*
+
+**Daily caffeine total shown:**
+- On the Drinks & Hydration page: *"Total caffeine today: 340mg"* with a color indicator (green < 200mg / yellow 200–400mg / orange 400–600mg / red > 600mg)
+- 400mg is the general "safe" upper guideline for adults; some people are more sensitive
+- Pre-workout supplements (in supplement_stack with caffeine_mg tracked) contribute to this total — the two systems need to add together
+
+**Supplement stack caffeine integration:**
+- When supplement_stack nutrients JSONB includes caffeine (common in pre-workouts: "Caffeine: 200mg"), this should count toward the daily caffeine total
+- The `matchSuppToNutrient()` function in nutrients.js would need a caffeine entry added to NUTRIENTS (or handled as a special case since caffeine isn't in the food micronutrient set)
+- OR: caffeine is treated separately from the nutrient encyclopedia (it's a stimulant, not a vitamin/mineral) — tracked but not shown in the encyclopedia grid
+
+**Caffeine → sleep correlation (future, not Phase 45):**
+- Once we have caffeine data + sleep data (from Google Health or check-in proxy), we can surface: *"Your last 3 nights of poor sleep all followed days with 400mg+ caffeine"*
+- Store the data now, surface the insight when sleep data is more complete
+
+---
+
+#### Part 10 — What NOT To Build in Phase 45
+
+*Keep scope focused. These are adjacent ideas that don't belong in this phase:*
+
+- **Alcohol tracking** — opens a complicated UX around judgment/safety messaging; save for much later if at all
+- **Detailed caffeine half-life calculator** ("your last coffee was at 3pm, you'll still have 100mg active at bedtime") — interesting but complex; save for future
+- **Hydration recommendations by sport type** — too niche; the dynamic goal covers the workout adjustment adequately
+- **Water quality / filter tracking** — completely out of scope for this app
+- **Push notification reminders to drink water** — requires PWA/native; do post-Vercel-deploy
+
+---
+
+
 *Adds the context fields that make the AI overview and workout plan genuinely personalized rather than generic.*
 
 **Biggest Obstacle(s)**
