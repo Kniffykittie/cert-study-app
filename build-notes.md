@@ -267,6 +267,13 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 44h - Complete
+- **Symptom Checker modal** — replaces static symptom pills with a full "Check My Symptoms" modal; 22 symptoms organized in 5 categories (Energy & Focus, Sleep & Recovery, Mood & Mental, Physical, Immune & Skin); results update live as symptoms are selected; two-column layout (symptoms left, results right) collapses gracefully
+- **Ranked results with mechanism sentences** — each result card explains the specific biological mechanism connecting the symptom to the nutrient (not generic — e.g. "Magnesium activates GABA receptors in your brain — the same inhibitory pathway sedatives work on"); cross-referenced against actual intake status (LOW/MODERATE/GOOD/SUPP/no data)
+- **Synthesis callout** — pattern recognition across top results: if 2+ nutrients are both low AND matched, explains why they decline together; if low energy check-in history aligns with selected symptoms, acknowledges the persistent pattern
+- **Supplement coverage note** — result cards show if supplements partially cover the matched nutrient
+- **Seamless handoff** — clicking any result opens the full nutrient detail panel; disclaimer note at bottom of results
+
 ### Phase 44g - Complete
 - **Symptom-check banner**: New "Noticing any of these?" banner on encyclopedia page — 14 symptom questions as pill-shaped buttons; when food data exists, prioritizes symptoms from low/moderate nutrients; each click opens the relevant nutrient detail panel
 - **"What can it help with"** section added to detail panel — renders `practical_benefits` array from AI profile as plain-language outcomes (e.g. "Helps muscles relax and reduces nighttime cramping"); gracefully absent on already-cached profiles until they're regenerated

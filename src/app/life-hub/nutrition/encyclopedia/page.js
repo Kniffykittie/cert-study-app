@@ -13,21 +13,339 @@ const STATUS_COLORS = {
 
 const FATIGUE_NUTRIENTS = ['iron', 'vitamin-b12', 'vitamin-d', 'magnesium', 'vitamin-b6']
 
-const SYMPTOM_QUESTIONS = [
-  { question: "Tired even after a full night's sleep?", slugs: ['iron', 'vitamin-b12', 'vitamin-d', 'magnesium'] },
-  { question: "Brain fog or trouble focusing?", slugs: ['vitamin-b12', 'iron', 'magnesium', 'vitamin-b6'] },
-  { question: "Muscle cramps, especially at night?", slugs: ['magnesium', 'potassium', 'calcium'] },
-  { question: "Trouble falling or staying asleep?", slugs: ['magnesium', 'vitamin-b6', 'calcium'] },
-  { question: "Hands and feet always cold?", slugs: ['iron'] },
-  { question: "Getting sick more than usual?", slugs: ['vitamin-c', 'vitamin-d', 'zinc'] },
-  { question: "Low mood or feeling anxious?", slugs: ['vitamin-b6', 'magnesium', 'folate', 'vitamin-d'] },
-  { question: "Brittle nails or hair thinning?", slugs: ['iron', 'zinc'] },
-  { question: "Tingling or numbness in hands/feet?", slugs: ['vitamin-b12'] },
-  { question: "Bloating or irregular digestion?", slugs: ['fiber'] },
-  { question: "Energy crashes after meals?", slugs: ['fiber', 'magnesium'] },
-  { question: "Wounds or cuts healing slowly?", slugs: ['zinc', 'vitamin-c', 'vitamin-a'] },
-  { question: "Nausea in the morning?", slugs: ['vitamin-b6', 'magnesium'] },
-  { question: "Feeling weak even without heavy exercise?", slugs: ['iron', 'potassium', 'vitamin-d'] },
+const SYMPTOM_CATEGORIES = [
+  {
+    label: 'Energy & Focus', emoji: '⚡',
+    symptoms: [
+      { id: 'tired_after_sleep', text: "Tired even after 7–8 hours of sleep", slugs: ['iron', 'vitamin-b12', 'vitamin-d', 'magnesium'] },
+      { id: 'afternoon_crash', text: "Energy crashes in the afternoon", slugs: ['fiber', 'magnesium', 'vitamin-b6'] },
+      { id: 'brain_fog', text: "Brain fog or can't focus", slugs: ['vitamin-b12', 'iron', 'magnesium', 'vitamin-b6'] },
+      { id: 'feel_weak', text: "Feel weak without much exertion", slugs: ['iron', 'potassium', 'vitamin-d'] },
+    ],
+  },
+  {
+    label: 'Sleep & Recovery', emoji: '🌙',
+    symptoms: [
+      { id: 'cant_sleep', text: "Hard to fall or stay asleep", slugs: ['magnesium', 'vitamin-b6', 'calcium'] },
+      { id: 'night_cramps', text: "Muscle cramps, especially at night", slugs: ['magnesium', 'potassium', 'calcium'] },
+      { id: 'slow_recovery', text: "Soreness that lingers longer than expected", slugs: ['magnesium', 'vitamin-c', 'vitamin-d'] },
+      { id: 'wake_tired', text: "Wake up exhausted even after full sleep", slugs: ['vitamin-d', 'iron', 'vitamin-b12'] },
+    ],
+  },
+  {
+    label: 'Mood & Mental', emoji: '🧠',
+    symptoms: [
+      { id: 'anxious', text: "Anxious or on edge for no clear reason", slugs: ['magnesium', 'vitamin-b6'] },
+      { id: 'low_mood', text: "Low mood or lack of motivation", slugs: ['vitamin-b6', 'vitamin-d', 'folate', 'magnesium'] },
+      { id: 'irritable', text: "More irritable than usual", slugs: ['magnesium', 'vitamin-b6', 'iron'] },
+      { id: 'morning_nausea', text: "Nausea in the morning", slugs: ['vitamin-b6', 'magnesium'] },
+    ],
+  },
+  {
+    label: 'Physical', emoji: '💪',
+    symptoms: [
+      { id: 'cold_extremities', text: "Hands and feet always cold", slugs: ['iron'] },
+      { id: 'brittle_nails', text: "Brittle nails or hair thinning", slugs: ['iron', 'zinc'] },
+      { id: 'skin_issues', text: "Dry skin, acne, or slow-healing cuts", slugs: ['zinc', 'vitamin-a', 'vitamin-c'] },
+      { id: 'headaches', text: "Frequent headaches", slugs: ['magnesium', 'potassium'] },
+      { id: 'bone_aches', text: "Joint or bone aches", slugs: ['vitamin-d', 'calcium', 'magnesium'] },
+      { id: 'numbness', text: "Tingling or numbness in hands/feet", slugs: ['vitamin-b12'] },
+      { id: 'bloating', text: "Bloating or constipation", slugs: ['fiber'] },
+    ],
+  },
+  {
+    label: 'Immune & Skin', emoji: '🛡️',
+    symptoms: [
+      { id: 'sick_often', text: "Getting sick more than twice a year", slugs: ['vitamin-c', 'vitamin-d', 'zinc'] },
+      { id: 'slow_healing', text: "Cuts or wounds heal slowly", slugs: ['zinc', 'vitamin-c', 'vitamin-a'] },
+      { id: 'vision', text: "Trouble with night vision or dry eyes", slugs: ['vitamin-a'] },
+    ],
+  },
+]
+
+// Mechanism sentences — what's actually happening in your body
+const CONNECTIONS = {
+  tired_after_sleep: {
+    iron: "Your red blood cells need iron to carry oxygen. When iron is low, less oxygen reaches your muscles and brain — sleep alone can't fix an oxygen delivery problem.",
+    'vitamin-b12': "B12 is essential for energy metabolism inside your cells. Without it, your mitochondria can't convert food into usable energy — no amount of rest compensates.",
+    'vitamin-d': "Vitamin D receptors sit on your mitochondria — your cellular energy factories. Deficiency impairs their output even when sleep is adequate.",
+    magnesium: "Magnesium activates ATP, the molecule every cell uses for energy. Low magnesium means even basic cellular energy production becomes inefficient.",
+  },
+  afternoon_crash: {
+    fiber: "Soluble fiber slows glucose absorption, preventing the sharp insulin spike and crash that follows a low-fiber meal. No fiber = no blood sugar stability.",
+    magnesium: "Magnesium is required for insulin sensitivity. Low magnesium means your cells respond poorly to insulin, leading to erratic blood sugar and energy swings.",
+    'vitamin-b6': "B6 helps regulate blood sugar by supporting glycogen metabolism — it's part of how your body maintains steady glucose between meals.",
+  },
+  brain_fog: {
+    'vitamin-b12': "B12 maintains the myelin sheath around nerves — the insulation that determines how fast nerve signals travel. Low B12 slows transmission throughout your brain.",
+    iron: "Your brain uses 20% of your body's oxygen despite being only 2% of your weight. Iron deficiency is one of the most common reversible causes of cognitive fatigue.",
+    magnesium: "Magnesium regulates NMDA receptors, which are central to learning and memory. Deficiency doesn't just cause fatigue — it directly impairs how your brain processes information.",
+    'vitamin-b6': "B6 is required to synthesize dopamine, serotonin, and GABA — three neurotransmitters directly responsible for focus, motivation, and mental clarity.",
+  },
+  feel_weak: {
+    iron: "Iron is required for myoglobin, the protein that stores oxygen inside muscle cells. Low iron means your muscles run out of oxygen faster under any load.",
+    potassium: "Potassium drives the electrical gradient across muscle membranes. Without it, muscles can't contract with normal force — weakness without effort is a classic sign.",
+    'vitamin-d': "Vitamin D receptors exist in muscle tissue and regulate protein synthesis. Deficiency causes measurable loss of muscle force production.",
+  },
+  cant_sleep: {
+    magnesium: "Magnesium activates GABA receptors in your brain — the same inhibitory pathway that sedatives work on. Without enough magnesium, your nervous system can't fully wind down.",
+    'vitamin-b6': "B6 converts tryptophan into serotonin, which then converts to melatonin at night. Low B6 disrupts the entire sleep-signaling chain before melatonin is even made.",
+    calcium: "Calcium helps the brain use tryptophan to manufacture melatonin. This is the actual biology behind the old warm-milk remedy — it works in part.",
+  },
+  night_cramps: {
+    magnesium: "Magnesium regulates calcium flow into muscle cells. When it's low, muscles can't fully relax — they stay partially contracted, which causes cramping, especially at night when circulation slows.",
+    potassium: "Potassium is the primary electrolyte inside muscle cells and controls how quickly they reset after a contraction. Depletion causes sustained, involuntary contractions.",
+    calcium: "Calcium triggers muscle contraction; magnesium and potassium trigger relaxation. When calcium is disproportionately high relative to its counterparts, cramps follow.",
+  },
+  slow_recovery: {
+    magnesium: "Magnesium is required for protein synthesis — the actual rebuilding of muscle tissue. Low magnesium means slower repair regardless of how much protein you eat.",
+    'vitamin-c': "Vitamin C is the required cofactor for collagen synthesis — the connective tissue that holds muscle together and repairs microtears from training.",
+    'vitamin-d': "Vitamin D regulates the inflammatory response after exercise. Without it, the normal post-workout inflammation doesn't resolve efficiently, prolonging soreness.",
+  },
+  wake_tired: {
+    'vitamin-d': "Vitamin D influences sleep architecture — how much time you spend in deep and REM sleep. Deficiency reduces sleep quality without affecting sleep quantity.",
+    iron: "Iron deficiency anemia causes restless legs syndrome and disrupts sleep stages — you may sleep long but never reach the restorative deep sleep phases.",
+    'vitamin-b12': "Low B12 disrupts the melatonin synthesis pathway and is associated with delayed sleep phase — your body's clock drifts, making sleep feel unrefreshing.",
+  },
+  anxious: {
+    magnesium: "Magnesium modulates the HPA axis (your stress response system) and NMDA receptors. Low magnesium raises baseline cortisol and keeps your stress response on a hair trigger.",
+    'vitamin-b6': "B6 is required to synthesize GABA — your brain's main inhibitory neurotransmitter. Less GABA means a nervous system that can't quiet itself down.",
+  },
+  low_mood: {
+    'vitamin-b6': "B6 is the cofactor for synthesizing serotonin and dopamine from their amino acid precursors. Without it, your brain literally cannot maintain adequate levels of either.",
+    'vitamin-d': "Vitamin D regulates serotonin production in the brain. Seasonal depression in winter is partly explained by this — less sunlight, lower D, lower serotonin.",
+    folate: "Folate drives methylation reactions that produce serotonin and dopamine. It's one of the most undertested contributors to persistent low mood.",
+    magnesium: "Magnesium deficiency is directly linked to higher rates of depression in population studies — it affects neurotransmitter regulation throughout the brain.",
+  },
+  irritable: {
+    magnesium: "Magnesium regulates cortisol output. When it's low, your stress response is disproportionate to the trigger — small frustrations feel amplified.",
+    'vitamin-b6': "B6 imbalance shifts tryptophan metabolism away from serotonin and toward kynurenic acid, a compound associated with mood instability.",
+    iron: "Low iron reduces dopamine receptor density in the brain over time. Dopamine isn't just about reward — it governs emotional regulation and impulse control.",
+  },
+  morning_nausea: {
+    'vitamin-b6': "B6 is the most clinically validated intervention for morning nausea — it reduces nausea signals in the brainstem and is prescribed in pregnancy for this exact reason.",
+    magnesium: "Magnesium regulates gut motility and the smooth muscle in the digestive tract. Deficiency can cause nausea and cramping, especially before eating.",
+  },
+  cold_extremities: {
+    iron: "Iron deficiency reduces red blood cell production and hemoglobin levels. Less oxygen-carrying capacity means less heat delivery to your extremities — cold hands and feet follow.",
+  },
+  brittle_nails: {
+    iron: "Nails and hair are among the first things your body deprioritizes when iron is scarce — they're not essential to survival. Brittle nails that split or spoon (koilonychia) are a classic sign.",
+    zinc: "Zinc is required for the keratin synthesis that builds nails and hair structure. Deficiency shows up as white spots, slow growth, and brittleness within weeks.",
+  },
+  skin_issues: {
+    zinc: "Zinc regulates sebum production and the inflammatory response in skin. Deficiency is directly linked to acne, slow wound healing, and impaired skin barrier function.",
+    'vitamin-a': "Vitamin A regulates skin cell turnover. Too little causes buildup of dead skin cells (keratosis pilaris — those rough bumps on arms), dryness, and poor healing.",
+    'vitamin-c': "Vitamin C drives collagen production, which is the structural foundation of your skin. Without it, skin loses elasticity and heals significantly slower.",
+  },
+  headaches: {
+    magnesium: "Magnesium regulates blood vessel tone and blocks pain receptors (NMDA receptors). It's so effective for migraines it's used as a clinical preventive treatment.",
+    potassium: "Low potassium raises blood pressure by allowing sodium to dominate fluid balance. Elevated blood pressure is a common mechanical trigger for tension headaches.",
+  },
+  bone_aches: {
+    'vitamin-d': "Vitamin D is required for calcium absorption in the gut. Without it, your body can't mineralize bone properly — the result is aching that mimics joint pain but is actually bone.",
+    calcium: "Calcium is the structural mineral of bone. Chronic deficiency causes the bone matrix to thin and become less dense, leading to pain under normal loads.",
+    magnesium: "Magnesium regulates bone density by influencing parathyroid hormone and supporting calcium metabolism. Low magnesium = impaired bone formation.",
+  },
+  numbness: {
+    'vitamin-b12': "B12 builds and maintains the myelin sheath — the protective insulation around every nerve. Without it, nerve signals become erratic and slow. Tingling and numbness are the first warning signs of this damage.",
+  },
+  bloating: {
+    fiber: "Dietary fiber feeds beneficial gut bacteria and maintains regular bowel transit. Too little causes slower movement through the colon, bacterial imbalance, and gas buildup.",
+  },
+  sick_often: {
+    'vitamin-c': "Vitamin C directly enhances white blood cell production and function. During infection it's rapidly depleted — consistent intake shortens illness duration and reduces severity.",
+    'vitamin-d': "Vitamin D regulates the innate immune system's first-response mechanisms. Low D is one of the strongest dietary predictors of repeated respiratory infections.",
+    zinc: "Zinc is required for T-cell development and activation. Without it, your adaptive immune system — the part that targets specific pathogens — operates at a fraction of its capacity.",
+  },
+  slow_healing: {
+    zinc: "Zinc is required at every stage of wound repair: clotting, cell proliferation, and tissue remodeling. Deficiency visibly slows all three phases.",
+    'vitamin-c': "Vitamin C is the required cofactor for collagen synthesis — the protein scaffold that literally holds wounds together as new tissue grows in.",
+    'vitamin-a': "Vitamin A regulates the inflammatory phase of wound healing and stimulates the epithelial cell growth needed to close wounds.",
+  },
+  vision: {
+    'vitamin-a': "Vitamin A is the precursor to retinal — the light-sensitive molecule in your retina. Without it, your eyes struggle to adapt from bright to dim environments. Night blindness is the earliest measurable sign of deficiency.",
+  },
+}
+
+function computeResults(selectedIds, ctx) {
+  if (selectedIds.size === 0) return []
+  const allSymptoms = SYMPTOM_CATEGORIES.flatMap(c => c.symptoms)
+  const selectedSymptoms = allSymptoms.filter(s => selectedIds.has(s.id))
+
+  const counts = {}
+  for (const sym of selectedSymptoms) {
+    for (const slug of sym.slugs) {
+      counts[slug] = (counts[slug] || 0) + 1
+    }
+  }
+
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([slug, matchCount]) => {
+      const nutrient = NUTRIENT_BY_SLUG[slug]
+      const s = getStatus(nutrient, ctx)
+      const matchedSymptoms = selectedSymptoms.filter(sym => sym.slugs.includes(slug))
+      // Find best connection sentence
+      let connection = null
+      for (const sym of matchedSymptoms) {
+        if (CONNECTIONS[sym.id]?.[slug]) { connection = CONNECTIONS[sym.id][slug]; break }
+      }
+      return { slug, nutrient, matchCount, status: s.status, pct: s.pct, suppAmt: s.suppAmt, connection, matchedSymptoms }
+    })
+}
+
+function getSynthesis(results, ctx, selectedIds) {
+  if (results.length === 0) return null
+  const lowAndMatched = results.filter(r => (r.status === 'low' || r.status === 'moderate') && r.matchCount >= 2)
+
+  if (lowAndMatched.length >= 2) {
+    const [a, b] = lowAndMatched
+    return `Both ${a.nutrient.name} and ${b.nutrient.name} are showing ${a.status} in your diet AND matching multiple symptoms. These often decline together — addressing diet quality across the board matters more than targeting a single supplement.`
+  }
+  if (lowAndMatched.length === 1 && lowAndMatched[0].matchCount >= 3) {
+    return `${lowAndMatched[0].nutrient.name} is matching ${lowAndMatched[0].matchCount} of your symptoms and is showing ${lowAndMatched[0].status} in your 30-day food log. This is the most direct place to start.`
+  }
+  if (ctx?.low_energy_signal && results.some(r => FATIGUE_NUTRIENTS.includes(r.slug))) {
+    return `You've also been logging consistently low energy over the last 14 days (avg ${ctx.avg_energy_14d}/5). The symptoms you selected align with that pattern — this isn't just a today thing.`
+  }
+  if (results.length >= 2 && results[0].matchCount === results[1].matchCount) {
+    return `${results[0].nutrient.name} and ${results[1].nutrient.name} are tied for most matches. They're also synergistic — getting both right matters more than fixing one in isolation.`
+  }
+  return null
+}
+
+function SymptomCheckerModal({ ctx, onSelectNutrient, onClose }) {
+  const [selected, setSelected] = useState(new Set())
+
+  function toggle(id) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const results = computeResults(selected, ctx)
+  const synthesis = getSynthesis(results, ctx, selected)
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 300 }} />
+      <div style={{ position: 'fixed', inset: 0, zIndex: 301, overflowY: 'auto', padding: '20px 16px 40px' }}>
+        <div style={{ maxWidth: '860px', margin: '0 auto', backgroundColor: 'var(--surface)', borderRadius: '14px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+
+          {/* Header */}
+          <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'sticky', top: 0, backgroundColor: 'var(--surface)', zIndex: 1 }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>🔍 What's Going On With You?</h2>
+              <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>Select everything that applies — results update as you tap. No diagnosis, just direction.</p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+              {selected.size > 0 && (
+                <button onClick={() => setSelected(new Set())}
+                  style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: '12px', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}>
+                  Clear all
+                </button>
+              )}
+              <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '22px', cursor: 'pointer', lineHeight: 1 }}>✕</button>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: results.length > 0 ? '1fr 1fr' : '1fr', gap: 0 }}>
+
+            {/* Left: Symptom selector */}
+            <div style={{ padding: '20px 24px', borderRight: results.length > 0 ? '1px solid var(--border)' : 'none' }}>
+              {SYMPTOM_CATEGORIES.map(cat => (
+                <div key={cat.label} style={{ marginBottom: '20px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>
+                    {cat.emoji} {cat.label}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {cat.symptoms.map(sym => {
+                      const active = selected.has(sym.id)
+                      return (
+                        <button key={sym.id} onClick={() => toggle(sym.id)}
+                          style={{ padding: '6px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', transition: 'all 0.15s', border: active ? '1px solid var(--accent-purple)' : '1px solid var(--border)', backgroundColor: active ? 'rgba(123,47,190,0.15)' : 'var(--background)', color: active ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: active ? '600' : '400' }}>
+                          {active ? '✓ ' : ''}{sym.text}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Right: Results */}
+            {results.length > 0 && (
+              <div style={{ padding: '20px 24px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '14px' }}>
+                  {selected.size} symptom{selected.size !== 1 ? 's' : ''} selected · {results.length} nutrients flagged
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {results.map((r, i) => {
+                    const color = STATUS_COLORS[r.status]
+                    const statusLabel = r.status === 'unknown' ? 'No data yet' : r.status === 'supplemented' ? 'Supplement only' : `${r.pct}% of target`
+                    return (
+                      <div key={r.slug}
+                        onClick={() => { onSelectNutrient(r.slug); onClose() }}
+                        style={{ backgroundColor: 'var(--background)', borderRadius: '10px', padding: '12px 14px', cursor: 'pointer', border: '1px solid var(--border)', transition: 'border-color 0.15s' }}
+                        onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-purple)'}
+                        onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', backgroundColor: 'var(--surface)', borderRadius: '4px', padding: '1px 6px' }}>#{i + 1}</span>
+                            <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>{r.nutrient.name}</span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{r.matchCount} match{r.matchCount !== 1 ? 'es' : ''}</span>
+                          </div>
+                          <span style={{ fontSize: '11px', fontWeight: '700', color, backgroundColor: `${color}18`, borderRadius: '5px', padding: '2px 7px', flexShrink: 0, marginLeft: '8px' }}>
+                            {r.status === 'unknown' ? 'LOG FOOD' : r.status === 'good' ? 'ON TRACK' : r.status === 'supplemented' ? 'SUPP' : r.status.toUpperCase()}
+                          </span>
+                        </div>
+
+                        {r.connection && (
+                          <p style={{ margin: '0 0 8px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.55' }}>{r.connection}</p>
+                        )}
+
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                          <span>{r.status !== 'unknown' ? statusLabel : 'Log 5+ days of food to see your intake'}</span>
+                          {r.suppAmt > 0 && <span style={{ color: 'var(--accent-purple)' }}>💊 Partially covered by supplements</span>}
+                          <span style={{ color: 'var(--accent-purple)', fontWeight: '600' }}>View profile →</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Synthesis callout */}
+                {synthesis && (
+                  <div style={{ marginTop: '14px', backgroundColor: 'rgba(123,47,190,0.08)', border: '1px solid rgba(123,47,190,0.25)', borderRadius: '10px', padding: '12px 14px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                    <span style={{ color: 'var(--accent-purple)', fontWeight: '700' }}>Pattern: </span>{synthesis}
+                  </div>
+                )}
+
+                {/* Disclaimer */}
+                <p style={{ marginTop: '14px', fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.5', opacity: 0.7 }}>
+                  This is informational, not medical advice. Symptoms have many causes — these connections are the most common dietary contributors, not a diagnosis.
+                </p>
+              </div>
+            )}
+
+            {/* Empty state when nothing selected */}
+            {results.length === 0 && selected.size === 0 && (
+              <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px', gridColumn: '1 / -1', display: 'none' }} />
+            )}
+          </div>
+
+        </div>
+      </div>
+    </>
+  )
+}
+
 ]
 
 function getStatus(nutrient, ctx) {
@@ -311,6 +629,7 @@ export default function EncyclopediaPage() {
   const [selected, setSelected] = useState(null)
   const [filter, setFilter] = useState('All')
   const [search, setSearch] = useState('')
+  const [symptomCheckerOpen, setSymptomCheckerOpen] = useState(false)
 
   useEffect(() => {
     fetch('/api/nutrition/encyclopedia').then(r => r.json()).then(setCtx).catch(() => {})
@@ -357,44 +676,17 @@ export default function EncyclopediaPage() {
         </div>
       )}
 
-      {/* Symptom Check Banner */}
-      {(() => {
-        // Prioritize symptoms from low-status nutrients if we have data, else show default set
-        let shown
-        if (ctx?.log_days >= 5) {
-          const lowSlugs = new Set(
-            NUTRIENTS
-              .filter(n => !n.isWarnHigh)
-              .filter(n => { const s = getStatus(n, ctx); return s.status === 'low' || s.status === 'moderate' })
-              .map(n => n.slug)
-          )
-          shown = SYMPTOM_QUESTIONS.filter(q => q.slugs.some(s => lowSlugs.has(s))).slice(0, 6)
-          if (shown.length < 4) shown = SYMPTOM_QUESTIONS.slice(0, 6)
-        } else {
-          shown = SYMPTOM_QUESTIONS.slice(0, 6)
-        }
-        return (
-          <div style={{ backgroundColor: 'rgba(123,47,190,0.07)', border: '1px solid rgba(123,47,190,0.25)', borderRadius: '10px', padding: '16px 20px', marginBottom: '16px' }}>
-            <div style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '14px', marginBottom: '4px' }}>🔍 Noticing any of these?</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>Tap a symptom to see which nutrients may be involved.</div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {shown.map((q, i) => {
-                const targetSlug = ctx?.log_days >= 5
-                  ? q.slugs.find(s => { const st = getStatus(NUTRIENT_BY_SLUG[s], ctx); return st.status === 'low' || st.status === 'moderate' }) || q.slugs[0]
-                  : q.slugs[0]
-                return (
-                  <button key={i} onClick={() => setSelected(targetSlug)}
-                    style={{ padding: '6px 13px', borderRadius: '20px', border: '1px solid rgba(123,47,190,0.35)', backgroundColor: 'rgba(123,47,190,0.1)', color: 'var(--text-primary)', fontSize: '12px', cursor: 'pointer', transition: 'background 0.15s' }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.22)'}
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.1)'}>
-                    {q.question}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )
-      })()}
+      {/* Symptom Checker CTA */}
+      <div style={{ backgroundColor: 'rgba(123,47,190,0.07)', border: '1px solid rgba(123,47,190,0.25)', borderRadius: '10px', padding: '16px 20px', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '14px', marginBottom: '3px' }}>🔍 Not sure where to start?</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Tell us what you've been feeling — we'll show you which nutrients are most likely involved and why.</div>
+        </div>
+        <button onClick={() => setSymptomCheckerOpen(true)}
+          style={{ padding: '10px 20px', borderRadius: '8px', backgroundColor: 'var(--accent-purple)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: '700', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>
+          Check My Symptoms →
+        </button>
+      </div>
 
       {/* Low Energy Banner */}
       {ctx?.low_energy_signal && (
@@ -459,6 +751,15 @@ export default function EncyclopediaPage() {
 
       {/* Detail Panel */}
       {selected && <DetailPanel slug={selected} ctx={ctx} onClose={() => setSelected(null)} />}
+
+      {/* Symptom Checker Modal */}
+      {symptomCheckerOpen && (
+        <SymptomCheckerModal
+          ctx={ctx}
+          onSelectNutrient={slug => { setSelected(slug); setSymptomCheckerOpen(false) }}
+          onClose={() => setSymptomCheckerOpen(false)}
+        />
+      )}
     </div>
   )
 }
