@@ -346,8 +346,6 @@ function SymptomCheckerModal({ ctx, onSelectNutrient, onClose }) {
   )
 }
 
-]
-
 function getStatus(nutrient, ctx) {
   if (!ctx) return { status: 'unknown', pct: 0, foodAvg: 0, suppAmt: 0, total: 0 }
   const foodAvg = ctx.avg_intakes?.[nutrient.key] || 0
