@@ -13,6 +13,23 @@ const STATUS_COLORS = {
 
 const FATIGUE_NUTRIENTS = ['iron', 'vitamin-b12', 'vitamin-d', 'magnesium', 'vitamin-b6']
 
+const SYMPTOM_QUESTIONS = [
+  { question: "Tired even after a full night's sleep?", slugs: ['iron', 'vitamin-b12', 'vitamin-d', 'magnesium'] },
+  { question: "Brain fog or trouble focusing?", slugs: ['vitamin-b12', 'iron', 'magnesium', 'vitamin-b6'] },
+  { question: "Muscle cramps, especially at night?", slugs: ['magnesium', 'potassium', 'calcium'] },
+  { question: "Trouble falling or staying asleep?", slugs: ['magnesium', 'vitamin-b6', 'calcium'] },
+  { question: "Hands and feet always cold?", slugs: ['iron'] },
+  { question: "Getting sick more than usual?", slugs: ['vitamin-c', 'vitamin-d', 'zinc'] },
+  { question: "Low mood or feeling anxious?", slugs: ['vitamin-b6', 'magnesium', 'folate', 'vitamin-d'] },
+  { question: "Brittle nails or hair thinning?", slugs: ['iron', 'zinc'] },
+  { question: "Tingling or numbness in hands/feet?", slugs: ['vitamin-b12'] },
+  { question: "Bloating or irregular digestion?", slugs: ['fiber'] },
+  { question: "Energy crashes after meals?", slugs: ['fiber', 'magnesium'] },
+  { question: "Wounds or cuts healing slowly?", slugs: ['zinc', 'vitamin-c', 'vitamin-a'] },
+  { question: "Nausea in the morning?", slugs: ['vitamin-b6', 'magnesium'] },
+  { question: "Feeling weak even without heavy exercise?", slugs: ['iron', 'potassium', 'vitamin-d'] },
+]
+
 function getStatus(nutrient, ctx) {
   if (!ctx) return { status: 'unknown', pct: 0, foodAvg: 0, suppAmt: 0, total: 0 }
   const foodAvg = ctx.avg_intakes?.[nutrient.key] || 0
@@ -192,6 +209,18 @@ function DetailPanel({ slug, ctx, onClose }) {
                   <p style={{ color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.65', margin: 0 }}>{profile.what_it_does}</p>
                 </Section>
               )}
+              {profile.practical_benefits?.length > 0 && (
+                <Section title="✅ What It Can Help With">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {profile.practical_benefits.map((b, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', color: 'var(--text-primary)', lineHeight: '1.5' }}>
+                        <span style={{ color: 'var(--success)', marginTop: '1px', flexShrink: 0 }}>→</span>
+                        {b}
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
               {profile.cool_facts?.length > 0 && (
                 <Section title="🧠 Cool Facts">
                   <ul style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -327,6 +356,45 @@ export default function EncyclopediaPage() {
           </div>
         </div>
       )}
+
+      {/* Symptom Check Banner */}
+      {(() => {
+        // Prioritize symptoms from low-status nutrients if we have data, else show default set
+        let shown
+        if (ctx?.log_days >= 5) {
+          const lowSlugs = new Set(
+            NUTRIENTS
+              .filter(n => !n.isWarnHigh)
+              .filter(n => { const s = getStatus(n, ctx); return s.status === 'low' || s.status === 'moderate' })
+              .map(n => n.slug)
+          )
+          shown = SYMPTOM_QUESTIONS.filter(q => q.slugs.some(s => lowSlugs.has(s))).slice(0, 6)
+          if (shown.length < 4) shown = SYMPTOM_QUESTIONS.slice(0, 6)
+        } else {
+          shown = SYMPTOM_QUESTIONS.slice(0, 6)
+        }
+        return (
+          <div style={{ backgroundColor: 'rgba(123,47,190,0.07)', border: '1px solid rgba(123,47,190,0.25)', borderRadius: '10px', padding: '16px 20px', marginBottom: '16px' }}>
+            <div style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '14px', marginBottom: '4px' }}>🔍 Noticing any of these?</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>Tap a symptom to see which nutrients may be involved.</div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {shown.map((q, i) => {
+                const targetSlug = ctx?.log_days >= 5
+                  ? q.slugs.find(s => { const st = getStatus(NUTRIENT_BY_SLUG[s], ctx); return st.status === 'low' || st.status === 'moderate' }) || q.slugs[0]
+                  : q.slugs[0]
+                return (
+                  <button key={i} onClick={() => setSelected(targetSlug)}
+                    style={{ padding: '6px 13px', borderRadius: '20px', border: '1px solid rgba(123,47,190,0.35)', backgroundColor: 'rgba(123,47,190,0.1)', color: 'var(--text-primary)', fontSize: '12px', cursor: 'pointer', transition: 'background 0.15s' }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.22)'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.1)'}>
+                    {q.question}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Low Energy Banner */}
       {ctx?.low_energy_signal && (

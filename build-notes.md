@@ -267,6 +267,11 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 44g - Complete
+- **Symptom-check banner**: New "Noticing any of these?" banner on encyclopedia page — 14 symptom questions as pill-shaped buttons; when food data exists, prioritizes symptoms from low/moderate nutrients; each click opens the relevant nutrient detail panel
+- **"What can it help with"** section added to detail panel — renders `practical_benefits` array from AI profile as plain-language outcomes (e.g. "Helps muscles relax and reduces nighttime cramping"); gracefully absent on already-cached profiles until they're regenerated
+- **AI prompt updated**: Added `practical_benefits` field to the encyclopedia generation prompt
+
 ### Phase 44f - Complete
 - **UI**: Encyclopedia detail panel widened again 560px → 680px per user request
 

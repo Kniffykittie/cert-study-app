@@ -52,6 +52,7 @@ export async function POST(req, { params }) {
 Return ONLY a JSON object with exactly these fields:
 {
   "what_it_does": "2-3 sentences on this nutrient's main roles. Be mechanistic — explain HOW it works, not just THAT it works.",
+  "practical_benefits": ["plain-language outcome a person would actually care about — e.g. 'Helps muscles relax and reduces nighttime cramping', 'May improve resting heart rate over time', 'Supports deeper, more restorative sleep'. 4-5 items. Keep each under 12 words."],
   "cool_facts": ["surprising fact most people don't know", "another genuinely interesting fact", "third fact"],
   "deficiency_signs": ["sign 1", "sign 2", "sign 3", "sign 4 — be specific, not vague like 'feeling tired'"],
   "too_much": "2 sentences on excess intake. If it's genuinely dangerous name the symptoms. If it's mostly harmless, say so honestly.",
