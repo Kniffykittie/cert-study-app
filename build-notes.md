@@ -267,6 +267,15 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 48b - Complete
+- **AddFoodModal rewritten with 3 equal tabs**: "⭐ My Favorites" (default) | "✏️ Enter Manually" | "🔍 Search Database" — Manual entry is now a first-class tab, not a secondary button buried in the search flow
+- **Create a Meal moved into AddFoodModal**: Now a subtle footer link ("🍳 Build a Meal from Multiple Ingredients") at the bottom of the My Favorites tab instead of a button in the Food Log header
+- **Tabs moved to top of Nutrition page**: Tabs now appear immediately after the page header (before the calorie ring), with "📅 Weekly Meal Plan" added as a proper tab (link to /meal-plan), replacing the old sidebar link
+- **"🍳 Create a Meal" removed from Food Log header and SavedFoodsTab header**: Header area is now clean; Copy from yesterday is a small text-style button aligned right
+- **Drinks filtered from meal favorites**: `mealFoods = myFoods.filter(f => !f.is_drink)` passed to `AddFoodModal` and `SavedFoodsTab` so drink entries don't appear in meal-logging flows
+- **SavedFoodsTab header simplified**: "Create Meal" button removed; just the "+ Add Favorite" button remains
+- **MealBuilderModal custom ingredient button styled prominently**: Purple background with ✏️ icon instead of a dashed grey button
+
 ### Phase 48 - Complete
 - **Nutrition UX overhaul — Favorites-first flow**: Replaced the confusing SearchModal log flow with a new `AddFoodModal` that opens on "My Favorites" tab by default; users see their saved foods first with inline "Log" button per item; clicking Log expands servings input + "✓ Add to [Meal]" confirm button with live calorie preview; "Find Food" tab provides OFFs search (capped at 8 results) and manual entry, both with "⭐ Save to My Favorites" checkbox defaulted on
 - **Saved Foods tab redesigned as `SavedFoodsTab` component**: "My Favorites" header with Log/Cancel per item; expanding a food shows servings input + calorie preview + slot chips (Breakfast/Lunch/Dinner/Snack/Other); clicking a slot chip logs the food directly without any additional modal — zero friction from library to log; renamed "Add Food" → "Add Favorite" to clarify intent

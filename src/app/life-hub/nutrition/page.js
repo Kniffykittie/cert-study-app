@@ -349,28 +349,34 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly })
   )
 }
 
-function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood }) {
-  const [screen, setScreen] = useState('favorites')
+function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal }) {
+  const [tab, setTab] = useState('favorites')
   const [filter, setFilter] = useState('')
   const [expandedId, setExpandedId] = useState(null)
   const [logServings, setLogServings] = useState('1')
+  // search tab
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState(null)
   const [searchServings, setSearchServings] = useState('1')
-  const [manualMode, setManualMode] = useState(false)
-  const [manual, setManual] = useState({ name: '', brand: '', serving_size_label: '1 serving', calories: '', protein_g: '', carbs_g: '', fat_g: '', fiber_g: '', sugar_g: '', sodium_mg: '', saturated_fat_g: '', trans_fat_g: '', cholesterol_mg: '', potassium_mg: '', calcium_mg: '', iron_mg: '', magnesium_mg: '', zinc_mg: '', vitamin_a_mcg: '', vitamin_c_mg: '', vitamin_d_mcg: '', vitamin_b12_mcg: '', vitamin_b6_mg: '', folate_mcg: '' })
   const [saveToLib, setSaveToLib] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [savingSearch, setSavingSearch] = useState(false)
   const [savingFood, setSavingFood] = useState(null)
+  // manual tab
+  const BLANK_MANUAL = { name: '', brand: '', serving_size_label: '1 serving', calories: '', protein_g: '', carbs_g: '', fat_g: '', fiber_g: '', sugar_g: '', sodium_mg: '', saturated_fat_g: '', trans_fat_g: '', cholesterol_mg: '', potassium_mg: '', calcium_mg: '', iron_mg: '', magnesium_mg: '', zinc_mg: '', vitamin_a_mcg: '', vitamin_c_mg: '', vitamin_d_mcg: '', vitamin_b12_mcg: '', vitamin_b6_mg: '', folate_mcg: '' }
+  const [manual, setManual] = useState(BLANK_MANUAL)
+  const [manualSaveToLib, setManualSaveToLib] = useState(true)
+  const [savingManual, setSavingManual] = useState(false)
+  const [manualServings, setManualServings] = useState('1')
+
   const debounceRef = useRef(null)
   const searchInputRef = useRef(null)
 
   const mealInfo = MEAL_SLOTS.find(m => m.key === slot)
   const filtered = filter ? myFoods.filter(f => f.name.toLowerCase().includes(filter.toLowerCase())) : myFoods
 
-  useEffect(() => { if (screen === 'search') searchInputRef.current?.focus() }, [screen])
+  useEffect(() => { if (tab === 'search') searchInputRef.current?.focus() }, [tab])
 
   function handleQueryChange(val) {
     setQuery(val); setSelected(null)
@@ -397,23 +403,45 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood }) {
     onClose()
   }
 
-  async function handleSearchAdd() {
-    setSaving(true)
-    let food = manualMode ? { ...manual, source: 'manual' } : selected
-    if (saveToLib && food) {
-      const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(food) })
+  async function handleSearchLog() {
+    if (!selected) return
+    setSavingSearch(true)
+    if (saveToLib) {
+      const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(selected) })
       const data = await res.json()
       if (data.food) onSaveFood(data.food)
     }
     const sv = parseFloat(searchServings) || 1
-    const entry = { meal_slot: slot, servings: sv, source: food._source || food.source || 'off' }
+    const entry = { meal_slot: slot, servings: sv, source: selected._source || selected.source || 'off' }
     for (const k of ['name', 'brand', 'serving_size_label', 'calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g', 'sodium_mg', 'saturated_fat_g', 'trans_fat_g', 'cholesterol_mg', 'potassium_mg', 'calcium_mg', 'iron_mg', 'magnesium_mg', 'zinc_mg', 'vitamin_a_mcg', 'vitamin_c_mg', 'vitamin_d_mcg', 'vitamin_b12_mcg', 'vitamin_b6_mg', 'folate_mcg']) {
-      entry[k] = food[k] ?? null
+      entry[k] = selected[k] ?? null
     }
-    entry.food_cache_id = food._source === 'my_foods' ? null : (food.id || null)
-    entry.my_food_id = food._source === 'my_foods' ? food.id : null
+    entry.food_cache_id = selected._source === 'my_foods' ? null : (selected.id || null)
+    entry.my_food_id = selected._source === 'my_foods' ? selected.id : null
     await onAdd(entry)
-    setSaving(false)
+    setSavingSearch(false)
+    onClose()
+  }
+
+  async function handleManualLog() {
+    if (!manual.name.trim()) return
+    setSavingManual(true)
+    let savedFood = null
+    if (manualSaveToLib) {
+      const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...manual, source: 'manual' }) })
+      const data = await res.json()
+      if (data.food) { savedFood = data.food; onSaveFood(data.food) }
+    }
+    const sv = parseFloat(manualServings) || 1
+    const entry = { meal_slot: slot, servings: sv, source: 'manual', my_food_id: savedFood?.id || null }
+    for (const k of ['name', 'brand', 'serving_size_label', 'calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g', 'sodium_mg', 'saturated_fat_g', 'trans_fat_g', 'cholesterol_mg', 'potassium_mg', 'calcium_mg', 'iron_mg', 'magnesium_mg', 'zinc_mg', 'vitamin_a_mcg', 'vitamin_c_mg', 'vitamin_d_mcg', 'vitamin_b12_mcg', 'vitamin_b6_mg', 'folate_mcg']) {
+      entry[k] = manual[k] !== '' ? Number(manual[k]) || null : null
+    }
+    entry.name = manual.name
+    entry.brand = manual.brand || null
+    entry.serving_size_label = manual.serving_size_label || '1 serving'
+    await onAdd(entry)
+    setSavingManual(false)
     onClose()
   }
 
@@ -424,52 +452,52 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood }) {
     setSavingFood(null)
   }
 
-  const tabStyle = (active) => ({
-    padding: '7px 14px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
-    backgroundColor: active ? 'var(--accent-blue)' : 'var(--background)', color: active ? '#fff' : 'var(--text-secondary)',
+  const tabBtn = (key, label) => ({
+    padding: '8px 14px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: '600',
+    cursor: 'pointer', backgroundColor: tab === key ? 'var(--accent-blue)' : 'var(--background)',
+    color: tab === key ? '#fff' : 'var(--text-secondary)', whiteSpace: 'nowrap',
   })
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', width: '100%', maxWidth: '540px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', width: '100%', maxWidth: '540px', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
 
+        {/* Header */}
         <div style={{ padding: '16px 20px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-          <div>
-            <h2 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', margin: '0 0 2px' }}>
-              {mealInfo?.emoji} Add to {mealInfo?.label}
-            </h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>
-              {screen === 'favorites' ? 'Quick-log from your saved favorites' : 'Search database or enter manually'}
-            </p>
-          </div>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', margin: 0 }}>
+            {mealInfo?.emoji} Add to {mealInfo?.label}
+          </h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '22px', cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
 
-        <div style={{ padding: '0 20px 10px', display: 'flex', gap: '6px', flexShrink: 0 }}>
-          <button onClick={() => setScreen('favorites')} style={tabStyle(screen === 'favorites')}>⭐ My Favorites</button>
-          <button onClick={() => setScreen('search')} style={tabStyle(screen === 'search')}>🔍 Find Food</button>
+        {/* Tabs */}
+        <div style={{ padding: '0 20px 12px', display: 'flex', gap: '6px', flexShrink: 0, overflowX: 'auto' }}>
+          <button onClick={() => setTab('favorites')} style={tabBtn('favorites', '')}>⭐ My Favorites</button>
+          <button onClick={() => setTab('manual')} style={tabBtn('manual', '')}>✏️ Enter Manually</button>
+          <button onClick={() => setTab('search')} style={tabBtn('search', '')}>🔍 Search Database</button>
         </div>
 
-        {screen === 'favorites' ? (
+        {/* ── My Favorites tab ── */}
+        {tab === 'favorites' && (
           <>
             <div style={{ padding: '0 20px 10px', flexShrink: 0 }}>
               <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter your favorites..."
                 style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 14px', color: 'var(--text-primary)', fontSize: '13px' }} />
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 16px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
               {filtered.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '30px 16px' }}>
-                  <div style={{ fontSize: '32px', marginBottom: '10px' }}>⭐</div>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '14px' }}>
-                    {filter ? `No favorites match "${filter}"` : "No saved favorites yet."}
+                <div style={{ textAlign: 'center', padding: '28px 0' }}>
+                  <div style={{ fontSize: '30px', marginBottom: '8px' }}>⭐</div>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '12px' }}>
+                    {filter ? `No favorites match "${filter}"` : 'No saved favorites yet.'}
                   </p>
-                  <button onClick={() => { setFilter(''); setScreen('search') }}
-                    style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 18px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                  <button onClick={() => { setFilter(''); setTab('search') }}
+                    style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
                     🔍 Find a food to add
                   </button>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingBottom: '8px' }}>
                   {filtered.map(food => {
                     const isExpanded = expandedId === food.id
                     const sv = parseFloat(logServings) || 1
@@ -493,15 +521,13 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood }) {
                           </button>
                         </div>
                         {isExpanded && (
-                          <div style={{ padding: '0 12px 12px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+                          <div style={{ padding: '8px 12px 12px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Servings:</span>
                               <input type="number" min="0.25" step="0.25" value={logServings} onChange={e => setLogServings(e.target.value)}
                                 style={{ width: '60px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
                             </div>
-                            {calPreview != null && (
-                              <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '700' }}>= {calPreview} kcal</span>
-                            )}
+                            {calPreview != null && <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '700' }}>= {calPreview} kcal</span>}
                             <button onClick={() => confirmLogFav(food)}
                               style={{ marginLeft: 'auto', backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '7px', padding: '7px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
                               ✓ Add to {mealInfo?.label}
@@ -514,95 +540,119 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood }) {
                 </div>
               )}
             </div>
-          </>
-        ) : (
-          <>
-            {!manualMode ? (
-              <>
-                <div style={{ padding: '0 20px 10px', flexShrink: 0 }}>
-                  <input ref={searchInputRef} value={query} onChange={e => handleQueryChange(e.target.value)}
-                    placeholder="Search food name or brand..."
-                    style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 14px', color: 'var(--text-primary)', fontSize: '13px' }} />
-                </div>
-                <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
-                  {searching && <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Searching...</p>}
-                  {!searching && results.length > 0 && (
-                    <div style={{ marginBottom: '12px' }}>
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Results (showing top 8)</div>
-                      {results.slice(0, 8).map((f, i) => (
-                        <FoodRow key={f.id || i} food={f} selected={selected?.id === f.id} onSelect={setSelected}
-                          onSave={handleQuickSave} savingId={savingFood} />
-                      ))}
-                    </div>
-                  )}
-                  {!searching && query && results.length === 0 && (
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>No results. Try entering manually below.</p>
-                  )}
-                  {!query && <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Type to search the Open Food Facts database.</p>}
-                </div>
-                {selected && (
-                  <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selected.name}</div>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-                        {selected.serving_size_label || '1 serving'}{selected.calories ? ` · ${Math.round(selected.calories * (parseFloat(searchServings) || 1))} kcal` : ''}
-                      </div>
-                    </div>
-                    <input type="number" min="0.25" step="0.25" value={searchServings} onChange={e => setSearchServings(e.target.value)}
-                      style={{ width: '56px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
-                    <button onClick={handleSearchAdd} disabled={saving}
-                      style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: saving ? 0.6 : 1, flexShrink: 0 }}>
-                      {saving ? '...' : '+ Log'}
-                    </button>
-                  </div>
-                )}
-                <div style={{ padding: '10px 20px 14px', borderTop: selected ? 'none' : '1px solid var(--border)', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input type="checkbox" id="savelib2" checked={saveToLib} onChange={e => setSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '14px', height: '14px' }} />
-                    <label htmlFor="savelib2" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>⭐ Save to My Favorites</label>
-                  </div>
-                  <button onClick={() => setManualMode(true)}
-                    style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '7px', padding: '6px 12px', fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                    + Enter manually
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px 20px' }}>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 14px' }}>Fill in what you know — only Name is required.</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {[{ key: 'name', label: 'Name *' }, { key: 'brand', label: 'Brand' }, { key: 'serving_size_label', label: 'Serving Size' }].map(({ key, label }) => (
-                    <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
-                      <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                      <input type="text" value={manual[key]} onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
-                        style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
-                    </div>
-                  ))}
-                  <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Macros</div>
-                  {[{ key: 'calories', label: 'Calories' }, { key: 'protein_g', label: 'Protein (g)' }, { key: 'carbs_g', label: 'Carbs (g)' }, { key: 'fat_g', label: 'Fat (g)' }, { key: 'fiber_g', label: 'Fiber (g)' }, { key: 'sugar_g', label: 'Sugar (g)' }, { key: 'sodium_mg', label: 'Sodium (mg)' }].map(({ key, label }) => (
-                    <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
-                      <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                      <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
-                        style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
-                    </div>
-                  ))}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-                    <input type="checkbox" id="savelib3" checked={saveToLib} onChange={e => setSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '14px', height: '14px' }} />
-                    <label htmlFor="savelib3" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>⭐ Save to My Favorites</label>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '10px', marginTop: '18px' }}>
-                  <button onClick={() => setManualMode(false)}
-                    style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>← Back</button>
-                  <button onClick={handleSearchAdd} disabled={!manual.name.trim() || saving}
-                    style={{ flex: 2, backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: (!manual.name.trim() || saving) ? 0.5 : 1 }}>
-                    {saving ? '...' : `+ Log to ${mealInfo?.label}`}
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Create a Meal footer */}
+            <div style={{ padding: '10px 20px 16px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+              <button onClick={() => { onClose(); onCreateMeal() }}
+                style={{ width: '100%', background: 'none', border: '1px solid rgba(167,139,250,0.35)', borderRadius: '8px', padding: '9px', fontSize: '13px', color: 'var(--accent-purple)', cursor: 'pointer', fontWeight: '500' }}>
+                🍳 Build a Meal from Multiple Ingredients
+              </button>
+            </div>
           </>
         )}
+
+        {/* ── Enter Manually tab ── */}
+        {tab === 'manual' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px 0' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 14px' }}>Only Name is required — fill in as much or as little as you know.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {[{ key: 'name', label: 'Name *', type: 'text' }, { key: 'brand', label: 'Brand', type: 'text' }, { key: 'serving_size_label', label: 'Serving Size', type: 'text' }].map(({ key, label, type }) => (
+                <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
+                  <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
+                  <input type={type} value={manual[key]} onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
+                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                </div>
+              ))}
+              <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Macros</div>
+              {[{ key: 'calories', label: 'Calories' }, { key: 'protein_g', label: 'Protein (g)' }, { key: 'carbs_g', label: 'Carbs (g)' }, { key: 'fat_g', label: 'Fat (g)' }, { key: 'fiber_g', label: 'Fiber (g)' }, { key: 'sugar_g', label: 'Sugar (g)' }, { key: 'sodium_mg', label: 'Sodium (mg)' }, { key: 'potassium_mg', label: 'Potassium (mg)' }].map(({ key, label }) => (
+                <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
+                  <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
+                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
+                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                </div>
+              ))}
+              <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Optional</div>
+              {[{ key: 'saturated_fat_g', label: 'Saturated Fat (g)' }, { key: 'cholesterol_mg', label: 'Cholesterol (mg)' }, { key: 'calcium_mg', label: 'Calcium (mg)' }, { key: 'iron_mg', label: 'Iron (mg)' }, { key: 'vitamin_c_mg', label: 'Vitamin C (mg)' }, { key: 'vitamin_d_mcg', label: 'Vitamin D (mcg)' }].map(({ key, label }) => (
+                <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
+                  <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
+                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
+                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '14px 0 4px' }}>
+              <input type="checkbox" id="mansavelib" checked={manualSaveToLib} onChange={e => setManualSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '14px', height: '14px' }} />
+              <label htmlFor="mansavelib" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>⭐ Save to My Favorites for quick logging next time</label>
+            </div>
+          </div>
+        )}
+        {tab === 'manual' && (
+          <div style={{ padding: '12px 20px 18px', borderTop: '1px solid var(--border)', flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Servings:</span>
+              <input type="number" min="0.25" step="0.25" value={manualServings} onChange={e => setManualServings(e.target.value)}
+                style={{ width: '56px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
+            </div>
+            <button onClick={handleManualLog} disabled={!manual.name.trim() || savingManual}
+              style={{ flex: 1, backgroundColor: manual.name.trim() ? 'var(--accent-blue)' : 'var(--border)', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: '600', cursor: manual.name.trim() ? 'pointer' : 'default', opacity: savingManual ? 0.6 : 1 }}>
+              {savingManual ? '...' : `+ Log to ${mealInfo?.label}`}
+            </button>
+          </div>
+        )}
+
+        {/* ── Search Database tab ── */}
+        {tab === 'search' && (
+          <>
+            <div style={{ padding: '0 20px 10px', flexShrink: 0 }}>
+              <input ref={searchInputRef} value={query} onChange={e => handleQueryChange(e.target.value)}
+                placeholder="Search food name or brand..."
+                style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 14px', color: 'var(--text-primary)', fontSize: '13px' }} />
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
+              {searching && <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Searching...</p>}
+              {!searching && results.length > 0 && (
+                <div style={{ marginBottom: '8px' }}>
+                  {results.slice(0, 8).map((f, i) => (
+                    <FoodRow key={f.id || i} food={f} selected={selected?.id === f.id} onSelect={setSelected}
+                      onSave={handleQuickSave} savingId={savingFood} />
+                  ))}
+                </div>
+              )}
+              {!searching && query && results.length === 0 && (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>No results. Try the "Enter Manually" tab to add it yourself.</p>
+              )}
+              {!query && (
+                <div style={{ padding: '8px 0' }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 12px' }}>Type to search Open Food Facts (millions of foods).</p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>Can't find what you're looking for? Use the <button onClick={() => setTab('manual')} style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', cursor: 'pointer', fontSize: '12px', padding: 0, textDecoration: 'underline' }}>Enter Manually</button> tab to add any food.</p>
+                </div>
+              )}
+            </div>
+
+            {selected && (
+              <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selected.name}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                    {selected.serving_size_label || '1 serving'}{selected.calories ? ` · ${Math.round(selected.calories * (parseFloat(searchServings) || 1))} kcal` : ''}
+                  </div>
+                </div>
+                <input type="number" min="0.25" step="0.25" value={searchServings} onChange={e => setSearchServings(e.target.value)}
+                  style={{ width: '56px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
+                <button onClick={handleSearchLog} disabled={savingSearch}
+                  style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: savingSearch ? 0.6 : 1, flexShrink: 0 }}>
+                  {savingSearch ? '...' : '+ Log'}
+                </button>
+              </div>
+            )}
+
+            <div style={{ padding: '10px 20px 14px', borderTop: selected ? 'none' : '1px solid var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input type="checkbox" id="searchsavelib" checked={saveToLib} onChange={e => setSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '14px', height: '14px' }} />
+              <label htmlFor="searchsavelib" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>⭐ Save to My Favorites when I log this</label>
+            </div>
+          </>
+        )}
+
       </div>
     </div>
   )
@@ -645,7 +695,7 @@ const MEAL_NUTRITION_KEYS = [
   'caffeine_mg','water_g','omega3_g','vitamin_k_mcg','choline_mg',
 ]
 
-function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onCreateMeal }) {
+function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary }) {
   const [expandedId, setExpandedId] = useState(null)
   const [logServings, setLogServings] = useState('1')
 
@@ -668,16 +718,10 @@ function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onCreate
           <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', margin: '0 0 4px' }}>My Favorites</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>Foods you eat often — tap Log, pick a meal, done.</p>
         </div>
-        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-          <button onClick={onCreateMeal}
-            style={{ backgroundColor: 'rgba(167,139,250,0.08)', color: 'var(--accent-purple)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: '8px', padding: '7px 12px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            🍳 Create Meal
-          </button>
-          <button onClick={onOpenLibrary}
-            style={{ backgroundColor: 'rgba(167,139,250,0.12)', color: 'var(--accent-purple)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '8px', padding: '7px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            + Add Favorite
-          </button>
-        </div>
+        <button onClick={onOpenLibrary}
+          style={{ backgroundColor: 'rgba(167,139,250,0.12)', color: 'var(--accent-purple)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '8px', padding: '7px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+          + Add Favorite
+        </button>
       </div>
       {myFoods.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '24px 0' }}>
@@ -900,8 +944,9 @@ function MealBuilderModal({ onClose, onSave }) {
               style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '13px' }} />
             {query.trim() && (
               <button onClick={addCustomIngredient}
-                style={{ marginTop: '6px', background: 'none', border: '1px dashed var(--border)', borderRadius: '7px', padding: '7px 14px', fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
-                + Add "{query.trim()}" as custom ingredient (fill in nutrition manually)
+                style={{ marginTop: '6px', backgroundColor: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.4)', borderRadius: '7px', padding: '9px 14px', fontSize: '12px', color: 'var(--accent-purple)', cursor: 'pointer', width: '100%', textAlign: 'left', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '14px' }}>✏️</span>
+                <span>Add "{query.trim()}" manually — I'll fill in the nutrition myself</span>
               </button>
             )}
             {searching && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Searching...</div>}
@@ -1243,6 +1288,8 @@ export default function NutritionPage() {
     </div>
   )
 
+  const mealFoods = myFoods.filter(f => !f.is_drink)
+
   const tdee = calcTDEE(goals)
   const macros = calcMacros(tdee, goals)
   const { bonus: workoutBonus, reason: bonusReason, grossBurn, duration: workoutDuration } = calcWorkoutBonus(todayWorkout, goals)
@@ -1265,7 +1312,7 @@ export default function NutritionPage() {
     <div>
       {logModal && (
         <AddFoodModal slot={logModal} onClose={() => setLogModal(null)} onAdd={handleAddEntry}
-          myFoods={myFoods} onSaveFood={handleSaveToMyFoods} />
+          myFoods={mealFoods} onSaveFood={handleSaveToMyFoods} onCreateMeal={() => setMealBuilderModal(true)} />
       )}
       {libraryModal && (
         <SearchModal slot={null} onClose={() => setLibraryModal(false)} onAdd={() => {}}
@@ -1280,11 +1327,34 @@ export default function NutritionPage() {
         }} />
       )}
 
-      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Nutrition</h1>
           <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Track meals, macros, and every nutrient that matters.</p>
         </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        {[
+          { key: 'log', label: 'Food Log' },
+          { key: 'myfoods', label: '⭐ My Favorites' },
+          { key: 'mealplan', label: '📅 Weekly Meal Plan' },
+          { key: 'supplements', label: 'Supplements' },
+        ].map(t => (
+          t.key === 'mealplan' ? (
+            <Link key="mealplan" href="/life-hub/nutrition/meal-plan" style={{ textDecoration: 'none' }}>
+              <button style={{ padding: '9px 16px', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: '400', cursor: 'pointer', backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', transition: 'all 0.15s' }}>
+                📅 Weekly Meal Plan
+              </button>
+            </Link>
+          ) : (
+            <button key={t.key} onClick={() => setActiveTab(t.key)}
+              style={{ padding: '9px 16px', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: activeTab === t.key ? '600' : '400', cursor: 'pointer', backgroundColor: activeTab === t.key ? 'var(--accent-blue)' : 'var(--surface)', color: activeTab === t.key ? '#E8E8E8' : 'var(--text-secondary)', transition: 'all 0.15s' }}>
+              {t.label}
+            </button>
+          )
+        ))}
       </div>
 
       {/* Calorie + Macro Summary */}
@@ -1402,32 +1472,12 @@ export default function NutritionPage() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
-        {[{ key: 'log', label: 'Food Log' }, { key: 'myfoods', label: '⭐ Saved Foods' }, { key: 'supplements', label: 'Supplements' }].map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key)}
-            style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: activeTab === t.key ? '600' : '400', cursor: 'pointer', backgroundColor: activeTab === t.key ? 'var(--accent-blue)' : 'var(--surface)', color: activeTab === t.key ? '#E8E8E8' : 'var(--text-secondary)', transition: 'all 0.15s' }}>
-            {t.label}
-          </button>
-        ))}
-        <Link href="/life-hub/nutrition/meal-plan" style={{ textDecoration: 'none', marginLeft: 'auto' }}>
-          <button style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '13px', fontWeight: '400', cursor: 'pointer', backgroundColor: 'var(--surface)', color: 'var(--text-secondary)' }}>
-            📅 Meal Plan →
-          </button>
-        </Link>
-      </div>
-
       {/* Food Log Tab */}
       {activeTab === 'log' && (
         <div>
-          {/* Copy yesterday + Create meal */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
-            <button onClick={() => setMealBuilderModal(true)}
-              style={{ background: 'none', border: '1px solid rgba(167,139,250,0.4)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', color: 'var(--accent-purple)', cursor: 'pointer', fontWeight: '500' }}>
-              🍳 Create a Meal
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
             <button onClick={handleCopyYesterday} disabled={copyingYesterday}
-              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', opacity: copyingYesterday ? 0.5 : 1 }}>
+              style={{ background: 'none', border: 'none', fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', opacity: copyingYesterday ? 0.5 : 1 }}>
               {copyingYesterday ? 'Copying...' : '📋 Copy from yesterday'}
             </button>
           </div>
@@ -1484,8 +1534,8 @@ export default function NutritionPage() {
 
       {/* Saved Foods Tab */}
       {activeTab === 'myfoods' && (
-        <SavedFoodsTab myFoods={myFoods} onDirectLog={handleAddEntry} onDelete={handleDeleteMyFood}
-          onOpenLibrary={() => setLibraryModal(true)} onCreateMeal={() => setMealBuilderModal(true)} />
+        <SavedFoodsTab myFoods={mealFoods} onDirectLog={handleAddEntry} onDelete={handleDeleteMyFood}
+          onOpenLibrary={() => setLibraryModal(true)} />
       )}
 
       {/* Supplements Tab */}
