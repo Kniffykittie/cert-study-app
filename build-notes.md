@@ -267,6 +267,17 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 45 - Complete
+- **Drinks & Hydration page** — Water Tracker redesigned into full Drinks & Hydration system at `/life-hub/health/water`; sidebar label updated "Water Tracker" → "Drinks & Hydration"
+- **Stacked hydration ring** — SVG ring with three segments: water (blue), beverages (purple), food water from drink entries (future green segment); shows total oz vs goal with breakdown legend
+- **Drink search + log modal** — search Open Food Facts for any beverage; log modal shows per-serving nutrition (calories, caffeine, water content); servings input; "Save to My Drinks" checkbox saves as is_drink=true to my_foods for future quick-log
+- **Saved Drinks chips** — horizontal chip row of saved drinks (my_foods.is_drink=true); one tap logs 1 serving directly without opening modal
+- **Caffeine tracker** — summed from food_log_entries where meal_slot='drink'; shown on ring card with color-coded indicator (green <200mg / yellow 200–400mg / orange 400–600mg / red >600mg)
+- **Combined today's log** — water entries and drink entries shown in unified log sorted by time; each row shows hydration contribution (oz), caffeine if nonzero, calories if nonzero
+- **DB migration** — `caffeine_mg` + `water_g` added to food_cache, my_foods, food_log_entries; `is_drink BOOLEAN DEFAULT false` added to my_foods; `water_goal_oz INT DEFAULT 64` added to goals_profiles
+- **API updates** — search/route.js now extracts caffeine (nutriments.caffeine) and water (nutriments.water) from OFF; log/route.js and my-foods/route.js include caffeine_mg + water_g in MICRO_FIELDS; my-foods POST saves is_drink flag
+- **Goal persistence** — water goal now syncs to goals_profiles.water_goal_oz on save (falls back to localStorage if no goals_profiles row)
+
 ### Phase 44h - Complete
 - **Symptom Checker modal** — replaces static symptom pills with a full "Check My Symptoms" modal; 22 symptoms organized in 5 categories (Energy & Focus, Sleep & Recovery, Mood & Mental, Physical, Immune & Skin); results update live as symptoms are selected; two-column layout (symptoms left, results right) collapses gracefully
 - **Ranked results with mechanism sentences** — each result card explains the specific biological mechanism connecting the symptom to the nutrient (not generic — e.g. "Magnesium activates GABA receptors in your brain — the same inhibitory pathway sedatives work on"); cross-referenced against actual intake status (LOW/MODERATE/GOOD/SUPP/no data)
@@ -905,8 +916,317 @@ ALTER TABLE daily_checkins ADD COLUMN hydration_score SMALLINT;
 
 ---
 
+### Phase 46 — Data Intelligence, Correlation Engine & Missing Nutrients
 
-*Adds the context fields that make the AI overview and workout plan genuinely personalized rather than generic.*
+*This phase is about making all the data we already collect actually talk to each other. Most of the raw ingredients exist — weight logs, food logs, workout logs, sleep sessions, step counts, check-ins, supplement stack, water logs. Right now they sit in separate features and rarely inform each other. This phase changes that. It also fills in the nutrient gaps that matter most and builds the philosophy of "here's what your data is actually telling you" into every corner of the app.*
+
+---
+
+#### Part 1 — Scale Context: Teaching People Why the Scale Lies
+
+*The single most demoralizing moment in any fitness journey is working hard, eating well, and watching the scale go up. It almost always has a rational explanation, and we have the data to provide it. This feature would prevent more people from quitting than almost anything else we could build.*
+
+**What actually moves scale weight day-to-day (not fat):**
+
+| Factor | Typical impact | Data we already have |
+|--------|---------------|---------------------|
+| High sodium intake | +1–2 lbs per 1,000mg above baseline (body retains ~200ml water per extra gram of sodium) | `food_log_entries.sodium_mg` |
+| Creatine supplement | +2–5 lbs first week (draws water into muscle cells — intracellular hydration, beneficial) | `supplement_stack` |
+| High-carb day | +1–3 lbs (every gram of glycogen binds 3–4g water; high-carb = more glycogen stored) | `food_log_entries.carbs` |
+| Post-workout inflammation | +1–3 lbs in worked muscles (tissue retains water during repair, most pronounced 24–48h post) | `workout_logs` |
+| High cortisol / stress | +0.5–2 lbs (cortisol causes sodium retention) | `daily_checkins.mood_level` (proxy) |
+| Poor sleep | +0.5–1.5 lbs (sleep deprivation raises cortisol) | `health_sleep_sessions` |
+| High fiber day | +0.5–1.5 lbs (fiber absorbs water, bulks digestive transit) | `food_log_entries.fiber_g` |
+| Dehydration | −1–3 lbs (temporary; misleading as "weight loss") | `water_logs` + hydration score |
+
+**What to build:**
+
+**Scale Context Panel on body measurements weight entry:**
+- When a user logs their weight, a small collapsible panel below the input computes which retention factors are active based on the last 24–48 hours of data
+- Shows: *"Your scale reading today may be elevated by an estimated 1.5–3 lbs from real weight change. Factors: high sodium yesterday (3,400mg), creatine in your stack, leg workout 2 days ago. Your 7-day trend average is more reliable."*
+- Only shows factors that are actually elevated — doesn't show the full table every time
+- A "Why?" link expands to explain the mechanism for each active factor in plain language
+- The explanation is educational, not alarming: *"Creatine draws water into muscle cells — this is normal and actually beneficial for performance. It's not fat."*
+
+**7-day rolling average as primary weight chart line:**
+- On the measurements weight chart, the raw daily dots stay visible but lighter
+- A bold 7-day rolling average line becomes the main visual
+- Days flagged as "high retention" (sodium > 3,000mg OR post-workout day OR creatine in stack) shown as hollow dots vs. solid dots — visually communicates noise vs. signal
+- Caption below chart: *"Daily weight fluctuates 1–5 lbs from water, food timing, and inflammation. Your trend (bold line) is what actually matters."*
+
+**Muscle gain + fat loss detection:**
+- Compare weight trend to body measurement trends over the same period
+- If weight is trending UP but waist/hips are trending DOWN → flag as likely recomposition: *"Your scale is up 2 lbs this month but your waist is down 0.75 inches. This pattern suggests muscle gain — the scale is misleading here. Keep going."*
+- If weight is trending UP and all measurements are stable or up → honest flag: *"Weight is trending up without measurement improvement — worth reviewing your calorie intake."*
+- This is the most important distinction in fitness and no app surfaces it clearly
+
+---
+
+#### Part 2 — Missing Nutrients to Add
+
+*Current 13 tracked: Iron, Calcium, Magnesium, Potassium, Zinc, Sodium, Vitamin D, Vitamin C, Vitamin A, B12, B6, Folate, Fiber. Additions below are ranked by importance.*
+
+**Priority additions:**
+
+**Omega-3 Fatty Acids (EPA+DHA combined, in mg)**
+- RDV: ~1,100–1,600mg/day (varies by sex); optimal for active people closer to 2,000–3,000mg EPA+DHA combined
+- Why it matters: anti-inflammatory (critical for workout recovery), brain function, heart health, joint lubrication, mental health. Deficiency is widespread — most people eating Western diets are severely under-target.
+- Open Food Facts field: `omega3_100g`
+- Supplement connection: fish oil, krill oil, algae oil are the most commonly taken supplements; the `suppMatch` array would include 'omega', 'fish oil', 'krill', 'epa', 'dha', 'algae oil'
+- Symptom connections: slow recovery, joint aches, low mood, brain fog
+- Encyclopedia entry angle: the omega-6 to omega-3 ratio story is genuinely interesting — the Western diet ratio is ~15:1 (pro-inflammatory) vs the optimal ~4:1; explaining this teaches people why eating more fish matters more than any supplement
+
+**Vitamin K (mcg, K1+K2 combined)**
+- RDV: ~90–120mcg/day (most people get K1 from leafy greens; K2 from fermented foods and animal products is rarer)
+- Why it matters: routes calcium into bones rather than arteries — someone can take all the Vitamin D and Calcium they want and still have suboptimal bone mineralization without adequate K2. The Vitamin D → Calcium → Vitamin K2 trio is the most important synergy we're not teaching.
+- Open Food Facts field: `vitamin_k_100g`
+- Supplement connection: K2 (MK-7 form) is increasingly supplemented alongside Vitamin D; `suppMatch`: 'vitamin k', 'k2', 'mk-7', 'mk7', 'menaquinone'
+- Add synergy link in encyclopedia: Calcium → Vitamin K, Vitamin D → Vitamin K
+
+**Choline (mg)**
+- RDV: ~425–550mg/day; most people get 300mg or less
+- Why it matters: brain function (acetylcholine neurotransmitter), liver health (prevents fatty liver), cell membrane integrity. Found primarily in eggs (1 egg = ~147mg), liver, fish, soybeans. People eating low-egg, plant-heavy diets can be significantly deficient. Almost nobody tracks it.
+- Open Food Facts field: `choline_100mg` (field exists but not always populated)
+- Symptom connections: brain fog, memory issues, fatigue — often mistaken for B12 deficiency
+- Encyclopedia angle: the "egg is brain food" story with the actual mechanism
+
+**Iodine (mcg)**
+- RDV: 150mcg/day
+- Why it matters: thyroid hormone production. Hypothyroidism symptoms (fatigue, weight gain, cold sensitivity, brain fog, hair thinning) overlap heavily with iron and Vitamin D deficiency — iodine should be in the differential when those symptoms are selected. People on low-sodium diets using non-iodized salt are at meaningful risk.
+- Supplement connection: many thyroid supplements and some multivitamins; `suppMatch`: 'iodine', 'potassium iodide', 'kelp'
+- Symptom connections: tired after sleep, feel weak, cold extremities, brain fog, hair thinning, weight gain despite normal eating — add iodine to these in the symptom checker
+- Note: iodine is not well-tracked in Open Food Facts; best approach is supplement stack tracking + general dietary assessment (dairy, seafood, iodized salt user flag)
+
+**Added Sugar (g, distinct from total carbs)**
+- No RDV — WHO recommends < 25g/day free sugars; American Heart Association < 36g (men) / 25g (women)
+- Why it matters: blood sugar spikes → crashes → energy rollercoaster (already a symptom in our checker); insulin resistance over time; fat storage promotion; inflammatory. Tracking total carbs without sugar breakdown misses the glycemic load story entirely.
+- Open Food Facts field: `sugars_100g` (already exists in OFF response — may already be partially mapped in our search route)
+- Correlation opportunity: added sugar days vs. energy check-in crash pattern, vs. afternoon energy dip logs
+- Not an encyclopedia nutrient — better shown on the nutrition page as a standalone bar with WHO guideline reference
+
+---
+
+#### Part 3 — Data We Have That Isn't Talking to Anything
+
+*These are existing data tables with valuable signal that currently feed zero other features. Listed by highest potential impact.*
+
+**Sleep data (health_sleep_sessions) — currently completely isolated**
+- We measure: total duration, deep sleep minutes, REM minutes, light minutes, awake minutes
+- This data should inform:
+  - **Daily Brief**: "You got 5h 12m sleep with only 38min deep — your cognitive performance and energy may be impaired today. Give yourself grace on workout intensity."
+  - **Energy check-in context**: if last night's sleep was < 6h or < 45min deep, the check-in should acknowledge it: *"You slept less than 6 hours — how's your energy given that?"*
+  - **Workout fatigue signal**: poor sleep is as impactful as low energy check-in for training readiness; should factor in equally
+  - **Calorie context**: sleep deprivation raises ghrelin (hunger hormone) by ~24%. If someone slept < 6h and their calorie intake is significantly above target the next day, connect the dots: *"Short sleep night followed by higher-than-usual calorie intake — this is a known physiological pattern, not a willpower failure."*
+  - **Monthly wrap**: average sleep duration and quality as a stat card; correlation note if low-sleep weeks align with low-energy check-in weeks
+  - **Correlation engine**: 30-day sleep average vs. 30-day energy check-in average; show as a chart on the progress or health overview page
+
+**Step count (health_steps_hourly) → TDEE recalibration**
+- We calculate TDEE from a static activity multiplier set during goals setup (desk job = 1.2×, active = 1.5×, etc.)
+- We have ACTUAL daily step data when Google Health is connected
+- Steps are the largest single variable in NEAT (non-exercise activity thermogenesis) — the calories you burn outside of structured exercise
+- 10,000 steps/day = ~400–500 extra calories burned vs. sedentary; 3,000 steps/day = significantly less than assumed for someone who checked "lightly active"
+- **What to build**: when 14+ days of step data exists, recalibrate the activity component of TDEE using actual steps instead of the static multiplier. Show a callout on the nutrition page: *"Based on your actual 14-day step average of 8,400 steps, your TDEE estimate has been updated from 2,450 to 2,380 calories. Your targets have adjusted."*
+- This makes the TDEE calibration system significantly more accurate without requiring weight change data
+
+**Macro timing vs. energy check-ins — the most compelling correlation we could build**
+- We have `food_log_entries` with timestamps (meal timing) and `daily_checkins` with energy levels
+- Correlations worth computing over 14+ days:
+  - Breakfast timing vs. energy: *"On days you log breakfast before 9am, your energy check-ins average 3.8/5. Days you skip or eat after noon: 2.4/5."*
+  - Fiber intake vs. afternoon energy crash: *"Your energy check-in is consistently lower on days your fiber intake is below 15g."*
+  - Protein hit rate vs. next-day energy: *"You hit your protein target 8 of the last 14 days. On those days, your next-day energy averaged 3.9/5 vs 2.7/5 on under-target days."*
+  - Calorie deficit depth vs. energy: *"On days you're in a deficit > 500 calories, your energy the following day averages 2.2/5."*
+- These insights should surface in the daily brief and monthly wrap when enough data exists
+- **Minimum data threshold**: 14 days of food logs + 10 daily check-ins to start computing correlations
+
+**Workout performance vs. nutrition — unused data pair**
+- We have `workout_log_sets` (exercise, weight, reps per session) and `food_log_entries` (macros, calories, timing)
+- Total volume = sets × weight × reps — computable per session
+- Correlations worth computing when 8+ paired sessions exist:
+  - Protein intake day-before vs. volume moved: *"On days following adequate protein intake (your 160g target), you moved an average 12% more total volume."*
+  - Carb intake pre-workout vs. performance: *"Your highest-volume sessions follow days with 200g+ carbs. Your lowest-volume sessions average 110g carbs the day prior."*
+  - Hydration score day-before vs. performance: *"Your 5 best sessions this month all had hydration scores above 70 the day before."*
+  - Calorie deficit vs. performance: *"Strength drops significantly when you're in a deficit > 400 calories — worth timing your heaviest sessions to maintenance days if possible."*
+- Surface on: workout history page (as a "Patterns" section), monthly wrap, daily brief on workout days
+
+**Weight chart + calorie overlay — the missing visual education**
+- Body measurements page shows weight over time as a line chart
+- Food logs give us daily calorie averages
+- These should be shown together: weight line primary, with calorie intake as a secondary bar or shaded area behind it
+- The 1–2 week lag between calorie change and weight response becomes visually obvious
+- Users would literally see: "deficit period → weight drops 10 days later" — this is what dietitians show in clinical practice
+- Add annotation: "The scale responds to calorie balance with a 1–2 week delay. What you eat this week shows up on the scale next week."
+
+**Supplement timing vs. nutrient absorption — specific actionable warnings**
+- We know from `supplement_stack`: what supplements, what timing (morning/pre/post/evening/with meals)
+- We know from the nutrient data which nutrients compete or enhance each other
+- Specific warnings worth generating (rule-based, no AI needed):
+  - Iron (morning) + Calcium supplement (morning) → *"Iron and calcium compete for the same transporters. Taking both in the morning reduces iron absorption by up to 60%. Consider spacing them 2+ hours apart."*
+  - Vitamin D (any time) + taken without fat → *"Vitamin D is fat-soluble — take it with your largest meal for best absorption."*
+  - Zinc + Copper (if both in stack) → *"High-dose zinc supplementation depletes copper over time. Make sure you're getting some copper from food or consider a zinc+copper ratio supplement."*
+  - Iron + Vitamin C (same time) → *"Taking iron with Vitamin C increases absorption by up to 3×. This is a great pairing — keep it."* (positive reinforcement too)
+  - Magnesium (evening) → *"Magnesium taken in the evening is well-timed — its GABA-activating properties support sleep quality."* (affirm good choices)
+- Surface these as a "Stack Interactions" card on the Supplements page, not just as errors
+
+---
+
+#### Part 4 — Recovery Score (Composite Daily Signal)
+
+*A single number that synthesizes everything we know about someone's recovery state. Powers smarter workout recommendations, daily brief framing, and monthly patterns.*
+
+**Formula (computed daily, stored in `daily_checkins.recovery_score SMALLINT`):**
+
+Inputs and weights:
+```
+sleep_quality_score (0–25 pts):
+  — 7-8h + adequate deep (45min+): 25
+  — 6-7h or low deep: 15
+  — <6h or <30min deep: 5
+  — no sleep data: 15 (neutral, not penalized)
+
+hydration_score_contribution (0–20 pts):
+  — hydration_score / 5 (max 20)
+
+protein_adequacy (0–20 pts):
+  — yesterday's protein / goal × 20 (capped at 20)
+
+workout_recovery_window (0–20 pts):
+  — no workout yesterday: 20 (fully recovered)
+  — workout yesterday, low intensity: 15
+  — workout yesterday, high volume: 10
+  — 2 workouts in 2 days: 5
+
+mood_energy_checkin (0–15 pts):
+  — avg of yesterday's energy + mood / 2 × 3 (max 15)
+
+recovery_score = sum of above (max 100)
+```
+
+**Recovery score → label:**
+- 80–100: 🟢 Well Recovered — full intensity appropriate
+- 60–79: 🟡 Moderate — normal session fine, avoid maxing out
+- 40–59: 🟠 Fatigued — consider lighter session or active recovery
+- 0–39: 🔴 Low — rest day strongly suggested
+
+**Where it shows up:**
+- Workout Plan page: large recovery chip below the day header, above exercise list; replacing or complementing the current fatigue signal
+- Daily Brief: *"Your recovery score today is 72 — you're in good shape for a normal training session but maybe hold back on PRs."*
+- Monthly Wrap: average recovery score for the month; days with low recovery that coincided with hard workouts flagged
+- History page: recovery score shown alongside each session as context for why performance varied
+
+---
+
+#### Part 5 — Inflammation Proxy
+
+*We can't run blood tests but we can triangulate chronic inflammation state from multiple data points we already collect.*
+
+**Inflammation signal inputs:**
+- Pro-inflammatory factors (raise score): high sugar intake (>30g added sugar), low omega-3 intake (once tracked), high omega-6 to omega-3 ratio, low sleep quality, consecutive hard workout days without recovery, low Vitamin D, high stress check-ins (mood ≤ 2 multiple days)
+- Anti-inflammatory factors (lower score): omega-3 intake meeting target, Vitamin D adequate, high Vitamin C intake, adequate sleep, rest days, high fiber intake (gut microbiome protection)
+
+**Shown as:** a subtle chip on the Life Hub home or Goals page — *"Inflammation signal: Elevated this week"* — with a tap to expand showing which factors are contributing and what would help most. Not clinical, not scary, just informative.
+
+**Connection to workout plan:** if inflammation proxy is elevated for 3+ consecutive days, the AI workout plan generation should be informed: reduce volume, increase recovery emphasis.
+
+---
+
+#### Part 6 — Tracking Motivation Philosophy (How We Teach and Inspire)
+
+*The most valuable insight we can give people is worthless if they don't log enough data for it to fire. Every empty state needs to communicate the specific value waiting on the other side of more data.*
+
+**The "data completeness" indicator on Life Hub home:**
+A small card showing what features are fully powered vs. waiting for more data:
+
+```
+📊 Your Data Dashboard
+✅ Daily Brief         Fully powered
+✅ Symptom Checker     Powered (partial — log food for intake data)
+⚡ Nutrient Encyclopedia  Needs 3 more food log days to show your status
+⚡ Scale Context       Log yesterday's food to activate
+⚡ Correlation Engine  Needs 14 days food logs + 10 check-ins (you have 6 + 7)
+  └── Progress bar: [████████░░░░░░] 10 more days to unlock nutrition-energy correlations
+```
+
+Each item links to the relevant page. Progress bars toward unlock thresholds. Not nagging — demonstrating value waiting to be unlocked.
+
+**Empty state language overhaul:**
+Replace generic "log food to see status" with specific, time-bound promises:
+
+Instead of: *"Log at least 5 days of food to see your personalized intake data."*
+Write: *"Log 2 more days of food and I'll show you exactly where your diet is falling short on these 13 nutrients — and which ones correlate with the symptoms you've been selecting."*
+
+Instead of: *"No data available."*
+Write: *"Once you've logged 14 days of food and 10 check-ins, I'll tell you whether your energy crashes correlate with specific nutrient patterns in your diet. Nobody has shown you this before because nobody had the data. You're 8 days away."*
+
+**Tracking streaks for data quality (not just consistency):**
+Rather than rewarding daily logging regardless of completeness (logging 1 food = logged), reward quality:
+- "Complete day" = food logged + check-in completed + weight logged (if it's weigh-in day)
+- Weekly quality streak shown on the Life Hub home
+- *"You've had 5 complete tracking days this week — your correlation engine is firing on all cylinders."*
+
+**The explanation layer on every insight:**
+Every AI-generated or rule-based insight that surfaces in the app should have a "Why does this happen?" expandable section — a 2–3 sentence plain-language explanation of the mechanism. Not just *"Your energy is low"* but *"Your energy is low because: you slept 5h 20min, your iron intake this week averages 6mg (33% of your RDV), and you've been in a calorie deficit > 400 calories for 4 consecutive days. Each of these independently reduces energy; all three together is a compounding effect."*
+
+Teaching people WHY is what builds the habit. Once someone understands the mechanism, they track because they understand the connection — not because an app told them to.
+
+---
+
+#### Part 7 — DB Changes Required for Phase 46
+
+```sql
+-- Body measurements: flag high-retention days
+ALTER TABLE body_measurements ADD COLUMN retention_factors JSONB;
+-- Stores computed retention factors at time of logging: {sodium_mg, post_workout, creatine_active, carb_g, etc.}
+
+-- Daily checkins: add recovery and inflammation scores
+ALTER TABLE daily_checkins ADD COLUMN recovery_score SMALLINT;
+ALTER TABLE daily_checkins ADD COLUMN inflammation_signal SMALLINT; -- 0=low, 1=moderate, 2=elevated
+
+-- Food cache / my_foods / food_log_entries: new nutrients
+ALTER TABLE food_cache ADD COLUMN omega3_g NUMERIC(8,3);
+ALTER TABLE food_cache ADD COLUMN vitamin_k_mcg NUMERIC(8,2);
+ALTER TABLE food_cache ADD COLUMN choline_mg NUMERIC(8,2);
+ALTER TABLE food_cache ADD COLUMN sugar_g NUMERIC(8,2); -- added/total sugar
+-- (iodine: tracked via supplement stack only; OFF data too sparse)
+
+ALTER TABLE my_foods ADD COLUMN omega3_g NUMERIC(8,3);
+ALTER TABLE my_foods ADD COLUMN vitamin_k_mcg NUMERIC(8,2);
+ALTER TABLE my_foods ADD COLUMN choline_mg NUMERIC(8,2);
+ALTER TABLE my_foods ADD COLUMN sugar_g NUMERIC(8,2);
+
+ALTER TABLE food_log_entries ADD COLUMN omega3_g NUMERIC(8,3);
+ALTER TABLE food_log_entries ADD COLUMN vitamin_k_mcg NUMERIC(8,2);
+ALTER TABLE food_log_entries ADD COLUMN choline_mg NUMERIC(8,2);
+ALTER TABLE food_log_entries ADD COLUMN sugar_g NUMERIC(8,2);
+
+-- Nutrient encyclopedia: add new entries
+-- Omega-3, Vitamin K, Choline, Iodine added to src/data/nutrients.js
+-- New nutrient_profiles rows generated on first view (same pattern)
+```
+
+---
+
+#### Part 8 — Correlation Engine: Technical Approach
+
+*The insights in Part 3 require computing correlations across multiple tables. These should not be computed on every page load — they are expensive queries that need to be cached.*
+
+**Approach:**
+- New API route: `GET /api/life-hub/correlations` — computes and returns all available correlation insights for the user
+- Cached in a new `user_insights` table: `user_id, insight_key TEXT, insight_data JSONB, computed_at TIMESTAMPTZ, expires_at TIMESTAMPTZ`
+- Each insight has a TTL — recomputed weekly (most correlations don't change day-to-day)
+- Minimum data gates enforced server-side: if data is insufficient for an insight, returns `{ available: false, needed: "X more days of food logs" }` rather than null
+- Insights surfaced in: Daily Brief (most important ones), Monthly Wrap (full summary), a new "Patterns" section on the Progress page, and as callout cards on relevant feature pages
+
+**Priority insight order (compute in this sequence):**
+1. Protein intake → workout volume correlation (most motivating)
+2. Fiber/sugar → energy crash pattern (most actionable)
+3. Sleep quality → next-day energy (most surprising to most people)
+4. Calorie balance → weight change with lag visualization (most educational)
+5. Hydration score → workout performance (reinforces tracking)
+6. Calorie deficit depth → energy check-in (prevents over-restriction)
+
+---
+
+
 
 **Biggest Obstacle(s)**
 - Multi-select (pick all that apply): Time / Consistency / Diet & Nutrition / Past Injuries / Low Motivation / Not Sure Where to Start / Burnout / Stress / Lack of Support / Sleep

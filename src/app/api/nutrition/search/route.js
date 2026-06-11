@@ -36,6 +36,10 @@ function extractNutrients(n, useSuffix) {
     vitamin_b12_mcg: get('vitamin-b12') != null ? get('vitamin-b12') * 1000000 : null,
     vitamin_b6_mg:   get('vitamin-b6') != null ? get('vitamin-b6') * 1000 : null,
     folate_mcg:      get('folate') != null ? get('folate') * 1000000 : null,
+    // caffeine: OFF stores as mg/100g under 'caffeine'
+    caffeine_mg:     get('caffeine') != null ? get('caffeine') : null,
+    // water: OFF stores as g/100g under 'water'
+    water_g:         get('water') != null ? get('water') : null,
   }
 }
 

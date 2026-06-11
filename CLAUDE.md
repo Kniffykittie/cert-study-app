@@ -134,7 +134,7 @@ src/
         page.js                        Health Overview — steps today, avg heart rate, sleep last night
         steps/page.js                  Step Tracker — hourly/weekly bar charts, goal progress, fixed tooltip
         sleep/page.js                  Sleep Tracker — stage breakdown bar, timeline chart, no-data state
-        water/page.js                  Water Tracker — progress ring, quick-add buttons (8/12/16/20/32 oz + custom), today's log with remove, 7-day bar chart; goal stored in localStorage; custom entry section has editable time input (defaults to now) so past entries can be backfilled with the correct timestamp
+        water/page.js                  Drinks & Hydration — stacked hydration ring (water blue, beverages purple), quick-add water buttons (8/12/16/20/32 oz + custom), drink search (logs to food_log_entries meal_slot='drink'), saved drinks chips (my_foods is_drink=true), combined today's log, caffeine tracker, 7-day bar chart; goal synced to goals_profiles.water_goal_oz
       goals/
         page.js                        Goals overview — AI overview panel, active goals chips, body metrics card (BMI + disclaimer + build label), lifestyle card (activity + daily steps + timeline), notes; Edit Goals button
         measurements/page.js           Body Measurements — how-to guide, log form (9 fields: weight/waist/hips/chest/neck/arms/thighs), history table with delta indicators, weight-over-time SVG chart; Progress Photos section (private Supabase Storage, lightbox, delete)
@@ -185,7 +185,7 @@ src/
       security-plus-labs.js            Security+ lab set — 4 labs, 20 steps — all steps have document arrays
   components/
     StudyHubSidebar.js                 Nav sidebar with test-in-progress guard
-    LifeHubSidebar.js                  Life Hub nav — Goals dropdown (My Goals + Measurements + Supplements + Setup), Health dropdown (Overview/Steps/Sleep/Water), Workouts dropdown (My Plan + Workout History + Exercise Library); each auto-opens on active routes
+    LifeHubSidebar.js                  Life Hub nav — Goals dropdown (My Goals + Measurements + Supplements + Setup), Health dropdown (Overview/Steps/Sleep/Drinks & Hydration), Workouts dropdown (My Plan + Workout History + Exercise Library); each auto-opens on active routes
     BookmarkModal.js                   Bookmark reason + notes modal
     DailyStreak.js                     30q/day streak tracker with 28-day calendar heatmap
     DomainTrend.js                     Per-domain score trend SVG chart (no library)
@@ -230,7 +230,7 @@ src/
 | `invite_codes` | Owner-generated one-time signup codes — code (unique), created_by, used_by (nullable), used_at; RLS: SELECT=public, INSERT=owner, UPDATE=authenticated |
 | `join_attempts` | IP-based brute force tracking for /join — ip TEXT, attempted_at, success BOOLEAN; `check_join_rate_limit(ip)` Postgres function counts fails in last hour |
 | `manual_steps_daily` | Manual step count per user per day — user_id, date, steps; unique(user_id, date); shown on workouts page when Google Health not connected |
-| `water_logs` | Water intake entries — user_id, date, amount_oz NUMERIC(6,1), created_at; RLS enabled; one row per tap (not aggregated) |
+| `water_logs` | Plain water intake entries — user_id, date, amount_oz NUMERIC(6,1), created_at; RLS enabled; one row per tap |
 | `supplement_stack` | User's active supplements — name, dose, timing (morning/afternoon/evening/with_meals/pre_workout/post_workout), nutrients JSONB (nutrient→"amount unit"), is_active; RLS enabled |
 | `supplement_profiles` | Cached AI supplement info cards — supplement_name (unique, normalized lowercase), ai_profile JSONB, generated_at; shared across all users; SELECT/INSERT/UPDATE open to all authenticated users |
 | `food_cache` | Shared cached food lookup results — barcode (unique), search_name, full nutrition fields (macros + 14 micronutrients), source ('off'); Open Food Facts results cached permanently per ODbL license; no RLS (shared read) |

@@ -5,6 +5,7 @@ const MICRO_FIELDS = [
   'saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg',
   'iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg',
   'vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg',
+  'caffeine_mg','water_g',
 ]
 
 export async function GET(req) {
