@@ -267,6 +267,11 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 47f - Complete
+- **MealBuilderModal per-ingredient nutrition editing** — each ingredient in the meal builder now has an "Edit"/"Done" toggle revealing a 2-column nutrition editor with all 21 fields (calories, macros, fiber, sodium, potassium, calcium, iron, all vitamins, omega-3); values pre-filled from Open Food Facts where available; missing fields count shown in ingredient subtitle as yellow warning; serving size label editable per ingredient; totals computed from the edited nutrition map (not raw food data)
+- **Custom ingredient add** — "+ Add '[name]' as custom ingredient" dashed button appears whenever search box has text; adds a blank nutrition row auto-expanded for filling in; no OFFs result required
+- **Auto-expand on add** — newly added ingredients (from search or custom) auto-open their nutrition panel
+
 ### Phase 47e - Complete
 - **Create a Meal** — `MealBuilderModal` component on nutrition page; search and add ingredients with per-ingredient serving qty (can type 0.5 for half a serving, 3 for three); live macro totals shown for whole recipe + per serving; meal name + "servings in whole recipe" field (e.g. 4 = the recipe feeds 4); saves to `my_foods` as per-serving nutrition (total ÷ servings); from then on, logging 1 serving = 1 portion, 0.25 = a quarter, etc.; accessible via "🍳 Create a Meal" button in food log tab header and "🍳 Create Meal" button on Saved Foods tab; built on existing `my_foods` + `food_log_entries` infrastructure — no new DB tables needed
 - **Fix**: `MicroNutrientPanel` function declaration accidentally dropped during MealBuilderModal insert — restored
