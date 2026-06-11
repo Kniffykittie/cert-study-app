@@ -267,6 +267,12 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 48 - Complete
+- **Nutrition UX overhaul — Favorites-first flow**: Replaced the confusing SearchModal log flow with a new `AddFoodModal` that opens on "My Favorites" tab by default; users see their saved foods first with inline "Log" button per item; clicking Log expands servings input + "✓ Add to [Meal]" confirm button with live calorie preview; "Find Food" tab provides OFFs search (capped at 8 results) and manual entry, both with "⭐ Save to My Favorites" checkbox defaulted on
+- **Saved Foods tab redesigned as `SavedFoodsTab` component**: "My Favorites" header with Log/Cancel per item; expanding a food shows servings input + calorie preview + slot chips (Breakfast/Lunch/Dinner/Snack/Other); clicking a slot chip logs the food directly without any additional modal — zero friction from library to log; renamed "Add Food" → "Add Favorite" to clarify intent
+- **OFFs result cap**: Search screen in `AddFoodModal` limits results to 8 (`results.slice(0, 8)`) to reduce overwhelm
+- **"Save to My Favorites" default on**: When searching/entering manually, checkbox defaults to true so new foods get saved automatically — stops the "I'll save it later" friction
+
 ### Phase 47f - Complete
 - **MealBuilderModal per-ingredient nutrition editing** — each ingredient in the meal builder now has an "Edit"/"Done" toggle revealing a 2-column nutrition editor with all 21 fields (calories, macros, fiber, sodium, potassium, calcium, iron, all vitamins, omega-3); values pre-filled from Open Food Facts where available; missing fields count shown in ingredient subtitle as yellow warning; serving size label editable per ingredient; totals computed from the edited nutrition map (not raw food data)
 - **Custom ingredient add** — "+ Add '[name]' as custom ingredient" dashed button appears whenever search box has text; adds a blank nutrition row auto-expanded for filling in; no OFFs result required
