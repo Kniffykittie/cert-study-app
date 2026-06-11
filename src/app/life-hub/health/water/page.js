@@ -93,6 +93,9 @@ export default function DrinksHydrationPage() {
   const [loading, setLoading] = useState(true)
   const [foodWaterOz, setFoodWaterOz] = useState(0)
   const [suppCaffeineMg, setSuppCaffeineMg] = useState(0)
+  const [todayNutrients, setTodayNutrients] = useState({ sodium_mg: 0, potassium_mg: 0 })
+  const [todayWorkoutMin, setTodayWorkoutMin] = useState(0)
+  const [dynamicGoal, setDynamicGoal] = useState(DEFAULT_GOAL)
 
   // Drink search
   const [drinkSearch, setDrinkSearch] = useState('')
@@ -217,6 +220,26 @@ export default function DrinksHydrationPage() {
       days.push({ date: key, label: d.toLocaleDateString('en-US', { weekday: 'short' }), oz: byDate[key] || 0 })
     }
     setWeek(days)
+
+    // Today's sodium + potassium from food log (for electrolyte indicator + dynamic goal)
+    const { data: todayFood } = await supabase
+      .from('food_log_entries')
+      .select('sodium_mg, potassium_mg')
+      .eq('user_id', user.id)
+      .eq('date', today)
+    const sodium = (todayFood || []).reduce((s, e) => s + (parseFloat(e.sodium_mg) || 0), 0)
+    const potassium = (todayFood || []).reduce((s, e) => s + (parseFloat(e.potassium_mg) || 0), 0)
+    setTodayNutrients({ sodium_mg: Math.round(sodium), potassium_mg: Math.round(potassium) })
+
+    // Today's workout duration (for dynamic goal adjustment)
+    const { data: todayWorkouts } = await supabase
+      .from('workout_logs')
+      .select('duration_seconds')
+      .eq('user_id', user.id)
+      .gte('created_at', `${today}T00:00:00`)
+    const workoutMin = (todayWorkouts || []).reduce((s, w) => s + (w.duration_seconds || 0), 0) / 60
+    setTodayWorkoutMin(Math.round(workoutMin))
+
     setLoading(false)
   }, [today])
 
@@ -399,6 +422,74 @@ export default function DrinksHydrationPage() {
   const totalCaffeine = drinkCaffeine + suppCaffeineMg
   const maxWeekOz = Math.max(...week.map(d => d.oz), goal)
 
+  // Dynamic goal — adjusts base goal for sodium, workout, and season
+  const dynGoal = (() => {
+    let g = goal
+    // Sodium: every 500mg above 2000mg adds 8oz, capped at +32oz
+    if (todayNutrients.sodium_mg > 2000) g += Math.min(Math.floor((todayNutrients.sodium_mg - 2000) / 500) * 8, 32)
+    // Workout today: +16oz (<60min) or +24oz (60min+)
+    if (todayWorkoutMin > 0) g += todayWorkoutMin >= 60 ? 24 : 16
+    // Season: June–August +8oz
+    const month = new Date().getMonth() // 0-indexed
+    if (month >= 5 && month <= 7) g += 8
+    return g
+  })()
+
+  // Why dynamic goal differs (for tooltip)
+  const dynGoalReasons = (() => {
+    const reasons = []
+    if (todayNutrients.sodium_mg > 2000) {
+      const adj = Math.min(Math.floor((todayNutrients.sodium_mg - 2000) / 500) * 8, 32)
+      reasons.push(`+${adj} oz for high sodium (${todayNutrients.sodium_mg.toLocaleString()}mg)`)
+    }
+    if (todayWorkoutMin > 0) reasons.push(`+${todayWorkoutMin >= 60 ? 24 : 16} oz for today's workout`)
+    const month = new Date().getMonth()
+    if (month >= 5 && month <= 7) reasons.push('+8 oz for summer heat')
+    return reasons
+  })()
+
+  // Hydration Score (0–100)
+  const hydrationScore = (() => {
+    if (dynGoal <= 0) return 0
+    const base = Math.min((totalOz / dynGoal) * 100, 100)
+    // Timing bonus: +5 if logs spread across ≥4 different hours
+    const hoursWithWater = new Set([
+      ...waterLogs.map(l => new Date(l.created_at).getHours()),
+      ...drinkEntries.map(e => new Date(e.created_at).getHours()),
+    ])
+    const timingBonus = hoursWithWater.size >= 4 ? 5 : 0
+    // Electrolyte penalty: high sodium + low hydration
+    const elecPenalty = (todayNutrients.sodium_mg > 3500 && totalOz < dynGoal * 0.5) ? -10 : 0
+    // Dilution penalty: over-hydrated but low potassium (only when food is logged)
+    const dilutionPenalty = (todayNutrients.potassium_mg > 0 && totalOz > dynGoal * 0.9 && todayNutrients.potassium_mg < 2350) ? -5 : 0
+    // Caffeine penalty: >500mg
+    const cafPenalty = totalCaffeine > 500 ? -5 : 0
+    return Math.round(Math.max(0, Math.min(100, base + timingBonus + elecPenalty + dilutionPenalty + cafPenalty)))
+  })()
+
+  function scoreLabel(s) {
+    if (s >= 80) return { text: 'Well Hydrated', color: 'var(--success)' }
+    if (s >= 60) return { text: 'On Track', color: 'var(--accent-blue)' }
+    if (s >= 40) return { text: 'Drink More', color: 'var(--warning)' }
+    return { text: 'Dehydrated', color: 'var(--error)' }
+  }
+  const scoreInfo = scoreLabel(hydrationScore)
+
+  // Electrolyte indicator (only shown when food data exists)
+  const electrolyteSituation = (() => {
+    if (todayNutrients.sodium_mg === 0 && todayNutrients.potassium_mg === 0) return null
+    if (todayNutrients.sodium_mg > 3000 && totalOz < dynGoal * 0.6) {
+      return { type: 'warn', msg: `High sodium (${todayNutrients.sodium_mg.toLocaleString()}mg) — your body needs extra water to balance it`, link: '/life-hub/nutrition/encyclopedia?open=sodium' }
+    }
+    if (totalOz > dynGoal * 0.9 && todayNutrients.potassium_mg > 0 && todayNutrients.potassium_mg < 2350) {
+      return { type: 'info', msg: `Well hydrated but potassium is low (${todayNutrients.potassium_mg}mg) — plain water dilutes electrolytes`, link: '/life-hub/nutrition/encyclopedia?open=potassium' }
+    }
+    if (totalOz >= dynGoal * 0.8) {
+      return { type: 'ok', msg: 'Electrolyte balance looks good', link: null }
+    }
+    return null
+  })()
+
   // Combine logs for display, sorted by time
   const allEntries = [
     ...waterLogs.map(l => ({ type: 'water', id: l.id, label: `+${formatOz(l.amount_oz)} oz water`, time: new Date(l.created_at), oz: parseFloat(l.amount_oz), waterOz: parseFloat(l.amount_oz) })),
@@ -417,37 +508,46 @@ export default function DrinksHydrationPage() {
       {/* Progress ring + summary */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <div style={{ flexShrink: 0 }}>
-            <StackedRing waterOz={waterOz} beverageOz={beverageWaterOz} foodWaterOz={foodWaterOz} goal={goal} />
+          <div style={{ flexShrink: 0, position: 'relative' }}>
+            <StackedRing waterOz={waterOz} beverageOz={beverageWaterOz} foodWaterOz={foodWaterOz} goal={dynGoal} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 30, fontWeight: 700, color: totalOz >= goal ? 'var(--success)' : 'var(--accent-blue)', lineHeight: 1 }}>
-              {formatOz(totalOz)} oz
+            {/* Hydration Score */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
+              <div style={{ fontSize: 30, fontWeight: 700, color: scoreInfo.color, lineHeight: 1 }}>{hydrationScore}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: scoreInfo.color }}>/ 100</div>
             </div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>
-              of {goal} oz goal
-              {totalOz >= goal && <span style={{ color: 'var(--success)', marginLeft: 8, fontWeight: 600 }}>✓ Goal reached!</span>}
+            <div style={{ fontSize: 13, fontWeight: 600, color: scoreInfo.color, marginBottom: 4 }}>{scoreInfo.text}</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+              {formatOz(totalOz)} oz of {dynGoal !== goal ? (
+                <span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{dynGoal}</span>
+                  <span style={{ color: 'var(--accent-blue)', marginLeft: 4, fontSize: 11 }} title={dynGoalReasons.join(' · ')}>
+                    ↑ adjusted{dynGoalReasons.length > 0 ? ` (${dynGoalReasons[0]})` : ''}
+                  </span>
+                </span>
+              ) : `${goal}`} oz goal
             </div>
             {/* Ring legend */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 12px', marginTop: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-secondary)' }}>
-                <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent-blue)', display: 'inline-block' }} />
-                Water {formatOz(waterOz)} oz
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', marginTop: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-secondary)' }}>
+                <span style={{ width: 8, height: 8, borderRadius: 1, background: 'var(--accent-blue)', display: 'inline-block' }} />
+                Water {formatOz(waterOz)}oz
               </div>
               {beverageWaterOz > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-secondary)' }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent-purple)', display: 'inline-block' }} />
-                  Beverages {formatOz(beverageWaterOz)} oz
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-secondary)' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 1, background: 'var(--accent-purple)', display: 'inline-block' }} />
+                  Drinks {formatOz(beverageWaterOz)}oz
                 </div>
               )}
               {foodWaterOz > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-secondary)' }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--success)', display: 'inline-block' }} />
-                  From food {formatOz(foodWaterOz)} oz
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-secondary)' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 1, background: 'var(--success)', display: 'inline-block' }} />
+                  Food {formatOz(foodWaterOz)}oz
                 </div>
               )}
             </div>
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginTop: 10 }}>
               {editingGoal ? (
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input type="number" value={goalInput} onChange={e => setGoalInput(e.target.value)}
@@ -460,16 +560,24 @@ export default function DrinksHydrationPage() {
               ) : (
                 <button onClick={() => { setGoalInput(String(goal)); setEditingGoal(true) }}
                   style={{ fontSize: 12, color: 'var(--text-secondary)', background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
-                  Edit goal
+                  Edit base goal
                 </button>
               )}
             </div>
           </div>
         </div>
 
+        {/* Electrolyte indicator */}
+        {electrolyteSituation && electrolyteSituation.type !== 'ok' && (
+          <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, background: electrolyteSituation.type === 'warn' ? 'rgba(241,196,15,0.1)' : 'rgba(0,128,255,0.08)', border: `1px solid ${electrolyteSituation.type === 'warn' ? 'rgba(241,196,15,0.3)' : 'rgba(0,128,255,0.2)'}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 14, flexShrink: 0 }}>{electrolyteSituation.type === 'warn' ? '⚠️' : 'ℹ️'}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1 }}>{electrolyteSituation.msg}</span>
+          </div>
+        )}
+
         {/* Caffeine tracker */}
         {totalCaffeine > 0 && (
-          <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>☕ Caffeine today</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -478,7 +586,7 @@ export default function DrinksHydrationPage() {
               </div>
             </div>
             {suppCaffeineMg > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 16, marginTop: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 16, marginTop: 4 }}>
                 {drinkCaffeine > 0 && <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Drinks: {Math.round(drinkCaffeine)}mg</span>}
                 <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Supplements (if taken): {Math.round(suppCaffeineMg)}mg</span>
               </div>

@@ -115,6 +115,7 @@ export default function LifeHubPage() {
   const [liveStats, setLiveStats] = useState({ waterOz: 0, workoutsThisWeek: 0, supplementCount: 0 })
   const [ctx, setCtx] = useState(null)
   const [microInsight, setMicroInsight] = useState(null)
+  const [recoveryScore, setRecoveryScore] = useState(null)
 
   // Brief state
   const [brief, setBrief] = useState(null)
@@ -150,16 +151,24 @@ export default function LifeHubPage() {
         { data: yesterdayWorkoutSets },
         { data: sleepData },
         { data: measurementData },
+        { data: yesterdayWaterLogs },
+        { data: yesterdayDrinkEntries },
+        { data: yesterdayWorkoutLogs },
+        { data: todayFoodWaterEntries },
       ] = await Promise.all([
         supabase.from('daily_checkins').select('*').eq('user_id', user.id).gte('date', twentyEightAgo).order('date', { ascending: false }),
         supabase.from('water_logs').select('amount_oz').eq('user_id', user.id).gte('created_at', `${today}T00:00:00`),
         supabase.from('workout_logs').select('id, created_at').eq('user_id', user.id).gte('created_at', `${weekStart}T00:00:00`),
         supabase.from('supplement_stack').select('id').eq('user_id', user.id).eq('is_active', true),
-        supabase.from('goals_profiles').select('weight_lbs, target_weight_lbs, job_activity, exercise_types, exercise_days_per_week, exercise_duration_min, exercise_consistency, body_composition, sex, goals').eq('user_id', user.id).single(),
+        supabase.from('goals_profiles').select('weight_lbs, target_weight_lbs, job_activity, exercise_types, exercise_days_per_week, exercise_duration_min, exercise_consistency, body_composition, sex, goals, water_goal_oz').eq('user_id', user.id).single(),
         supabase.from('food_log_entries').select('calories, protein_g').eq('user_id', user.id).eq('date', yesterday),
         supabase.from('workout_log_sets').select('exercise_name, set_type').eq('user_id', user.id).gte('created_at', `${yesterday}T00:00:00`).lt('created_at', `${today}T00:00:00`),
         supabase.from('health_sleep_sessions').select('sleep_minutes').eq('user_id', user.id).gte('date', yesterday).order('date', { ascending: false }).limit(1),
         supabase.from('body_measurements').select('date, weight_lbs').eq('user_id', user.id).order('date', { ascending: false }).limit(5),
+        supabase.from('water_logs').select('amount_oz').eq('user_id', user.id).gte('created_at', `${yesterday}T00:00:00`).lt('created_at', `${today}T00:00:00`),
+        supabase.from('food_log_entries').select('water_g').eq('user_id', user.id).eq('date', yesterday).eq('meal_slot', 'drink'),
+        supabase.from('workout_logs').select('duration_seconds').eq('user_id', user.id).gte('created_at', `${yesterday}T00:00:00`).lt('created_at', `${today}T00:00:00`),
+        supabase.from('food_log_entries').select('water_g').eq('user_id', user.id).eq('date', today).neq('meal_slot', 'drink').not('water_g', 'is', null),
       ])
 
       setCheckins(checkinData ?? [])
@@ -172,8 +181,9 @@ export default function LifeHubPage() {
       }
 
       const waterOz = (waterData ?? []).reduce((s, r) => s + parseFloat(r.amount_oz), 0)
+      const todayFoodWaterOz = (todayFoodWaterEntries ?? []).reduce((s, r) => s + (r.water_g || 0) / 29.5735, 0)
       setLiveStats({
-        waterOz: Math.round(waterOz),
+        waterOz: Math.round(waterOz + todayFoodWaterOz),
         workoutsThisWeek: (workoutData ?? []).length,
         supplementCount: (suppData ?? []).length,
       })
@@ -198,6 +208,33 @@ export default function LifeHubPage() {
       const weightDays = weights.length >= 2 ? Math.round((new Date(weights[0].date) - new Date(weights[weights.length - 1].date)) / 86400000) : null
 
       setCtx({ calDiff, sleepHours, lastExercises, lowEnergyStreak, tdee, weightDelta, weightDays })
+
+      // Recovery Score (0–100) — based on yesterday's data
+      const yesterdayWaterOz = (yesterdayWaterLogs ?? []).reduce((s, r) => s + parseFloat(r.amount_oz), 0)
+        + (yesterdayDrinkEntries ?? []).reduce((s, r) => s + (r.water_g || 0) / 29.5735, 0)
+      const waterGoal = goalsData?.water_goal_oz || 64
+      const yesterdayWorkoutMin = (yesterdayWorkoutLogs ?? []).reduce((s, r) => s + Math.round((r.duration_seconds || 0) / 60), 0)
+      const yesterdayProtein = (yesterdayFood || []).reduce((s, r) => s + (r.protein_g || 0), 0)
+      const proteinTarget = goalsData?.weight_lbs ? goalsData.weight_lbs * 0.75 : 100
+
+      const sleepPts = sleepHours == null ? null : sleepHours >= 8 ? 25 : sleepHours >= 7 ? 20 : sleepHours >= 6 ? 12 : sleepHours >= 5 ? 6 : 0
+      const hydrationPts = Math.min((yesterdayWaterOz / waterGoal) * 20, 20)
+      const proteinRatio = yesterdayProtein > 0 && proteinTarget > 0 ? yesterdayProtein / proteinTarget : 0
+      const proteinPts = proteinRatio >= 1 ? 20 : proteinRatio >= 0.8 ? 15 : proteinRatio >= 0.6 ? 10 : yesterdayProtein > 0 ? 5 : 0
+      const yesterdayEnergy = checkinData?.find(r => r.date === yesterday)?.energy_level ?? null
+      const energyPts = yesterdayEnergy != null ? yesterdayEnergy * 4 : 0
+      const workoutPts = yesterdayWorkoutMin === 0 ? 15 : yesterdayWorkoutMin < 45 ? 12 : yesterdayWorkoutMin <= 75 ? 8 : 5
+
+      const hasEnoughData = sleepPts != null || yesterdayWaterOz > 0 || yesterdayProtein > 0
+      if (hasEnoughData) {
+        const total = (sleepPts ?? 12) + hydrationPts + proteinPts + energyPts + workoutPts
+        setRecoveryScore({
+          total: Math.round(Math.min(100, total)),
+          components: { sleepPts: sleepPts ?? null, hydrationPts: Math.round(hydrationPts), proteinPts, energyPts, workoutPts },
+          sleepHours, yesterdayWaterOz: Math.round(yesterdayWaterOz), waterGoal,
+        })
+      }
+
       setLoaded(true)
 
       // Load brief (cache check first)
@@ -359,6 +396,46 @@ export default function LifeHubPage() {
           </p>
         )}
       </div>
+
+      {/* Recovery Score */}
+      {recoveryScore && (
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+            <div>
+              <h2 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', marginBottom: '2px' }}>Recovery Score</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>Based on yesterday's sleep, hydration, nutrition, and workout load</p>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: '32px', fontWeight: '700', lineHeight: 1, color: recoveryScore.total >= 75 ? 'var(--success)' : recoveryScore.total >= 55 ? 'var(--accent-blue)' : recoveryScore.total >= 35 ? 'var(--warning)' : 'var(--error)' }}>
+                {recoveryScore.total}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                {recoveryScore.total >= 75 ? 'Well Recovered' : recoveryScore.total >= 55 ? 'Decent Recovery' : recoveryScore.total >= 35 ? 'Recovering' : 'Low Recovery'}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
+            {[
+              { label: 'Sleep', pts: recoveryScore.components.sleepPts, max: 25, icon: '😴', tip: recoveryScore.sleepHours != null ? `${recoveryScore.sleepHours}h` : 'No data' },
+              { label: 'Hydration', pts: recoveryScore.components.hydrationPts, max: 20, icon: '💧', tip: `${recoveryScore.yesterdayWaterOz}/${recoveryScore.waterGoal} oz` },
+              { label: 'Protein', pts: recoveryScore.components.proteinPts, max: 20, icon: '🥩', tip: recoveryScore.components.proteinPts > 0 ? `${recoveryScore.components.proteinPts}/20` : 'No data' },
+              { label: 'Energy', pts: recoveryScore.components.energyPts, max: 20, icon: '⚡', tip: recoveryScore.components.energyPts > 0 ? `${recoveryScore.components.energyPts}/20` : 'Not logged' },
+              { label: 'Load', pts: recoveryScore.components.workoutPts, max: 15, icon: '🏋️', tip: recoveryScore.components.workoutPts === 15 ? 'Rest day' : `${recoveryScore.components.workoutPts}/15` },
+            ].map(c => (
+              <div key={c.label} title={c.tip} style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '16px', marginBottom: '3px' }}>{c.icon}</div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: c.pts >= c.max * 0.7 ? 'var(--success)' : c.pts >= c.max * 0.4 ? 'var(--warning)' : c.pts == null ? 'var(--text-secondary)' : 'var(--error)' }}>
+                  {c.pts != null ? c.pts : '—'}
+                </div>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{c.label}</div>
+                <div style={{ height: '3px', borderRadius: '2px', backgroundColor: 'var(--border)', marginTop: '4px' }}>
+                  <div style={{ height: '100%', borderRadius: '2px', width: `${c.pts != null ? Math.round((c.pts / c.max) * 100) : 0}%`, backgroundColor: c.pts >= c.max * 0.7 ? 'var(--success)' : c.pts >= c.max * 0.4 ? 'var(--warning)' : 'var(--error)' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Smart Check-In */}
       <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>

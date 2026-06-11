@@ -40,6 +40,14 @@ function extractNutrients(n, useSuffix) {
     caffeine_mg:     get('caffeine') != null ? get('caffeine') : null,
     // water: OFF stores as g/100g under 'water'
     water_g:         get('water') != null ? get('water') : null,
+    // omega-3 fatty acids: g/100g — no unit conversion needed
+    omega3_g:        get('omega-3-fat') != null ? get('omega-3-fat') : null,
+    // vitamin K (phylloquinone): g/100g → mcg (×1,000,000); try k1 first then generic k
+    vitamin_k_mcg:   (get('vitamin-k1') ?? get('vitamin-k')) != null ? (get('vitamin-k1') ?? get('vitamin-k')) * 1000000 : null,
+    // choline: g/100g → mg (×1,000)
+    choline_mg:      get('choline') != null ? get('choline') * 1000 : null,
+    // added sugars: g/100g — no conversion
+    added_sugar_g:   get('added-sugars') != null ? get('added-sugars') : null,
   }
 }
 

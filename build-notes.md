@@ -267,6 +267,16 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 46 - Complete
+- **3 new nutrients in Encyclopedia** — Omega-3, Vitamin K, Choline added to NUTRIENTS array (`src/data/nutrients.js`); all encyclopedia features (gap report, low-energy banner, status grid, detail panel, symptom checker) auto-propagate with no UI changes required
+- **DB migration `phase46_new_nutrients`** — `omega3_g NUMERIC(8,3)`, `vitamin_k_mcg NUMERIC(8,3)`, `choline_mg NUMERIC(8,3)`, `added_sugar_g NUMERIC(8,3)` added to `food_cache`, `my_foods`, `food_log_entries`, `meal_plan_entries` via Supabase migration
+- **Open Food Facts extraction updated** — `search/route.js` now extracts omega-3 (`omega-3-fat`, g→g), vitamin K (`vitamin-k1` or `vitamin-k`, g→mcg ×1e6), choline (`choline`, g→mg ×1000), added sugar (`added-sugars`, g→g) from OFF nutriments
+- **Food log + my-foods routes updated** — `MICRO_FIELDS` and `ALL_NUTRITION_FIELDS` in `log/route.js` and `my-foods/route.js` include all 4 new fields; values multiplied by servings on log
+- **Encyclopedia context route updated** — `encyclopedia/route.js` food_log_entries SELECT includes `omega3_g,vitamin_k_mcg,choline_mg`; meal_plan_entries SELECT uses `*` to catch all new fields
+- **Recovery Score widget on Life Hub home** — composite 0–100 score card between Daily Brief and Check-In; 5 components: Sleep (0–25), Hydration (0–20), Protein (0–20), Energy check-in (0–20), Workout Load (0–15); labels: Well Recovered (≥75), Decent Recovery (≥55), Recovering (≥35), Low Recovery (<35); only renders when at least one data source is available; mini bar per component shows proportion of max
+- **Life Hub home water stat fix** — "Water Today" live stat now includes hydration from food (non-drink entries water_g converted to oz) in addition to water_logs
+- **New data queries on Life Hub home** — yesterday's water_logs, yesterday's drink entries water_g, yesterday's workout_logs duration_seconds, today's food entry water_g added for Recovery Score computation; goals_profiles SELECT includes water_goal_oz
+
 ### Phase 45b - Complete
 - **Supplement caffeine → Drinks & Hydration total** — active supplements with caffeine in their nutrients JSONB now contribute to the daily caffeine total; shown as a breakdown ("Supplements (if taken): Xmg") when supplements add to the total; suppCaffeineMg state parsed by iterating supplement_stack nutrients and matching any key containing "caffeine"
 - **Daily Brief hydration upgrade** — now pulls total hydration (water_logs + beverage water_g from food_log_entries) and yesterday's caffeine total including supplement stack estimate; brief data includes "Caffeine yesterday: Xmg — HIGH" when ≥400mg

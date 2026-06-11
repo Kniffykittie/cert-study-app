@@ -128,7 +128,7 @@ src/
         monthly-wrap/route.js          GET cached wrap for ?month=YYYY-MM; POST generates (6-table gather + Claude narrative), caches forever; uses getUser() + is_disabled check
     life-hub/
       layout.js                        Life Hub layout with LifeHubSidebar
-      page.js                          Life Hub landing — Daily Brief (AI paragraph, cached daily), Smart Contextual Check-In (adaptive question labels + micro-insight after save), 28-day heatmap, live stats strip, hub navigation cards (includes Monthly Wrap card)
+      page.js                          Life Hub landing — Daily Brief (AI paragraph, cached daily), Recovery Score (5-component composite 0–100: sleep/hydration/protein/energy/workout load), Smart Contextual Check-In (adaptive question labels + micro-insight after save), 28-day heatmap, live stats strip (water includes food water_g), hub navigation cards (includes Monthly Wrap card)
       monthly-wrap/page.js             Monthly Wrap — month picker, AI narrative card, stat grid (workouts/energy/mood/weight/calories/water); Generate button on first visit; cached forever per month
       health/
         page.js                        Health Overview — steps today, avg heart rate, sleep last night
@@ -431,6 +431,8 @@ src/
 - **Phase 43c built:** Monthly Wrap: auto-generates on 1st of month (background, LifeHubSidebar); history sidebar of all past wraps; current month blocked with "still in progress" state; GET without ?month= returns all months list
 - **Phase 43e built:** Nutrition sidebar dropdown — "Nutrition" is now a collapsible dropdown with "Food Log", "Meal Plan", and "Encyclopedia" children; auto-opens on active nutrition routes
 - **Phase 44 built:** Nutrient Encyclopedia at `/life-hub/nutrition/encyclopedia` — 13 tracked nutrients, AI profiles cached in `nutrient_profiles` (shared), Gap Report card, Low Energy banner from check-in data, color-coded status grid (food + supplement split bar), right-drawer detail panel (intake, meal plan coverage, workout note, goal chips, AI profile, synergies/competitors)
+- **Phase 45b built:** Supplement caffeine feeds into Drinks & Hydration caffeine total; Daily Brief upgraded with total hydration oz (water + beverages) and caffeine mention; Monthly Wrap includes beverage water in hydration avg + avg_caffeine_mg; Weight chart rebuilt with 7-day rolling average line and smart scale-context callout for big day-to-day jumps
+- **Phase 46 built:** 3 new nutrients added to Encyclopedia (Omega-3, Vitamin K, Choline) — DB columns added to food_cache/my_foods/food_log_entries/meal_plan_entries, OFF extraction updated, food log routes updated; Recovery Score widget on Life Hub home — 5-component composite (sleep/hydration/protein/energy/workout load = 0–100), renders between Daily Brief and Check-In; Life Hub home water stat now includes beverage water_g from food entries
 
 ### Google Health Integration
 - OAuth flow restricted to owner account only (`sethproper40@yahoo.com`) — 403 for all others

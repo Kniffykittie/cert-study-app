@@ -28,7 +28,7 @@ export async function GET() {
     { data: mealPlanRow },
   ] = await Promise.all([
     supabase.from('food_log_entries').select(
-      'date,calories,iron_mg,calcium_mg,magnesium_mg,potassium_mg,zinc_mg,sodium_mg,vitamin_d_mcg,vitamin_c_mg,vitamin_a_mcg,vitamin_b12_mcg,vitamin_b6_mg,folate_mcg,fiber_g'
+      'date,calories,iron_mg,calcium_mg,magnesium_mg,potassium_mg,zinc_mg,sodium_mg,vitamin_d_mcg,vitamin_c_mg,vitamin_a_mcg,vitamin_b12_mcg,vitamin_b6_mg,folate_mcg,fiber_g,omega3_g,vitamin_k_mcg,choline_mg'
     ).eq('user_id', user.id).gte('date', thirtyDaysAgo),
     supabase.from('supplement_stack').select('nutrients').eq('user_id', user.id).eq('is_active', true),
     supabase.from('daily_checkins').select('energy_level,mood_level').eq('user_id', user.id).gte('date', fourteenDaysAgo),
@@ -69,9 +69,7 @@ export async function GET() {
   // Meal plan daily averages for current week
   const meal_plan_avgs = {}
   if (mealPlanRow?.id) {
-    const { data: planEntries } = await supabase.from('meal_plan_entries').select(
-      'iron_mg,calcium_mg,magnesium_mg,potassium_mg,zinc_mg,sodium_mg,vitamin_d_mcg,vitamin_c_mg,vitamin_a_mcg,vitamin_b12_mcg,vitamin_b6_mg,folate_mcg,fiber_g'
-    ).eq('plan_id', mealPlanRow.id)
+    const { data: planEntries } = await supabase.from('meal_plan_entries').select('*').eq('plan_id', mealPlanRow.id)
 
     if (planEntries?.length) {
       const totals = {}
