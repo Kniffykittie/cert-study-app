@@ -268,7 +268,7 @@ Everything below was built but not yet tested by the user. Go through this list 
 ## Phase Log
 
 ### Phase 45 - Complete
-- **Drinks & Hydration page** — Water Tracker redesigned into full Drinks & Hydration system at `/life-hub/health/water`; sidebar label updated "Water Tracker" → "Drinks & Hydration"
+- **Drinks & Hydration page** — Water Tracker redesigned into full Drinks & Hydration system at `/life-hub/health/water`; sidebar label updated "Water Tracker" → "Drinks & Hydration"; food water content from non-drink food_log_entries wired into ring as green segment (e.g. watermelon, cucumber contribute to total hydration)
 - **Stacked hydration ring** — SVG ring with three segments: water (blue), beverages (purple), food water from drink entries (future green segment); shows total oz vs goal with breakdown legend
 - **Drink search + log modal** — search Open Food Facts for any beverage; log modal shows per-serving nutrition (calories, caffeine, water content); servings input; "Save to My Drinks" checkbox saves as is_drink=true to my_foods for future quick-log
 - **Saved Drinks chips** — horizontal chip row of saved drinks (my_foods.is_drink=true); one tap logs 1 serving directly without opening modal

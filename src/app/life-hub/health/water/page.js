@@ -91,6 +91,7 @@ export default function DrinksHydrationPage() {
   const [adding, setAdding] = useState(false)
   const [week, setWeek] = useState([])
   const [loading, setLoading] = useState(true)
+  const [foodWaterOz, setFoodWaterOz] = useState(0)
 
   // Drink search
   const [drinkSearch, setDrinkSearch] = useState('')
@@ -142,6 +143,17 @@ export default function DrinksHydrationPage() {
       .eq('meal_slot', 'drink')
       .order('created_at', { ascending: true })
     setDrinkEntries(de || [])
+
+    // Today's food entries (non-drink) that have water content — e.g. watermelon, cucumber
+    const { data: fe } = await supabase
+      .from('food_log_entries')
+      .select('water_g')
+      .eq('user_id', user.id)
+      .eq('date', today)
+      .neq('meal_slot', 'drink')
+      .not('water_g', 'is', null)
+    const foodWaterTotalG = (fe || []).reduce((s, e) => s + (parseFloat(e.water_g) || 0), 0)
+    setFoodWaterOz(foodWaterTotalG * 0.0338)
 
     // Saved drinks (my_foods with is_drink = true)
     const { data: sd } = await supabase
@@ -364,7 +376,7 @@ export default function DrinksHydrationPage() {
   // Computed totals
   const waterOz = waterLogs.reduce((s, l) => s + parseFloat(l.amount_oz), 0)
   const beverageWaterOz = drinkEntries.reduce((s, e) => s + (e.water_g ? e.water_g * 0.0338 : 0), 0)
-  const totalOz = waterOz + beverageWaterOz
+  const totalOz = waterOz + beverageWaterOz + foodWaterOz
   const totalCaffeine = drinkEntries.reduce((s, e) => s + (parseFloat(e.caffeine_mg) || 0), 0)
   const maxWeekOz = Math.max(...week.map(d => d.oz), goal)
 
@@ -387,7 +399,7 @@ export default function DrinksHydrationPage() {
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           <div style={{ flexShrink: 0 }}>
-            <StackedRing waterOz={waterOz} beverageOz={beverageWaterOz} foodWaterOz={0} goal={goal} />
+            <StackedRing waterOz={waterOz} beverageOz={beverageWaterOz} foodWaterOz={foodWaterOz} goal={goal} />
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 30, fontWeight: 700, color: totalOz >= goal ? 'var(--success)' : 'var(--accent-blue)', lineHeight: 1 }}>
@@ -406,7 +418,13 @@ export default function DrinksHydrationPage() {
               {beverageWaterOz > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-secondary)' }}>
                   <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent-purple)', display: 'inline-block' }} />
-                  From drinks {formatOz(beverageWaterOz)} oz
+                  Beverages {formatOz(beverageWaterOz)} oz
+                </div>
+              )}
+              {foodWaterOz > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--success)', display: 'inline-block' }} />
+                  From food {formatOz(foodWaterOz)} oz
                 </div>
               )}
             </div>
