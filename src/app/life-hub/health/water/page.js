@@ -124,6 +124,10 @@ export default function DrinksHydrationPage() {
 
   // Manage saved drinks
   const [managingDrinks, setManagingDrinks] = useState(false)
+  const [addDrinkModal, setAddDrinkModal] = useState(false)
+  const [addDrinkForm, setAddDrinkForm] = useState({ name: '', serving_size_label: '', calories: '', protein_g: '', carbs_g: '', fat_g: '', sugar_g: '', sodium_mg: '', potassium_mg: '', vitamin_c_mg: '', caffeine_mg: '', water_oz: '' })
+  const [addDrinkNutrition, setAddDrinkNutrition] = useState(false)
+  const [savingAddDrink, setSavingAddDrink] = useState(false)
   const [editSavedModal, setEditSavedModal] = useState(null)
   const [savedEditForm, setSavedEditForm] = useState({ name: '', serving_size_label: '', calories: '', protein_g: '', carbs_g: '', fat_g: '', sugar_g: '', sodium_mg: '', potassium_mg: '', vitamin_c_mg: '', caffeine_mg: '', water_oz: '' })
   const [savingSaved, setSavingSaved] = useState(false)
@@ -410,6 +414,41 @@ export default function DrinksHydrationPage() {
     }
     setSavingEdit(false)
     setEditLogModal(null)
+  }
+
+  function openAddDrinkModal() {
+    setAddDrinkForm({ name: '', serving_size_label: '1 serving', calories: '', protein_g: '', carbs_g: '', fat_g: '', sugar_g: '', sodium_mg: '', potassium_mg: '', vitamin_c_mg: '', caffeine_mg: '', water_oz: '' })
+    setAddDrinkNutrition(false)
+    setAddDrinkModal(true)
+  }
+
+  async function saveNewDrink() {
+    const f = addDrinkForm
+    if (!f.name.trim()) return
+    setSavingAddDrink(true)
+    const body = {
+      name: f.name.trim(),
+      serving_size_label: f.serving_size_label || '1 serving',
+      is_drink: true,
+      calories: f.calories !== '' ? Number(f.calories) : null,
+      protein_g: f.protein_g !== '' ? Number(f.protein_g) : null,
+      carbs_g: f.carbs_g !== '' ? Number(f.carbs_g) : null,
+      fat_g: f.fat_g !== '' ? Number(f.fat_g) : null,
+      sugar_g: f.sugar_g !== '' ? Number(f.sugar_g) : null,
+      sodium_mg: f.sodium_mg !== '' ? Number(f.sodium_mg) : null,
+      potassium_mg: f.potassium_mg !== '' ? Number(f.potassium_mg) : null,
+      vitamin_c_mg: f.vitamin_c_mg !== '' ? Number(f.vitamin_c_mg) : null,
+      caffeine_mg: f.caffeine_mg !== '' ? Number(f.caffeine_mg) : null,
+      water_g: f.water_oz !== '' ? Number(f.water_oz) * 29.5735 : null,
+    }
+    const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const data = await res.json()
+    if (data.food) {
+      setSavedDrinks(prev => [...prev, data.food].sort((a, b) => a.name.localeCompare(b.name)))
+    }
+    setSavingAddDrink(false)
+    setAddDrinkForm({ name: '', serving_size_label: '1 serving', calories: '', protein_g: '', carbs_g: '', fat_g: '', sugar_g: '', sodium_mg: '', potassium_mg: '', vitamin_c_mg: '', caffeine_mg: '', water_oz: '' })
+    setAddDrinkNutrition(false)
   }
 
   function openEditSavedModal(drink) {
@@ -771,14 +810,28 @@ export default function DrinksHydrationPage() {
         <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>Tracks calories, caffeine, and hydration from beverages</div>
 
         {/* Saved drinks chips */}
+        {savedDrinks.length === 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <button onClick={openAddDrinkModal}
+              style={{ fontSize: 12, color: 'var(--accent-purple)', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: 8, cursor: 'pointer', padding: '6px 14px', fontWeight: 600 }}>
+              + Add to My Drinks
+            </button>
+          </div>
+        )}
         {savedDrinks.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>My Drinks</div>
-              <button onClick={() => setManagingDrinks(m => !m)}
-                style={{ fontSize: 11, color: managingDrinks ? 'var(--accent-purple)' : 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                {managingDrinks ? 'Done' : 'Manage'}
-              </button>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button onClick={openAddDrinkModal}
+                  style={{ fontSize: 11, color: 'var(--accent-purple)', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: 6, cursor: 'pointer', padding: '3px 8px', fontWeight: 600 }}>
+                  + Add
+                </button>
+                <button onClick={() => setManagingDrinks(m => !m)}
+                  style={{ fontSize: 11, color: managingDrinks ? 'var(--accent-purple)' : 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  {managingDrinks ? 'Done' : 'Manage'}
+                </button>
+              </div>
             </div>
             {managingDrinks ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -965,6 +1018,94 @@ export default function DrinksHydrationPage() {
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 'auto' }}>Goal: {goal} oz/day</div>
         </div>
       </div>
+
+      {/* Add new drink to library modal */}
+      {addDrinkModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, maxWidth: 400, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Add to My Drinks</div>
+              <button onClick={() => setAddDrinkModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 18, cursor: 'pointer' }}>✕</button>
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 16px' }}>Saved here — nothing gets logged to today. Tap the chip later to log instantly.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                { label: 'Name *', key: 'name', type: 'text', placeholder: 'e.g. Diet Coke, Orange Juice' },
+                { label: 'Serving Size', key: 'serving_size_label', type: 'text', placeholder: 'e.g. 1 can (12 fl oz)' },
+              ].map(f => (
+                <div key={f.key}>
+                  <label style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>{f.label}</label>
+                  <input type={f.type} value={addDrinkForm[f.key]} placeholder={f.placeholder}
+                    onChange={e => setAddDrinkForm(p => ({ ...p, [f.key]: e.target.value }))}
+                    autoFocus={f.key === 'name'}
+                    style={{ width: '100%', boxSizing: 'border-box', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text-primary)', fontSize: 13 }} />
+                </div>
+              ))}
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>Nutrition per serving</div>
+              {[
+                { label: 'Calories', key: 'calories' },
+                { label: 'Water content (oz)', key: 'water_oz' },
+                { label: 'Caffeine (mg)', key: 'caffeine_mg' },
+              ].map(f => (
+                <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', width: 150, flexShrink: 0 }}>{f.label}</label>
+                  <input type="number" value={addDrinkForm[f.key]} min="0"
+                    onChange={e => setAddDrinkForm(p => ({ ...p, [f.key]: e.target.value }))}
+                    placeholder="0"
+                    style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
+                </div>
+              ))}
+              <button onClick={() => setAddDrinkNutrition(v => !v)}
+                style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', fontSize: 12, cursor: 'pointer', padding: 0, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 4 }}>
+                {addDrinkNutrition ? '▲ Hide' : '▼ More nutrients'} (sodium, sugar, protein…)
+              </button>
+              {addDrinkNutrition && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px', background: 'var(--background)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                  {[
+                    { label: 'Sodium (mg)', key: 'sodium_mg' },
+                    { label: 'Sugar (g)', key: 'sugar_g' },
+                    { label: 'Protein (g)', key: 'protein_g' },
+                    { label: 'Carbs (g)', key: 'carbs_g' },
+                    { label: 'Fat (g)', key: 'fat_g' },
+                    { label: 'Potassium (mg)', key: 'potassium_mg' },
+                    { label: 'Vitamin C (mg)', key: 'vitamin_c_mg' },
+                  ].map(f => (
+                    <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <label style={{ fontSize: 12, color: 'var(--text-secondary)', width: 150, flexShrink: 0 }}>{f.label}</label>
+                      <input type="number" value={addDrinkForm[f.key]} min="0"
+                        onChange={e => setAddDrinkForm(p => ({ ...p, [f.key]: e.target.value }))}
+                        placeholder="0"
+                        style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+              <button onClick={saveNewDrink} disabled={savingAddDrink || !addDrinkForm.name.trim()}
+                style={{ flex: 1, padding: '10px', background: addDrinkForm.name.trim() ? 'var(--accent-purple)' : 'var(--border)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 600, cursor: addDrinkForm.name.trim() ? 'pointer' : 'default', opacity: savingAddDrink ? 0.6 : 1 }}>
+                {savingAddDrink ? 'Saving...' : 'Save Drink'}
+              </button>
+              <button onClick={() => setAddDrinkModal(false)}
+                style={{ padding: '10px 16px', background: 'none', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-secondary)', fontSize: 14, cursor: 'pointer' }}>
+                Done
+              </button>
+            </div>
+            {savedDrinks.length > 0 && (
+              <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Added so far this session</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {savedDrinks.slice(-5).reverse().map(d => (
+                    <div key={d.id} style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '4px 8px', background: 'var(--background)', borderRadius: 6 }}>
+                      ✓ {d.name}{d.calories != null ? ` — ${Math.round(d.calories)} cal` : ''}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Edit logged drink modal */}
       {editLogModal && (

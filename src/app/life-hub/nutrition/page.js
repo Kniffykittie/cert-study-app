@@ -108,7 +108,7 @@ function MacroBar({ value, goal, color, warn }) {
 }
 
 // Search modal with saved foods quick-select and full micronutrient entry
-function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood }) {
+function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
@@ -153,19 +153,25 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood }) {
 
   async function handleAdd() {
     setSaving(true)
-    let food = selected
-    if (manualMode) {
-      if (saveToLib) {
-        const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(manual) })
-        const data = await res.json()
-        food = { ...manual, my_food_id: data.food?.id, source: 'my_foods' }
+    if (libraryOnly || (manualMode && saveToLib)) {
+      // Save to My Foods only — no log entry
+      const payload = manualMode ? manual : selected
+      const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const data = await res.json()
+      if (data.food) onSaveFood(data.food)
+      setSaving(false)
+      if (libraryOnly && manualMode) {
+        setManual({ name: '', brand: '', serving_size_label: '1 serving', calories: '', protein_g: '', carbs_g: '', fat_g: '', fiber_g: '', sugar_g: '', sodium_mg: '', saturated_fat_g: '', trans_fat_g: '', cholesterol_mg: '', potassium_mg: '', calcium_mg: '', iron_mg: '', magnesium_mg: '', zinc_mg: '', vitamin_a_mcg: '', vitamin_c_mg: '', vitamin_d_mcg: '', vitamin_b12_mcg: '', vitamin_b6_mg: '', folate_mcg: '' })
+        setManualMode(false)
       } else {
-        food = { ...manual, source: 'manual' }
+        onClose()
       }
+      return
     }
+    let food = selected
+    if (manualMode) food = { ...manual, source: 'manual' }
     const sv = parseFloat(servings) || 1
     const entry = { meal_slot: slot, servings: sv, source: food._source || food.source || 'off' }
-    // Copy all nutrition fields, multiplied by servings handled in API
     for (const k of ['name','brand','serving_size_label','calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg',
       'saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg',
       'vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg']) {
@@ -187,10 +193,11 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood }) {
 
         <div style={{ padding: '18px 20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', margin: 0 }}>
-            {mealLabel?.emoji} {mealLabel?.label}
+            {libraryOnly ? '⭐ Add to My Foods Library' : `${mealLabel?.emoji} ${mealLabel?.label}`}
           </h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '22px', cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
+        {libraryOnly && <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '6px 20px 0' }}>Save foods for quick logging later — nothing gets added to today's log.</p>}
 
         {!manualMode ? (
           <>
@@ -247,7 +254,7 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood }) {
                 </div>
                 <button onClick={handleAdd} disabled={saving}
                   style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: saving ? 0.6 : 1, flexShrink: 0 }}>
-                  {saving ? '...' : '+ Add'}
+                  {saving ? '...' : libraryOnly ? '⭐ Save' : '+ Add'}
                 </button>
               </div>
             )}
@@ -320,17 +327,19 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood }) {
                     style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
                 </div>
               ))}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
-                <input type="checkbox" id="savelib" checked={saveToLib} onChange={e => setSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '16px', height: '16px' }} />
-                <label htmlFor="savelib" style={{ color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>⭐ Save to My Foods library</label>
-              </div>
+              {!libraryOnly && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
+                  <input type="checkbox" id="savelib" checked={saveToLib} onChange={e => setSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '16px', height: '16px' }} />
+                  <label htmlFor="savelib" style={{ color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>⭐ Save to My Foods library</label>
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', gap: '10px', marginTop: '18px' }}>
               <button onClick={() => setManualMode(false)}
                 style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>← Back</button>
               <button onClick={handleAdd} disabled={!manual.name.trim() || saving}
                 style={{ flex: 2, backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: (!manual.name.trim() || saving) ? 0.5 : 1 }}>
-                {saving ? '...' : '+ Add to Log'}
+                {saving ? '...' : libraryOnly ? '⭐ Save to Library' : '+ Add to Log'}
               </button>
             </div>
           </div>
@@ -424,6 +433,7 @@ export default function NutritionPage() {
   const [entries, setEntries] = useState([])
   const [myFoods, setMyFoods] = useState([])
   const [logModal, setLogModal] = useState(null)
+  const [libraryModal, setLibraryModal] = useState(false)
   const [activeTab, setActiveTab] = useState('log')
   const [microOpen, setMicroOpen] = useState(false)
   const [todayWorkout, setTodayWorkout] = useState(null)
@@ -551,6 +561,13 @@ export default function NutritionPage() {
       {logModal && (
         <SearchModal slot={logModal} onClose={() => setLogModal(null)} onAdd={handleAddEntry}
           myFoods={myFoods} onSaveFood={handleSaveToMyFoods} />
+      )}
+      {libraryModal && (
+        <SearchModal slot={null} onClose={() => setLibraryModal(false)} onAdd={() => {}}
+          myFoods={myFoods} onSaveFood={food => setMyFoods(prev => {
+            if (prev.find(f => f.id === food.id)) return prev
+            return [...prev, food].sort((a, b) => a.name.localeCompare(b.name))
+          })} libraryOnly />
       )}
 
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -754,9 +771,15 @@ export default function NutritionPage() {
       {/* Saved Foods Tab */}
       {activeTab === 'myfoods' && (
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-          <div style={{ marginBottom: '12px' }}>
-            <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', margin: '0 0 4px' }}>Saved Foods</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>Foods you've saved for quick logging. Hit ⭐ on any search result to add here.</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+            <div>
+              <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', margin: '0 0 4px' }}>Saved Foods</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>Save foods here to log them instantly — no searching needed.</p>
+            </div>
+            <button onClick={() => setLibraryModal(true)}
+              style={{ backgroundColor: 'rgba(167,139,250,0.12)', color: 'var(--accent-purple)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '8px', padding: '7px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>
+              + Add to Library
+            </button>
           </div>
           {myFoods.length === 0 ? (
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Nothing saved yet. Search for a food and tap ⭐ to save it, or check "Save to My Foods" when entering manually.</p>
