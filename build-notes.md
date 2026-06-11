@@ -267,6 +267,12 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 45b - Complete
+- **Supplement caffeine → Drinks & Hydration total** — active supplements with caffeine in their nutrients JSONB now contribute to the daily caffeine total; shown as a breakdown ("Supplements (if taken): Xmg") when supplements add to the total; suppCaffeineMg state parsed by iterating supplement_stack nutrients and matching any key containing "caffeine"
+- **Daily Brief hydration upgrade** — now pulls total hydration (water_logs + beverage water_g from food_log_entries) and yesterday's caffeine total including supplement stack estimate; brief data includes "Caffeine yesterday: Xmg — HIGH" when ≥400mg
+- **Monthly Wrap hydration upgrade** — hydration average now includes water_g from drink entries, not just water_logs; avg_caffeine_mg added to reportData and Claude prompt; data text notes "water + beverages" for clarity
+- **Weight chart rolling average + scale context** — chart rebuilt with dual lines: raw data (dim purple dots + faint line) and 7-day rolling average (bold purple line); rolling average visually filters water weight noise; smart "About that +X lbs overnight" callout appears automatically when consecutive entries differ ≥1.5 lbs within 3 days, explains water weight, glycogen, hormones, and points to the 7-day avg as the signal to trust; chart now uses last 60 entries (was 30)
+
 ### Phase 45 - Complete
 - **Drinks & Hydration page** — Water Tracker redesigned into full Drinks & Hydration system at `/life-hub/health/water`; sidebar label updated "Water Tracker" → "Drinks & Hydration"; food water content from non-drink food_log_entries wired into ring as green segment (e.g. watermelon, cucumber contribute to total hydration)
 - **Stacked hydration ring** — SVG ring with three segments: water (blue), beverages (purple), food water from drink entries (future green segment); shows total oz vs goal with breakdown legend

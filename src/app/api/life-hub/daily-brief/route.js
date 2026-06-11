@@ -51,6 +51,7 @@ export async function POST(req) {
     { data: supplements },
     { data: sleepRows },
     { data: stepsRows },
+    { data: drinkEntries },
   ] = await Promise.all([
     supabase.from('goals_profiles').select('*').eq('user_id', user.id).single(),
     supabase.from('body_measurements').select('date, weight_lbs').eq('user_id', user.id).order('date', { ascending: false }).limit(5),
@@ -59,7 +60,8 @@ export async function POST(req) {
     supabase.from('workout_log_sets').select('exercise_name, set_type').eq('user_id', user.id).gte('created_at', `${yesterday}T00:00:00`).lt('created_at', `${today}T00:00:00`),
     supabase.from('daily_checkins').select('date, energy_level, mood_level').eq('user_id', user.id).gte('date', fourteenAgo).order('date', { ascending: false }),
     supabase.from('water_logs').select('amount_oz').eq('user_id', user.id).gte('created_at', `${yesterday}T00:00:00`).lt('created_at', `${today}T00:00:00`),
-    supabase.from('supplement_stack').select('name').eq('user_id', user.id).eq('is_active', true),
+    supabase.from('supplement_stack').select('name, nutrients').eq('user_id', user.id).eq('is_active', true),
+    supabase.from('food_log_entries').select('caffeine_mg, water_g').eq('user_id', user.id).eq('date', yesterday).eq('meal_slot', 'drink'),
     supabase.from('health_sleep_sessions').select('sleep_minutes, date').eq('user_id', user.id).gte('date', yesterday).order('date', { ascending: false }).limit(1),
     supabase.from('health_steps_hourly').select('steps').eq('user_id', user.id).eq('date', yesterday),
   ])
@@ -124,10 +126,24 @@ export async function POST(req) {
     return streak
   })()
 
-  // Sleep, steps, water
+  // Sleep, steps, water + hydration
   const sleepHours = (sleepRows || [])[0]?.sleep_minutes ? Math.round((sleepRows[0].sleep_minutes / 60) * 10) / 10 : null
   const stepsYesterday = (stepsRows || []).reduce((s, r) => s + (r.steps || 0), 0) || null
-  const waterYestOz = Math.round((waterYest || []).reduce((s, r) => s + parseFloat(r.amount_oz), 0))
+  const waterLogOz = Math.round((waterYest || []).reduce((s, r) => s + parseFloat(r.amount_oz), 0))
+  const drinkWaterOz = Math.round((drinkEntries || []).reduce((s, r) => s + (r.water_g ? r.water_g * 0.0338 : 0), 0))
+  const waterYestOz = waterLogOz + drinkWaterOz
+  const caffeineYest = Math.round((drinkEntries || []).reduce((s, r) => s + (parseFloat(r.caffeine_mg) || 0), 0))
+  // Add supplement caffeine estimate
+  let suppCaffeineMg = 0
+  for (const s of supplements || []) {
+    for (const [key, val] of Object.entries(s.nutrients || {})) {
+      if (key.toLowerCase().includes('caffeine')) {
+        const match = String(val).match(/([\d.]+)/)
+        if (match) suppCaffeineMg += parseFloat(match[1])
+      }
+    }
+  }
+  const totalCaffeineYest = caffeineYest + suppCaffeineMg
 
   // Build summary for Claude
   const lines = [
@@ -154,7 +170,8 @@ export async function POST(req) {
     lowEnergyStreak >= 3 ? `  ⚠ ${lowEnergyStreak} consecutive low-energy days` : '',
     sleepHours ? `  Sleep last night: ${sleepHours} hours` : '  Sleep: no data (Google Health not connected or not worn)',
     stepsYesterday ? `  Steps yesterday: ${stepsYesterday.toLocaleString()}` : '',
-    waterYestOz > 0 ? `  Water yesterday: ${waterYestOz} oz` : '  Water yesterday: not logged',
+    waterYestOz > 0 ? `  Hydration yesterday: ${waterYestOz} oz total${drinkWaterOz > 0 ? ` (${waterLogOz} oz water + ${drinkWaterOz} oz from beverages)` : ''}` : '  Hydration yesterday: not logged',
+    totalCaffeineYest > 0 ? `  Caffeine yesterday: ${totalCaffeineYest}mg${totalCaffeineYest >= 400 ? ' — HIGH' : ''}` : '',
     (supplements || []).length ? `  Supplements: ${supplements.map(s => s.name).join(', ')}` : '',
   ].filter(l => l !== null && l !== undefined)
 

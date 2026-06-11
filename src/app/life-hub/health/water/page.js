@@ -92,6 +92,7 @@ export default function DrinksHydrationPage() {
   const [week, setWeek] = useState([])
   const [loading, setLoading] = useState(true)
   const [foodWaterOz, setFoodWaterOz] = useState(0)
+  const [suppCaffeineMg, setSuppCaffeineMg] = useState(0)
 
   // Drink search
   const [drinkSearch, setDrinkSearch] = useState('')
@@ -154,6 +155,23 @@ export default function DrinksHydrationPage() {
       .not('water_g', 'is', null)
     const foodWaterTotalG = (fe || []).reduce((s, e) => s + (parseFloat(e.water_g) || 0), 0)
     setFoodWaterOz(foodWaterTotalG * 0.0338)
+
+    // Supplement caffeine — stack items that have "caffeine" in their nutrients JSONB
+    const { data: suppStack } = await supabase
+      .from('supplement_stack')
+      .select('name, nutrients')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+    let suppCafTotal = 0
+    for (const supp of suppStack || []) {
+      for (const [key, val] of Object.entries(supp.nutrients || {})) {
+        if (key.toLowerCase().includes('caffeine')) {
+          const match = String(val).match(/([\d.]+)/)
+          if (match) suppCafTotal += parseFloat(match[1])
+        }
+      }
+    }
+    setSuppCaffeineMg(suppCafTotal)
 
     // Saved drinks (my_foods with is_drink = true)
     const { data: sd } = await supabase
@@ -377,7 +395,8 @@ export default function DrinksHydrationPage() {
   const waterOz = waterLogs.reduce((s, l) => s + parseFloat(l.amount_oz), 0)
   const beverageWaterOz = drinkEntries.reduce((s, e) => s + (e.water_g ? e.water_g * 0.0338 : 0), 0)
   const totalOz = waterOz + beverageWaterOz + foodWaterOz
-  const totalCaffeine = drinkEntries.reduce((s, e) => s + (parseFloat(e.caffeine_mg) || 0), 0)
+  const drinkCaffeine = drinkEntries.reduce((s, e) => s + (parseFloat(e.caffeine_mg) || 0), 0)
+  const totalCaffeine = drinkCaffeine + suppCaffeineMg
   const maxWeekOz = Math.max(...week.map(d => d.oz), goal)
 
   // Combine logs for display, sorted by time
@@ -450,12 +469,20 @@ export default function DrinksHydrationPage() {
 
         {/* Caffeine tracker */}
         {totalCaffeine > 0 && (
-          <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>☕ Caffeine today</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: caffeineColor(totalCaffeine) }}>{Math.round(totalCaffeine)}mg</span>
-              <span style={{ fontSize: 11, color: caffeineColor(totalCaffeine) }}>{caffeineLabel(totalCaffeine)}</span>
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>☕ Caffeine today</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: caffeineColor(totalCaffeine) }}>{Math.round(totalCaffeine)}mg</span>
+                <span style={{ fontSize: 11, color: caffeineColor(totalCaffeine) }}>{caffeineLabel(totalCaffeine)}</span>
+              </div>
             </div>
+            {suppCaffeineMg > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 16, marginTop: 6 }}>
+                {drinkCaffeine > 0 && <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Drinks: {Math.round(drinkCaffeine)}mg</span>}
+                <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Supplements (if taken): {Math.round(suppCaffeineMg)}mg</span>
+              </div>
+            )}
           </div>
         )}
       </div>

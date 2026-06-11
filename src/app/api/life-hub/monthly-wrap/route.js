@@ -76,7 +76,7 @@ export async function POST(req) {
     supabase.from('body_measurements').select('date, weight_lbs').eq('user_id', user.id).gte('date', start).lte('date', end).order('date'),
     supabase.from('goals_profiles').select('goals, weight_lbs, target_weight_lbs').eq('user_id', user.id).single(),
     supabase.from('water_logs').select('amount_oz, date').eq('user_id', user.id).gte('date', start).lte('date', end),
-    supabase.from('food_log_entries').select('calories, protein_g, date').eq('user_id', user.id).gte('date', start).lte('date', end),
+    supabase.from('food_log_entries').select('calories, protein_g, date, meal_slot, caffeine_mg, water_g').eq('user_id', user.id).gte('date', start).lte('date', end),
   ])
 
   const avgEnergy = checkins?.length ? (checkins.reduce((s, c) => s + c.energy_level, 0) / checkins.length).toFixed(1) : null
@@ -87,10 +87,26 @@ export async function POST(req) {
   const endWeight = measurements?.[measurements.length - 1]?.weight_lbs || null
   const weightDelta = startWeight && endWeight ? Math.round((endWeight - startWeight) * 10) / 10 : null
 
-  const waterByDate = {}
-  for (const w of waterLogs || []) { waterByDate[w.date] = (waterByDate[w.date] || 0) + w.amount_oz }
-  const waterDays = Object.keys(waterByDate)
-  const avgWater = waterDays.length ? Math.round(waterDays.reduce((s, d) => s + waterByDate[d], 0) / waterDays.length) : null
+  // Hydration: water_logs + beverage water_g from food_log_entries
+  const hydrationByDate = {}
+  for (const w of waterLogs || []) { hydrationByDate[w.date] = (hydrationByDate[w.date] || 0) + parseFloat(w.amount_oz) }
+  for (const f of foodLogs || []) {
+    if (f.meal_slot === 'drink' && f.water_g) {
+      hydrationByDate[f.date] = (hydrationByDate[f.date] || 0) + f.water_g * 0.0338
+    }
+  }
+  const waterDays = Object.keys(hydrationByDate)
+  const avgWater = waterDays.length ? Math.round(waterDays.reduce((s, d) => s + hydrationByDate[d], 0) / waterDays.length) : null
+
+  // Caffeine: sum from drink entries
+  const cafByDate = {}
+  for (const f of foodLogs || []) {
+    if (f.meal_slot === 'drink' && f.caffeine_mg) {
+      cafByDate[f.date] = (cafByDate[f.date] || 0) + parseFloat(f.caffeine_mg)
+    }
+  }
+  const cafDays = Object.keys(cafByDate)
+  const avgCaffeine = cafDays.length ? Math.round(cafDays.reduce((s, d) => s + cafByDate[d], 0) / cafDays.length) : null
 
   const foodByDate = {}
   for (const f of foodLogs || []) { foodByDate[f.date] = (foodByDate[f.date] || 0) + (f.calories || 0) }
@@ -110,6 +126,7 @@ export async function POST(req) {
     end_weight: endWeight,
     weight_delta: weightDelta,
     avg_water_oz: avgWater,
+    avg_caffeine_mg: avgCaffeine,
     avg_calories: avgCalories,
     logged_days: foodDates.length,
     days_in_month: daysInMonth,
@@ -121,7 +138,7 @@ export async function POST(req) {
 Check-ins: ${reportData.checkin_days} days | Avg energy: ${avgEnergy || 'n/a'}/5 | Avg mood: ${avgMood || 'n/a'}/5
 Workouts: ${workoutCount} sessions, ${totalWorkoutMin} total minutes
 Weight: ${startWeight ? startWeight + ' lbs start' : 'no start weight'} → ${endWeight ? endWeight + ' lbs end' : 'no end weight'}${weightDelta !== null ? ` (${weightDelta > 0 ? '+' : ''}${weightDelta} lbs)` : ''}${goals?.target_weight_lbs ? ` | Target: ${goals.target_weight_lbs} lbs` : ''}
-Avg daily water: ${avgWater ? avgWater + ' oz' : 'not tracked'}
+Avg daily hydration: ${avgWater ? avgWater + ' oz (water + beverages)' : 'not tracked'}${avgCaffeine ? ` | Avg caffeine: ${avgCaffeine}mg/day` : ''}
 Avg daily calories: ${avgCalories ? avgCalories + ' cal' : 'not tracked'} (logged ${foodDates.length}/${daysInMonth} days)
 Goals: ${(goals?.goals || []).join(', ') || 'not set'}`
 

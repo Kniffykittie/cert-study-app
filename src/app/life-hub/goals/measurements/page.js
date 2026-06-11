@@ -142,32 +142,79 @@ export default function MeasurementsPage() {
     loadHistory()
   }
 
-  // Build simple SVG line chart for weight over time
+  // 7-day rolling average for weight chart
+  function rollingAvg(vals, window = 7) {
+    return vals.map((_, i) => {
+      const slice = vals.slice(Math.max(0, i - window + 1), i + 1)
+      return slice.reduce((a, b) => a + b, 0) / slice.length
+    })
+  }
+
+  // Detect large recent jump for scale context callout
+  function recentBigJump() {
+    const wPts = history.filter(r => r.weight_lbs).slice(0, 3)
+    if (wPts.length < 2) return null
+    const diff = parseFloat(wPts[0].weight_lbs) - parseFloat(wPts[1].weight_lbs)
+    const daysBetween = Math.round((new Date(wPts[0].date) - new Date(wPts[1].date)) / 86400000)
+    if (Math.abs(diff) >= 1.5 && daysBetween <= 3) return { diff: Math.round(diff * 10) / 10, days: daysBetween }
+    return null
+  }
+
   function WeightChart() {
-    const pts = history.filter(r => r.weight_lbs).slice(0, 30).reverse()
+    const pts = history.filter(r => r.weight_lbs).slice(0, 60).reverse()
     if (pts.length < 2) return null
     const vals = pts.map(r => parseFloat(r.weight_lbs))
-    const min = Math.min(...vals) - 2
-    const max = Math.max(...vals) + 2
-    const W = 560, H = 120, PAD = 8
+    const avgVals = rollingAvg(vals)
+    const allVals = [...vals, ...avgVals]
+    const min = Math.min(...allVals) - 1.5
+    const max = Math.max(...allVals) + 1.5
+    const W = 560, H = 130, PAD = 10
     const x = i => PAD + (i / (pts.length - 1)) * (W - PAD * 2)
     const y = v => H - PAD - ((v - min) / (max - min)) * (H - PAD * 2)
-    const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(vals[i]).toFixed(1)}`).join(' ')
+    const rawPath = pts.map((_, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(vals[i]).toFixed(1)}`).join(' ')
+    const avgPath = pts.map((_, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(avgVals[i]).toFixed(1)}`).join(' ')
+    const jump = recentBigJump()
+
     return (
       <div style={{ marginBottom: '24px' }}>
-        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Weight Over Time</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Weight Over Time</div>
+          <div style={{ display: 'flex', gap: 12, fontSize: '11px', color: 'var(--text-secondary)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 20, height: 2, background: 'rgba(167,139,250,0.35)', display: 'inline-block' }} /> Raw
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 20, height: 2, background: 'var(--accent-purple)', display: 'inline-block' }} /> 7-day avg
+            </span>
+          </div>
+        </div>
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px', overflowX: 'auto' }}>
-          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: '300px', display: 'block' }}>
-            <path d={d} fill="none" stroke="var(--accent-purple)" strokeWidth="2" strokeLinejoin="round" />
-            {pts.map((p, i) => (
-              <circle key={i} cx={x(i)} cy={y(vals[i])} r="3" fill="var(--accent-purple)" />
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: '280px', display: 'block' }}>
+            {/* Raw data — dim dots and faint line */}
+            <path d={rawPath} fill="none" stroke="rgba(167,139,250,0.3)" strokeWidth="1.5" strokeLinejoin="round" />
+            {pts.map((_, i) => (
+              <circle key={i} cx={x(i)} cy={y(vals[i])} r="2.5" fill="rgba(167,139,250,0.4)" />
             ))}
+            {/* 7-day rolling average — bold, solid */}
+            <path d={avgPath} fill="none" stroke="var(--accent-purple)" strokeWidth="2.5" strokeLinejoin="round" />
           </svg>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
             <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{formatDate(pts[0].date)}</span>
             <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{formatDate(pts[pts.length - 1].date)}</span>
           </div>
         </div>
+
+        {/* Scale context callout — appears when there's a notable recent jump */}
+        {jump && (
+          <div style={{ marginTop: 10, background: 'rgba(0,128,255,0.08)', border: '1px solid rgba(0,128,255,0.25)', borderRadius: 10, padding: '12px 14px' }}>
+            <div style={{ fontSize: 13, color: 'var(--accent-blue)', fontWeight: 600, marginBottom: 4 }}>
+              💧 About that {jump.diff > 0 ? '+' : ''}{jump.diff} lbs {jump.days === 1 ? 'overnight' : `in ${jump.days} days`}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              Day-to-day weight swings of 1–3 lbs are almost always water weight, not fat. Your body holds roughly 3–4 grams of water per gram of glycogen — one high-carb meal, a salty dinner, or a harder workout can shift your scale weight by 2–3 lbs by the next morning. Hormones, digestion timing, and even how much you slept affect it too. The 7-day average line above filters all that noise and shows your actual trend.
+            </div>
+          </div>
+        )}
       </div>
     )
   }
