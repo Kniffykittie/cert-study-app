@@ -14,6 +14,122 @@ const TIMING_OPTIONS = Object.entries(TIMING_LABELS)
 
 const EMPTY_FORM = { name: '', dose: '', timing: 'morning', nutrients: [{ nutrient: '', amount: '', unit: 'mg' }] }
 
+function computeInteractions(stack) {
+  if (stack.length < 1) return []
+  const results = []
+
+  function hasKw(s, ...kws) {
+    const name = s.name.toLowerCase()
+    const nKeys = Object.keys(s.nutrients || {}).map(k => k.toLowerCase())
+    return kws.some(kw => name.includes(kw) || nKeys.some(n => n.includes(kw)))
+  }
+  function suppsWithKw(...kws) { return stack.filter(s => hasKw(s, ...kws)) }
+
+  const ironS = suppsWithKw('iron')
+  const calciumS = suppsWithKw('calcium')
+  const zincS = suppsWithKw('zinc')
+  const copperS = suppsWithKw('copper')
+  const vitDS = suppsWithKw('vitamin d', 'vit d', 'cholecalciferol')
+  const vitCS = suppsWithKw('vitamin c', 'vit c', 'ascorbic')
+  const magS = suppsWithKw('magnesium', 'mag glycinate', 'mag citrate', 'mag malate')
+  const cafS = stack.filter(s => {
+    const name = s.name.toLowerCase()
+    return name.includes('caffeine') || name.includes('pre-workout') || name.includes('preworkout')
+      || Object.keys(s.nutrients || {}).some(k => k.toLowerCase().includes('caffeine'))
+  })
+  const fatSolS = suppsWithKw('vitamin d', 'vit d', 'vitamin a', 'vit a', 'vitamin k', 'vit k', 'vitamin e', 'vit e')
+
+  // Iron + Calcium clash
+  if (ironS.length && calciumS.length) {
+    const sameTime = ironS.some(i => calciumS.some(c => c.timing === i.timing))
+    results.push({
+      type: sameTime ? 'warn' : 'tip',
+      icon: sameTime ? '⚠️' : '💡',
+      message: sameTime
+        ? `Iron and calcium compete for the same absorption transporter — you're taking them at the same time. Space them at least 2 hours apart to maximize iron absorption.`
+        : `Iron and calcium compete for absorption. You're spacing them — just make sure they're at least 2 hours apart.`,
+      affected: [...new Set([...ironS, ...calciumS].map(s => s.name))],
+    })
+  }
+
+  // Iron + Vitamin C (positive or tip to combine)
+  if (ironS.length && vitCS.length) {
+    const sameTime = ironS.some(i => vitCS.some(c => c.timing === i.timing))
+    results.push({
+      type: sameTime ? 'good' : 'tip',
+      icon: sameTime ? '✅' : '💡',
+      message: sameTime
+        ? `Taking iron with Vitamin C increases absorption by up to 3×. Great timing — keep it.`
+        : `Vitamin C boosts iron absorption by up to 3×. Try timing them together for maximum effect.`,
+      affected: [...new Set([...ironS, ...vitCS].map(s => s.name))],
+    })
+  }
+
+  // Iron + Caffeine morning clash
+  if (ironS.length && cafS.length) {
+    const clash = ironS.some(i => i.timing === 'morning') && cafS.some(c => c.timing === 'morning' || c.timing === 'pre_workout')
+    if (clash) {
+      results.push({
+        type: 'warn',
+        icon: '⚠️',
+        message: `Caffeine reduces iron absorption by ~30%. Try taking iron at least 1 hour before your pre-workout, or move iron to a different time of day.`,
+        affected: [...new Set([...ironS, ...cafS].map(s => s.name))],
+      })
+    }
+  }
+
+  // Zinc without copper (high dose)
+  if (zincS.length && !copperS.length) {
+    const highDose = zincS.some(s => { const m = s.dose.match(/([\d.]+)/); return m && parseFloat(m[1]) >= 25 })
+    if (highDose) {
+      results.push({
+        type: 'tip',
+        icon: '💡',
+        message: `Long-term zinc supplementation at 25mg+ can deplete copper over time. Consider a zinc supplement that includes copper (typically ~2mg), or add a small copper supplement.`,
+        affected: zincS.map(s => s.name),
+      })
+    }
+  }
+
+  // Zinc + Copper both present — affirm good ratio awareness
+  if (zincS.length && copperS.length) {
+    results.push({
+      type: 'tip',
+      icon: '💡',
+      message: `You have both zinc and copper — good foresight. Aim for roughly an 8:1 ratio (e.g. 16mg zinc : 2mg copper) to prevent zinc from depleting copper stores.`,
+      affected: [...new Set([...zincS, ...copperS].map(s => s.name))],
+    })
+  }
+
+  // Vitamin D not taken with meals
+  if (vitDS.length) {
+    const notWithFood = vitDS.filter(s => s.timing !== 'with_meals' && s.timing !== 'post_workout')
+    if (notWithFood.length) {
+      results.push({
+        type: 'tip',
+        icon: '💡',
+        message: `Vitamin D is fat-soluble and absorbs significantly better when taken with a meal that contains fat. Consider switching to "With Meals" timing.`,
+        affected: notWithFood.map(s => s.name),
+      })
+    }
+  }
+
+  // Magnesium in the evening — affirm
+  if (magS.length) {
+    const eveningMag = magS.filter(s => s.timing === 'evening')
+    if (eveningMag.length) {
+      results.push({
+        type: 'good',
+        icon: '✅',
+        message: `Evening magnesium is ideal timing — it activates GABA receptors that promote relaxation and support sleep quality.`,
+        affected: eveningMag.map(s => s.name),
+      })
+    }
+  }
+
+  return results
+}
+
 function InfoModal({ supplement, onClose }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -409,6 +525,39 @@ export default function SupplementsPage() {
           ✓ {stack.length} supplement{stack.length !== 1 ? 's' : ''} in your stack — these will automatically count toward your daily micronutrient totals in the nutrition dashboard.
         </div>
       )}
+
+      {/* Stack Interactions */}
+      {stack.length >= 1 && (() => {
+        const interactions = computeInteractions(stack)
+        if (!interactions.length) return null
+        return (
+          <div style={{ marginTop: 20, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14 }}>⚡ Stack Interactions</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {interactions.map((ix, i) => {
+                const colors = {
+                  warn: { bg: 'rgba(204,0,0,0.06)', border: 'rgba(204,0,0,0.2)', text: 'var(--error)' },
+                  tip:  { bg: 'rgba(0,128,255,0.06)', border: 'rgba(0,128,255,0.2)', text: 'var(--accent-blue)' },
+                  good: { bg: 'rgba(46,204,113,0.06)', border: 'rgba(46,204,113,0.2)', text: 'var(--success)' },
+                }[ix.type]
+                return (
+                  <div key={i} style={{ background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 14, flexShrink: 0 }}>{ix.icon}</span>
+                      <div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 3 }}>
+                          {ix.affected.join(' · ')}
+                        </div>
+                        <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.55 }}>{ix.message}</div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {infoModal && <InfoModal supplement={infoModal} onClose={() => setInfoModal(null)} />}
       {editModal && <EditModal supplement={editModal} onSave={handleEdit} onClose={() => setEditModal(null)} />}

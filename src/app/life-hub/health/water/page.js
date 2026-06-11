@@ -705,6 +705,55 @@ export default function DrinksHydrationPage() {
         </div>
       )}
 
+      {/* Drink Timing Chart */}
+      {combinedLog.length > 0 && (() => {
+        const hourlyOz = Array(24).fill(0)
+        for (const l of waterLogs) {
+          const h = new Date(l.created_at).getHours()
+          hourlyOz[h] += parseFloat(l.amount_oz) || 0
+        }
+        for (const e of drinkEntries) {
+          const h = new Date(e.created_at).getHours()
+          hourlyOz[h] += (e.water_g || 0) / 29.5735
+        }
+        const wakingHours = Array.from({ length: 18 }, (_, i) => i + 5) // 5am–11pm
+        const maxHz = Math.max(...wakingHours.map(h => hourlyOz[h]), 0.1)
+        const totalAfter6pm = wakingHours.filter(h => h >= 18).reduce((s, h) => s + hourlyOz[h], 0)
+        const midGap = !wakingHours.slice(5, 11).some(h => hourlyOz[h] > 0)
+        const callout = totalOz > 8 && totalAfter6pm / totalOz > 0.6
+          ? "Most of your hydration is late in the day — spreading it earlier improves absorption and reduces nighttime bathroom trips."
+          : totalOz > 8 && midGap
+          ? "There's a gap in your midday hydration — afternoon dehydration is a common trigger for 2–3pm energy crashes."
+          : totalOz > 16 ? "Good pacing throughout the day." : null
+        return (
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 14 }}>Hydration Timing Today</div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 64 }}>
+              {wakingHours.map(h => {
+                const oz = hourlyOz[h]
+                const barH = oz > 0 ? Math.max((oz / maxHz) * 54, 4) : 2
+                const now = new Date().getHours()
+                const isPast = h < now
+                const color = oz > 0 ? 'var(--accent-blue)' : isPast ? 'rgba(255,255,255,0.06)' : 'var(--border)'
+                const label = h === 5 ? '5a' : h === 12 ? '12p' : h === 17 ? '5p' : h === 21 ? '9p' : ''
+                return (
+                  <div key={h} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', gap: 2 }}>
+                    <div title={oz > 0 ? `${h}:00 — ${Math.round(oz * 10) / 10} oz` : undefined}
+                      style={{ width: '100%', height: `${barH}px`, background: color, borderRadius: '2px 2px 0 0', transition: 'height 0.2s' }} />
+                    <div style={{ fontSize: 9, color: 'var(--text-secondary)', minHeight: 11 }}>{label}</div>
+                  </div>
+                )
+              })}
+            </div>
+            {callout && (
+              <div style={{ marginTop: 10, fontSize: 12, color: callout.startsWith('Good') ? 'var(--success)' : 'var(--warning)', background: callout.startsWith('Good') ? 'rgba(46,204,113,0.06)' : 'rgba(241,196,15,0.06)', border: `1px solid ${callout.startsWith('Good') ? 'rgba(46,204,113,0.2)' : 'rgba(241,196,15,0.2)'}`, borderRadius: 8, padding: '8px 12px' }}>
+                {callout}
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
       {/* 7-day chart */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 14 }}>Last 7 Days</div>

@@ -62,7 +62,7 @@ export async function POST(req) {
     supabase.from('water_logs').select('amount_oz').eq('user_id', user.id).gte('created_at', `${yesterday}T00:00:00`).lt('created_at', `${today}T00:00:00`),
     supabase.from('supplement_stack').select('name, nutrients').eq('user_id', user.id).eq('is_active', true),
     supabase.from('food_log_entries').select('caffeine_mg, water_g').eq('user_id', user.id).eq('date', yesterday).eq('meal_slot', 'drink'),
-    supabase.from('health_sleep_sessions').select('sleep_minutes, date').eq('user_id', user.id).gte('date', yesterday).order('date', { ascending: false }).limit(1),
+    supabase.from('health_sleep_sessions').select('sleep_minutes, date, stages').eq('user_id', user.id).gte('date', yesterday).order('date', { ascending: false }).limit(1),
     supabase.from('health_steps_hourly').select('steps').eq('user_id', user.id).eq('date', yesterday),
   ])
 
@@ -127,7 +127,10 @@ export async function POST(req) {
   })()
 
   // Sleep, steps, water + hydration
-  const sleepHours = (sleepRows || [])[0]?.sleep_minutes ? Math.round((sleepRows[0].sleep_minutes / 60) * 10) / 10 : null
+  const sleepRow = (sleepRows || [])[0]
+  const sleepHours = sleepRow?.sleep_minutes ? Math.round((sleepRow.sleep_minutes / 60) * 10) / 10 : null
+  const deepSleepMin = sleepRow?.stages?.deep ?? null
+  const remSleepMin = sleepRow?.stages?.rem ?? null
   const stepsYesterday = (stepsRows || []).reduce((s, r) => s + (r.steps || 0), 0) || null
   const waterLogOz = Math.round((waterYest || []).reduce((s, r) => s + parseFloat(r.amount_oz), 0))
   const drinkWaterOz = Math.round((drinkEntries || []).reduce((s, r) => s + (r.water_g ? r.water_g * 0.0338 : 0), 0))
@@ -144,6 +147,28 @@ export async function POST(req) {
     }
   }
   const totalCaffeineYest = caffeineYest + suppCaffeineMg
+
+  // Supplement interaction flags (rule-based — key warnings for Claude to reference)
+  const suppInteractionWarnings = []
+  const suppList = supplements || []
+  function suppHasKw(s, ...kws) {
+    const name = s.name.toLowerCase()
+    const nKeys = Object.keys(s.nutrients || {}).map(k => k.toLowerCase())
+    return kws.some(kw => name.includes(kw) || nKeys.some(n => n.includes(kw)))
+  }
+  const ironS = suppList.filter(s => suppHasKw(s, 'iron'))
+  const calcS = suppList.filter(s => suppHasKw(s, 'calcium'))
+  const vitDS = suppList.filter(s => suppHasKw(s, 'vitamin d', 'vit d'))
+  const cafS = suppList.filter(s => s.name.toLowerCase().includes('pre-workout') || s.name.toLowerCase().includes('caffeine') || Object.keys(s.nutrients||{}).some(k=>k.toLowerCase().includes('caffeine')))
+  if (ironS.length && calcS.length && ironS.some(i => calcS.some(c => c.timing === i.timing))) {
+    suppInteractionWarnings.push(`Iron + Calcium timing clash (same slot) — absorption conflict`)
+  }
+  if (ironS.length && cafS.length && ironS.some(i => i.timing === 'morning') && cafS.some(c => c.timing === 'morning' || c.timing === 'pre_workout')) {
+    suppInteractionWarnings.push(`Caffeine + Iron in the morning — caffeine reduces iron absorption ~30%`)
+  }
+  if (vitDS.length && vitDS.some(s => s.timing !== 'with_meals' && s.timing !== 'post_workout')) {
+    suppInteractionWarnings.push(`Vitamin D not taken with a meal — fat-soluble, needs food for absorption`)
+  }
 
   // Build summary for Claude
   const lines = [
@@ -168,11 +193,12 @@ export async function POST(req) {
     `WELLNESS:`,
     avgEnergy ? `  Energy trend: ${avgEnergy}/5 average over last 7 check-ins` : '  No check-in data',
     lowEnergyStreak >= 3 ? `  ⚠ ${lowEnergyStreak} consecutive low-energy days` : '',
-    sleepHours ? `  Sleep last night: ${sleepHours} hours` : '  Sleep: no data (Google Health not connected or not worn)',
+    sleepHours ? `  Sleep last night: ${sleepHours} hours${deepSleepMin != null ? ` (${deepSleepMin}min deep, ${remSleepMin ?? '?'}min REM)` : ''}` : '  Sleep: no data (Google Health not connected or not worn)',
     stepsYesterday ? `  Steps yesterday: ${stepsYesterday.toLocaleString()}` : '',
     waterYestOz > 0 ? `  Hydration yesterday: ${waterYestOz} oz total${drinkWaterOz > 0 ? ` (${waterLogOz} oz water + ${drinkWaterOz} oz from beverages)` : ''}` : '  Hydration yesterday: not logged',
     totalCaffeineYest > 0 ? `  Caffeine yesterday: ${totalCaffeineYest}mg${totalCaffeineYest >= 400 ? ' — HIGH' : ''}` : '',
     (supplements || []).length ? `  Supplements: ${supplements.map(s => s.name).join(', ')}` : '',
+    suppInteractionWarnings.length ? `  ⚠ Supplement interactions detected: ${suppInteractionWarnings.join('; ')}` : '',
   ].filter(l => l !== null && l !== undefined)
 
   const dataSummary = lines.join('\n')

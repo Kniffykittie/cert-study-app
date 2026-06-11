@@ -267,6 +267,12 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 47 - Complete
+- **Stack Interactions card** on Supplements page (`/life-hub/goals/supplements`) — `computeInteractions(stack)` function runs rule-based checks against supplement names and nutrients JSONB; detects: Iron+Calcium same-slot clash, Iron+Vitamin C synergy (good vs tip based on whether already timed together), Caffeine+Iron morning conflict, high-dose Zinc without Copper, Vitamin D not taken with meals, Magnesium evening affirmation; renders warn/tip/good cards with affected supplement names; only shows when stack has ≥1 supplement and at least one interaction fires
+- **Drink Timing chart** on Drinks & Hydration page (`/life-hub/health/water`) — inline IIFE renders 18-bar hourly chart (5am–11pm) from combined waterLogs + drinkEntries timestamps; smart callout fires when: >60% hydration logged after 6pm OR no entries between hours 10–15; "Good pacing" in green when totalOz > 16 and neither fires; only renders when combinedLog has entries
+- **Daily Brief deep sleep data** — `stages` JSONB fetched from health_sleep_sessions; deepSleepMin and remSleepMin extracted; sleep summary line shows "(Xmin deep, Ymin REM)" when available
+- **Daily Brief supplement interaction warnings** — server-side warnings array computed and injected into Claude's context; covers Iron+Calcium clash, Caffeine+Iron morning, Vitamin D without meals
+
 ### Phase 46 - Complete
 - **3 new nutrients in Encyclopedia** — Omega-3, Vitamin K, Choline added to NUTRIENTS array (`src/data/nutrients.js`); all encyclopedia features (gap report, low-energy banner, status grid, detail panel, symptom checker) auto-propagate with no UI changes required
 - **DB migration `phase46_new_nutrients`** — `omega3_g NUMERIC(8,3)`, `vitamin_k_mcg NUMERIC(8,3)`, `choline_mg NUMERIC(8,3)`, `added_sugar_g NUMERIC(8,3)` added to `food_cache`, `my_foods`, `food_log_entries`, `meal_plan_entries` via Supabase migration
