@@ -84,6 +84,24 @@ export async function POST(req) {
   return NextResponse.json({ entry: data })
 }
 
+export async function PATCH(req) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await req.json()
+  const { id, ...fields } = body
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+  const allowed = ['name', 'servings', 'calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g', 'sodium_mg', 'caffeine_mg', 'water_g', ...MICRO_FIELDS]
+  const updates = {}
+  for (const k of allowed) { if (fields[k] !== undefined) updates[k] = fields[k] }
+
+  const { data, error } = await supabase.from('food_log_entries').update(updates).eq('id', id).eq('user_id', user.id).select().single()
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ entry: data })
+}
+
 export async function DELETE(req) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

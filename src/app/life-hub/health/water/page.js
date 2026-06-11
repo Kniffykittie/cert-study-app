@@ -107,6 +107,21 @@ export default function DrinksHydrationPage() {
   const [saveDrink, setSaveDrink] = useState(false)
   const [loggingDrink, setLoggingDrink] = useState(false)
 
+  // Edit logged drink entry
+  const [editLogModal, setEditLogModal] = useState(null) // { entry (from drinkEntries), perServing: {cal,caf,waterOz} }
+  const [editServings, setEditServings] = useState('1')
+  const [editName, setEditName] = useState('')
+  const [editCalPer, setEditCalPer] = useState('')
+  const [editCafPer, setEditCafPer] = useState('')
+  const [editWaterOzPer, setEditWaterOzPer] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  // Manage saved drinks
+  const [managingDrinks, setManagingDrinks] = useState(false)
+  const [editSavedModal, setEditSavedModal] = useState(null)
+  const [savedEditForm, setSavedEditForm] = useState({ name: '', serving_size_label: '', calories: '', caffeine_mg: '', water_oz: '' })
+  const [savingSaved, setSavingSaved] = useState(false)
+
   const searchTimeout = useRef(null)
   const today = new Date().toLocaleDateString('en-CA')
 
@@ -355,6 +370,77 @@ export default function DrinksHydrationPage() {
       }
     }
     setLoggingDrink(false)
+  }
+
+  function openEditLogModal(entry) {
+    const sv = entry.servings || 1
+    setEditLogModal(entry)
+    setEditName(entry.name || '')
+    setEditServings(String(sv))
+    setEditCalPer(entry.calories ? String(Math.round((entry.calories / sv) * 10) / 10) : '')
+    setEditCafPer(entry.caffeine_mg ? String(Math.round((entry.caffeine_mg / sv) * 10) / 10) : '')
+    setEditWaterOzPer(entry.water_g ? String(Math.round((entry.water_g / sv) * 0.0338 * 10) / 10) : '')
+  }
+
+  async function saveEditLogEntry() {
+    if (!editLogModal) return
+    setSavingEdit(true)
+    const sv = parseFloat(editServings) || 1
+    const calPer = parseFloat(editCalPer) || 0
+    const cafPer = parseFloat(editCafPer) || 0
+    const waterOzPer = parseFloat(editWaterOzPer) || 0
+    const body = {
+      id: editLogModal.id,
+      name: editName.trim() || editLogModal.name,
+      servings: sv,
+      calories: calPer * sv || null,
+      caffeine_mg: cafPer * sv || null,
+      water_g: waterOzPer > 0 ? (waterOzPer * 29.5735) * sv : null,
+    }
+    const res = await fetch('/api/nutrition/log', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const data = await res.json()
+    if (data.entry) {
+      setDrinkEntries(prev => prev.map(e => e.id === editLogModal.id ? data.entry : e))
+    }
+    setSavingEdit(false)
+    setEditLogModal(null)
+  }
+
+  function openEditSavedModal(drink) {
+    setEditSavedModal(drink)
+    setSavedEditForm({
+      name: drink.name || '',
+      serving_size_label: drink.serving_size_label || '1 serving',
+      calories: drink.calories != null ? String(drink.calories) : '',
+      caffeine_mg: drink.caffeine_mg != null ? String(drink.caffeine_mg) : '',
+      water_oz: drink.water_g != null ? String(Math.round(drink.water_g * 0.0338 * 10) / 10) : '',
+    })
+  }
+
+  async function saveEditSavedDrink() {
+    if (!editSavedModal) return
+    setSavingSaved(true)
+    const body = {
+      id: editSavedModal.id,
+      name: savedEditForm.name.trim() || editSavedModal.name,
+      serving_size_label: savedEditForm.serving_size_label || '1 serving',
+      calories: savedEditForm.calories !== '' ? Number(savedEditForm.calories) : null,
+      caffeine_mg: savedEditForm.caffeine_mg !== '' ? Number(savedEditForm.caffeine_mg) : null,
+      water_g: savedEditForm.water_oz !== '' ? Number(savedEditForm.water_oz) * 29.5735 : null,
+      is_drink: true,
+    }
+    const res = await fetch('/api/nutrition/my-foods', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const data = await res.json()
+    if (data.food) {
+      setSavedDrinks(prev => prev.map(d => d.id === editSavedModal.id ? data.food : d))
+    }
+    setSavingSaved(false)
+    setEditSavedModal(null)
+  }
+
+  async function deleteSavedDrink(id) {
+    await fetch('/api/nutrition/my-foods', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+    setSavedDrinks(prev => prev.filter(d => d.id !== id))
   }
 
   function openLogModal(item) {
@@ -631,13 +717,47 @@ export default function DrinksHydrationPage() {
 
         {/* Saved drinks chips */}
         {savedDrinks.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-            {savedDrinks.map(d => (
-              <button key={d.id} onClick={() => quickLogSavedDrink(d)} disabled={loggingDrink}
-                style={{ padding: '6px 12px', background: 'var(--background)', border: '1px solid var(--accent-purple)', borderRadius: 20, color: 'var(--accent-purple)', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}>
-                {d.name}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>My Drinks</div>
+              <button onClick={() => setManagingDrinks(m => !m)}
+                style={{ fontSize: 11, color: managingDrinks ? 'var(--accent-purple)' : 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                {managingDrinks ? 'Done' : 'Manage'}
               </button>
-            ))}
+            </div>
+            {managingDrinks ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {savedDrinks.map(d => (
+                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', gap: 8, marginTop: 1 }}>
+                        {d.calories != null && <span>{Math.round(d.calories)} cal</span>}
+                        {d.caffeine_mg != null && <span>☕ {Math.round(d.caffeine_mg)}mg</span>}
+                        {d.water_g != null && <span>💧 {Math.round(d.water_g * 0.0338 * 10) / 10}oz</span>}
+                      </div>
+                    </div>
+                    <button onClick={() => openEditSavedModal(d)}
+                      style={{ padding: '5px 10px', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-secondary)', fontSize: 11, cursor: 'pointer' }}>
+                      Edit
+                    </button>
+                    <button onClick={() => deleteSavedDrink(d.id)}
+                      style={{ padding: '5px 10px', background: 'none', border: '1px solid var(--error-border)', borderRadius: 6, color: 'var(--error)', fontSize: 11, cursor: 'pointer' }}>
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {savedDrinks.map(d => (
+                  <button key={d.id} onClick={() => quickLogSavedDrink(d)} disabled={loggingDrink}
+                    style={{ padding: '6px 12px', background: 'var(--background)', border: '1px solid var(--accent-purple)', borderRadius: 20, color: 'var(--accent-purple)', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}>
+                    {d.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -691,10 +811,16 @@ export default function DrinksHydrationPage() {
                     {entry.calories > 0 && <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{Math.round(entry.calories)} cal</span>}
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 10 }}>
                   <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
                     {entry.time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                   </span>
+                  {entry.type === 'drink' && (
+                    <button onClick={() => {
+                      const raw = drinkEntries.find(e => e.id === entry.id)
+                      if (raw) openEditLogModal(raw)
+                    }} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 12, padding: '0 2px' }} title="Edit">✏️</button>
+                  )}
                   <button
                     onClick={() => entry.type === 'water' ? removeWaterLog(entry.id, entry.waterOz) : removeDrinkEntry(entry.id, entry.water_g)}
                     style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 14, padding: '0 2px' }}>×</button>
@@ -784,6 +910,90 @@ export default function DrinksHydrationPage() {
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 'auto' }}>Goal: {goal} oz/day</div>
         </div>
       </div>
+
+      {/* Edit logged drink modal */}
+      {editLogModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, maxWidth: 380, width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Edit Entry</div>
+              <button onClick={() => setEditLogModal(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 18, cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>Name</label>
+                <input value={editName} onChange={e => setEditName(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text-primary)', fontSize: 13 }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>Servings</label>
+                <input type="number" value={editServings} onChange={e => setEditServings(e.target.value)} min="0.1" step="0.5"
+                  style={{ width: 90, background: 'var(--background)', border: '1px solid var(--accent-blue)', borderRadius: 8, padding: '8px 12px', color: 'var(--text-primary)', fontSize: 14, fontWeight: 600 }} />
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: -4 }}>Per serving values (multiply by servings above):</div>
+              {[
+                { label: 'Calories', value: editCalPer, set: setEditCalPer, placeholder: '0' },
+                { label: 'Caffeine (mg)', value: editCafPer, set: setEditCafPer, placeholder: '0' },
+                { label: 'Water content (oz)', value: editWaterOzPer, set: setEditWaterOzPer, placeholder: '0' },
+              ].map(f => (
+                <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', width: 140, flexShrink: 0 }}>{f.label}</label>
+                  <input type="number" value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.placeholder} min="0"
+                    style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+              <button onClick={saveEditLogEntry} disabled={savingEdit}
+                style={{ flex: 1, padding: '10px', background: 'var(--accent-blue)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                {savingEdit ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button onClick={() => setEditLogModal(null)}
+                style={{ padding: '10px 16px', background: 'none', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-secondary)', fontSize: 14, cursor: 'pointer' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit saved drink modal */}
+      {editSavedModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, maxWidth: 380, width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Edit Saved Drink</div>
+              <button onClick={() => setEditSavedModal(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 18, cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[
+                { label: 'Name *', key: 'name', type: 'text' },
+                { label: 'Serving Size Label', key: 'serving_size_label', type: 'text', placeholder: 'e.g. 1 can, 12 fl oz' },
+                { label: 'Calories per serving', key: 'calories', type: 'number' },
+                { label: 'Caffeine per serving (mg)', key: 'caffeine_mg', type: 'number' },
+                { label: 'Water content per serving (oz)', key: 'water_oz', type: 'number' },
+              ].map(f => (
+                <div key={f.key}>
+                  <label style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>{f.label}</label>
+                  <input type={f.type} value={savedEditForm[f.key]} onChange={e => setSavedEditForm(p => ({ ...p, [f.key]: e.target.value }))}
+                    placeholder={f.placeholder || ''}
+                    style={{ width: '100%', boxSizing: 'border-box', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text-primary)', fontSize: 13 }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+              <button onClick={saveEditSavedDrink} disabled={savingSaved || !savedEditForm.name.trim()}
+                style={{ flex: 1, padding: '10px', background: 'var(--accent-blue)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: savingSaved ? 0.6 : 1 }}>
+                {savingSaved ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button onClick={() => setEditSavedModal(null)}
+                style={{ padding: '10px 16px', background: 'none', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-secondary)', fontSize: 14, cursor: 'pointer' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Log drink modal */}
       {logModal && (

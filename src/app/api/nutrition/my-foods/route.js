@@ -49,6 +49,32 @@ export async function POST(req) {
   return NextResponse.json({ food: data })
 }
 
+export async function PUT(req) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await req.json()
+  const { id, name, ...rest } = body
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+  if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
+
+  const nutritionValues = {}
+  for (const field of ALL_NUTRITION_FIELDS) {
+    if (rest[field] !== undefined) nutritionValues[field] = rest[field] != null && rest[field] !== '' ? Number(rest[field]) : null
+  }
+
+  const { data, error } = await supabase.from('my_foods').update({
+    name: name.trim(),
+    brand: rest.brand?.trim() || null,
+    serving_size_label: rest.serving_size_label?.trim() || '1 serving',
+    ...nutritionValues,
+  }).eq('id', id).eq('user_id', user.id).select().single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ food: data })
+}
+
 export async function DELETE(req) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

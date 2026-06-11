@@ -267,6 +267,10 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 47b - Complete
+- **Edit logged drink entries** — ✏️ button on each drink in Today's Log opens edit modal; can change name, servings, calories/caffeine/water per serving; PATCH `/api/nutrition/log` endpoint added
+- **Manage saved drinks** — "Manage" toggle next to "My Drinks" shows list with Edit + Delete per drink; Edit modal covers name, serving size, calories, caffeine, water content; PUT `/api/nutrition/my-foods` endpoint added
+
 ### Phase 47 - Complete
 - **Stack Interactions card** on Supplements page (`/life-hub/goals/supplements`) — `computeInteractions(stack)` function runs rule-based checks against supplement names and nutrients JSONB; detects: Iron+Calcium same-slot clash, Iron+Vitamin C synergy (good vs tip based on whether already timed together), Caffeine+Iron morning conflict, high-dose Zinc without Copper, Vitamin D not taken with meals, Magnesium evening affirmation; renders warn/tip/good cards with affected supplement names; only shows when stack has ≥1 supplement and at least one interaction fires
 - **Drink Timing chart** on Drinks & Hydration page (`/life-hub/health/water`) — inline IIFE renders 18-bar hourly chart (5am–11pm) from combined waterLogs + drinkEntries timestamps; smart callout fires when: >60% hydration logged after 6pm OR no entries between hours 10–15; "Good pacing" in green when totalOz > 16 and neither fires; only renders when combinedLog has entries
