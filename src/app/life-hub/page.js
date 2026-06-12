@@ -100,6 +100,8 @@ export default function LifeHubPage() {
   const [briefLoading, setBriefLoading] = useState(false)
   const [briefGeneratedAt, setBriefGeneratedAt] = useState(null)
   const [briefExpanded, setBriefExpanded] = useState(false)
+  const [recoveryExpanded, setRecoveryExpanded] = useState(false)
+  const [checkinWhyOpen, setCheckinWhyOpen] = useState(false)
 
   const briefTriggered = useRef(false)
 
@@ -457,6 +459,152 @@ export default function LifeHubPage() {
         )}
       </div>
 
+      {/* Recovery Score — prominent banner above section cards */}
+      {recoveryScore && (() => {
+        const score = recoveryScore.total
+        const scoreColor = score >= 75 ? 'var(--success)' : score >= 55 ? 'var(--accent-blue)' : score >= 35 ? 'var(--warning)' : 'var(--error)'
+        const scoreLabel = score >= 75 ? 'Well Recovered' : score >= 55 ? 'Decent Recovery' : score >= 35 ? 'Recovering' : 'Low Recovery'
+        const rc = recoveryScore.components
+
+        const componentDetails = [
+          {
+            icon: '😴', label: 'Sleep', pts: rc.sleepPts, max: 25,
+            detail: rc.sleepPts == null
+              ? 'No sleep data — connect Google Health to track sleep and earn up to 25 pts.'
+              : recoveryScore.sleepHours >= 8
+                ? `You got ${recoveryScore.sleepHours}h — excellent. Full 25 pts.`
+                : recoveryScore.sleepHours >= 7
+                  ? `You got ${recoveryScore.sleepHours}h — solid. 7–8h earns 20 pts. Another 30–60 min would max this out.`
+                  : recoveryScore.sleepHours >= 6
+                    ? `You got ${recoveryScore.sleepHours}h — below optimal. 7+ hours earns 20 pts and gives your body more repair time.`
+                    : `You got ${recoveryScore.sleepHours}h — that's rough. Under 6h earns only 6 pts. Prioritize sleep tonight.`,
+            tip: rc.sleepPts != null && rc.sleepPts < 20 ? 'Try going to bed 30 min earlier tonight.' : null,
+          },
+          {
+            icon: '💧', label: 'Hydration', pts: rc.hydrationPts, max: 20,
+            detail: recoveryScore.yesterdayWaterOz === 0
+              ? `No water logged yesterday. Hit your ${recoveryScore.waterGoal} oz goal for the full 20 pts.`
+              : recoveryScore.yesterdayWaterOz >= recoveryScore.waterGoal
+                ? `You hit ${recoveryScore.yesterdayWaterOz} oz yesterday — at or above your ${recoveryScore.waterGoal} oz goal. Full 20 pts.`
+                : `You got ${recoveryScore.yesterdayWaterOz} oz out of your ${recoveryScore.waterGoal} oz goal (${Math.round((recoveryScore.yesterdayWaterOz / recoveryScore.waterGoal) * 100)}%). ${Math.round(recoveryScore.yesterdayWaterOz / recoveryScore.waterGoal * 20)}/20 pts.`,
+            tip: rc.hydrationPts < 20 ? `Drink ${recoveryScore.waterGoal - recoveryScore.yesterdayWaterOz > 0 ? Math.round(recoveryScore.waterGoal - recoveryScore.yesterdayWaterOz) + ' more oz' : 'more water'} today to hit your goal.` : null,
+          },
+          {
+            icon: '🥩', label: 'Protein', pts: rc.proteinPts, max: 20,
+            detail: rc.proteinPts === 0
+              ? 'No protein logged yesterday. Log your food to earn up to 20 pts here.'
+              : rc.proteinPts >= 20
+                ? 'You hit your protein target yesterday. Full 20 pts.'
+                : rc.proteinPts >= 15
+                  ? `Good protein intake — you were at 80–100% of your target. ${rc.proteinPts}/20 pts.`
+                  : `Protein was below 80% of your target yesterday. ${rc.proteinPts}/20 pts. Aim to hit your goal consistently.`,
+            tip: rc.proteinPts < 20 && rc.proteinPts > 0 ? 'Add a protein-rich meal or snack to close the gap today.' : null,
+          },
+          {
+            icon: '⚡', label: 'Energy', pts: rc.energyPts, max: 20,
+            detail: rc.energyPts === 0
+              ? "Yesterday's energy wasn't logged. Check in daily to earn up to 20 pts here — your 1–5 rating is worth 4 pts each."
+              : rc.energyPts >= 16
+                ? `You logged energy ${rc.energyPts / 4}/5 yesterday — feeling great. ${rc.energyPts}/20 pts.`
+                : rc.energyPts >= 12
+                  ? `You logged energy ${rc.energyPts / 4}/5 yesterday — decent. ${rc.energyPts}/20 pts.`
+                  : `You logged energy ${rc.energyPts / 4}/5 yesterday — low. ${rc.energyPts}/20 pts. Sleep, calories, and hydration are often the culprits.`,
+            tip: rc.energyPts < 12 && rc.energyPts > 0 ? 'Log today\'s energy after workouts or meals to track patterns over time.' : null,
+          },
+          {
+            icon: '🏋️', label: 'Workout Load', pts: rc.workoutPts, max: 15,
+            detail: rc.workoutPts === 15
+              ? 'You rested yesterday — full 15 pts. Rest is when your body actually repairs and gets stronger.'
+              : rc.workoutPts >= 12
+                ? 'Short workout yesterday (under 45 min) — a little extra load, but mostly recovered. 12/15 pts.'
+                : rc.workoutPts >= 8
+                  ? 'Solid workout yesterday (45–75 min) — your body absorbed some stress. 8/15 pts. Normal recovery mode.'
+                  : 'Long or intense session yesterday (75+ min) — higher load means more recovery needed. 5/15 pts.',
+            tip: rc.workoutPts <= 8 ? 'This is normal after hard training. Keep nutrition and sleep dialed in today.' : null,
+          },
+        ]
+
+        return (
+          <div style={{ backgroundColor: 'var(--surface)', border: `2px solid ${scoreColor}44`, borderLeft: `4px solid ${scoreColor}`, borderRadius: '14px', padding: '20px 24px', marginBottom: '20px', cursor: 'pointer', transition: 'border-color 0.15s' }}
+            onClick={() => setRecoveryExpanded(e => !e)}
+            onMouseEnter={e => e.currentTarget.style.borderColor = scoreColor}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = `${scoreColor}44`; e.currentTarget.style.borderLeftColor = scoreColor }}>
+
+            {/* Header row */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '42px', fontWeight: '800', lineHeight: 1, color: scoreColor }}>{score}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>out of 100</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '17px', fontWeight: '700', color: scoreColor, marginBottom: '2px' }}>⚡ {scoreLabel}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Recovery Score — based on yesterday's data</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                {/* Mini component bars */}
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+                  {componentDetails.map(c => {
+                    const pct = c.pts != null ? Math.round((c.pts / c.max) * 100) : 0
+                    const barColor = pct >= 70 ? 'var(--success)' : pct >= 40 ? 'var(--warning)' : 'var(--error)'
+                    return (
+                      <div key={c.label} style={{ textAlign: 'center', width: '28px' }}>
+                        <div style={{ fontSize: '11px', color: barColor, fontWeight: '700', marginBottom: '3px' }}>{c.pts != null ? c.pts : '—'}</div>
+                        <div style={{ width: '100%', height: '32px', backgroundColor: 'var(--border)', borderRadius: '3px', display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
+                          <div style={{ width: '100%', height: `${pct}%`, backgroundColor: barColor, borderRadius: '3px', transition: 'height 0.3s' }} />
+                        </div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '3px' }}>{c.icon}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '18px', transition: 'transform 0.2s', transform: recoveryExpanded ? 'rotate(180deg)' : 'none' }}>▾</div>
+              </div>
+            </div>
+
+            {/* Expanded breakdown */}
+            {recoveryExpanded && (
+              <div style={{ marginTop: '20px', borderTop: '1px solid var(--border)', paddingTop: '18px' }} onClick={e => e.stopPropagation()}>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '14px' }}>What's driving your score today</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {componentDetails.map(c => {
+                    const pct = c.pts != null ? Math.round((c.pts / c.max) * 100) : 0
+                    const barColor = pct >= 70 ? 'var(--success)' : pct >= 40 ? 'var(--warning)' : 'var(--error)'
+                    return (
+                      <div key={c.label} style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                        <div style={{ fontSize: '20px', width: '28px', flexShrink: 0, textAlign: 'center', paddingTop: '1px' }}>{c.icon}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>{c.label}</span>
+                            <span style={{ fontSize: '13px', fontWeight: '700', color: barColor, flexShrink: 0 }}>{c.pts != null ? c.pts : '—'} / {c.max} pts</span>
+                          </div>
+                          <div style={{ height: '4px', backgroundColor: 'var(--border)', borderRadius: '2px', marginBottom: '7px' }}>
+                            <div style={{ height: '100%', width: `${pct}%`, backgroundColor: barColor, borderRadius: '2px' }} />
+                          </div>
+                          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.6' }}>{c.detail}</p>
+                          {c.tip && (
+                            <div style={{ marginTop: '6px', display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                              <span style={{ fontSize: '11px', color: SC.overview, fontWeight: '700', flexShrink: 0 }}>→</span>
+                              <span style={{ fontSize: '11px', color: SC.overview, fontWeight: '600', lineHeight: '1.5' }}>{c.tip}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div style={{ marginTop: '18px', padding: '12px 14px', backgroundColor: `${scoreColor}10`, border: `1px solid ${scoreColor}30`, borderRadius: '8px' }}>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.6' }}>
+                    <strong style={{ color: 'var(--text-primary)' }}>How it's calculated:</strong> Sleep (25 pts) + Hydration (20 pts) + Protein (20 pts) + Yesterday's Energy Check-In (20 pts) + Workout Load (15 pts). Score reflects how prepared your body is for today based on what you logged yesterday.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
       {/* Zone 3 — Section Summary Cards */}
       {loaded && sd && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
@@ -491,52 +639,12 @@ export default function LifeHubPage() {
         </div>
       )}
 
-      {/* Recovery Score */}
-      {recoveryScore && (
-        <div style={{ backgroundColor: 'var(--surface)', border: `1px solid var(--border)`, borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-            <div>
-              <h2 style={{ color: SC.overview, fontSize: '16px', fontWeight: '700', marginBottom: '2px' }}>⚡ Recovery Score</h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>Based on yesterday's sleep, hydration, nutrition, and workout load</p>
-            </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontSize: '32px', fontWeight: '700', lineHeight: 1, color: recoveryScore.total >= 75 ? 'var(--success)' : recoveryScore.total >= 55 ? 'var(--accent-blue)' : recoveryScore.total >= 35 ? 'var(--warning)' : 'var(--error)' }}>
-                {recoveryScore.total}
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                {recoveryScore.total >= 75 ? 'Well Recovered' : recoveryScore.total >= 55 ? 'Decent Recovery' : recoveryScore.total >= 35 ? 'Recovering' : 'Low Recovery'}
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
-            {[
-              { label: 'Sleep', pts: recoveryScore.components.sleepPts, max: 25, icon: '😴', tip: recoveryScore.sleepHours != null ? `${recoveryScore.sleepHours}h` : 'No data' },
-              { label: 'Hydration', pts: recoveryScore.components.hydrationPts, max: 20, icon: '💧', tip: `${recoveryScore.yesterdayWaterOz}/${recoveryScore.waterGoal} oz` },
-              { label: 'Protein', pts: recoveryScore.components.proteinPts, max: 20, icon: '🥩', tip: recoveryScore.components.proteinPts > 0 ? `${recoveryScore.components.proteinPts}/20` : 'No data' },
-              { label: 'Energy', pts: recoveryScore.components.energyPts, max: 20, icon: '⚡', tip: recoveryScore.components.energyPts > 0 ? `${recoveryScore.components.energyPts}/20` : 'Not logged' },
-              { label: 'Load', pts: recoveryScore.components.workoutPts, max: 15, icon: '🏋️', tip: recoveryScore.components.workoutPts === 15 ? 'Rest day' : `${recoveryScore.components.workoutPts}/15` },
-            ].map(c => (
-              <div key={c.label} title={c.tip} style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '16px', marginBottom: '3px' }}>{c.icon}</div>
-                <div style={{ fontSize: '13px', fontWeight: '700', color: c.pts >= c.max * 0.7 ? 'var(--success)' : c.pts >= c.max * 0.4 ? 'var(--warning)' : c.pts == null ? 'var(--text-secondary)' : 'var(--error)' }}>
-                  {c.pts != null ? c.pts : '—'}
-                </div>
-                <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{c.label}</div>
-                <div style={{ height: '3px', borderRadius: '2px', backgroundColor: 'var(--border)', marginTop: '4px' }}>
-                  <div style={{ height: '100%', borderRadius: '2px', width: `${c.pts != null ? Math.round((c.pts / c.max) * 100) : 0}%`, backgroundColor: c.pts >= c.max * 0.7 ? 'var(--success)' : c.pts >= c.max * 0.4 ? 'var(--warning)' : 'var(--error)' }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Check-In + Heatmap — combined card */}
       <div style={{ backgroundColor: 'var(--surface)', border: `1px solid var(--border)`, borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', padding: '24px', marginBottom: '0' }}>
         {/* Header row */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
               <h2 style={{ color: SC.overview, fontSize: '16px', fontWeight: '700', margin: 0 }}>✍️ Today's Check-In</h2>
               {(() => {
                 const checkinMap = {}
@@ -554,13 +662,32 @@ export default function LifeHubPage() {
                   </span>
                 ) : null
               })()}
+              <button onClick={() => setCheckinWhyOpen(o => !o)}
+                style={{ background: 'none', border: `1px solid ${SC.overview}44`, borderRadius: '20px', color: SC.overview, fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', opacity: 0.8 }}>
+                ℹ️ Why log this?
+              </button>
             </div>
-            {checkinContext?.contextNote
-              ? <p style={{ color: SC.overview, fontSize: '12px', fontWeight: '500', margin: '4px 0 0', opacity: 0.85 }}>{checkinContext.contextNote}</p>
-              : <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '4px 0 0' }}>How are you feeling today?</p>
-            }
+            {saved && <span style={{ fontSize: '12px', color: 'var(--success)', fontWeight: '600', flexShrink: 0 }}>✓ Logged</span>}
           </div>
-          {saved && <span style={{ fontSize: '12px', color: 'var(--success)', fontWeight: '600', flexShrink: 0 }}>✓ Logged</span>}
+          {checkinContext?.contextNote
+            ? <p style={{ color: SC.overview, fontSize: '12px', fontWeight: '500', margin: '0 0 0', opacity: 0.85 }}>{checkinContext.contextNote}</p>
+            : <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0' }}>How are you feeling today?</p>
+          }
+          {checkinWhyOpen && (
+            <div style={{ marginTop: '12px', backgroundColor: `${SC.overview}0d`, border: `1px solid ${SC.overview}30`, borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: SC.overview, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Why your daily check-in matters</div>
+              {[
+                { icon: '🤖', text: 'Powers your Daily Brief — the AI reads your energy and mood when writing your personalized morning summary, so it actually reflects how you\'re doing.' },
+                { icon: '🧠', text: 'Makes your questions smarter — leg day? low sleep? calorie deficit? The app adjusts what it asks you based on patterns in your real data.' },
+                { icon: '📊', text: 'Builds your health picture — your 28-day heatmap tracks consistency, and low-energy streaks trigger warnings in your workout plan so you don\'t overtrain.' },
+              ].map(({ icon, text }) => (
+                <div key={icon} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '14px', flexShrink: 0 }}>{icon}</span>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>{text}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Two-column: form left, heatmap right */}
