@@ -118,6 +118,7 @@ src/
         generate-profile/route.js      POST — AI supplement info card (Sonnet); cached in supplement_profiles by normalized name (shared across users); uses getUser() + is_disabled check; supplement name wrapped in user_input tags
       nutrition/
         search/route.js                GET ?q= or ?barcode= — checks food_cache + my_foods first; falls back to Open Food Facts API; caches OFF results permanently (ODbL allows); uses getUser()
+        ai-food-fill/route.js          POST { name } — Haiku estimates nutrition per typical serving; returns fill JSONB (name, serving_size_label, macros + subset of micros); no cache (user reviews before saving); uses getUser() + is_disabled check
         log/route.js                   GET ?date= today's entries; POST add entry (multiplies macros by servings); DELETE by id; uses getUser()
         my-foods/route.js              GET user's saved food library; POST save new food; DELETE by id; uses getUser()
         tdee-check/route.js            GET pending tdee_suggestion; POST calculates implied TDEE from food logs + weight measurements (needs 14+ days + 2+ measurements); PATCH accept (writes custom_tdee) or dismiss; uses getUser()

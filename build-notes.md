@@ -466,7 +466,7 @@ Returns: `{ servings_per_container, package_note, estimated_nutrition, confidenc
 | 2A.1 | ✅ Done | Personalized timing in FoodIntelCard — NutritionPage fetches active workout plan on load (today's day_of_week entry); passes `workoutCtx = { loggedToday: bool, plannedLabel: string|null }` down through AddFoodModal, SearchModal, SavedFoodsTab → FoodIntelCard; best_time_note overridden with "You already trained today" or "You have [Push Day] planned today" when relevant. |
 | 2B | ⏳ After 2A | Servings-per-container on food cards + "Use whole container" button |
 | 2C | ⏳ After 2A | AI autofill missing micronutrients (fills gaps from OFFs) + `~AI` amber markers, editable |
-| 2D | ⏳ After 2A | AI fallback search — triggers when OFFs < 2 results, pre-fills manual entry form |
+| 2D | ✅ Done | AI fallback search — new `POST /api/nutrition/ai-food-fill` (Haiku, no cache); when OFFs returns 0 results a purple "Ask AI to estimate" banner appears; when 1 result a subtle "AI estimate instead" link appears; clicking calls Haiku, switches to manual entry tab, pre-fills form with estimated values; AI-estimated fields tinted amber with `rgba(241,196,15,0.08)` background + amber border; editing any field clears its amber tint; dismissible AI banner at top of manual form. Works in both AddFoodModal (search tab) and SearchModal. |
 | 2E | ⏳ After 2A | %DV ↔ amount toggle on Enter Manually + ingredient editor (uses existing DV constants) |
 | 2F | ⏳ Standalone | Weight-to-servings secondary input (parse grams from label, "or X g total" input updates servings) |
 | 2G | ⏳ Standalone | Sort My Favorites by recency — `last_logged_at` + `log_count` columns on `my_foods`, updated on log |

@@ -125,6 +125,8 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
   const [saveToLib, setSaveToLib] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savingFood, setSavingFood] = useState(null)
+  const [aiFilling, setAiFilling] = useState(false)
+  const [aiEstimatedFields, setAiEstimatedFields] = useState(new Set())
   const inputRef = useRef(null)
   const debounceRef = useRef(null)
 
@@ -142,6 +144,30 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
       setResults(data.results || [])
       setSearching(false)
     }, 500)
+  }
+
+  async function handleAiFill() {
+    if (aiFilling) return
+    setAiFilling(true)
+    const res = await fetch('/api/nutrition/ai-food-fill', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: query }),
+    })
+    const data = await res.json()
+    setAiFilling(false)
+    if (!data.fill) return
+    const fill = data.fill
+    const estimated = new Set()
+    const numFields = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg','saturated_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','vitamin_c_mg','vitamin_d_mcg']
+    const filled = { name: '', brand: '', serving_size_label: '1 serving', calories: '', protein_g: '', carbs_g: '', fat_g: '', fiber_g: '', sugar_g: '', sodium_mg: '', saturated_fat_g: '', trans_fat_g: '', cholesterol_mg: '', potassium_mg: '', calcium_mg: '', iron_mg: '', magnesium_mg: '', zinc_mg: '', vitamin_a_mcg: '', vitamin_c_mg: '', vitamin_d_mcg: '', vitamin_b12_mcg: '', vitamin_b6_mg: '', folate_mcg: '' }
+    filled.name = fill.name || query || ''
+    if (fill.serving_size_label) { filled.serving_size_label = fill.serving_size_label; estimated.add('serving_size_label') }
+    for (const f of numFields) {
+      if (fill[f] != null) { filled[f] = String(fill[f]); estimated.add(f) }
+    }
+    setManual(filled)
+    setAiEstimatedFields(estimated)
+    setManualMode(true)
   }
 
   async function handleQuickSave(food, e) {
@@ -231,7 +257,15 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
               )}
 
               {!searching && query && results.length === 0 && filteredMyFoods.length === 0 && (
-                <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>No results. Try entering manually below.</p>
+                <div style={{ marginTop: '8px', backgroundColor: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: '10px', padding: '14px 16px' }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 10px' }}>No results found in the database.</p>
+                  <button onClick={handleAiFill} disabled={aiFilling}
+                    style={{ backgroundColor: 'rgba(167,139,250,0.15)', color: 'var(--accent-purple)', border: '1px solid rgba(167,139,250,0.35)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: '600', cursor: aiFilling ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: aiFilling ? 0.7 : 1 }}>
+                    <span>🤖</span>
+                    <span>{aiFilling ? 'Estimating nutrition...' : `Ask AI to estimate "${query}"`}</span>
+                  </button>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '11px', margin: '8px 0 0', opacity: 0.7 }}>AI will pre-fill the manual entry form — review before saving.</p>
+                </div>
               )}
               {!query && myFoods.length === 0 && (
                 <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Type to search, or enter food manually.</p>
@@ -272,7 +306,18 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
         ) : (
           // Manual entry — all fields
           <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px 20px' }}>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 14px' }}>Fill in what you know — everything except Name is optional.</p>
+            {aiEstimatedFields.size > 0 ? (
+              <div style={{ backgroundColor: 'rgba(241,196,15,0.08)', border: '1px solid rgba(241,196,15,0.3)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '14px', flexShrink: 0 }}>🤖</span>
+                <div>
+                  <p style={{ color: 'var(--warning)', fontSize: '12px', fontWeight: '600', margin: '0 0 2px' }}>AI-estimated nutrition</p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '11px', margin: 0 }}>Highlighted fields are estimates — verify with the label if you have it.</p>
+                </div>
+                <button onClick={() => setAiEstimatedFields(new Set())} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer', flexShrink: 0, padding: 0, lineHeight: 1 }}>×</button>
+              </div>
+            ) : (
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 14px' }}>Fill in what you know — everything except Name is optional.</p>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {[
                 { key: 'name', label: 'Name *' }, { key: 'brand', label: 'Brand' },
@@ -280,8 +325,8 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
               ].map(({ key, label }) => (
                 <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
                   <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                  <input type="text" value={manual[key]} placeholder={key === 'serving_size_label' ? '1 cup (240ml)' : ''} onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
-                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                  <input type="text" value={manual[key]} placeholder={key === 'serving_size_label' ? '1 cup (240ml)' : ''} onChange={e => { setManual(m => ({ ...m, [key]: e.target.value })); setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n }) }}
+                    style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
                 </div>
               ))}
               <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Main Macros</div>
@@ -292,8 +337,8 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
               ].map(({ key, label }) => (
                 <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
                   <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
-                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => { setManual(m => ({ ...m, [key]: e.target.value })); setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n }) }}
+                    style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
                 </div>
               ))}
               <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Fats & Cholesterol</div>
@@ -302,8 +347,8 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
               ].map(({ key, label }) => (
                 <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
                   <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
-                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => { setManual(m => ({ ...m, [key]: e.target.value })); setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n }) }}
+                    style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
                 </div>
               ))}
               <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Minerals</div>
@@ -314,8 +359,8 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
               ].map(({ key, label }) => (
                 <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
                   <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
-                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => { setManual(m => ({ ...m, [key]: e.target.value })); setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n }) }}
+                    style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
                 </div>
               ))}
               <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Vitamins</div>
@@ -326,8 +371,8 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
               ].map(({ key, label }) => (
                 <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
                   <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
-                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => { setManual(m => ({ ...m, [key]: e.target.value })); setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n }) }}
+                    style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
                 </div>
               ))}
               {!libraryOnly && (
@@ -372,6 +417,8 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
   const [manualSaveToLib, setManualSaveToLib] = useState(true)
   const [savingManual, setSavingManual] = useState(false)
   const [manualServings, setManualServings] = useState('1')
+  const [aiFilling, setAiFilling] = useState(false)
+  const [aiEstimatedFields, setAiEstimatedFields] = useState(new Set())
 
   const debounceRef = useRef(null)
   const searchInputRef = useRef(null)
@@ -392,6 +439,30 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
       setResults(data.results || [])
       setSearching(false)
     }, 500)
+  }
+
+  async function handleAiFill() {
+    if (aiFilling) return
+    setAiFilling(true)
+    const res = await fetch('/api/nutrition/ai-food-fill', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: query }),
+    })
+    const data = await res.json()
+    setAiFilling(false)
+    if (!data.fill) return
+    const fill = data.fill
+    const estimated = new Set()
+    const filled = { ...BLANK_MANUAL }
+    const numFields = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg','saturated_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','vitamin_c_mg','vitamin_d_mcg']
+    filled.name = fill.name || query || ''
+    if (fill.serving_size_label) { filled.serving_size_label = fill.serving_size_label; estimated.add('serving_size_label') }
+    for (const f of numFields) {
+      if (fill[f] != null) { filled[f] = String(fill[f]); estimated.add(f) }
+    }
+    setManual(filled)
+    setAiEstimatedFields(estimated)
+    setTab('manual')
   }
 
   function handleExpandLog(foodId) {
@@ -556,29 +627,40 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
         {/* ── Enter Manually tab ── */}
         {tab === 'manual' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px 0' }}>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 14px' }}>Only Name is required — fill in as much or as little as you know.</p>
+            {aiEstimatedFields.size > 0 ? (
+              <div style={{ backgroundColor: 'rgba(241,196,15,0.08)', border: '1px solid rgba(241,196,15,0.3)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '14px', flexShrink: 0 }}>🤖</span>
+                <div>
+                  <p style={{ color: 'var(--warning)', fontSize: '12px', fontWeight: '600', margin: '0 0 2px' }}>AI-estimated nutrition</p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '11px', margin: 0 }}>Highlighted fields are estimates — verify with the label if you have it. You can edit any field before logging.</p>
+                </div>
+                <button onClick={() => setAiEstimatedFields(new Set())} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer', flexShrink: 0, padding: 0, lineHeight: 1 }}>×</button>
+              </div>
+            ) : (
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 14px' }}>Only Name is required — fill in as much or as little as you know.</p>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {[{ key: 'name', label: 'Name *', type: 'text' }, { key: 'brand', label: 'Brand', type: 'text' }, { key: 'serving_size_label', label: 'Serving Size', type: 'text' }].map(({ key, label, type }) => (
                 <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
                   <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                  <input type={type} value={manual[key]} onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
-                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                  <input type={type} value={manual[key]} onChange={e => { setManual(m => ({ ...m, [key]: e.target.value })); setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n }) }}
+                    style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
                 </div>
               ))}
               <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Macros</div>
               {[{ key: 'calories', label: 'Calories' }, { key: 'protein_g', label: 'Protein (g)' }, { key: 'carbs_g', label: 'Carbs (g)' }, { key: 'fat_g', label: 'Fat (g)' }, { key: 'fiber_g', label: 'Fiber (g)' }, { key: 'sugar_g', label: 'Sugar (g)' }, { key: 'sodium_mg', label: 'Sodium (mg)' }, { key: 'potassium_mg', label: 'Potassium (mg)' }].map(({ key, label }) => (
                 <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
                   <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
-                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => { setManual(m => ({ ...m, [key]: e.target.value })); setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n }) }}
+                    style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
                 </div>
               ))}
               <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Optional</div>
               {[{ key: 'saturated_fat_g', label: 'Saturated Fat (g)' }, { key: 'cholesterol_mg', label: 'Cholesterol (mg)' }, { key: 'calcium_mg', label: 'Calcium (mg)' }, { key: 'iron_mg', label: 'Iron (mg)' }, { key: 'vitamin_c_mg', label: 'Vitamin C (mg)' }, { key: 'vitamin_d_mcg', label: 'Vitamin D (mcg)' }].map(({ key, label }) => (
                 <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
                   <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
-                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => { setManual(m => ({ ...m, [key]: e.target.value })); setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n }) }}
+                    style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
                 </div>
               ))}
             </div>
@@ -622,7 +704,24 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
                 </div>
               )}
               {!searching && query && results.length === 0 && (
-                <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>No results. Try the "Enter Manually" tab to add it yourself.</p>
+                <div style={{ marginTop: '8px', backgroundColor: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: '10px', padding: '14px 16px' }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 10px' }}>No results found in the database.</p>
+                  <button onClick={handleAiFill} disabled={aiFilling}
+                    style={{ backgroundColor: 'rgba(167,139,250,0.15)', color: 'var(--accent-purple)', border: '1px solid rgba(167,139,250,0.35)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: '600', cursor: aiFilling ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: aiFilling ? 0.7 : 1 }}>
+                    <span>🤖</span>
+                    <span>{aiFilling ? 'Estimating nutrition...' : `Ask AI to estimate "${query}"`}</span>
+                  </button>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '11px', margin: '8px 0 0', opacity: 0.7 }}>AI will pre-fill the manual entry form — review and adjust before logging.</p>
+                </div>
+              )}
+              {!searching && query && results.length > 0 && results.length < 2 && (
+                <div style={{ marginTop: '8px', backgroundColor: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Only 1 result found.</span>
+                  <button onClick={handleAiFill} disabled={aiFilling}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent-purple)', fontSize: '12px', fontWeight: '600', cursor: aiFilling ? 'default' : 'pointer', padding: 0, opacity: aiFilling ? 0.7 : 1 }}>
+                    {aiFilling ? '🤖 Estimating...' : '🤖 AI estimate instead'}
+                  </button>
+                </div>
               )}
               {!query && (
                 <div style={{ padding: '8px 0' }}>
