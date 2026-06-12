@@ -344,9 +344,9 @@ export default function LifeHubPage() {
   function StatusPill({ color, icon, value, sub, label, href }) {
     return (
       <Link href={href} style={{ textDecoration: 'none' }}>
-        <div style={{ backgroundColor: 'var(--surface)', borderTop: `1px solid ${color}33`, borderRight: `1px solid ${color}33`, borderBottom: `1px solid ${color}33`, borderLeft: `3px solid ${color}`, borderRadius: '12px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '12px', transition: 'all 0.15s', height: '100%', boxSizing: 'border-box' }}
-          onMouseEnter={e => { e.currentTarget.style.borderTopColor = color; e.currentTarget.style.borderRightColor = color; e.currentTarget.style.borderBottomColor = color; e.currentTarget.style.backgroundColor = `${color}08` }}
-          onMouseLeave={e => { e.currentTarget.style.borderTopColor = `${color}33`; e.currentTarget.style.borderRightColor = `${color}33`; e.currentTarget.style.borderBottomColor = `${color}33`; e.currentTarget.style.backgroundColor = 'var(--surface)' }}>
+        <div style={{ backgroundColor: 'var(--surface)', borderTop: `1px solid ${color}33`, borderRight: `1px solid ${color}33`, borderBottom: `1px solid ${color}33`, borderLeft: `3px solid ${color}`, borderRadius: '12px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '12px', transition: 'background-color 0.15s', height: '100%', boxSizing: 'border-box' }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${color}10` }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--surface)' }}>
           <span style={{ fontSize: '22px', flexShrink: 0 }}>{icon}</span>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontSize: '20px', fontWeight: '700', color, lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
@@ -361,9 +361,9 @@ export default function LifeHubPage() {
   // Section summary card
   function SectionCard({ color, icon, sectionLabel, hero, heroSub, href, actionLabel, actionHref }) {
     return (
-      <div style={{ backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${color}`, borderRadius: '12px', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '10px', transition: 'border-color 0.15s' }}
-        onMouseEnter={e => { e.currentTarget.style.borderTopColor = color; e.currentTarget.style.borderRightColor = color; e.currentTarget.style.borderBottomColor = color }}
-        onMouseLeave={e => { e.currentTarget.style.borderTopColor = 'var(--border)'; e.currentTarget.style.borderRightColor = 'var(--border)'; e.currentTarget.style.borderBottomColor = 'var(--border)' }}>
+      <div style={{ backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${color}`, borderRadius: '12px', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '10px', transition: 'background-color 0.15s' }}
+        onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${color}0a` }}
+        onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--surface)' }}>
         <div style={{ fontSize: '11px', fontWeight: '700', color, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{icon} {sectionLabel}</div>
         <div>
           <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1.1, marginBottom: '3px' }}>{hero}</div>
@@ -525,10 +525,10 @@ export default function LifeHubPage() {
         ]
 
         return (
-          <div style={{ backgroundColor: 'var(--surface)', borderTop: `2px solid ${scoreColor}44`, borderRight: `2px solid ${scoreColor}44`, borderBottom: `2px solid ${scoreColor}44`, borderLeft: `4px solid ${scoreColor}`, borderRadius: '14px', padding: '20px 24px', marginBottom: '20px', cursor: 'pointer', transition: 'border-color 0.15s' }}
+          <div style={{ backgroundColor: 'var(--surface)', borderTop: `2px solid ${scoreColor}44`, borderRight: `2px solid ${scoreColor}44`, borderBottom: `2px solid ${scoreColor}44`, borderLeft: `4px solid ${scoreColor}`, borderRadius: '14px', padding: '20px 24px', marginBottom: '20px', cursor: 'pointer', transition: 'background-color 0.15s' }}
             onClick={() => setRecoveryExpanded(e => !e)}
-            onMouseEnter={e => { e.currentTarget.style.borderTopColor = scoreColor; e.currentTarget.style.borderRightColor = scoreColor; e.currentTarget.style.borderBottomColor = scoreColor }}
-            onMouseLeave={e => { e.currentTarget.style.borderTopColor = `${scoreColor}44`; e.currentTarget.style.borderRightColor = `${scoreColor}44`; e.currentTarget.style.borderBottomColor = `${scoreColor}44` }}>
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${scoreColor}0a` }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--surface)' }}>
 
             {/* Header row */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
