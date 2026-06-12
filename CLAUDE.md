@@ -138,7 +138,7 @@ src/
         monthly-wrap/route.js          GET cached wrap for ?month=YYYY-MM; POST generates (6-table gather + Claude narrative), caches forever; uses getUser() + is_disabled check
     life-hub/
       layout.js                        Life Hub layout with LifeHubSidebar
-      page.js                          Life Hub landing — Daily Brief (AI paragraph, cached daily), Recovery Score (5-component composite 0–100: sleep/hydration/protein/energy/workout load), Smart Contextual Check-In (adaptive question labels + micro-insight after save), 28-day heatmap, live stats strip (water includes food water_g), hub navigation cards (includes Monthly Wrap card)
+      page.js                          Life Hub landing — 3-zone dashboard: Zone 1 = 4-pill status bar (calories/workouts/steps/water, section-colored); Zone 2 = Daily Brief (AI paragraph, cached daily, section-colored left border, collapsible); Zone 3 = 2×2 live section summary cards (Nutrition/Workouts/Health/Goals with real data + left-border accents); below: Recovery Score (5-component 0–100), Smart Contextual Check-In, 28-day heatmap
       monthly-wrap/page.js             Monthly Wrap — month picker, AI narrative card, stat grid (workouts/energy/mood/weight/calories/water); Generate button on first visit; cached forever per month; grouped under Overview in sidebar
       health/
         page.js                        Health Overview — steps today, avg heart rate, sleep last night
