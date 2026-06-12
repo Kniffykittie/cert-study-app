@@ -456,6 +456,7 @@ Returns: `{ servings_per_container, package_note, estimated_nutrition, confidenc
 | 1B | ✅ Done | Section color applied to all Life Hub page headers (title = section color) |
 | 1B.5 | ✅ Done | Colored + icon card section headers across all Life Hub pages |
 | 1C | ✅ Done | Overview dashboard redesign — 4-pill status bar (calories/workouts/steps/water), compact Daily Brief with section-color left border, 2×2 live section summary cards (Nutrition/Workouts/Health/Goals with real data), all with 3px colored left borders |
+| 1C.1 | ✅ Done | Status pills bigger + workout pill shows day label (Push Day/Rest Day); sleep sub-label on steps pill; water % on water pill; Check-In + Heatmap merged into one card with streak badge |
 | 2A | 🔜 Next | `ai_food_intel_cache` DB table + `POST /api/nutrition/ai-food-intel` route (Haiku, cached by food_key) |
 | 2B | ⏳ After 2A | Servings-per-container on food cards + "Use whole container" button |
 | 2C | ⏳ After 2A | AI autofill missing micronutrients (fills gaps from OFFs) + `~AI` amber markers, editable |
