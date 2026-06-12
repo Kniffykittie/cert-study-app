@@ -2330,7 +2330,346 @@ The `hydration_score` column in `daily_checkins` will accumulate 30 days of data
 
 ---
 
-### Phase 46 — Data Intelligence, Correlation Engine & Missing Nutrients
+### Feature: Sleep Tracker Upgrade — Full Sleep Intelligence
+
+*The existing sleep page shows total sleep, stage breakdown bar, and a timeline chart. This upgrade adds sleep quality metrics (onset, efficiency, restlessness), heart rate during sleep overlaid on the intraday chart, and genuine educational content about what's actually happening in your body during each stage — the kind of context that makes the data meaningful rather than just numbers.*
+
+> **Google Health API capabilities confirmed:** Sleep sessions with stages (deep/light/REM/awake) are already being fetched and stored. Sleep onset latency, awake segment count, and sleep efficiency are all derivable from the existing `health_sleep_sessions.stages` JSONB data — no new API calls needed. Heart rate during sleep = intraday HR data during the sleep window (available once Phase 0 of the HR build is live). SpO2 and respiratory rate may be available via separate data types depending on the wearable — check at build time.
+
+---
+
+#### What We're Adding to the Data Layer
+
+**Step 1 — Extract richer metrics from existing `health_sleep_sessions` data**
+
+The `stages` JSONB already contains ordered stage entries with start times and durations. We're not extracting or storing enough from it. Add these computed columns:
+
+```sql
+ALTER TABLE health_sleep_sessions ADD COLUMN onset_minutes NUMERIC(5,1);
+-- Time from session start to first non-awake stage (minutes)
+
+ALTER TABLE health_sleep_sessions ADD COLUMN efficiency_pct SMALLINT;
+-- (total_sleep_minutes / total_in_bed_minutes) × 100
+
+ALTER TABLE health_sleep_sessions ADD COLUMN awake_count SMALLINT;
+-- Number of distinct awake segments within the session
+
+ALTER TABLE health_sleep_sessions ADD COLUMN longest_stretch_min SMALLINT;
+-- Longest continuous sleep segment without waking (most restorative sleep measure)
+
+ALTER TABLE health_sleep_sessions ADD COLUMN restlessness TEXT;
+-- Computed label: 'restful' | 'normal' | 'restless' | 'very_restless'
+-- Based on awake_count and total awake_minutes relative to total duration
+```
+
+Compute these during the sync route's sleep processing (same place stages are currently parsed):
+
+```js
+// After parsing stages array:
+function computeSleepMetrics(stages, sessionStart) {
+  // onset: gap from session start to first non-awake stage
+  const firstSleep = stages.find(s => s.stage !== 'awake')
+  const onset = firstSleep
+    ? (new Date(firstSleep.start) - new Date(sessionStart)) / 60000
+    : null
+
+  // awake segments (exclude first entry if it's the pre-sleep awake period)
+  const internalAwakes = stages.filter((s, i) => s.stage === 'awake' && i > 0)
+  const awakeCount = internalAwakes.length
+  const totalAwakeMin = internalAwakes.reduce((sum, s) => sum + s.duration_min, 0)
+
+  // efficiency
+  const totalMin = stages.reduce((sum, s) => sum + s.duration_min, 0)
+  const sleepMin = totalMin - totalAwakeMin
+  const efficiency = Math.round((sleepMin / totalMin) * 100)
+
+  // longest continuous stretch
+  let longest = 0, current = 0
+  for (const s of stages) {
+    if (s.stage !== 'awake') { current += s.duration_min; longest = Math.max(longest, current) }
+    else current = 0
+  }
+
+  // restlessness label
+  const awakePct = totalAwakeMin / totalMin
+  const restlessness =
+    awakeCount >= 5 || awakePct > 0.15 ? 'very_restless' :
+    awakeCount >= 3 || awakePct > 0.08 ? 'restless' :
+    awakeCount >= 1 ? 'normal' : 'restful'
+
+  return { onset, awakeCount, efficiency, longestStretch: Math.round(longest), restlessness }
+}
+```
+
+**Step 2 — HR during sleep (no new data needed once Phase 0 HR is live)**
+
+The `health_heart_rate_intraday` table bucketed by hour will naturally contain sleep-window data. The sleep page just needs to query those hours and overlay them on the stage timeline. Zero additional API calls or storage changes.
+
+**Step 3 — SpO2 (check at build time)**
+
+Google Health may expose `blood-oxygen-saturation` or `spo2` as a data type under the existing scope. Before building, test: `fetchDataType(accessToken, 'blood-oxygen-saturation', since)` and log the response. If it returns data, store it as `avg_spo2 NUMERIC(4,1)` on `health_sleep_sessions`. If it returns nothing, skip — the feature degrades gracefully.
+
+---
+
+#### Updated Sleep Tracker Page — `/life-hub/health/sleep`
+
+**Section 1 — The headline card (most important numbers, top of page)**
+
+Four stat chips in a row (same pattern as today):
+```
+😴 7h 32m Total    🌊 1h 14m Deep    💭 1h 48m REM    💡 4h 30m Light
+```
+
+Below those, three new quality chips in a different style (smaller, secondary):
+```
+⚡ Fell asleep in 14m    ✓ 92% Efficient    😌 Restful (woke 1×)
+```
+
+Color coding on the quality chips:
+- Onset: green < 15min / yellow 15–30min / red > 30min (> 30min = possible sleep onset issue)
+- Efficiency: green ≥ 85% / yellow 75–84% / red < 75%
+- Restfulness: green = restful or normal / yellow = restless / red = very restless (4+ wakings)
+
+**Section 2 — The sleep timeline (already exists, upgrade it)**
+
+Current: proportional stage breakdown bar. Keep that.
+
+Add below it: a continuous timeline showing the actual arc of the night — stages as colored blocks from left (sleep start) to right (wake time), with the x-axis labeled in hours (10pm, 12am, 2am, 4am, 6am).
+
+```
+Stage colors:
+  Deep (Stage 3):  var(--accent-blue)   — the most restorative
+  REM:             var(--accent-purple) — dreaming
+  Light (Stage 1/2): var(--text-secondary) at 40% opacity — in-between
+  Awake:           var(--warning) at 60% opacity — disruptions
+```
+
+The typical healthy night's pattern: deep sleep dominates the first half of the night (before ~2am), REM sleep dominates the second half (after ~2am). If the user's timeline shows this pattern — that's a good sign. If deep sleep is fragmented across the night or REM is missing from the second half — that's notable.
+
+**Section 3 — HR during sleep (new, requires Phase 0 HR)**
+
+A secondary line chart overlaid below or beside the stage timeline — same x-axis (time of night), y-axis = bpm.
+
+The visual story this tells:
+- HR drops when deep sleep starts (body at its most relaxed)
+- HR is slightly higher and more variable during REM (brain activity without muscle tone)
+- Awake segments show as brief HR spikes
+- The lowest point of the night is called "nocturnal dip" — a healthy dip of 10–20% below resting daytime HR
+
+Show: "Lowest sleep HR: 52 bpm at 1:14am" and "Heart rate dip: 18% below your daytime resting average — healthy range is 10–20%."
+
+If the dip is < 10%: amber note "A small nocturnal dip can indicate sleep disruption, high stress, or alcohol consumption."
+If the dip is > 25%: note "A deeper-than-average dip sometimes occurs after intense exercise."
+
+**Section 4 — Stage education cards (the feature you asked for)**
+
+Below all the data: collapsible cards explaining what's actually happening in each stage. Collapsed by default — a small "What does this mean? ↓" link expands them. They should feel like something you'd want to read, not a textbook.
+
+---
+
+**💙 Deep Sleep (Slow-Wave Sleep, Stage 3)**
+
+> *This is your body's repair shop. It's the hardest stage to wake you from, and the one you feel most robbed of when you don't get enough.*
+
+**What's happening:**
+- Your brain shifts to slow, synchronized waves called "delta waves" — hence "slow-wave sleep"
+- Growth hormone (GH) is released in large pulses almost exclusively during deep sleep — this is when muscle tissue repair, bone maintenance, and cellular regeneration happen
+- Your immune system gets its clearest window here: cytokines (immune signaling proteins) are produced and the lymphatic system clears metabolic waste from the brain — including beta-amyloid plaques associated with cognitive decline
+- Your heart rate and breathing are at their slowest and most regular — lowest energy expenditure of any stage
+- Blood pressure drops 10–20% (called "nocturnal dipping") — this nightly BP drop is one reason consistent sleep protects heart health
+- Core body temperature continues falling
+
+**When it happens:** Mostly in the first half of the night, in the first 1–3 sleep cycles. After ~2am, deep sleep drops off sharply.
+
+**What you notice when you don't get enough:** Physical fatigue that doesn't improve with rest, slow muscle recovery, feeling foggy — because the cellular maintenance work wasn't done. If you wake someone from deep sleep, they're profoundly confused (sleep inertia is strongest here).
+
+**What helps you get more:**
+- Going to bed earlier (deep sleep is front-loaded — late bedtimes cut it)
+- Consistent wake time (the brain schedules deep sleep based on your rhythm)
+- Exercise (especially strength training) modestly increases deep sleep the same night
+- Avoiding alcohol (alcohol fragments deep sleep in the second half even if it helps you fall asleep)
+
+**How much is normal:** 15–25% of total sleep time. Less than 10% is a flag.
+
+---
+
+**💜 REM Sleep (Rapid Eye Movement)**
+
+> *Your brain's creativity and emotional processing studio. This is where dreams happen — and where your mind makes sense of the day.*
+
+**What's happening:**
+- Your eyes move rapidly under closed lids — the defining characteristic
+- Brain activity looks almost identical to being awake on an EEG — your brain is just as active as during the day
+- Muscle tone drops to near-zero (atonia) — your body is essentially paralyzed. This is a feature, not a bug: it prevents you from physically acting out your dreams
+- Emotional memories are being processed and emotionally "defused" — the hippocampus replays the day's experiences and the amygdala (emotional processor) decides how to file them. This is why sleep after a difficult day genuinely helps you feel better about it
+- Creative associations form: the brain makes cross-domain connections it doesn't make while awake — this is the basis for "sleep on it" producing insights
+- Declarative memory consolidation: fact-based learning and procedural skills (how to do things) are transferred from short-term to long-term storage
+- Heart rate is slightly higher and more variable than deep sleep — the brain needs more blood flow
+- You're thermoregulating less effectively (the body partially "turns off" temperature control)
+
+**When it happens:** Mostly in the second half of the night. The first REM period is short (~10 min); each subsequent REM cycle is longer — the last REM period before waking can be 30–60 min. Cutting sleep short by even 1 hour removes a disproportionate amount of REM.
+
+**What you notice when you don't get enough:** Emotional reactivity, difficulty concentrating, reduced creativity, impaired learning retention. REM deprivation specifically is linked to anxiety amplification — the emotional filing system backs up.
+
+**What helps you get more:**
+- Not cutting sleep short (REM is at the end — alarms are the enemy of REM)
+- Reducing alcohol (alcohol suppresses REM for the entire night it's consumed)
+- Not taking melatonin in large doses (it shifts timing but doesn't increase REM)
+- A cool room temperature (paradoxically, REM is when your body stops regulating temperature — cooler environments keep the cycle going more smoothly)
+
+**How much is normal:** 20–25% of total sleep. Athletes and people under stress often show reduced REM. Growing children and teenagers have dramatically more REM than adults.
+
+---
+
+**⬜ Light Sleep (NREM Stages 1 and 2)**
+
+> *The transition and maintenance stage. Not as dramatic as deep or REM, but it's doing important work and makes up the majority of your night.*
+
+**Stage 1 (5–10 min):**
+- The entry point to sleep — you're between waking and sleeping
+- Hypnic jerks happen here (the sudden falling sensation that jolts you awake — caused by the brain misinterpreting muscle relaxation as falling)
+- Very easy to wake; you may not even believe you were asleep
+- Heart rate slows, eyes drift slowly
+
+**Stage 2 (the bulk of light sleep — 40–50% of total sleep):**
+- Body temperature drops, heart rate slows further
+- Sleep spindles appear: short bursts of neural activity (12–15 Hz) that actively block sensory processing — they're why you stop hearing the TV, why noise is less likely to wake you
+- K-complexes: large, slow waves that may function as a "sleep protection" mechanism, suppressing arousal responses
+- Motor sequence memory consolidation begins here (this is why practicing a skill and then sleeping improves performance)
+- Breathing becomes regular
+
+**What you notice when it's disrupted:** Feeling like you "slept but didn't sleep" — light sleep is less restorative than deep or REM but is not trivial. It's the connective tissue of the night.
+
+---
+
+**🟡 Awake Segments During Sleep**
+
+> *Brief awakenings are normal. The number and duration is what matters.*
+
+Healthy adults wake briefly 3–5 times per night naturally — often without remembering it. These micro-awakenings last seconds to minutes and are part of the sleep cycle transition process. The brain surfaces briefly, checks for threats, and returns to sleep.
+
+**What shows up in your data as "awake":**
+- True micro-awakenings (normal, unmemorable)
+- Needing to use the bathroom (more frequent with age or high evening fluid intake)
+- Environmental disturbances: a sound, temperature change, a partner moving
+- Internal disturbances: pain, acid reflux, anxiety, alcohol metabolism (stimulant phase hits ~3–4 hours after drinking)
+
+**When it becomes a problem:**
+- 5+ awakenings per night consistently → look at sleep hygiene, alcohol, room temperature, stress
+- Awake segments clustered in the second half of the night → often alcohol or cortisol-related (cortisol rises pre-dawn)
+- Long awakenings (> 15 min) → body has difficulty returning to sleep; consider sleep restriction therapy if chronic
+
+**What your data shows:** The restlessness rating (Restful / Normal / Restless / Very Restless) is computed from awake_count and what percentage of the night was spent awake. "Restful" = 0–1 awakenings. "Very Restless" = 4+ awakenings or > 15% of night awake.
+
+---
+
+**Section 5 — Sleep score (composite, shown prominently)**
+
+A single 0–100 score computed from the metrics we now have:
+
+```
+Sleep Score components:
+  Duration vs target (target = goals_profiles.sleep_hours × 60):
+    ≥ 95% of target:  30 pts
+    85–94%:           24 pts
+    70–84%:           16 pts
+    < 70%:             8 pts
+
+  Deep sleep %:
+    ≥ 18%:            20 pts
+    12–17%:           15 pts
+    8–11%:            10 pts
+    < 8%:              5 pts
+
+  REM sleep %:
+    ≥ 20%:            20 pts
+    14–19%:           15 pts
+    9–13%:            10 pts
+    < 9%:              5 pts
+
+  Sleep efficiency:
+    ≥ 88%:            15 pts
+    78–87%:           11 pts
+    68–77%:            7 pts
+    < 68%:             3 pts
+
+  Onset (fell asleep quickly):
+    ≤ 15 min:         15 pts
+    16–25 min:        11 pts
+    26–40 min:         7 pts
+    > 40 min:          3 pts
+```
+
+Total: 0–100. Store in `health_sleep_sessions.sleep_score SMALLINT`.
+
+Label the score: 85–100 = Excellent · 70–84 = Good · 55–69 = Fair · < 55 = Poor
+
+This score feeds Recovery Score (currently "Sleep quality" is just duration-based — replace it with this computed score for a much more accurate signal).
+
+**Add column:** `ALTER TABLE health_sleep_sessions ADD COLUMN sleep_score SMALLINT;`
+
+---
+
+#### Cross-System Connections
+
+- **Recovery Score:** Replace the current duration-only sleep component with `sleep_score` — dramatically more accurate signal
+- **Daily Brief:** Claude gets: "Sleep last night: score 78/100 (Good). Deep: 1h 12m (16%). REM: 1h 44m (23%). Onset: 8 min. Efficiency: 91%. Restlessness: Normal (woke 2×)." This is enough context for genuinely useful brief language: "You got solid REM last night — good conditions for learning and mood today."
+- **Monthly Wrap:** Average sleep score for the month, deep sleep % avg, REM % avg, trend vs prior month. "Your sleep quality improved from an avg 68 to 77 this month — deep sleep averaged 18%, up from 13% last month."
+- **Heart Rate page:** The 24-hour intraday chart naturally covers sleep hours. Annotate with the sleep session: shaded blue background during sleep window, stage blocks behind the HR line exactly as workout sessions get shaded. HR drops into the 50s during deep sleep blocks, rises slightly during REM — the user can literally see their physiology.
+- **Encyclopedia:** If check-in energy is consistently low and sleep score averages < 65, the energy Encyclopedia page surfaces it prominently: "Your sleep quality may be a bigger factor than any nutrient gap here."
+- **Workout plan:** If last night's sleep score < 55, add it to the workout fatigue signal alongside energy check-in and hydration: "Poor sleep last night (score 52) — your body is less recovered than usual. Consider a lighter session."
+- **TDEE calibration:** Sleep deprivation reduces metabolic rate modestly (~5–8%). If sleep score < 60 consistently over 14+ days, note in the TDEE calibration card: "Chronically short sleep can reduce metabolic rate slightly. This may affect your actual TDEE."
+
+---
+
+#### Key Technical Decisions
+
+| Decision | Reason |
+|----------|--------|
+| Onset/efficiency/restlessness computed from existing stages data, not new API fields | We already have everything we need in stages JSONB. No new fetch required. |
+| Sleep score stored on health_sleep_sessions, not recomputed on every page load | Expensive to recompute; score is stable once the session is processed |
+| Stage education cards collapsed by default | Don't overwhelm users who just want the numbers; make the depth opt-in |
+| Restlessness label computed (not fetched) | Google Health doesn't expose a "restlessness" field directly; awake_count + awake_pct is equivalent |
+| SpO2 checked at build time | Field name and availability varies by wearable; check before adding storage |
+| sleep_hours target from goals_profiles | Already set during goals setup — the only place this is stored; don't duplicate it |
+| HR during sleep requires Phase 0 HR to be live first | HR intraday data doesn't exist until the sync route is modified |
+
+---
+
+### Feature: Heart Rate Page — Full 24-Hour View Upgrade
+
+*An extension of the intraday HR spec to clarify that the page is a 24-hour window for any selected day, with sleep annotated exactly as workout sessions are annotated.*
+
+**Chart spans the full 24 hours (midnight to midnight).** The sleep session appears as a shaded region (different color than workout shading — blue-tinted for sleep vs orange-tinted for workout). Inside the sleep region, stage blocks from `health_sleep_sessions.timeline` are drawn as semi-transparent colored fills behind the HR line:
+- Deep sleep: deeper blue tint
+- REM: purple tint
+- Light: grey tint
+- Awake: amber tint
+
+**The visual story the full day tells:**
+
+```
+Midnight ───────── 6am ──── 8am ─────────────── 12pm ──── 3pm ──────── 6pm ──── 10pm ── Midnight
+[  sleep window — HR 52–65  ][wakeup rise][ day activity ][workout spike][evening decline][ → ]
+```
+
+Users who have never seen their full day's HR in one chart will be immediately drawn to:
+1. How low their HR gets during sleep
+2. How dramatically the workout spike stands out
+3. How long it takes their HR to return to baseline after exercise
+4. The evening wind-down pattern
+
+**Date navigation:** Prev day / Next day arrows, or a date picker. Today is the default. If no data for a selected day (no sync or no wearable), show empty state for that day only.
+
+**Sleep annotation tooltip:** Hovering over the sleep region shows a mini card: "Sleep · 10:48pm – 6:22am · Score 78 · 7h 34m · Deep 16% · REM 23%"
+
+**Workout annotation tooltip:** Hovering over workout region shows: "Push Day · 11:02am – 12:14am · Avg 147 bpm · Peak 168 bpm · 72 min"
+
+This is the same chart as the intraday HR page — not a new page. The sleep annotation is an additional overlay layer on the existing chart design.
+
+---
+
+
 
 *This phase is about making all the data we already collect actually talk to each other. Most of the raw ingredients exist — weight logs, food logs, workout logs, sleep sessions, step counts, check-ins, supplement stack, water logs. Right now they sit in separate features and rarely inform each other. This phase changes that. It also fills in the nutrient gaps that matter most and builds the philosophy of "here's what your data is actually telling you" into every corner of the app.*
 
