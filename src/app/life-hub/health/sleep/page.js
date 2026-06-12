@@ -91,7 +91,7 @@ export default function SleepTrackerPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ color: 'var(--accent-purple)', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Sleep Tracker</h1>
+          <h1 style={{ color: '#22c55e', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Sleep Tracker</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Last night's sleep from Google Pixel Watch 4</p>
         </div>
         <button onClick={handleSync} disabled={syncing}

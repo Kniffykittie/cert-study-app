@@ -167,7 +167,7 @@ export default function WorkoutSetupPage() {
 
       <div style={{ marginBottom: '28px' }}>
         <div style={{ fontSize: '11px', color: 'var(--accent-purple)', fontWeight: '600', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>Step {step + 1} of {STEPS.length}</div>
-        <h1 style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>{current.title}</h1>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#3b82f6', marginBottom: '6px' }}>{current.title}</h1>
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{current.subtitle}</p>
       </div>
 

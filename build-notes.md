@@ -448,21 +448,21 @@ Returns: `{ servings_per_container, package_note, estimated_nutrition, confidenc
 
 ---
 
-#### BUILD ORDER & DEPENDENCIES
+#### BUILD ORDER & SEQUENCE
 
-| Sprint | Work | Dependencies |
+| Sprint | Status | Work |
 |---|---|---|
-| 1A | Sidebar restructure + nav grouping | None |
-| 1B | Section color system | 1A |
-| 1C | Overview dashboard | 1B |
-| 2A | `ai_food_intel_cache` table + API route | None (parallel with 1x) |
-| 2B | Servings-per-container display + "Use whole container" | 2A |
-| 2C | AI autofill missing nutrients + `~AI` markers | 2A |
-| 2D | AI fallback search | 2A |
-| 2E | %DV toggle | None |
-| 2F | Weight-to-servings input | None |
-| 2G | Sort My Favorites by recency | DB migration |
-| 3A | Contextual banners + improved empty states | 1A |
+| 1A | ✅ Done | Sidebar restructure + section color system |
+| 1B | ✅ Done | Section color applied to all Life Hub page headers (title = section color) |
+| 1C | 🔜 Next | Overview dashboard redesign (status bar row, compact brief, 2×2 section summary cards) |
+| 2A | ⏳ After 1C | `ai_food_intel_cache` DB table + `POST /api/nutrition/ai-food-intel` route (Haiku, cached by food_key) |
+| 2B | ⏳ After 2A | Servings-per-container on food cards + "Use whole container" button |
+| 2C | ⏳ After 2A | AI autofill missing micronutrients (fills gaps from OFFs) + `~AI` amber markers, editable |
+| 2D | ⏳ After 2A | AI fallback search — triggers when OFFs < 2 results, pre-fills manual entry form |
+| 2E | ⏳ After 2A | %DV ↔ amount toggle on Enter Manually + ingredient editor (uses existing DV constants) |
+| 2F | ⏳ Standalone | Weight-to-servings secondary input (parse grams from label, "or X g total" input updates servings) |
+| 2G | ⏳ Standalone | Sort My Favorites by recency — `last_logged_at` + `log_count` columns on `my_foods`, updated on log |
+| 3A | ⏳ After 2x | Contextual banners (lunch/water/gap checks) + improved empty states across nutrition pages |
 
 ---
 

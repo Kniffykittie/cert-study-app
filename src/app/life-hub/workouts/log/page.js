@@ -576,7 +576,7 @@ export default function LogWorkoutPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
           <Link href="/life-hub/workouts" style={{ color: 'var(--text-secondary)', fontSize: 13, textDecoration: 'none' }}>← My Plan</Link>
-          <h1 style={{ margin: '4px 0 0', fontSize: 20, color: 'var(--text-primary)' }}>{dayLabel}</h1>
+          <h1 style={{ margin: '4px 0 0', fontSize: 20, color: '#3b82f6' }}>{dayLabel}</h1>
           {resumingLogId && <div style={{ fontSize: 11, color: 'var(--accent-purple)', marginTop: 2 }}>▶ Resuming paused workout</div>}
         </div>
         <div style={{ textAlign: 'right' }}>

@@ -235,7 +235,7 @@ export default function MeasurementsPage() {
   return (
     <div style={{ maxWidth: '640px' }}>
       <div style={{ marginBottom: '28px' }}>
-        <h1 style={{ color: 'var(--accent-purple)', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Body Measurements</h1>
+        <h1 style={{ color: '#06b6d4', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Body Measurements</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Track your measurements over time to see real progress beyond the scale.</p>
       </div>
 

@@ -105,7 +105,7 @@ export default function GoalsPage() {
     <div style={{ padding: '32px', maxWidth: '800px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>My Goals</h1>
+          <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#06b6d4', margin: 0 }}>My Goals</h1>
           <p style={{ color: 'var(--text-secondary)', marginTop: '6px', fontSize: '14px' }}>Your personal profile powers AI recommendations across the Life Hub.</p>
         </div>
         <Link href="/life-hub/goals/setup" style={{ padding: '10px 20px', backgroundColor: 'var(--accent-purple)', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>

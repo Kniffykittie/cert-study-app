@@ -36,7 +36,7 @@ export default function WorkoutHistoryPage() {
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <Link href="/life-hub/workouts" style={{ color: 'var(--text-secondary)', fontSize: 13, textDecoration: 'none' }}>← My Plan</Link>
-        <h1 style={{ margin: 0, fontSize: 22, color: 'var(--text-primary)' }}>Workout History</h1>
+        <h1 style={{ margin: 0, fontSize: 22, color: '#3b82f6' }}>Workout History</h1>
       </div>
 
       {/* PR section */}

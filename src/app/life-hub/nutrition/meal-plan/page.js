@@ -218,7 +218,7 @@ export default function MealPlanPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
             <Link href="/life-hub/nutrition" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none' }}>← Nutrition</Link>
           </div>
-          <h1 style={{ color: 'var(--accent-purple)', fontSize: '24px', fontWeight: '700', marginBottom: '2px' }}>Weekly Meal Plan</h1>
+          <h1 style={{ color: '#f97316', fontSize: '24px', fontWeight: '700', marginBottom: '2px' }}>Weekly Meal Plan</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Plan ahead — this doesn't affect your food log, only what you intend to eat.</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

@@ -55,7 +55,7 @@ export default function ExerciseLibraryPage() {
     <div>
       {/* Header */}
       <div style={{ marginBottom: '20px' }}>
-        <h1 style={{ color: 'var(--accent-blue)', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Exercise Library</h1>
+        <h1 style={{ color: '#3b82f6', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Exercise Library</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
           {loading ? 'Loading...' : `${totalCount.toLocaleString()} dumbbell, bodyweight & cardio exercises`}
         </p>

@@ -680,7 +680,7 @@ export default function DrinksHydrationPage() {
 
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '24px 16px' }}>
-      <h1 style={{ color: 'var(--text-primary)', fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>💧 Drinks & Hydration</h1>
+      <h1 style={{ color: '#f97316', fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>💧 Drinks & Hydration</h1>
       <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: '0 0 24px' }}>
         {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
       </p>

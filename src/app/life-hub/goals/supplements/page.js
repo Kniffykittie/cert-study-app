@@ -440,7 +440,7 @@ export default function SupplementsPage() {
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '24px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
         <div>
-          <h1 style={{ color: 'var(--text-primary)', fontSize: 22, fontWeight: 700, margin: 0 }}>💊 My Supplement Stack</h1>
+          <h1 style={{ color: '#f97316', fontSize: 22, fontWeight: 700, margin: 0 }}>💊 My Supplement Stack</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: '4px 0 0' }}>
             Supplements listed here automatically count toward your daily nutrient totals
           </p>

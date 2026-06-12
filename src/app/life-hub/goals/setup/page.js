@@ -350,7 +350,7 @@ export default function GoalsSetupPage() {
 
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div style={{ fontSize: '32px', marginBottom: '8px' }}>🎯</div>
-          <h1 style={{ color: 'var(--accent-purple)', fontSize: '26px', fontWeight: '700', marginBottom: '6px' }}>Set Up Your Goals</h1>
+          <h1 style={{ color: '#06b6d4', fontSize: '26px', fontWeight: '700', marginBottom: '6px' }}>Set Up Your Goals</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>This helps the AI personalize your workout plan, nutrition advice, and health insights.</p>
         </div>
 
