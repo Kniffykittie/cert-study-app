@@ -267,6 +267,19 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Sleep Tracker Upgrade — Complete
+- Added `ScoreRing` SVG component: animated progress ring (0–100), color-coded (green ≥80 / blue ≥65 / yellow ≥50 / red <50), shows score and label (Excellent/Good/Fair/Poor)
+- New top card combines score ring + quality metrics grid: Total Sleep, Sleep Onset (with green/yellow threshold at 20m), Efficiency (threshold at 85%), Awakenings (threshold at 3), Restlessness label (Restful/Normal/Restless/Very Restless) — all pulled from new sync route fields (sleepScore, sleepOnset, sleepEfficiency, sleepAwakeCount, sleepRestlessness)
+- Stage summary cards (Deep/REM/Light/Awake) now show percentage of total sleep + target range below the minute count
+- Added `STAGE_EDUCATION` constant with 4 detailed education cards (collapsible) explaining Deep/REM/Light/Awake:
+  - Each card: target %, plain-language description of what's happening, bulleted body processes, "If you're low" warning callout
+  - Deep: muscle repair, immune cells, brain waste flushing
+  - REM: memory consolidation, emotion processing, creativity, motor skills
+  - Light: sleep spindles, bridge role, why it still matters
+  - Awake: normal awakening count ranges, temperature/alcohol/consistency tips
+- Cards expand on click, auto-annotate with your actual minutes + percentage for the stage
+- All new data (`sleepScore`, `sleepOnset`, etc.) was already being written by the sync route from Phase 0 — purely a UI update, no API changes
+
 ### Edit Saved Favorites — Complete
 - Added `foodCompleteness(food)` helper (module-level): returns `'complete'` (all 4 macros + ≥6 tracked micros), `'partial'` (all macros, few micros), or `'minimal'` (missing a core macro)
 - Added `CORE_MACRO_KEYS` and `TRACKED_MICRO_KEYS` constants at module level (19 micro fields tracked)

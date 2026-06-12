@@ -146,7 +146,7 @@ src/
       health/
         page.js                        Health Overview — steps today, avg heart rate, sleep last night
         steps/page.js                  Step Tracker — hourly/weekly bar charts, goal progress, fixed tooltip
-        sleep/page.js                  Sleep Tracker — stage breakdown bar, timeline chart, no-data state
+        sleep/page.js                  Sleep Tracker — Sleep Score ring (0–100, color-coded), quality metrics (onset/efficiency/awakenings/restlessness), stage summary cards with % + target ranges, stage breakdown bar, hypnogram timeline, 4 collapsible education cards (Deep/REM/Light/Awake) explaining physiology + "if you're low" warnings
         water/page.js                  Drinks & Hydration — stacked hydration ring (water blue, beverages purple), quick-add water buttons (8/12/16/20/32 oz + custom), drink search (logs to food_log_entries meal_slot='drink'), saved drinks chips (my_foods is_drink=true) with Manage mode (edit name/nutrition/delete), combined today's log with ✏️ edit button on drink entries, caffeine tracker, hydration timing chart (18-bar hourly), 7-day bar chart; goal synced to goals_profiles.water_goal_oz; listed under Nutrition in sidebar (not Health)
       goals/
         page.js                        Goals overview — AI overview panel, active goals chips, body metrics card (BMI + disclaimer + build label), lifestyle card (activity + daily steps + timeline), notes; Edit Goals button
