@@ -952,7 +952,292 @@ Returns: `{ servings_per_container, package_note, estimated_nutrition, confidenc
 
 ---
 
-### Phase 45 — Drinks & Hydration (Full Expansion)
+### Feature: Foods vs Ingredients Split in My Favorites
+
+*User wants to differentiate between things eaten as-is (foods) and things used to build meals (ingredients) — so the meal builder can pull from the right list.*
+
+**DB change:** Add `is_ingredient BOOLEAN DEFAULT false` to `my_foods` table. No new table needed.
+
+**UI — My Favorites tabs:**
+- Two tabs in the SavedFoodsTab component: **🍽️ Foods** (default, `is_ingredient = false`) and **🧂 Ingredients** (`is_ingredient = true`)
+- When saving a food to My Favorites, the save panel lets the user choose: "Save as Food" or "Save as Ingredient"
+- Foods tab: things you log and eat directly (chicken breast, Greek yogurt, protein bar)
+- Ingredients tab: things you combine (white onion, garlic, alfredo sauce, American cheese, olive oil)
+
+**Meal Builder integration:**
+- The existing MealBuilderModal defaults to the Ingredients tab when picking components
+- A meal built from ingredients gets saved to My Foods as a new entry with all macros/micros summed
+- Saved meals appear on the Foods tab with a 🍳 badge indicating it's a composite meal
+- Future: a third **🍳 Meals** tab that only shows these saved composite entries for fast re-logging
+
+**Expansion ideas:**
+- "Meal templates" — save a meal composition and allow scaling (e.g. "2x batch" doubles all quantities)
+- The meal builder shows a running nutrition total as ingredients are added (live calc before saving)
+- Ingredient entries can have a "typical use amount" — e.g. "garlic: 1 clove (3g)" pre-filled whenever you build with it
+
+---
+
+### Feature: Edit Saved Favorites + AI Micro-Fill from Library
+
+*Once a food is in My Favorites, the user should be able to open it, see all fields, fix typos, add micronutrients they didn't have at save time, and re-run AI micro-fill.*
+
+**UI — Edit mode on saved food card:**
+- ✏️ edit button on each food row in SavedFoodsTab (visible in expanded panel)
+- Opens the same manual entry form, pre-populated with all stored field values
+- AI micro-fill button ("🤖 Fill missing micros") available in edit mode — only fills null fields, doesn't overwrite existing values
+- AI intel button available to load the FoodIntelCard for reference while editing
+- Save button calls PUT `/api/nutrition/my-foods` — Cancel closes without changes
+
+**Completeness indicator:**
+- Small chip on each food card: e.g. "⚠️ 6 micros missing" in amber, or "✓ Complete" in green
+- Threshold: a food is "complete" if it has calories + all 4 macros + at least 8 micro fields filled
+- This drives users back to fix sparse entries that matter for the Nutrient Encyclopedia gap report
+
+**Expansion ideas:**
+- Bulk "fill all incomplete" — a button at the top of My Favorites that iterates incomplete entries and calls AI micro-fill for each (rate-limited, one at a time)
+- "Last edited" timestamp shown on card so you know if the data is stale
+- Duplicate detection: if you try to save a new food with a very similar name, prompt "Did you mean [existing]? Edit it instead?"
+
+---
+
+### Feature: Preview Panel Before Saving to My Favorites
+
+*Currently saving is immediate — one tap and it's in. User wants to see all the food data, edit it, and explicitly confirm before it's committed to the library.*
+
+**Flow change — two-step save:**
+1. User clicks ⭐ Save on any search result
+2. A "Save to My Favorites" sheet opens (same as the manual entry form but pre-filled from OFFs data)
+3. All fields are visible and editable before saving
+4. AI micro-fill button present for sparse OFFs results
+5. User chooses: Save as **Food** or **Ingredient** (toggle)
+6. User sets a custom serving size label or name if desired (e.g. rename "GREAT VALUE CHICKEN BREAST" to "Chicken Breast")
+7. ✓ Save or × Cancel — nothing is committed until Save is tapped
+
+**What this replaces:**
+- The current instant save behavior (⭐ button saves immediately)
+- The `saveToLib` checkbox on the search tab (replaced by the explicit flow above)
+
+**Expansion ideas:**
+- "Quick save" option for power users — hold the ⭐ to skip the panel and save with defaults
+- Tag field on the save sheet — add custom tags like "meal prep", "work lunch", "post-workout" for filtering later
+- Notes field — a short personal note per saved food (e.g. "only buy the Kirkland brand", "check sodium on label")
+
+---
+
+### Feature: Hydration Section — Full UX Upgrade (Search + Edit + Preview + Food Water)
+
+*User wants the hydration section to match the food log experience: search for drinks, preview before saving, edit saved drinks, see all micronutrient/water data, and track water that comes from food automatically.*
+
+**Part A — Drink search with preview panel:**
+- Same search → preview → save/cancel flow as the improved My Favorites (see above)
+- OFFs has extensive beverage data — filter results toward beverages in the search
+- Preview panel shows: calories, caffeine, sugar, sodium, water content (water_g), and any other available micros
+- AI micro-fill available for sparse drink entries
+- Drinks save to `my_foods` with `is_drink = true` (already exists)
+
+**Part B — Edit and remove saved drinks:**
+- ✏️ edit button on each saved drink chip/card (same as food edit flow)
+- × remove button with confirmation
+
+**Part C — Water from food tracking:**
+- `water_g` already exists on `food_log_entries` — sum it daily and surface it
+- On the hydration page: a three-source stacked ring (or stacked bar):
+  - 💧 Water logged (from `water_logs`)
+  - 🥤 Beverage water (from `food_log_entries` where `is_drink = true`, using `water_g`)
+  - 🥗 Food water (from `food_log_entries` where `is_drink = false`, using `water_g`)
+- Each source shown in a different color with oz equivalent
+- A "food hydration" chip: "Your food contributed ~12 oz of water today"
+- The hydration goal progress bar includes all three sources combined
+
+**Part D — Is food water worth tracking?**
+- Yes for most foods: cucumber (96% water = ~7oz per cup), watermelon (92%), chicken breast (65%, ~3oz per 4oz serving), cooked pasta (62%), alfredo sauce (~65%, so a 4oz portion = ~2.6oz water)
+- The key insight: users who eat a lot of whole foods are partially hydrated through diet and shouldn't feel like they're failing their water goal
+- Surfacing this reduces guilt and increases trust in the tracker
+- The app already has `water_g` from OFFs for many foods — AI micro-fill can estimate it for others
+
+**Expansion ideas:**
+- Electrolyte tracking alongside hydration (sodium, potassium) — both are needed for actual cellular hydration
+- A "hydration quality" score: plain water counts more than caffeinated beverages (caffeine has mild diuretic effect at high doses) — show a net hydration number
+- Morning hydration reminder: if it's 10am and no water logged yet, surface a nudge on Life Hub home
+- Hydration-to-workout correlation in Monthly Wrap: "On days you hit your hydration goal, your logged workout energy was 0.8 points higher on average"
+
+---
+
+### Feature: Meal Plan Improvements (AI Check + Favorites + Daily Macro/Micro View)
+
+*Three improvements to the Weekly Meal Plan page that make it more useful for planning and catch nutritional gaps before the week starts.*
+
+**Improvement A — Add from My Favorites:**
+- The meal plan food search currently goes straight to OFFs
+- Add a "⭐ My Favorites" tab to the meal plan food picker (same as AddFoodModal tab structure)
+- Ingredient and Food tabs both visible so you can plan a meal from ingredients or log a whole food
+- This makes building the meal plan much faster since saved foods need no re-searching
+
+**Improvement B — Daily macro/micro totals:**
+- Below each day's meal slots: a collapsible "📊 Day Totals" row
+- Shows: Calories, Protein, Carbs, Fat, Fiber — always visible as small chips
+- Expands to show key micros (Vitamin D, Iron, Calcium, Potassium, Omega-3) vs DV %
+- Color-coded: green ≥ 80% DV, yellow 50–79%, red < 50%
+- A "week summary" row at the bottom shows the 7-day average for each nutrient
+- This lets the user see gaps while building the plan, before asking AI
+
+**Improvement C — AI analysis button:**
+- "🤖 Analyze this week" button at the top of the meal plan page
+- Sends the full week's planned meals (name, macros, key micros) to Claude (Haiku)
+- Returns 4–6 typed callouts (same format as existing meal plan AI insights):
+  - Calorie surplus/deficit days
+  - Macronutrient imbalances (e.g. protein low Mon–Wed)
+  - Micronutrient gaps (e.g. Vitamin D missing all week)
+  - Variety score (eating the same thing 4+ days)
+  - Pre/post workout meal alignment (see Feature #10)
+- Callouts are dismissible, cached for the day
+
+**Expansion ideas:**
+- "Fix this for me" button on any callout — Claude suggests a food swap or addition for that specific day
+- Grocery list export: generate a shopping list from the week's meal plan (grouped by category: produce, protein, dairy, etc.)
+- Meal plan templates: save a whole week as a template and apply it to future weeks
+- Calorie cycling view: if the user has high/low calorie days in their plan, show it as a visual pattern across the week
+
+---
+
+### Feature: AI Search for Supplements
+
+*User wants to search supplements like "Men's One A Day" or "1000mg Omega-3" instead of manually entering everything. Critical detail: label dose ≠ active compound dose (e.g. 1000mg fish oil softgel is only ~300mg EPA+DHA).*
+
+**Search flow:**
+- Search bar at the top of the Supplement Stack page (same pattern as food search)
+- Calls a new `POST /api/supplements/search` endpoint:
+  1. First checks OFFs — it has supplement data (protein powders, vitamins, etc.)
+  2. Falls back to Haiku AI estimate with supplement-specific prompt if OFFs returns nothing
+- Results show: supplement name, brand, serving size, key active compounds
+- Preview panel before adding (same preview-then-save pattern as food)
+
+**Active compound vs label dose:**
+- Supplement form gets a second field: **Active amount** (separate from total dose)
+- Example: "Omega-3 Fish Oil — Total: 1000mg per softgel → Active EPA+DHA: 300mg"
+- The AI prompt specifically instructs Haiku to distinguish label weight from bioavailable amount
+- The Nutrient Encyclopedia gap report uses the active amount for its calculations, not the label weight
+- This is the most important accuracy improvement for supplement tracking
+
+**AI info card:**
+- The existing 🤖 Info button on supplement cards (already built) shows the AI profile
+- In the search preview panel, show a condensed version of this before adding
+- Key fields: what it does, typical effective dose range, timing, food synergies, interactions
+
+**Expansion ideas:**
+- Brand comparison: search "creatine" and see 3–4 common forms (monohydrate, HCl, buffered) with AI notes on bioavailability differences
+- Cycling reminders: some supplements should be cycled (creatine loading phase, caffeine tolerance breaks) — AI info card could flag this
+- Stacking suggestions: after adding a supplement, AI suggests what pairs well with it (e.g. "Vitamin D pairs well with Vitamin K2 and Magnesium for absorption")
+- OFFs has UPC barcodes for many supplements — barcode scanner integration would be ideal for exact label data
+
+---
+
+### Feature: Heart Rate — Intraday View + Workout HR Tracking
+
+*User has the daily avg/min/max HR but wants to see how it changes throughout the day and during workouts specifically. Long-term goal: see resting HR trend improving over months.*
+
+**Part A — Intraday HR page at `/life-hub/health/heart-rate`:**
+- Google Health API (`health_metrics_and_measurements.readonly` scope, already granted) exposes intraday HR data
+- New DB table: `health_heart_rate_intraday` — user_id, date, hour, avg_bpm, min_bpm, max_bpm (5-minute aggregates stored per hour bucket)
+- Line chart (not bars — HR is continuous): x-axis = time of day, y-axis = bpm
+- Horizontal reference lines: resting zone (< 60% max HR), fat-burn zone (60–70%), cardio zone (70–85%), peak zone (> 85%)
+- Max HR = 220 - age (from goals_profiles.age)
+- Workout segments highlighted in a different color band on the chart (cross-reference workout_logs timestamps)
+
+**Part B — Workout HR tracking:**
+- On the Active Workout Logger page: a live HR widget (if Google Health connected) showing current HR
+- Google Health fitness sessions API tags datapoints by activity — workout HR segments extractable
+- Post-workout: HR during workout shown on the completion screen as a zone breakdown (e.g. "12 min fat-burn, 28 min cardio, 5 min peak")
+- Stored in `workout_logs` as a `hr_zones JSONB` column
+
+**Part C — Resting HR trend (most motivating metric):**
+- A 30-day resting HR trend card on the Health Overview page
+- Resting HR = lowest 5-minute avg during sleep or early morning window
+- A declining line over weeks is the clearest signal that cardiovascular fitness is improving
+- Monthly Wrap includes "Your resting HR dropped X bpm this month" when trend is positive
+
+**Expansion ideas:**
+- Heart Rate Variability (HRV) if Google Health exposes it — HRV is an even better recovery indicator than resting HR
+- "Hard day" detection: if workout HR stayed in peak zone > 15 min, flag for next day's Recovery Score
+- Alert when HR during a workout seems unusually high for that exercise type (potential overtraining signal)
+
+---
+
+### Feature: Stretching & Yoga Tab — Correlated with Workouts
+
+*A stretching encyclopedia and routine planner that correlates with whatever muscle groups were worked that day or are planned. Pre/post distinction built in from the start. Teaches correct form like the exercise library does.*
+
+**DB: `stretches` table:**
+- `id`, `name`, `muscle_group` (same values as exercises: chest, back, legs, etc.), `type` (pre_workout / post_workout / both / standalone), `duration_seconds` (typical hold time), `instructions TEXT[]`, `cues TEXT[]` (where to feel it, common mistakes), `image_url`, `also_helps TEXT[]` (secondary benefits: posture, stress relief, mobility)
+- Pre-loaded with ~40–60 stretches covering all major muscle groups
+
+**Routine generation:**
+- After logging a workout (or when viewing today's workout plan), a "🧘 Stretches for today" card appears
+- Pulls relevant stretches from the `stretches` table based on today's muscle groups
+- Pre-workout routine: only `type = pre_workout or both` — dynamic stretches only (leg swings, arm circles, hip openers)
+- Post-workout routine: only `type = post_workout or both` — static holds (pigeon pose, chest opener, hamstring stretch)
+- User can customize: add/remove stretches, set hold time, reorder
+
+**Stretch encyclopedia at `/life-hub/workouts/stretches`:**
+- Same layout as the Exercise Library: sticky muscle-group nav, grouped sections, image cards
+- Detail modal: image, instructions, muscle focus, where you should feel it (green), what NOT to do (red), pre/post/both badge
+- Cardio-specific stretches section (hip flexors, calves, IT band — crucial for runners/cyclists)
+
+**Pre/post education:**
+- A banner or tooltip in the routine card: "Dynamic stretches before, static after — why this matters"
+- Static stretching before lifting has been shown to reduce power output by up to 8% — the app teaches this instead of letting users make the mistake
+- Foam rolling gets its own sub-category: can be done pre OR post, different technique each time
+
+**Integration across the app:**
+- Daily Brief mentions "You have a leg day today — don't skip the hip flexor pre-stretch"
+- Monthly Wrap: "You completed X stretching sessions this month"
+- Recovery Score: add a "mobility" component (replaces or supplements one existing component) — did you stretch after your last workout?
+- Future: a standalone **Mobility Score** (0–100) alongside Recovery Score
+
+**Expansion ideas:**
+- Yoga flow builder: chain 6–10 stretches into a timed flow with rest periods
+- Video/GIF support (same as exercises — gif_url column, can be added after launch)
+- "Feel tight here?" symptom-to-stretch lookup: select body area, get targeted stretches
+- Morning mobility routine option: 5–10 min full-body dynamic routine independent of workout schedule
+
+---
+
+### Feature: Pre/Post Workout Meal Advisor — Integrated into Weekly Meal Plan
+
+*Tells you whether what you've planned to eat is well-timed relative to your workout, and what to adjust. Lives in the meal plan where you can act on it before the day arrives.*
+
+**How it works in the meal plan:**
+- The meal plan already knows which days have workouts (from `workout_plans` active plan, `day_of_week`)
+- For workout days: each meal slot gets a timing badge based on its position relative to the expected workout time
+  - Meal 1–2 hours before workout: ⚡ Pre-workout window
+  - Meal within 1 hour after workout: 💪 Post-workout window
+  - Other meals: no badge
+- The badge color reflects whether the planned food is well-suited:
+  - Green: food is appropriate for that window (high-GI carbs + moderate protein pre, high-protein + carbs post)
+  - Yellow: suboptimal (high fat pre-workout slows digestion, delays fuel availability)
+  - Red: poor choice (heavy cream sauce immediately pre-workout)
+
+**Logic uses existing data — no new AI call needed per food:**
+- `intel.glycemic_load` from `ai_food_intel_cache` → high GI = good pre-workout fuel
+- `intel.best_time` → if "pre-workout" or "post-workout", confirms the badge
+- `protein_g` → post-workout meal should hit ≥ 20g protein for muscle protein synthesis
+- `fat_g` → > 15g fat in a pre-workout meal = yellow flag (slows gastric emptying)
+- `fiber_g` → > 8g fiber pre-workout = yellow flag (GI discomfort risk)
+
+**AI analysis integration (from Improvement C above):**
+- The "🤖 Analyze this week" button includes pre/post alignment in its callouts:
+  - "Tuesday's pre-workout meal is high in fat — consider swapping alfredo pasta for rice + chicken"
+  - "Friday's post-workout slot has no logged food — add a protein source within 1 hour"
+
+**Expansion ideas:**
+- Workout time input: let the user set a planned workout time per day in the meal plan view so the window calculation is precise (instead of estimating from plan position)
+- "Build my workout day" assistant: given today's workout (push day, 45 min), Claude suggests a full day of meals from My Favorites that would optimize performance and recovery
+- Intra-workout fueling guidance: for sessions > 60 min, suggest a mid-workout carb source (banana, dates, sports drink)
+- Race/event day planning: a special mode for big events where the meal timing is locked to the event start time
+
+---
+
+
 
 *Expands the water tracker into a complete Drinks & Hydration system. Hydration becomes a first-class data point that feeds every existing feature — daily brief, monthly wrap, symptom checker, nutrition dashboard, encyclopedia, workout signals, and check-in. Built so it gracefully handles users who don't log anything (hydration score still computable from food water content and contextual signals) and rewards users who do log everything with genuinely unique insights no other app surfaces.*
 
