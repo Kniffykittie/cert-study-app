@@ -422,7 +422,7 @@ export default function LifeHubPage() {
       )}
 
       {/* Zone 2 — Daily Brief */}
-      <div style={{ backgroundColor: 'var(--surface)', border: `1px solid ${brief ? `${SC.overview}44` : 'var(--border)'}`, borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+      <div style={{ backgroundColor: 'var(--surface)', borderTop: `1px solid ${brief ? `${SC.overview}44` : 'var(--border)'}`, borderRight: `1px solid ${brief ? `${SC.overview}44` : 'var(--border)'}`, borderBottom: `1px solid ${brief ? `${SC.overview}44` : 'var(--border)'}`, borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: brief ? '12px' : '0' }}>
           <span style={{ fontSize: '18px' }}>🤖</span>
           <div>
@@ -640,7 +640,7 @@ export default function LifeHubPage() {
       )}
 
       {/* Check-In + Heatmap — combined card */}
-      <div style={{ backgroundColor: 'var(--surface)', border: `1px solid var(--border)`, borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', padding: '24px', marginBottom: '0' }}>
+      <div style={{ backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', padding: '24px', marginBottom: '0' }}>
         {/* Header row */}
         <div style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
