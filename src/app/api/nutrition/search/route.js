@@ -104,6 +104,15 @@ export async function GET(req) {
       brand: p.brands || null,
       serving_size_g: null,
       serving_size_label: p.serving_size || '1 serving',
+      servings_per_container: (() => {
+        // Try explicit servings_per_container field first
+        if (p.servings_per_container != null) return parseFloat(p.servings_per_container) || null
+        // Derive from product_quantity / serving_quantity if both exist
+        const pq = parseFloat(p.product_quantity)
+        const sq = parseFloat(p.serving_quantity)
+        if (pq > 0 && sq > 0) return Math.round((pq / sq) * 10) / 10
+        return null
+      })(),
       source: 'off',
       ...nutrients,
     }

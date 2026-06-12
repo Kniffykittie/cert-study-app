@@ -127,6 +127,9 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
   const [savingFood, setSavingFood] = useState(null)
   const [aiFilling, setAiFilling] = useState(false)
   const [aiEstimatedFields, setAiEstimatedFields] = useState(new Set())
+  const [microFilling, setMicroFilling] = useState(false)
+  const [gramInput, setGramInput] = useState('')
+  const [dvMode, setDvMode] = useState(false)
   const inputRef = useRef(null)
   const debounceRef = useRef(null)
 
@@ -168,6 +171,32 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
     setManual(filled)
     setAiEstimatedFields(estimated)
     setManualMode(true)
+  }
+
+  async function handleMicroFill(food) {
+    if (microFilling) return
+    setMicroFilling(true)
+    const res = await fetch('/api/nutrition/ai-micro-fill', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: food.name, brand: food.brand, calories: food.calories, protein_g: food.protein_g, carbs_g: food.carbs_g, fat_g: food.fat_g }),
+    })
+    const data = await res.json()
+    setMicroFilling(false)
+    if (!data.micros) return
+    const MICRO_KEYS = ['sodium_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','omega3_g','vitamin_k_mcg','choline_mg']
+    const estimated = new Set(aiEstimatedFields)
+    const filled = { ...manual }
+    for (const k of MICRO_KEYS) {
+      if (data.micros[k] != null && (manual[k] === '' || manual[k] == null)) { filled[k] = String(data.micros[k]); estimated.add(k) }
+    }
+    setManual(filled)
+    setAiEstimatedFields(estimated)
+    setManualMode(true)
+  }
+
+  function parseGramWeight(label) {
+    const m = label?.match(/\((\d+(?:\.\d+)?)\s*g\)/i)
+    return m ? parseFloat(m[1]) : null
   }
 
   async function handleQuickSave(food, e) {
@@ -282,16 +311,46 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
                       {selected.calories ? ` · ${Math.round(selected.calories * (parseFloat(servings) || 1))} kcal` : ''}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Servings</span>
-                    <input type="number" min="0.25" step="0.25" value={servings} onChange={e => setServings(e.target.value)}
-                      style={{ width: '56px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Servings</span>
+                      <input type="number" min="0.25" step="0.25" value={servings} onChange={e => { setServings(e.target.value); setGramInput('') }}
+                        style={{ width: '56px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
+                    </div>
+                    {parseGramWeight(selected.serving_size_label) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>or</span>
+                        <input type="number" min="1" step="1" value={gramInput} placeholder="g total"
+                          onChange={e => { setGramInput(e.target.value); const g = parseFloat(e.target.value); const perSv = parseGramWeight(selected.serving_size_label); if (g > 0 && perSv > 0) setServings(String(Math.round((g / perSv) * 100) / 100)) }}
+                          style={{ width: '68px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 8px', color: 'var(--text-primary)', fontSize: '12px', textAlign: 'center' }} />
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>g</span>
+                      </div>
+                    )}
+                    {selected.servings_per_container > 1 && (
+                      <button onClick={() => { setServings(String(selected.servings_per_container)); setGramInput('') }}
+                        style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '6px', padding: '3px 8px', fontSize: '11px', color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        × {selected.servings_per_container} (whole container)
+                      </button>
+                    )}
                   </div>
                   <button onClick={handleAdd} disabled={saving}
-                    style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: saving ? 0.6 : 1, flexShrink: 0 }}>
+                    style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: saving ? 0.6 : 1, flexShrink: 0, alignSelf: 'flex-start' }}>
                     {saving ? '...' : libraryOnly ? '⭐ Save' : '+ Add'}
                   </button>
                 </div>
+                {(() => {
+                  const MICRO_KEYS = ['sodium_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg']
+                  const nullCount = MICRO_KEYS.filter(k => selected[k] == null).length
+                  return nullCount >= 4 ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                      <button onClick={() => handleMicroFill(selected)} disabled={microFilling}
+                        style={{ background: 'none', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', color: 'var(--accent-purple)', fontWeight: '600', cursor: microFilling ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '5px', opacity: microFilling ? 0.6 : 1 }}>
+                        <span>🤖</span><span>{microFilling ? 'Estimating micros...' : 'Fill missing micros'}</span>
+                      </button>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', opacity: 0.7 }}>{nullCount} fields missing</span>
+                    </div>
+                  ) : null
+                })()}
                 <FoodIntelCard foodName={selected.name} brand={selected.brand} calories={selected.calories} protein_g={selected.protein_g} carbs_g={selected.carbs_g} fat_g={selected.fat_g} fiber_g={selected.fiber_g} sugar_g={selected.sugar_g} workoutCtx={workoutCtx} />
               </div>
             )}
@@ -419,9 +478,16 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
   const [manualServings, setManualServings] = useState('1')
   const [aiFilling, setAiFilling] = useState(false)
   const [aiEstimatedFields, setAiEstimatedFields] = useState(new Set())
+  const [microFilling, setMicroFilling] = useState(false)
+  const [searchGramInput, setSearchGramInput] = useState('')
 
   const debounceRef = useRef(null)
   const searchInputRef = useRef(null)
+
+  function parseGramWeight(label) {
+    const m = label?.match(/\((\d+(?:\.\d+)?)\s*g\)/i)
+    return m ? parseFloat(m[1]) : null
+  }
 
   const mealInfo = MEAL_SLOTS.find(m => m.key === slot)
   const filtered = filter ? myFoods.filter(f => f.name.toLowerCase().includes(filter.toLowerCase())) : myFoods
@@ -462,6 +528,30 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
     }
     setManual(filled)
     setAiEstimatedFields(estimated)
+    setTab('manual')
+  }
+
+  async function handleMicroFill(food) {
+    if (microFilling) return
+    setMicroFilling(true)
+    const res = await fetch('/api/nutrition/ai-micro-fill', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: food.name, brand: food.brand, calories: food.calories, protein_g: food.protein_g, carbs_g: food.carbs_g, fat_g: food.fat_g }),
+    })
+    const data = await res.json()
+    setMicroFilling(false)
+    if (!data.micros) return
+    const MICRO_KEYS = ['sodium_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','omega3_g','vitamin_k_mcg','choline_mg']
+    const estimated = new Set(aiEstimatedFields)
+    const filled = { ...BLANK_MANUAL, name: food.name, brand: food.brand || '', serving_size_label: food.serving_size_label || '1 serving' }
+    const numericFields = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg','saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg']
+    for (const k of numericFields) { if (food[k] != null) filled[k] = String(food[k]) }
+    for (const k of MICRO_KEYS) {
+      if (data.micros[k] != null && food[k] == null) { filled[k] = String(data.micros[k]); estimated.add(k) }
+    }
+    setManual(filled)
+    setAiEstimatedFields(estimated)
+    setManualSaveToLib(true)
     setTab('manual')
   }
 
@@ -628,7 +718,7 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
         {tab === 'manual' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px 0' }}>
             {aiEstimatedFields.size > 0 ? (
-              <div style={{ backgroundColor: 'rgba(241,196,15,0.08)', border: '1px solid rgba(241,196,15,0.3)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+              <div style={{ backgroundColor: 'rgba(241,196,15,0.08)', border: '1px solid rgba(241,196,15,0.3)', borderRadius: '8px', padding: '10px 14px', marginBottom: '10px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                 <span style={{ fontSize: '14px', flexShrink: 0 }}>🤖</span>
                 <div>
                   <p style={{ color: 'var(--warning)', fontSize: '12px', fontWeight: '600', margin: '0 0 2px' }}>AI-estimated nutrition</p>
@@ -636,9 +726,15 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
                 </div>
                 <button onClick={() => setAiEstimatedFields(new Set())} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer', flexShrink: 0, padding: 0, lineHeight: 1 }}>×</button>
               </div>
-            ) : (
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 14px' }}>Only Name is required — fill in as much or as little as you know.</p>
-            )}
+            ) : null}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>Only Name is required.</p>
+              <button onClick={() => setDvMode(d => !d)}
+                style={{ background: 'none', border: `1px solid ${dvMode ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '6px', padding: '3px 9px', fontSize: '11px', color: dvMode ? 'var(--accent-blue)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>
+                {dvMode ? '% DV mode' : 'Amount mode'}
+              </button>
+            </div>
+            {dvMode && <p style={{ color: 'var(--text-secondary)', fontSize: '11px', margin: '-8px 0 10px', opacity: 0.8 }}>Enter % of Daily Value for supported fields. Other fields stay as amounts.</p>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {[{ key: 'name', label: 'Name *', type: 'text' }, { key: 'brand', label: 'Brand', type: 'text' }, { key: 'serving_size_label', label: 'Serving Size', type: 'text' }].map(({ key, label, type }) => (
                 <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
@@ -648,21 +744,41 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
                 </div>
               ))}
               <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Macros</div>
-              {[{ key: 'calories', label: 'Calories' }, { key: 'protein_g', label: 'Protein (g)' }, { key: 'carbs_g', label: 'Carbs (g)' }, { key: 'fat_g', label: 'Fat (g)' }, { key: 'fiber_g', label: 'Fiber (g)' }, { key: 'sugar_g', label: 'Sugar (g)' }, { key: 'sodium_mg', label: 'Sodium (mg)' }, { key: 'potassium_mg', label: 'Potassium (mg)' }].map(({ key, label }) => (
-                <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
-                  <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => { setManual(m => ({ ...m, [key]: e.target.value })); setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n }) }}
-                    style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
-                </div>
-              ))}
+              {[{ key: 'calories', label: 'Calories' }, { key: 'protein_g', label: 'Protein (g)' }, { key: 'carbs_g', label: 'Carbs (g)' }, { key: 'fat_g', label: 'Fat (g)' }, { key: 'fiber_g', label: dvMode && DV.fiber_g ? `Fiber (% DV, ${DV.fiber_g}g)` : 'Fiber (g)' }, { key: 'sugar_g', label: 'Sugar (g)' }, { key: 'sodium_mg', label: dvMode && DV.sodium_mg ? `Sodium (% DV, ${DV.sodium_mg}mg)` : 'Sodium (mg)' }, { key: 'potassium_mg', label: dvMode && DV.potassium_mg ? `Potassium (% DV, ${DV.potassium_mg}mg)` : 'Potassium (mg)' }].map(({ key, label }) => {
+                const hasDV = dvMode && DV[key] != null
+                const displayVal = hasDV && manual[key] !== '' ? String(Math.round((parseFloat(manual[key]) / DV[key]) * 100)) : manual[key]
+                return (
+                  <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
+                    <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
+                    <input type="number" min="0" step={hasDV ? '1' : '0.1'} value={hasDV ? displayVal : manual[key]} placeholder="0"
+                      onChange={e => {
+                        const raw = e.target.value
+                        const stored = hasDV && raw !== '' ? String(Math.round((parseFloat(raw) / 100) * DV[key] * 10) / 10) : raw
+                        setManual(m => ({ ...m, [key]: stored }))
+                        setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n })
+                      }}
+                      style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
+                  </div>
+                )
+              })}
               <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Optional</div>
-              {[{ key: 'saturated_fat_g', label: 'Saturated Fat (g)' }, { key: 'cholesterol_mg', label: 'Cholesterol (mg)' }, { key: 'calcium_mg', label: 'Calcium (mg)' }, { key: 'iron_mg', label: 'Iron (mg)' }, { key: 'vitamin_c_mg', label: 'Vitamin C (mg)' }, { key: 'vitamin_d_mcg', label: 'Vitamin D (mcg)' }].map(({ key, label }) => (
-                <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
-                  <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                  <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => { setManual(m => ({ ...m, [key]: e.target.value })); setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n }) }}
-                    style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
-                </div>
-              ))}
+              {[{ key: 'saturated_fat_g', label: dvMode && DV.saturated_fat_g ? `Sat. Fat (% DV, ${DV.saturated_fat_g}g)` : 'Saturated Fat (g)' }, { key: 'cholesterol_mg', label: dvMode && DV.cholesterol_mg ? `Cholesterol (% DV, ${DV.cholesterol_mg}mg)` : 'Cholesterol (mg)' }, { key: 'calcium_mg', label: dvMode && DV.calcium_mg ? `Calcium (% DV, ${DV.calcium_mg}mg)` : 'Calcium (mg)' }, { key: 'iron_mg', label: dvMode && DV.iron_mg ? `Iron (% DV, ${DV.iron_mg}mg)` : 'Iron (mg)' }, { key: 'vitamin_c_mg', label: dvMode && DV.vitamin_c_mg ? `Vitamin C (% DV, ${DV.vitamin_c_mg}mg)` : 'Vitamin C (mg)' }, { key: 'vitamin_d_mcg', label: dvMode && DV.vitamin_d_mcg ? `Vitamin D (% DV, ${DV.vitamin_d_mcg}mcg)` : 'Vitamin D (mcg)' }].map(({ key, label }) => {
+                const hasDV = dvMode && DV[key] != null
+                const displayVal = hasDV && manual[key] !== '' ? String(Math.round((parseFloat(manual[key]) / DV[key]) * 100)) : manual[key]
+                return (
+                  <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
+                    <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
+                    <input type="number" min="0" step={hasDV ? '1' : '0.1'} value={hasDV ? displayVal : manual[key]} placeholder="0"
+                      onChange={e => {
+                        const raw = e.target.value
+                        const stored = hasDV && raw !== '' ? String(Math.round((parseFloat(raw) / 100) * DV[key] * 10) / 10) : raw
+                        setManual(m => ({ ...m, [key]: stored }))
+                        setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n })
+                      }}
+                      style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
+                  </div>
+                )
+              })}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '14px 0 4px' }}>
               <input type="checkbox" id="mansavelib" checked={manualSaveToLib} onChange={e => setManualSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '14px', height: '14px' }} />
@@ -733,20 +849,50 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
 
             {selected && (
               <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '4px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selected.name}</div>
                     <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
                       {selected.serving_size_label || '1 serving'}{selected.calories ? ` · ${Math.round(selected.calories * (parseFloat(searchServings) || 1))} kcal` : ''}
                     </div>
                   </div>
-                  <input type="number" min="0.25" step="0.25" value={searchServings} onChange={e => setSearchServings(e.target.value)}
-                    style={{ width: '56px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+                    <input type="number" min="0.25" step="0.25" value={searchServings} onChange={e => { setSearchServings(e.target.value); setSearchGramInput('') }}
+                      style={{ width: '56px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
+                    {parseGramWeight(selected.serving_size_label) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>or</span>
+                        <input type="number" min="1" step="1" value={searchGramInput} placeholder="g total"
+                          onChange={e => { setSearchGramInput(e.target.value); const g = parseFloat(e.target.value); const perSv = parseGramWeight(selected.serving_size_label); if (g > 0 && perSv > 0) setSearchServings(String(Math.round((g / perSv) * 100) / 100)) }}
+                          style={{ width: '68px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 8px', color: 'var(--text-primary)', fontSize: '12px', textAlign: 'center' }} />
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>g</span>
+                      </div>
+                    )}
+                    {selected.servings_per_container > 1 && (
+                      <button onClick={() => { setSearchServings(String(selected.servings_per_container)); setSearchGramInput('') }}
+                        style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '6px', padding: '3px 8px', fontSize: '11px', color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        × {selected.servings_per_container} (whole container)
+                      </button>
+                    )}
+                  </div>
                   <button onClick={handleSearchLog} disabled={savingSearch}
                     style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: savingSearch ? 0.6 : 1, flexShrink: 0 }}>
                     {savingSearch ? '...' : '+ Log'}
                   </button>
                 </div>
+                {(() => {
+                  const MICRO_KEYS = ['sodium_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg']
+                  const nullCount = MICRO_KEYS.filter(k => selected[k] == null).length
+                  return nullCount >= 4 ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <button onClick={() => handleMicroFill(selected)} disabled={microFilling}
+                        style={{ background: 'none', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', color: 'var(--accent-purple)', fontWeight: '600', cursor: microFilling ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '5px', opacity: microFilling ? 0.6 : 1 }}>
+                        <span>🤖</span><span>{microFilling ? 'Estimating micros...' : 'Fill missing micros'}</span>
+                      </button>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', opacity: 0.7 }}>{nullCount} fields missing</span>
+                    </div>
+                  ) : null
+                })()}
                 <FoodIntelCard foodName={selected.name} brand={selected.brand} calories={selected.calories} protein_g={selected.protein_g} carbs_g={selected.carbs_g} fat_g={selected.fat_g} fiber_g={selected.fiber_g} sugar_g={selected.sugar_g} workoutCtx={workoutCtx} />
               </div>
             )}

@@ -44,6 +44,7 @@ export async function POST(req) {
     name: body.name.trim(),
     brand: body.brand?.trim() || null,
     serving_size_label: body.serving_size_label?.trim() || '1 serving',
+    servings_per_container: body.servings_per_container != null ? Number(body.servings_per_container) : null,
     is_drink: body.is_drink === true,
     ...nutritionValues,
   }).select().single()
@@ -71,6 +72,7 @@ export async function PUT(req) {
     name: name.trim(),
     brand: rest.brand?.trim() || null,
     serving_size_label: rest.serving_size_label?.trim() || '1 serving',
+    servings_per_container: rest.servings_per_container != null ? Number(rest.servings_per_container) : null,
     ...nutritionValues,
   }).eq('id', id).eq('user_id', user.id).select().single()
 

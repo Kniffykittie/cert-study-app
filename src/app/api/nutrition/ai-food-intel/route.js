@@ -56,14 +56,15 @@ Return ONLY valid JSON with exactly these fields:
   "best_time_note": "one sentence — why this timing works best",
   "pairs_well_with": ["food1", "food2"],
   "pairs_note": "one sentence — why these pairings work nutritionally",
-  "fun_fact": "one surprising or useful fact most people don't know about this food"
+  "fun_fact": "one surprising or useful fact most people don't know about this food",
+  "servings_per_container": number or null — typical number of servings in one standard package/container of this food (e.g. 2 for a can of soup, 8 for a bag of chips, null if sold individually like a banana)
 }
 
 Ratings: satiety 1=very low 5=very high filling. nutrient_density 1=empty calories 5=very nutrient-dense.`
 
   const message = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 600,
+    max_tokens: 650,
     messages: [{ role: 'user', content: prompt }],
   })
 
