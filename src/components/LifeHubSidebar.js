@@ -196,6 +196,7 @@ export default function LifeHubSidebar() {
           <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
             {navLink('Overview', '/life-hub/health', SECTION_COLORS.health)}
             {navLink('Step Tracker', '/life-hub/health/steps', SECTION_COLORS.health)}
+            {navLink('Heart Rate', '/life-hub/health/heart-rate', SECTION_COLORS.health)}
             {navLink('Sleep Tracker', '/life-hub/health/sleep', SECTION_COLORS.health)}
           </div>
         )}

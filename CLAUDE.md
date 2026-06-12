@@ -132,6 +132,8 @@ src/
         status/route.js                Checks if Google Health is connected
         sync/route.js                  GET = read cache; POST = fetch from Google + write cache; now also stores intraday HR (health_heart_rate_intraday), resting_bpm, hrv_rmssd, and computed sleep quality metrics (onset, efficiency, awake_count, restlessness, sleep_score)
         workout-hr-sync/route.js       POST — lightweight 2-hour HR fetch called every 90s during active workout; fills intraday table with dense data for the workout window; no auth.is_disabled check (not AI)
+      health/
+        heart-rate/route.js            GET ?date= — returns intraday hourly HR (health_heart_rate_intraday), 7-day daily trend (health_heart_rate_daily), workoutWindow (start/end hour from workout_logs for that date), todayAvg/todayResting/todayHrv
         disconnect/route.js            Removes stored tokens
       workouts/
         generate-plan/route.js         AI workout plan generator; uses getUser() + is_disabled check; prompt injection protected on limitations + dumbbell_note fields
@@ -144,8 +146,9 @@ src/
       page.js                          Life Hub landing — 3-zone dashboard: Zone 1 = 4-pill status bar (calories/workouts/steps/water, section-colored); Zone 2 = Daily Brief (AI paragraph, cached daily, section-colored left border, collapsible); Zone 3 = 2×2 live section summary cards (Nutrition/Workouts/Health/Goals with real data + left-border accents); below: Recovery Score (5-component 0–100), Smart Contextual Check-In, 28-day heatmap
       monthly-wrap/page.js             Monthly Wrap — month picker, AI narrative card, stat grid (workouts/energy/mood/weight/calories/water); Generate button on first visit; cached forever per month; grouped under Overview in sidebar
       health/
-        page.js                        Health Overview — steps today, avg heart rate, sleep last night
+        page.js                        Health Overview — 3 primary cards (Steps/HR/Sleep, each a link to sub-page) + 3 secondary cards (Resting HR / HRV / Sleep Score); all clickable to sub-pages; Refresh syncs health + heart-rate in parallel
         steps/page.js                  Step Tracker — hourly/weekly bar charts, goal progress, fixed tooltip
+        heart-rate/page.js             Heart Rate — 24-hour intraday bar chart (color-coded by zone, workout window annotated), 7-day resting HR trend (SVG polyline), HRV panel with zone chips; top cards: avg/resting/HRV
         sleep/page.js                  Sleep Tracker — Sleep Score ring (0–100, color-coded), quality metrics (onset/efficiency/awakenings/restlessness), stage summary cards with % + target ranges, stage breakdown bar, hypnogram timeline, 4 collapsible education cards (Deep/REM/Light/Awake) explaining physiology + "if you're low" warnings
         water/page.js                  Drinks & Hydration — stacked hydration ring (water blue, beverages purple), quick-add water buttons (8/12/16/20/32 oz + custom), drink search (logs to food_log_entries meal_slot='drink'), saved drinks chips (my_foods is_drink=true) with Manage mode (edit name/nutrition/delete), combined today's log with ✏️ edit button on drink entries, caffeine tracker, hydration timing chart (18-bar hourly), 7-day bar chart; goal synced to goals_profiles.water_goal_oz; listed under Nutrition in sidebar (not Health)
       goals/
@@ -198,7 +201,7 @@ src/
       security-plus-labs.js            Security+ lab set — 4 labs, 20 steps — all steps have document arrays
   components/
     StudyHubSidebar.js                 Nav sidebar with test-in-progress guard
-    LifeHubSidebar.js                  Life Hub nav — section color system (overview=purple, health=green, nutrition=orange, workouts=blue, goals=teal); Overview section (Dashboard + Monthly Wrap), Goals dropdown (Overview + Measurements + Setup), Health dropdown (Overview + Steps + Sleep), Nutrition dropdown (Food Log + Meal Plan + Encyclopedia + Hydration + Supplements), Workouts dropdown (My Plan + History + Exercise Library); Hydration and Supplements live under Nutrition group; auto-opens on active routes; SECTION_COLORS constant defines all section accent colors
+    LifeHubSidebar.js                  Life Hub nav — section color system (overview=purple, health=green, nutrition=orange, workouts=blue, goals=teal); Overview section (Dashboard + Monthly Wrap), Goals dropdown (Overview + Measurements + Setup), Health dropdown (Overview + Step Tracker + Heart Rate + Sleep Tracker), Nutrition dropdown (Food Log + Meal Plan + Encyclopedia + Hydration + Supplements), Workouts dropdown (My Plan + History + Exercise Library); Hydration and Supplements live under Nutrition group; auto-opens on active routes; SECTION_COLORS constant defines all section accent colors
     BookmarkModal.js                   Bookmark reason + notes modal
     DailyStreak.js                     30q/day streak tracker with 28-day calendar heatmap
     DomainTrend.js                     Per-domain score trend SVG chart (no library)

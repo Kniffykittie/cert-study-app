@@ -5,6 +5,7 @@ import Link from 'next/link'
 export default function HealthPage() {
   const [connected, setConnected] = useState(null)
   const [data, setData] = useState(null)
+  const [hrData, setHrData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
 
@@ -17,8 +18,13 @@ export default function HealthPage() {
       const cached = localStorage.getItem('health_overview')
       if (cached) { setData(JSON.parse(cached)); setConnected(true); setLoading(false) }
 
-      const syncRes = await fetch('/api/health/sync')
+      const [syncRes, hrRes] = await Promise.all([
+        fetch('/api/health/sync'),
+        fetch('/api/health/heart-rate'),
+      ])
       const syncData = await syncRes.json()
+      const hrJson = await hrRes.json()
+
       if (syncData.error === 'Not connected') { setConnected(false); setLoading(false); return }
       if (!syncData.error) {
         setConnected(true)
@@ -26,15 +32,15 @@ export default function HealthPage() {
         setLoading(false)
         localStorage.setItem('health_overview', JSON.stringify(syncData))
       }
+      if (!hrJson.error) setHrData(hrJson)
+
       if (!syncData.error && (syncData.neverSynced || !syncData.lastSyncedAt || Date.now() - new Date(syncData.lastSyncedAt).getTime() > 15 * 60 * 1000)) {
         fetch('/api/health/sync', { method: 'POST' })
-          .then(() => fetch('/api/health/sync'))
-          .then(r => r.json())
-          .then(fresh => {
-            if (!fresh.error) {
-              setData(fresh)
-              localStorage.setItem('health_overview', JSON.stringify(fresh))
-            }
+          .then(() => Promise.all([fetch('/api/health/sync'), fetch('/api/health/heart-rate')]))
+          .then(([r1, r2]) => Promise.all([r1.json(), r2.json()]))
+          .then(([fresh, freshHr]) => {
+            if (!fresh.error) { setData(fresh); localStorage.setItem('health_overview', JSON.stringify(fresh)) }
+            if (!freshHr.error) setHrData(freshHr)
           })
           .catch(() => {})
       }
@@ -45,12 +51,10 @@ export default function HealthPage() {
   async function handleSync() {
     setSyncing(true)
     await fetch('/api/health/sync', { method: 'POST' })
-    const res = await fetch('/api/health/sync')
-    const syncData = await res.json()
-    if (!syncData.error) {
-      setData(syncData)
-      localStorage.setItem('health_overview', JSON.stringify(syncData))
-    }
+    const [r1, r2] = await Promise.all([fetch('/api/health/sync'), fetch('/api/health/heart-rate')])
+    const [syncData, hrJson] = await Promise.all([r1.json(), r2.json()])
+    if (!syncData.error) { setData(syncData); localStorage.setItem('health_overview', JSON.stringify(syncData)) }
+    if (!hrJson.error) setHrData(hrJson)
     setSyncing(false)
   }
 
@@ -66,8 +70,7 @@ export default function HealthPage() {
         Connect your Google Health account to see your steps, heart rate, and sleep data here.
       </p>
       <a href="/api/health/connect"
-        style={{ display: 'inline-block', backgroundColor: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.4)', color: '#4285F4', borderRadius: '8px', padding: '12px 24px', fontSize: '14px', fontWeight: '600', textDecoration: 'none' }}
-      >
+        style={{ display: 'inline-block', backgroundColor: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.4)', color: '#4285F4', borderRadius: '8px', padding: '12px 24px', fontSize: '14px', fontWeight: '600', textDecoration: 'none' }}>
         Connect Google Health
       </a>
       <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '12px' }}>
@@ -76,10 +79,14 @@ export default function HealthPage() {
     </div>
   )
 
-  const stats = [
-    { label: 'Steps Today', value: data?.steps != null ? data.steps.toLocaleString() : '—', unit: 'steps', color: 'var(--accent-blue)', goal: 10000, current: data?.steps },
-    { label: 'Avg Heart Rate', value: data?.heartRate != null ? data.heartRate : '—', unit: 'bpm', color: 'var(--error)', goal: null },
-    { label: 'Sleep Last Night', value: data?.sleepHours != null ? data.sleepHours : '—', unit: 'hrs', color: 'var(--accent-purple)', goal: 8, current: data?.sleepHours },
+  const restingHR = hrData?.todayResting ?? data?.restingHR ?? null
+  const hrv = hrData?.todayHrv ?? data?.hrv ?? null
+  const sleepScore = data?.sleepScore ?? null
+
+  const primaryStats = [
+    { label: 'Steps Today', value: data?.steps != null ? data.steps.toLocaleString() : '—', unit: 'steps', color: 'var(--accent-blue)', goal: 10000, current: data?.steps, href: '/life-hub/health/steps' },
+    { label: 'Avg Heart Rate', value: data?.heartRate != null ? data.heartRate : '—', unit: 'bpm', color: 'var(--error)', href: '/life-hub/health/heart-rate' },
+    { label: 'Sleep Last Night', value: data?.sleepHours != null ? data.sleepHours : '—', unit: 'hrs', color: 'var(--accent-purple)', goal: 8, current: data?.sleepHours, href: '/life-hub/health/sleep' },
   ]
 
   return (
@@ -89,39 +96,76 @@ export default function HealthPage() {
           <h1 style={{ color: 'var(--success)', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Health Overview</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Today's data from Google Health</p>
         </div>
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: syncing ? 'not-allowed' : 'pointer', opacity: syncing ? 0.6 : 1 }}
-        >
+        <button onClick={handleSync} disabled={syncing}
+          style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: syncing ? 'not-allowed' : 'pointer', opacity: syncing ? 0.6 : 1 }}>
           {syncing ? 'Syncing...' : '↻ Refresh'}
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
-        {stats.map(stat => (
-          <div key={stat.label} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '8px' }}>{stat.label}</div>
-            <div style={{ color: stat.color, fontSize: '32px', fontWeight: '700', lineHeight: 1 }}>{stat.value}</div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>{stat.unit}</div>
-            {stat.goal && stat.current != null && (
-              <div style={{ marginTop: '10px' }}>
-                <div style={{ height: '4px', backgroundColor: 'var(--border)', borderRadius: '2px' }}>
-                  <div style={{ height: '100%', width: `${Math.min(100, (stat.current / stat.goal) * 100)}%`, backgroundColor: stat.color, borderRadius: '2px', transition: 'width 0.3s' }} />
+      {/* Primary stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
+        {primaryStats.map(stat => (
+          <Link key={stat.label} href={stat.href} style={{ textDecoration: 'none' }}>
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', cursor: 'pointer', transition: 'border-color 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-blue)'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '8px' }}>{stat.label}</div>
+              <div style={{ color: stat.color, fontSize: '32px', fontWeight: '700', lineHeight: 1 }}>{stat.value}</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>{stat.unit}</div>
+              {stat.goal && stat.current != null && (
+                <div style={{ marginTop: '10px' }}>
+                  <div style={{ height: '4px', backgroundColor: 'var(--border)', borderRadius: '2px' }}>
+                    <div style={{ height: '100%', width: `${Math.min(100, (stat.current / stat.goal) * 100)}%`, backgroundColor: stat.color, borderRadius: '2px', transition: 'width 0.3s' }} />
+                  </div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '4px' }}>Goal: {stat.goal.toLocaleString()}</div>
                 </div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '4px' }}>Goal: {stat.goal.toLocaleString()}</div>
-              </div>
-            )}
-          </div>
+              )}
+              <div style={{ color: 'var(--accent-blue)', fontSize: '11px', marginTop: '8px' }}>View details →</div>
+            </div>
+          </Link>
         ))}
       </div>
 
-      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-        <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>More data coming soon</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-          Calories, active minutes, and weekly trends will be added in the next phase.
-        </p>
+      {/* Secondary metrics */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
+        <Link href="/life-hub/health/heart-rate" style={{ textDecoration: 'none' }}>
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px', cursor: 'pointer' }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-blue)'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px' }}>Resting HR</div>
+            <div style={{ color: 'var(--accent-blue)', fontSize: '24px', fontWeight: '700', lineHeight: 1 }}>{restingHR ?? '—'}</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '3px' }}>bpm · Google-computed</div>
+          </div>
+        </Link>
+        <Link href="/life-hub/health/heart-rate" style={{ textDecoration: 'none' }}>
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px', cursor: 'pointer' }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-purple)'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px' }}>HRV (RMSSD)</div>
+            <div style={{ color: 'var(--accent-purple)', fontSize: '24px', fontWeight: '700', lineHeight: 1 }}>{hrv != null ? Math.round(hrv) : '—'}</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '3px' }}>ms · higher = better recovery</div>
+          </div>
+        </Link>
+        <Link href="/life-hub/health/sleep" style={{ textDecoration: 'none' }}>
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px', cursor: 'pointer' }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = '#22c55e'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px' }}>Sleep Score</div>
+            <div style={{ color: sleepScore != null ? (sleepScore >= 80 ? 'var(--success)' : sleepScore >= 60 ? 'var(--accent-blue)' : sleepScore >= 40 ? 'var(--warning)' : 'var(--error)') : 'var(--text-secondary)', fontSize: '24px', fontWeight: '700', lineHeight: 1 }}>
+              {sleepScore ?? '—'}
+            </div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '3px' }}>
+              {sleepScore != null ? (sleepScore >= 80 ? 'Excellent' : sleepScore >= 65 ? 'Good' : sleepScore >= 50 ? 'Fair' : 'Poor') : 'out of 100'}
+            </div>
+          </div>
+        </Link>
       </div>
+
+      {data?.lastSyncedAt && (
+        <p style={{ color: 'var(--text-secondary)', fontSize: '11px', textAlign: 'right', opacity: 0.6 }}>
+          Last synced {new Date(data.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </p>
+      )}
     </div>
   )
 }
