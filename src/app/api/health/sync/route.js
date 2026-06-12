@@ -1,79 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import {
+  estDateStr, getEstHour,
+  refreshTokenIfNeeded, fetchDataType,
+  computeSleepMetrics, computeSleepScore,
+} from '@/lib/googleHealth'
 
-const BASE = 'https://health.googleapis.com/v4'
-const TZ = 'America/New_York'
-const STALE_MS = 15 * 60 * 1000 // 15 minutes
+const STALE_MS = 15 * 60 * 1000
 const SLEEP_STAGES = { AWAKE: 'Awake', LIGHT: 'Light', DEEP: 'Deep', REM: 'REM', UNKNOWN: 'Unknown' }
-
-function estDateStr(date = new Date()) {
-  return date.toLocaleDateString('en-CA', { timeZone: TZ })
-}
-
-function getEstHour(isoString) {
-  return parseInt(new Date(isoString).toLocaleString('en-US', { timeZone: TZ, hour: 'numeric', hour12: false })) % 24
-}
 
 function getCivilDateStr(point) {
   const d = point.steps?.interval?.civilStartTime?.date
   if (!d) return null
   return `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`
-}
-
-function pointTime(p) {
-  return p.steps?.interval?.startTime
-    ?? p.heartRate?.sampleTime?.physicalTime
-    ?? p.sleep?.interval?.startTime
-    ?? null
-}
-
-async function refreshTokenIfNeeded(supabase, userId, tokenRow) {
-  if (!tokenRow.refresh_token) return tokenRow.access_token
-  const expiresAt = new Date(tokenRow.expires_at)
-  if (expiresAt > new Date(Date.now() + 60000)) return tokenRow.access_token
-
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.GOOGLE_HEALTH_CLIENT_ID,
-      client_secret: process.env.GOOGLE_HEALTH_CLIENT_SECRET,
-      refresh_token: tokenRow.refresh_token,
-      grant_type: 'refresh_token',
-    }),
-  })
-  const data = await res.json()
-  if (!res.ok || !data.access_token) return null
-
-  await supabase.from('google_health_tokens').update({
-    access_token: data.access_token,
-    expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(),
-    updated_at: new Date().toISOString(),
-  }).eq('user_id', userId)
-
-  return data.access_token
-}
-
-async function fetchDataType(accessToken, dataType, since) {
-  let allPoints = []
-  let pageToken = null
-  do {
-    const url = pageToken
-      ? `${BASE}/users/me/dataTypes/${dataType}/dataPoints?pageToken=${encodeURIComponent(pageToken)}`
-      : `${BASE}/users/me/dataTypes/${dataType}/dataPoints`
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
-    if (!res.ok) break
-    const json = await res.json()
-    const points = json.dataPoints ?? []
-    if (points.length === 0) break
-    allPoints = allPoints.concat(points)
-    pageToken = json.nextPageToken ?? null
-    if (since) {
-      const oldest = pointTime(points[points.length - 1])
-      if (oldest && oldest < since) break
-    }
-  } while (pageToken)
-  return allPoints
 }
 
 // ─── GET: read from Supabase cache (fast) ────────────────────────────────────
@@ -108,7 +47,7 @@ export async function GET(req) {
         .eq('user_id', user.id)
         .gte('date', weekStart),
       supabase.from('health_heart_rate_daily')
-        .select('avg_bpm')
+        .select('avg_bpm, resting_bpm')
         .eq('user_id', user.id)
         .eq('date', todayEST)
         .maybeSingle(),
@@ -141,6 +80,7 @@ export async function GET(req) {
     return NextResponse.json({
       range: 'week', weeklySteps, totalSteps, avgSteps,
       heartRate: hrRow.data?.avg_bpm ?? null,
+      restingHR: hrRow.data?.resting_bpm ?? null,
       sleepHours: null, sleepStages: {}, sleepTimeline: [],
       neverSynced,
       lastSyncedAt: tokenRow.last_synced_at,
@@ -154,12 +94,12 @@ export async function GET(req) {
       .eq('user_id', user.id)
       .eq('date', targetDate),
     supabase.from('health_heart_rate_daily')
-      .select('avg_bpm')
+      .select('avg_bpm, resting_bpm, hrv_rmssd')
       .eq('user_id', user.id)
       .eq('date', targetDate)
       .maybeSingle(),
     supabase.from('health_sleep_sessions')
-      .select('sleep_minutes, stages, timeline')
+      .select('sleep_minutes, stages, timeline, sleep_score, onset_minutes, efficiency_pct, awake_count, restlessness')
       .eq('user_id', user.id)
       .gte('date', range === 'yesterday'
         ? estDateStr(new Date(Date.now() - 2 * 86400000))
@@ -177,12 +117,19 @@ export async function GET(req) {
 
   const sleepData = sleepRow.data
   const sleepHours = sleepData ? Math.round((sleepData.sleep_minutes / 60) * 10) / 10 : null
-  const sleepStages = sleepData?.stages ?? {}
-  const sleepTimeline = sleepData?.timeline ?? []
 
   return NextResponse.json({
     range, steps, heartRate: hrRow.data?.avg_bpm ?? null,
-    sleepHours, hourlySteps, sleepStages, sleepTimeline,
+    restingHR: hrRow.data?.resting_bpm ?? null,
+    hrv: hrRow.data?.hrv_rmssd ?? null,
+    sleepHours, hourlySteps,
+    sleepStages: sleepData?.stages ?? {},
+    sleepTimeline: sleepData?.timeline ?? [],
+    sleepScore: sleepData?.sleep_score ?? null,
+    sleepOnset: sleepData?.onset_minutes ?? null,
+    sleepEfficiency: sleepData?.efficiency_pct ?? null,
+    sleepAwakeCount: sleepData?.awake_count ?? null,
+    sleepRestlessness: sleepData?.restlessness ?? null,
     neverSynced,
     lastSyncedAt: tokenRow.last_synced_at,
   })
@@ -206,18 +153,19 @@ export async function POST(req) {
   const accessToken = await refreshTokenIfNeeded(supabase, user.id, tokenRow)
   if (!accessToken) return NextResponse.json({ error: 'Token refresh failed' }, { status: 401 })
 
-  // Fetch since last sync minus 1 hour overlap, or 30 days back for first sync
   const since = tokenRow.last_synced_at
     ? new Date(new Date(tokenRow.last_synced_at).getTime() - 3600000).toISOString()
     : new Date(Date.now() - 30 * 86400000).toISOString()
 
-  const [stepsPoints, heartPoints, sleepPoints] = await Promise.all([
+  const [stepsPoints, heartPoints, sleepPoints, restingHRPoints, hrvPoints] = await Promise.all([
     fetchDataType(accessToken, 'steps', since),
     fetchDataType(accessToken, 'heart-rate', since),
     fetchDataType(accessToken, 'sleep', since),
+    fetchDataType(accessToken, 'daily-resting-heart-rate', since),
+    fetchDataType(accessToken, 'daily-heart-rate-variability', since),
   ])
 
-  // ── Write steps (aggregate per hour per day, then upsert) ──
+  // ── Write steps ──
   const stepsBucket = {}
   stepsPoints.forEach(p => {
     const date = getCivilDateStr(p)
@@ -234,18 +182,29 @@ export async function POST(req) {
     await supabase.from('health_steps_hourly').upsert(stepsRows, { onConflict: 'user_id,date,hour' })
   }
 
-  // ── Write heart rate (avg/min/max per day) ──
-  const hrBucket = {}
+  // ── Write heart rate — daily AND intraday ──
+  const hrDailyBucket = {}
+  const hrHourBucket = {}
+
   heartPoints.forEach(p => {
     const t = p.heartRate?.sampleTime?.physicalTime
     const bpm = parseInt(p.heartRate?.beatsPerMinute)
     if (!t || isNaN(bpm) || bpm <= 0) return
     const date = estDateStr(new Date(t))
-    if (!hrBucket[date]) hrBucket[date] = []
-    hrBucket[date].push(bpm)
+    const hour = getEstHour(t)
+
+    // Daily bucket (existing)
+    if (!hrDailyBucket[date]) hrDailyBucket[date] = []
+    hrDailyBucket[date].push(bpm)
+
+    // Intraday bucket (new)
+    if (!hrHourBucket[date]) hrHourBucket[date] = {}
+    if (!hrHourBucket[date][hour]) hrHourBucket[date][hour] = []
+    hrHourBucket[date][hour].push(bpm)
   })
-  if (Object.keys(hrBucket).length > 0) {
-    const hrRows = Object.entries(hrBucket).map(([date, vals]) => ({
+
+  if (Object.keys(hrDailyBucket).length > 0) {
+    const hrDailyRows = Object.entries(hrDailyBucket).map(([date, vals]) => ({
       user_id: user.id,
       date,
       avg_bpm: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
@@ -254,10 +213,73 @@ export async function POST(req) {
       sample_count: vals.length,
       synced_at: new Date().toISOString(),
     }))
-    await supabase.from('health_heart_rate_daily').upsert(hrRows, { onConflict: 'user_id,date' })
+    await supabase.from('health_heart_rate_daily').upsert(hrDailyRows, { onConflict: 'user_id,date' })
   }
 
-  // ── Write sleep sessions ──
+  if (Object.keys(hrHourBucket).length > 0) {
+    const intradayRows = []
+    for (const [date, hours] of Object.entries(hrHourBucket)) {
+      for (const [hour, vals] of Object.entries(hours)) {
+        intradayRows.push({
+          user_id: user.id,
+          date,
+          hour: parseInt(hour),
+          avg_bpm: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
+          min_bpm: Math.min(...vals),
+          max_bpm: Math.max(...vals),
+          sample_count: vals.length,
+          synced_at: new Date().toISOString(),
+        })
+      }
+    }
+    await supabase.from('health_heart_rate_intraday').upsert(intradayRows, { onConflict: 'user_id,date,hour' })
+  }
+
+  // ── Write resting HR (Google-computed, more accurate than deriving ourselves) ──
+  if (restingHRPoints.length > 0) {
+    const restingRows = []
+    for (const p of restingHRPoints) {
+      const t = p.heartRate?.sampleTime?.physicalTime ?? p.sampleTime?.physicalTime
+      const bpm = parseInt(p.heartRate?.beatsPerMinute ?? p.beatsPerMinute)
+      if (!t || isNaN(bpm) || bpm <= 0) continue
+      restingRows.push({
+        user_id: user.id,
+        date: estDateStr(new Date(t)),
+        resting_bpm: bpm,
+      })
+    }
+    if (restingRows.length > 0) {
+      await supabase.from('health_heart_rate_daily')
+        .upsert(restingRows, { onConflict: 'user_id,date', ignoreDuplicates: false })
+    }
+  }
+
+  // ── Write HRV (defensive — field names confirmed at runtime) ──
+  if (hrvPoints.length > 0) {
+    const hrvRows = []
+    for (const p of hrvPoints) {
+      const t = p.heartRateVariability?.sampleTime?.physicalTime
+        ?? p.sampleTime?.physicalTime
+      const rmssd = parseFloat(
+        p.heartRateVariability?.rmssd
+        ?? p.heartRateVariability?.sdnn
+        ?? p.rmssd
+        ?? p.sdnn
+      )
+      if (!t || isNaN(rmssd) || rmssd <= 0) continue
+      hrvRows.push({
+        user_id: user.id,
+        date: estDateStr(new Date(t)),
+        hrv_rmssd: rmssd,
+      })
+    }
+    if (hrvRows.length > 0) {
+      await supabase.from('health_heart_rate_daily')
+        .upsert(hrvRows, { onConflict: 'user_id,date', ignoreDuplicates: false })
+    }
+  }
+
+  // ── Write sleep sessions (with computed quality metrics) ──
   if (sleepPoints.length > 0) {
     const sleepRows = sleepPoints
       .filter(p => p.sleep?.interval?.startTime && p.sleep?.interval?.endTime)
@@ -286,6 +308,9 @@ export async function POST(req) {
           }))
           .sort((a, b) => new Date(a.start) - new Date(b.start))
 
+        const metrics = computeSleepMetrics(timeline, startTime)
+        const sleepScore = computeSleepScore(stages, metrics.onset_minutes, metrics.efficiency_pct)
+
         return {
           user_id: user.id,
           session_id: sessionId,
@@ -298,6 +323,8 @@ export async function POST(req) {
           timeline,
           is_nap: isNap,
           synced_at: new Date().toISOString(),
+          ...metrics,
+          sleep_score: sleepScore,
         }
       })
     if (sleepRows.length > 0) {
@@ -305,10 +332,15 @@ export async function POST(req) {
     }
   }
 
-  // ── Update last_synced_at ──
   await supabase.from('google_health_tokens')
     .update({ last_synced_at: new Date().toISOString() })
     .eq('user_id', user.id)
 
-  return NextResponse.json({ ok: true, synced: new Date().toISOString() })
+  return NextResponse.json({
+    ok: true,
+    synced: new Date().toISOString(),
+    intradayHours: Object.values(hrHourBucket).reduce((n, h) => n + Object.keys(h).length, 0),
+    restingHRPoints: restingHRPoints.length,
+    hrvPoints: hrvPoints.length,
+  })
 }

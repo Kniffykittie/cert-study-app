@@ -253,6 +253,8 @@ export default function LogWorkoutPage() {
   const [restActive, setRestActive] = useState(false)
   const restIntervalRef = useRef(null)
   const restTotalRef = useRef(0)
+  const hrPollRef = useRef(null)
+  const [healthConnected, setHealthConnected] = useState(false)
 
   // Hydration banner
   const [hydrationWarning, setHydrationWarning] = useState(false)
@@ -274,10 +276,27 @@ export default function LogWorkoutPage() {
   }, [])
 
   useEffect(() => {
+    fetch('/api/health/status').then(r => r.json()).then(d => { if (d.connected) setHealthConnected(true) }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
     if (!day) { router.push('/life-hub/workouts'); return }
     load()
     return () => { clearInterval(timerRef.current); clearInterval(restIntervalRef.current) }
   }, [day])
+
+  // Live HR polling during active workout — every 90s when running and wearable connected
+  useEffect(() => {
+    if (running && healthConnected) {
+      hrPollRef.current = setInterval(() => {
+        fetch('/api/health/workout-hr-sync', { method: 'POST' }).catch(() => {})
+      }, 90 * 1000)
+    } else {
+      clearInterval(hrPollRef.current)
+      hrPollRef.current = null
+    }
+    return () => clearInterval(hrPollRef.current)
+  }, [running, healthConnected])
 
   useEffect(() => {
     if (running) {
@@ -467,6 +486,10 @@ export default function LogWorkoutPage() {
 
   function handleFinishClick() {
     setRunning(false)
+    // Final HR sync to capture the tail end of the session
+    if (healthConnected) {
+      fetch('/api/health/workout-hr-sync', { method: 'POST' }).catch(() => {})
+    }
     setShowPostModal(true)
   }
 
