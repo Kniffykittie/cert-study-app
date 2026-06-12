@@ -267,6 +267,18 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Heart Rate Phase 3 — Workout Zone Breakdown — Complete
+- Added `computeHrZones(supabase, userId, logId, durationSeconds)` in `/api/workouts/log/route.js`:
+  - Computes workout start/end from `Date.now()` and `duration_seconds`
+  - Fetches `health_heart_rate_intraday` rows for the workout date filtered to start/end hours
+  - Fetches `goals_profiles.age` to compute max HR (220 - age; default 35 if not set)
+  - Zones: Fat Burn 60-70%, Cardio 70-80%, Hard 80-90%, Peak 90%+
+  - Minutes estimated from `sample_count / 6` (~10s per sample)
+  - Writes result to `workout_logs.hr_zones` JSONB; returns `null` silently if no intraday data
+- POST and PATCH handlers now run `computeHrZones` in `Promise.all` alongside overload detection; `hrZones` included in response
+- Completion screen: new HR Zones card renders when `done.hrZones` has any non-zero zone minutes — proportional colored bar + legend with minutes per zone + avg/max bpm header; gracefully absent when Google Health not connected or no HR data for the session
+- History page: expanded session rows now show HR zones bar + legend when `log.hr_zones` exists — automatically populated for any future workout; historical sessions without data show nothing (no empty state)
+
 ### Heart Rate Phase 1 + 2 — Complete
 - Created `/api/health/heart-rate/route.js` (GET): returns `intraday` (hourly avg/min/max_bpm for requested date), `daily` (7-day resting HR + HRV trend), `workoutWindow` (start/end hour from today's workout_logs, if any), `todayAvg`, `todayResting`, `todayHrv`
 - Created `/life-hub/health/heart-rate/page.js`:

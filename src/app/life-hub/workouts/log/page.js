@@ -514,7 +514,7 @@ export default function LogWorkoutPage() {
     const workingSets = sets.filter(s => s.set_type === 'working' && s.weight_lbs != null && s.reps != null)
     const totalVolume = workingSets.reduce((sum, s) => sum + s.weight_lbs * s.reps, 0)
     const completedCount = exercises.reduce((sum, ex) => sum + ex.sets.filter(s => s.completed).length, 0)
-    setDone({ duration: elapsed, totalVolume, completedCount, totalSets: exercises.reduce((sum, ex) => sum + ex.sets.length, 0), overloadSuggestions: json.overloadSuggestions || [], difficulty, energy })
+    setDone({ duration: elapsed, totalVolume, completedCount, totalSets: exercises.reduce((sum, ex) => sum + ex.sets.length, 0), overloadSuggestions: json.overloadSuggestions || [], hrZones: json.hrZones || null, difficulty, energy })
   }
 
   if (loading) return <div style={{ padding: 40, color: 'var(--text-secondary)', textAlign: 'center' }}>Loading workout...</div>
@@ -560,6 +560,46 @@ export default function LogWorkoutPage() {
                 <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Energy · {ENERGY_LABELS[done.energy-1]}</div>
               </div>
             )}
+          </div>
+        )}
+
+        {done.hrZones && (done.hrZones.fat_burn_min > 0 || done.hrZones.cardio_min > 0 || done.hrZones.hard_min > 0 || done.hrZones.peak_min > 0) && (
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--error)' }}>❤️ Heart Rate Zones</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                {done.hrZones.avg_bpm > 0 && `avg ${done.hrZones.avg_bpm} bpm`}
+                {done.hrZones.max_bpm > 0 && ` · max ${done.hrZones.max_bpm} bpm`}
+              </div>
+            </div>
+            {(() => {
+              const zones = [
+                { key: 'fat_burn_min', label: 'Fat Burn', color: '#22c55e', range: '60–70%' },
+                { key: 'cardio_min', label: 'Cardio', color: '#f59e0b', range: '70–80%' },
+                { key: 'hard_min', label: 'Hard', color: 'var(--warning)', range: '80–90%' },
+                { key: 'peak_min', label: 'Peak', color: 'var(--error)', range: '90%+' },
+              ]
+              const total = zones.reduce((s, z) => s + (done.hrZones[z.key] || 0), 0) || 1
+              return (
+                <>
+                  <div style={{ display: 'flex', height: 12, borderRadius: 6, overflow: 'hidden', marginBottom: 10, gap: 2 }}>
+                    {zones.map(z => done.hrZones[z.key] > 0 && (
+                      <div key={z.key} style={{ flex: done.hrZones[z.key], backgroundColor: z.color, minWidth: 4 }} title={`${z.label}: ${done.hrZones[z.key]}m`} />
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {zones.filter(z => done.hrZones[z.key] > 0).map(z => (
+                      <div key={z.key} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: z.color, flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{z.label}</span>
+                        <span style={{ fontSize: 12, color: z.color, fontWeight: 700 }}>{done.hrZones[z.key]}m</span>
+                        <span style={{ fontSize: 10, color: 'var(--text-secondary)', opacity: 0.7 }}>{z.range}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )
+            })()}
           </div>
         )}
 

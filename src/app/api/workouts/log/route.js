@@ -1,5 +1,61 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { estDateStr } from '@/lib/googleHealth'
+
+async function computeHrZones(supabase, userId, logId, durationSeconds) {
+  try {
+    const endMs = Date.now()
+    const startMs = endMs - durationSeconds * 1000
+    const date = estDateStr(new Date(endMs))
+    const startHour = new Date(startMs).getHours()
+    const endHour = new Date(endMs).getHours()
+
+    const [intradayRes, goalsRes] = await Promise.all([
+      supabase.from('health_heart_rate_intraday')
+        .select('hour, avg_bpm, sample_count')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .gte('hour', startHour)
+        .lte('hour', endHour),
+      supabase.from('goals_profiles')
+        .select('age')
+        .eq('user_id', userId)
+        .maybeSingle(),
+    ])
+
+    const intraday = intradayRes.data ?? []
+    if (!intraday.length) return null
+
+    const age = goalsRes.data?.age ?? 35
+    const maxHr = 220 - age
+
+    const zones = { fat_burn_min: 0, cardio_min: 0, hard_min: 0, peak_min: 0, avg_bpm: 0, max_bpm: 0 }
+    let totalSamples = 0
+    let weightedBpm = 0
+
+    for (const row of intraday) {
+      const bpm = row.avg_bpm
+      const approxMins = Math.round((row.sample_count ?? 6) / 6)
+      const pct = bpm / maxHr
+
+      if (pct >= 0.90) zones.peak_min += approxMins
+      else if (pct >= 0.80) zones.hard_min += approxMins
+      else if (pct >= 0.70) zones.cardio_min += approxMins
+      else if (pct >= 0.60) zones.fat_burn_min += approxMins
+
+      weightedBpm += bpm * (row.sample_count ?? 6)
+      totalSamples += (row.sample_count ?? 6)
+      if (bpm > zones.max_bpm) zones.max_bpm = bpm
+    }
+
+    zones.avg_bpm = totalSamples > 0 ? Math.round(weightedBpm / totalSamples) : 0
+
+    await supabase.from('workout_logs').update({ hr_zones: zones }).eq('id', logId)
+    return zones
+  } catch {
+    return null
+  }
+}
 
 // GET ?day=Monday — previous sets for that day
 export async function GET(req) {
@@ -127,8 +183,11 @@ export async function POST(req) {
 
   if (is_partial) return NextResponse.json({ ok: true, log_id: log.id })
 
-  const overloadSuggestions = await runOverloadDetection(supabase, user.id, sets)
-  return NextResponse.json({ ok: true, log_id: log.id, overloadSuggestions })
+  const [overloadSuggestions, hrZones] = await Promise.all([
+    runOverloadDetection(supabase, user.id, sets),
+    computeHrZones(supabase, user.id, log.id, duration_seconds),
+  ])
+  return NextResponse.json({ ok: true, log_id: log.id, overloadSuggestions, hrZones })
 }
 
 // PATCH — complete a previously-paused (partial) workout
@@ -159,6 +218,9 @@ export async function PATCH(req) {
     await supabase.from('workout_log_sets').insert(rows)
   }
 
-  const overloadSuggestions = await runOverloadDetection(supabase, user.id, sets)
-  return NextResponse.json({ ok: true, log_id, overloadSuggestions })
+  const [overloadSuggestions, hrZones] = await Promise.all([
+    runOverloadDetection(supabase, user.id, sets),
+    computeHrZones(supabase, user.id, log_id, duration_seconds),
+  ])
+  return NextResponse.json({ ok: true, log_id, overloadSuggestions, hrZones })
 }

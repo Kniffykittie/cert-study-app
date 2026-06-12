@@ -86,6 +86,41 @@ export default function WorkoutHistoryPage() {
 
                 {isOpen && (
                   <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border)' }}>
+                    {/* HR Zones */}
+                    {log.hr_zones && (() => {
+                      const z = log.hr_zones
+                      const zones = [
+                        { key: 'fat_burn_min', label: 'Fat Burn', color: '#22c55e' },
+                        { key: 'cardio_min', label: 'Cardio', color: '#f59e0b' },
+                        { key: 'hard_min', label: 'Hard', color: 'var(--warning)' },
+                        { key: 'peak_min', label: 'Peak', color: 'var(--error)' },
+                      ].filter(zone => z[zone.key] > 0)
+                      if (!zones.length) return null
+                      return (
+                        <div style={{ marginTop: 12, background: 'var(--background)', borderRadius: 8, padding: '10px 12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--error)' }}>❤️ HR Zones</span>
+                            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                              {z.avg_bpm > 0 && `avg ${z.avg_bpm}`}{z.max_bpm > 0 && ` · max ${z.max_bpm} bpm`}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 8, gap: 1 }}>
+                            {zones.map(zone => (
+                              <div key={zone.key} style={{ flex: z[zone.key], backgroundColor: zone.color, minWidth: 4 }} />
+                            ))}
+                          </div>
+                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                            {zones.map(zone => (
+                              <div key={zone.key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <div style={{ width: 7, height: 7, borderRadius: 2, backgroundColor: zone.color }} />
+                                <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{zone.label}</span>
+                                <span style={{ fontSize: 11, color: zone.color, fontWeight: 700 }}>{z[zone.key]}m</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()}
                     {/* Group sets by exercise */}
                     {(() => {
                       const byEx = {}
