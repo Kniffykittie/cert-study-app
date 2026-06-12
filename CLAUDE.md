@@ -29,6 +29,16 @@ var(--error-border)       red border variant
 var(--accent-purple)      #a78bfa
 ```
 
+## Section Identity Colors (Life Hub)
+Each Life Hub section has a dedicated accent color applied via the `SECTION_COLORS` constant in `LifeHubSidebar.js`. Use these for active nav states, section headers, card accent borders, and page-level color theming.
+```
+Overview    #a78bfa   (accent-purple — consistent with existing brand)
+Goals       #06b6d4   (cyan/teal)
+Health      #22c55e   (green)
+Nutrition   #f97316   (orange)
+Workouts    #3b82f6   (blue)
+```
+
 ---
 
 ## Key Rules
@@ -129,17 +139,17 @@ src/
     life-hub/
       layout.js                        Life Hub layout with LifeHubSidebar
       page.js                          Life Hub landing — Daily Brief (AI paragraph, cached daily), Recovery Score (5-component composite 0–100: sleep/hydration/protein/energy/workout load), Smart Contextual Check-In (adaptive question labels + micro-insight after save), 28-day heatmap, live stats strip (water includes food water_g), hub navigation cards (includes Monthly Wrap card)
-      monthly-wrap/page.js             Monthly Wrap — month picker, AI narrative card, stat grid (workouts/energy/mood/weight/calories/water); Generate button on first visit; cached forever per month
+      monthly-wrap/page.js             Monthly Wrap — month picker, AI narrative card, stat grid (workouts/energy/mood/weight/calories/water); Generate button on first visit; cached forever per month; grouped under Overview in sidebar
       health/
         page.js                        Health Overview — steps today, avg heart rate, sleep last night
         steps/page.js                  Step Tracker — hourly/weekly bar charts, goal progress, fixed tooltip
         sleep/page.js                  Sleep Tracker — stage breakdown bar, timeline chart, no-data state
-        water/page.js                  Drinks & Hydration — stacked hydration ring (water blue, beverages purple), quick-add water buttons (8/12/16/20/32 oz + custom), drink search (logs to food_log_entries meal_slot='drink'), saved drinks chips (my_foods is_drink=true) with Manage mode (edit name/nutrition/delete), combined today's log with ✏️ edit button on drink entries, caffeine tracker, hydration timing chart (18-bar hourly), 7-day bar chart; goal synced to goals_profiles.water_goal_oz
+        water/page.js                  Drinks & Hydration — stacked hydration ring (water blue, beverages purple), quick-add water buttons (8/12/16/20/32 oz + custom), drink search (logs to food_log_entries meal_slot='drink'), saved drinks chips (my_foods is_drink=true) with Manage mode (edit name/nutrition/delete), combined today's log with ✏️ edit button on drink entries, caffeine tracker, hydration timing chart (18-bar hourly), 7-day bar chart; goal synced to goals_profiles.water_goal_oz; listed under Nutrition in sidebar (not Health)
       goals/
         page.js                        Goals overview — AI overview panel, active goals chips, body metrics card (BMI + disclaimer + build label), lifestyle card (activity + daily steps + timeline), notes; Edit Goals button
         measurements/page.js           Body Measurements — how-to guide, log form (9 fields: weight/waist/hips/chest/neck/arms/thighs), history table with delta indicators, weight-over-time SVG chart; Progress Photos section (private Supabase Storage, lightbox, delete)
-        supplements/page.js            Supplement Stack — add/edit/remove supplements (name, dose, timing, optional nutrient content from label); 🤖 Info button fetches AI-generated card per supplement (cached in supplement_profiles); nutrient chips shown on each card; empty state with explainer
-        setup/page.js                  4-step goals onboarding: Step 1 Goals, Step 2 Your Body, Step 3 Starting Point, Step 4 Your Context (obstacles/motivations/why/diet/sleep); supports ?redirect= param
+        supplements/page.js            Supplement Stack — add/edit/remove supplements (name, dose, timing, optional nutrient content from label); 🤖 Info button fetches AI-generated card per supplement (cached in supplement_profiles); nutrient chips shown on each card; empty state with explainer; listed under Nutrition in sidebar (not Goals)
+        setup/page.js                  5-step goals onboarding; supports ?redirect= param
       workouts/
         page.js                        My Workout Plan — weekly plan cards sorted Mon-Sun, day reassignment, add/remove exercises with AI check-in, add/change cardio on rest days; Start Workout / ▶ Resume Workout / ✓ Done Today button logic per day; Add Exercise modal grouped by muscle group with ? detail popup; gates on goals profile
         setup/page.js                  7-step onboarding: experience, goals (multi-select), days, schedule, fitness check, cardio preferences, equipment; gates on goals profile
@@ -185,7 +195,7 @@ src/
       security-plus-labs.js            Security+ lab set — 4 labs, 20 steps — all steps have document arrays
   components/
     StudyHubSidebar.js                 Nav sidebar with test-in-progress guard
-    LifeHubSidebar.js                  Life Hub nav — Goals dropdown (My Goals + Measurements + Supplements + Setup), Health dropdown (Overview/Steps/Sleep/Drinks & Hydration), Workouts dropdown (My Plan + Workout History + Exercise Library); each auto-opens on active routes
+    LifeHubSidebar.js                  Life Hub nav — section color system (overview=purple, health=green, nutrition=orange, workouts=blue, goals=teal); Overview section (Dashboard + Monthly Wrap), Goals dropdown (Overview + Measurements + Setup), Health dropdown (Overview + Steps + Sleep), Nutrition dropdown (Food Log + Meal Plan + Encyclopedia + Hydration + Supplements), Workouts dropdown (My Plan + History + Exercise Library); Hydration and Supplements live under Nutrition group; auto-opens on active routes; SECTION_COLORS constant defines all section accent colors
     BookmarkModal.js                   Bookmark reason + notes modal
     DailyStreak.js                     30q/day streak tracker with 28-day calendar heatmap
     DomainTrend.js                     Per-domain score trend SVG chart (no library)
@@ -436,6 +446,7 @@ src/
 - **Phase 48b built:** AddFoodModal rewritten with 3 equal tabs (⭐ My Favorites | ✏️ Enter Manually | 🔍 Search Database) — manual entry is now first-class; "🍳 Build a Meal" moved into AddFoodModal as footer link on Favorites tab; tabs moved above calorie ring with 📅 Weekly Meal Plan as a proper tab; drinks filtered from meal favorites (`is_drink` flag); SavedFoodsTab and Food Log header cleaned up (Create Meal button removed); MealBuilderModal custom ingredient button styled prominently in purple
 - **Phase 46 built:** 3 new nutrients added to Encyclopedia (Omega-3, Vitamin K, Choline) — DB columns added to food_cache/my_foods/food_log_entries/meal_plan_entries, OFF extraction updated, food log routes updated; Recovery Score widget on Life Hub home — 5-component composite (sleep/hydration/protein/energy/workout load = 0–100), renders between Daily Brief and Check-In; Life Hub home water stat now includes beverage water_g from food entries
 - **Phase 47 built:** Stack Interactions card on Supplements page — rule-based timing warnings and synergy tips (Iron+Calcium clash, Iron+Vitamin C synergy, Caffeine+Iron morning conflict, Zinc high-dose copper depletion, Vitamin D fat absorption tip, Magnesium evening affirmation); Drink Timing chart on Hydration page — 18-bar hourly chart (5am–11pm) with smart callout when hydration is back-loaded or has a midday gap; Daily Brief upgraded with deep/REM sleep minutes from health_sleep_sessions.stages, and supplement interaction warnings injected into Claude's context
+- **Phase 49 (in progress):** Life Hub navigation restructure + visual identity system — section color theming (Overview=purple, Goals=teal, Health=green, Nutrition=orange, Workouts=blue); sidebar rebuilt with colored section headers, section-aware active states, and new grouping (Supplements + Hydration now under Nutrition, Monthly Wrap now under Overview); Sprint 2 (planned): AI Food Intelligence (ai_food_intel_cache table, Haiku-powered food lookup with cached profiles, servings-per-container, AI micronutrient autofill for OFFs gaps, AI fallback search, %DV↔amount toggle, weight-to-servings input, recency-sorted favorites)
 
 ### Google Health Integration
 - OAuth flow restricted to owner account only (`sethproper40@yahoo.com`) — 403 for all others

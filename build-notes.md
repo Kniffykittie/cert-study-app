@@ -267,7 +267,207 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Phase 49 — MASTER PLAN (In Progress)
+
+**Design Philosophy:** Progressive disclosure — surface what matters now, depth is one tap away and never more.
+**Core Goal:** Simple to scan, zero friction for daily use, AI fills in what you don't know.
+
+---
+
+#### NAVIGATION RESTRUCTURE (Sprint 1A)
+
+**Problem:** Water tracking is under Health but it's dietary intake. Supplements are under Goals but they're consumables. Monthly Wrap is a top-level nav item but it's a reporting feature. Every section looks identical — no visual identity, easy to get lost.
+
+**New section identity (colors already exist as CSS variables):**
+- 🔵 **Nutrition** (`--accent-blue`) = Everything you *consume*: food, water, beverages, supplements
+- 🟣 **Workouts** (`--accent-purple`) = Everything you *do* physically: plan, log, history, library
+- 🟢 **Health** (`--success`) = What your body *measures passively*: steps, sleep, heart rate (wearables only)
+- 🟡 **Goals** (`--warning`) = Where you *want to go*: targets, body measurements, progress photos, setup
+- **Overview** = Today's command center + Monthly Wrap (reporting, not a section)
+
+**Moves:**
+- `Drinks & Hydration` (currently Health → Water) → moves to **Nutrition** sidebar group
+- `Supplements` (currently Goals → Supplements) → moves to **Nutrition** sidebar group
+- `Monthly Wrap` (currently top-level) → moves under **Overview** group
+- All URLs stay the same — sidebar navigation is the only change (no route refactoring)
+
+**New Sidebar Structure:**
+```
+Overview
+Monthly Wrap (under Overview)
+
+🔵 Nutrition ▼
+  Food Log
+  My Favorites
+  Weekly Meal Plan
+  Encyclopedia
+  Drinks & Hydration  ← moved from Health
+  Supplements         ← moved from Goals
+
+🟣 Workouts ▼
+  My Plan
+  Workout History
+  Exercise Library
+
+🟢 Health ▼
+  Overview
+  Steps
+  Sleep
+
+🟡 Goals ▼
+  My Goals
+  Body Measurements
+  Setup
+```
+
+---
+
+#### VISUAL IDENTITY SYSTEM (Sprint 1B)
+
+**`--section-color` CSS variable** added to each section's layout component. Every element within a section references this variable for its accent color — page header, active tab underline, card left-border accent, button backgrounds.
+
+**LifeHubSidebar redesign:**
+- Section headers styled with their color (`--accent-blue` for Nutrition, etc.)
+- Active page item gets a colored left-border pill (2px solid `--section-color`)
+- Section header text is section-colored when open
+- No layout changes — same sidebar, new color application
+
+**Page header pattern (all Life Hub pages):**
+```
+[section-color h1 title]
+[text-secondary subtitle]
+[section-colored bottom border or accent line]
+```
+
+**Typography hierarchy (currently flat):**
+- Page title: 28px, section color
+- Section header within page: 16px, 700 weight, text-primary
+- Card label/meta: 11px, uppercase, 0.08em letter-spacing, text-secondary
+- Body: 13px, text-primary
+- Supporting: 11px, text-secondary
+
+**Card accent pattern:**
+Every card gets a 3px left border in `--section-color`. Gives each card a subtle identity marker even when far from the page header.
+
+---
+
+#### OVERVIEW DASHBOARD REDESIGN (Sprint 1C)
+
+**Replace the current stacked-cards overview with 3 zones:**
+
+**Zone 1 — Today's Status Bar (hero, always visible)**
+Four pills in one row, each section-colored:
+```
+🔵 1,240 / 2,793 kcal  |  🟣 Chest Day ✓  |  🟢 6,200 steps  |  🔵 48oz water
+```
+Answers "am I on track?" in 2 seconds. No scrolling required.
+
+**Zone 2 — Daily Brief (one focused insight, collapsed after first read)**
+Not a paragraph. One headline sentence: *"Recovery looks solid. You're 1,400 cal under target — unusual for a Tuesday."* Tap to expand full brief. Collapsed by default once read today.
+
+**Zone 3 — Section Summary Cards (2×2 grid)**
+Each card: section color accent, one hero metric, 7-day mini sparkline, one action button.
+```
+[🔵 Nutrition: 1,240 kcal · +Log meal]   [🟣 Workouts: Chest Day · +Start]
+[🟢 Health: 6,200 steps · 7h sleep]      [🟡 Goals: 182.4 lbs · ↓0.8 this week]
+```
+
+**Check-in and heatmap** move below the grid (supporting context, not primary).
+
+---
+
+#### NUTRITION AI INTELLIGENCE (Sprint 2)
+
+**New Supabase table: `ai_food_intel_cache`**
+```sql
+id, food_key TEXT UNIQUE (normalized name+brand), servings_per_container NUMERIC,
+package_note TEXT, estimated_nutrition JSONB, confidence TEXT, generated_at TIMESTAMPTZ
+RLS: SELECT open to all authenticated, INSERT/UPDATE owner only
+```
+
+**New API route: `POST /api/nutrition/ai-food-intel`**
+Accepts: `{ name, brand, serving_size_label, known_nutrition, request_types[] }`
+Returns: `{ servings_per_container, package_note, estimated_nutrition, confidence, source_note }`
+- Checks `ai_food_intel_cache` first (by normalized food_key)
+- On miss: single Claude call with structured prompt
+- Caches result permanently (food package sizes and nutrition don't change)
+- Claude model: claude-haiku-4-5 (fast, cheap — this runs on every food open)
+
+**Servings-per-container display:**
+- OFFs `quantity` field (total package weight) parsed first — if available, calculate without AI
+- Shown on food card: *"¾ cup (56g) · **8 servings per box**"*
+- **"Use whole container"** button: one tap sets servings = total package servings
+- AI fills it when OFFs `quantity` is missing
+
+**AI autofill missing micronutrients:**
+- Shown as button: *"🤖 Fill 7 missing fields"* when ingredient has gaps
+- Filled fields marked `~AI` with amber color, fully editable
+- `confidence` field shown: "High" (branded product with known nutrition) vs "Estimate" (generic)
+
+**AI fallback search:**
+- Triggers when OFFs returns < 2 results
+- Button: *"🤖 Ask Claude about '[query]'"*
+- Claude returns structured food object, asks one clarifying question if brand/variety ambiguous
+- Pre-fills manual entry form — user reviews and confirms
+
+**%DV ↔ Amount toggle:**
+- Global toggle on Enter Manually tab and ingredient editor: `[Enter as: amounts | % daily value]`
+- Uses existing `DV` constants object already in nutrition/page.js
+- "25" in %DV mode for calcium → stores 325mg
+- Toggle state persists in localStorage so user picks once
+
+**Weight-to-servings input:**
+- Parse gram weight from serving size label regex: `/\((\d+\.?\d*)\s*g\)/i`
+- If found, show secondary input below servings: *"or [____] g total"*
+- Updates servings = entered_g / serving_g in real time
+- Shown alongside the normal servings input, not replacing it
+
+**Sort My Favorites by recency + frequency:**
+- Add `last_logged_at TIMESTAMPTZ` and `log_count INT DEFAULT 0` to `my_foods` table
+- `log/route.js` POST handler updates `last_logged_at = NOW()` and increments `log_count` on the referenced `my_food_id` when logging
+- My Favorites sorted: first by `last_logged_at` DESC (within last 30 days), then `log_count` DESC
+
+**Quick-log from Meal Plan (stretch goal Sprint 2):**
+- If today has a planned meal and it's the relevant meal time window (breakfast 6-10am, lunch 11-2pm, dinner 5-9pm), show soft suggestion in Food Log: *"You planned [meal] for [slot]. [Log 1 srv] [Log 2 srv] [Skip]"*
+
+---
+
+#### CONTEXTUAL INTELLIGENCE (Sprint 3)
+
+**"What's next" banners (rule-based, not AI):**
+- 1pm and lunch has 0 entries: *"You haven't logged lunch yet."* with quick-add button
+- Water < 30% of goal after 2pm: *"You're behind on water — you usually hit 60% by now."*
+- 3+ hours since last food log and calories < 60% of target: *"Long gap since your last meal."*
+- All dismissible per-day, stored in localStorage
+
+**Empty states that guide:**
+- Replace all *"Nothing logged yet."* with actionable prompts:
+  - Breakfast slot: *"Start your day — log breakfast"* [+ Add]
+  - My Favorites empty: *"Add the foods you eat regularly for one-tap logging."* [+ Add a Favorite]
+  - All meal slots empty: *"Tap any meal slot to start logging."*
+
+---
+
+#### BUILD ORDER & DEPENDENCIES
+
+| Sprint | Work | Dependencies |
+|---|---|---|
+| 1A | Sidebar restructure + nav grouping | None |
+| 1B | Section color system | 1A |
+| 1C | Overview dashboard | 1B |
+| 2A | `ai_food_intel_cache` table + API route | None (parallel with 1x) |
+| 2B | Servings-per-container display + "Use whole container" | 2A |
+| 2C | AI autofill missing nutrients + `~AI` markers | 2A |
+| 2D | AI fallback search | 2A |
+| 2E | %DV toggle | None |
+| 2F | Weight-to-servings input | None |
+| 2G | Sort My Favorites by recency | DB migration |
+| 3A | Contextual banners + improved empty states | 1A |
+
+---
+
 ### Phase 48b - Complete
+
 - **AddFoodModal rewritten with 3 equal tabs**: "⭐ My Favorites" (default) | "✏️ Enter Manually" | "🔍 Search Database" — Manual entry is now a first-class tab, not a secondary button buried in the search flow
 - **Create a Meal moved into AddFoodModal**: Now a subtle footer link ("🍳 Build a Meal from Multiple Ingredients") at the bottom of the My Favorites tab instead of a button in the Food Log header
 - **Tabs moved to top of Nutrition page**: Tabs now appear immediately after the page header (before the calorie ring), with "📅 Weekly Meal Plan" added as a proper tab (link to /meal-plan), replacing the old sidebar link

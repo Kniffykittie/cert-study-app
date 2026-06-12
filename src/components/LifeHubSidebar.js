@@ -4,6 +4,14 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
+const SECTION_COLORS = {
+  overview: '#a78bfa',
+  health: '#22c55e',
+  nutrition: '#f97316',
+  workouts: '#3b82f6',
+  goals: '#06b6d4',
+}
+
 function getLastMonth() {
   const now = new Date()
   const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
@@ -44,16 +52,12 @@ export default function LifeHubSidebar() {
     const autoGenKey = `wrap_autogen_${lastMonth}`
 
     async function checkAndNotify() {
-      // Get account creation month to guard against pre-account generation
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const accountSince = user.created_at.slice(0, 7)
-
-      // Last month must be at or after account creation — no point generating otherwise
       if (lastMonth < accountSince) return
 
-      // On the 1st of the month, auto-generate last month's wrap if not done yet
       if (isFirstOfMonth && !localStorage.getItem(autoGenKey)) {
         localStorage.setItem(autoGenKey, '1')
         const check = await fetch(`/api/life-hub/monthly-wrap?month=${lastMonth}`).then(r => r.json()).catch(() => ({}))
@@ -68,7 +72,6 @@ export default function LifeHubSidebar() {
         }
       }
 
-      // Show notification if wrap exists and hasn't been dismissed this month
       const dismissKey = `wrap_notified_${lastMonth}`
       if (localStorage.getItem(dismissKey)) return
       if (pathname === '/life-hub/monthly-wrap') return
@@ -86,7 +89,7 @@ export default function LifeHubSidebar() {
     if (pathname.startsWith('/life-hub/health')) setHealthOpen(true)
     if (pathname.startsWith('/life-hub/workouts')) setWorkoutsOpen(true)
     if (pathname.startsWith('/life-hub/goals')) setGoalsOpen(true)
-    if (pathname.startsWith('/life-hub/nutrition')) setNutritionOpen(true)
+    if (pathname.startsWith('/life-hub/nutrition') || pathname.startsWith('/life-hub/goals/supplements') || pathname.startsWith('/life-hub/health/water')) setNutritionOpen(true)
   }, [pathname])
 
   function dismissWrap() {
@@ -101,29 +104,50 @@ export default function LifeHubSidebar() {
 
   const initial = displayName ? displayName[0].toUpperCase() : '?'
 
-  const navLink = (label, href) => {
+  const navLink = (label, href, color = SECTION_COLORS.overview) => {
     const active = pathname === href
     return (
       <Link key={href} href={href}
-        style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', textDecoration: 'none', display: 'block', backgroundColor: active ? 'rgba(123,47,190,0.12)' : 'transparent', color: active ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: active ? '600' : '400', borderLeft: active ? '2px solid var(--accent-purple)' : '2px solid transparent' }}
-        onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.08)' }}
+        style={{ padding: '7px 12px', borderRadius: '6px', fontSize: '13px', textDecoration: 'none', display: 'block', backgroundColor: active ? `${color}1a` : 'transparent', color: active ? color : 'var(--text-secondary)', fontWeight: active ? '600' : '400', borderLeft: active ? `2px solid ${color}` : '2px solid transparent' }}
+        onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = `${color}0d` }}
         onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}>
         {label}
       </Link>
     )
   }
 
-  const healthActive = pathname.startsWith('/life-hub/health')
+  const sectionHeader = (label, color) => (
+    <div style={{ fontSize: '10px', fontWeight: '700', color, padding: '12px 12px 4px', letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: '4px' }}>
+      {label}
+    </div>
+  )
+
+  const dropdownHeader = (label, isOpen, setOpen, isActive, color) => (
+    <div
+      onClick={() => setOpen(o => !o)}
+      style={{ padding: '7px 12px', borderRadius: '6px', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: isActive && !isOpen ? `${color}1a` : 'transparent', color: isActive ? color : 'var(--text-secondary)', fontWeight: isActive ? '600' : '400', borderLeft: isActive ? `2px solid ${color}` : '2px solid transparent' }}
+      onMouseEnter={e => { if (!isActive) e.currentTarget.style.backgroundColor = `${color}0d` }}
+      onMouseLeave={e => { if (!isActive) e.currentTarget.style.backgroundColor = isActive && !isOpen ? `${color}1a` : 'transparent' }}
+    >
+      <span>{label}</span>
+      <span style={{ fontSize: '9px', transition: 'transform 0.2s', display: 'inline-block', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', color: isActive ? color : 'var(--text-secondary)' }}>▼</span>
+    </div>
+  )
+
+  const overviewActive = pathname === '/life-hub' || pathname === '/life-hub/monthly-wrap'
+  const healthActive = pathname.startsWith('/life-hub/health') && pathname !== '/life-hub/health/water'
+  const nutritionActive = pathname.startsWith('/life-hub/nutrition') || pathname === '/life-hub/goals/supplements' || pathname === '/life-hub/health/water'
+  const workoutsActive = pathname.startsWith('/life-hub/workouts')
+  const goalsActive = pathname.startsWith('/life-hub/goals') && pathname !== '/life-hub/goals/supplements'
 
   return (
     <>
-      {/* Monthly Wrap notification */}
       {wrapNotify && (
-        <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 500, backgroundColor: 'var(--surface)', border: '1px solid var(--accent-purple)', borderRadius: '14px', padding: '18px 20px', maxWidth: '300px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+        <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 500, backgroundColor: 'var(--surface)', border: `1px solid ${SECTION_COLORS.overview}`, borderRadius: '14px', padding: '18px 20px', maxWidth: '300px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '20px' }}>📅</span>
-              <span style={{ color: 'var(--accent-purple)', fontWeight: '700', fontSize: '14px' }}>Monthly Wrap is Ready</span>
+              <span style={{ color: SECTION_COLORS.overview, fontWeight: '700', fontSize: '14px' }}>Monthly Wrap is Ready</span>
             </div>
             <button onClick={dismissWrap}
               style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1, padding: '0 0 0 8px', flexShrink: 0 }}>✕</button>
@@ -132,135 +156,83 @@ export default function LifeHubSidebar() {
             Your {monthLabel(getLastMonth())} summary is ready — workouts, energy, weight, and your AI wrap-up.
           </p>
           <button onClick={goToWrap}
-            style={{ width: '100%', backgroundColor: 'var(--accent-purple)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+            style={{ width: '100%', backgroundColor: SECTION_COLORS.overview, border: 'none', color: '#fff', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
             Take me there →
           </button>
         </div>
       )}
 
-      <aside style={{ width: '220px', minHeight: '100vh', backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '16px 12px', gap: '4px', flexShrink: 0 }}>
-      <div style={{ backgroundColor: '#0A0A0A', borderRadius: '8px', padding: '8px 12px', marginBottom: '8px', textAlign: 'center', fontWeight: '700', fontSize: '20px', color: 'var(--accent-purple)' }}>
-        CSA
-      </div>
-
-      <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', marginBottom: '8px' }}
-        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.08)'}
-        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-        ← Home
-      </Link>
-
-      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '4px 12px', marginBottom: '4px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Life Hub</div>
-
-      {navLink('Overview', '/life-hub')}
-
-      {/* Goals dropdown */}
-      {(() => {
-        const goalsActive = pathname.startsWith('/life-hub/goals')
-        return (
-          <div>
-            <div
-              onClick={() => setGoalsOpen(o => !o)}
-              style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: goalsActive && !goalsOpen ? 'rgba(123,47,190,0.12)' : 'transparent', color: goalsActive ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: goalsActive ? '600' : '400', borderLeft: goalsActive ? '2px solid var(--accent-purple)' : '2px solid transparent' }}
-              onMouseEnter={e => { if (!goalsActive) e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.08)' }}
-              onMouseLeave={e => { if (!goalsActive) e.currentTarget.style.backgroundColor = goalsActive && !goalsOpen ? 'rgba(123,47,190,0.12)' : 'transparent' }}
-            >
-              <span>Goals</span>
-              <span style={{ fontSize: '10px', transition: 'transform 0.2s', display: 'inline-block', transform: goalsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
-            </div>
-            {goalsOpen && (
-              <div style={{ paddingLeft: '12px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                {navLink('My Goals', '/life-hub/goals')}
-                {navLink('Measurements', '/life-hub/goals/measurements')}
-                {navLink('Supplements', '/life-hub/goals/supplements')}
-                {navLink('Setup', '/life-hub/goals/setup')}
-              </div>
-            )}
-          </div>
-        )
-      })()}
-
-      {/* Health dropdown */}
-      <div>
-        <div
-          onClick={() => setHealthOpen(o => !o)}
-          style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: healthActive && !healthOpen ? 'rgba(123,47,190,0.12)' : 'transparent', color: healthActive ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: healthActive ? '600' : '400', borderLeft: healthActive ? '2px solid var(--accent-purple)' : '2px solid transparent' }}
-          onMouseEnter={e => { if (!healthActive) e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.08)' }}
-          onMouseLeave={e => { if (!healthActive) e.currentTarget.style.backgroundColor = healthActive && !healthOpen ? 'rgba(123,47,190,0.12)' : 'transparent' }}
-        >
-          <span>Health</span>
-          <span style={{ fontSize: '10px', transition: 'transform 0.2s', display: 'inline-block', transform: healthOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+      <aside style={{ width: '220px', minHeight: '100vh', backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '12px 8px', gap: '2px', flexShrink: 0, overflowY: 'auto' }}>
+        <div style={{ backgroundColor: '#0A0A0A', borderRadius: '8px', padding: '8px 12px', marginBottom: '8px', textAlign: 'center', fontWeight: '700', fontSize: '20px', color: SECTION_COLORS.overview }}>
+          CSA
         </div>
-        {healthOpen && (
-          <div style={{ paddingLeft: '12px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {navLink('Overview', '/life-hub/health')}
-            {navLink('Step Tracker', '/life-hub/health/steps')}
-            {navLink('Sleep Tracker', '/life-hub/health/sleep')}
-            {navLink('Drinks & Hydration', '/life-hub/health/water')}
+
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', marginBottom: '4px' }}
+          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(167,139,250,0.08)'}
+          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+          ← Home
+        </Link>
+
+        {/* OVERVIEW */}
+        {sectionHeader('Overview', SECTION_COLORS.overview)}
+        {navLink('Dashboard', '/life-hub', SECTION_COLORS.overview)}
+        {navLink('Monthly Wrap', '/life-hub/monthly-wrap', SECTION_COLORS.overview)}
+
+        {/* BODY & GOALS */}
+        {sectionHeader('Goals', SECTION_COLORS.goals)}
+        {dropdownHeader('My Goals', goalsOpen, setGoalsOpen, goalsActive, SECTION_COLORS.goals)}
+        {goalsOpen && (
+          <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+            {navLink('Overview', '/life-hub/goals', SECTION_COLORS.goals)}
+            {navLink('Measurements', '/life-hub/goals/measurements', SECTION_COLORS.goals)}
+            {navLink('Setup', '/life-hub/goals/setup', SECTION_COLORS.goals)}
           </div>
         )}
-      </div>
 
-      {/* Nutrition dropdown */}
-      {(() => {
-        const nutritionActive = pathname.startsWith('/life-hub/nutrition')
-        return (
-          <div>
-            <div
-              onClick={() => setNutritionOpen(o => !o)}
-              style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: nutritionActive && !nutritionOpen ? 'rgba(123,47,190,0.12)' : 'transparent', color: nutritionActive ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: nutritionActive ? '600' : '400', borderLeft: nutritionActive ? '2px solid var(--accent-purple)' : '2px solid transparent' }}
-              onMouseEnter={e => { if (!nutritionActive) e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.08)' }}
-              onMouseLeave={e => { if (!nutritionActive) e.currentTarget.style.backgroundColor = nutritionActive && !nutritionOpen ? 'rgba(123,47,190,0.12)' : 'transparent' }}
-            >
-              <span>Nutrition</span>
-              <span style={{ fontSize: '10px', transition: 'transform 0.2s', display: 'inline-block', transform: nutritionOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
-            </div>
-            {nutritionOpen && (
-              <div style={{ paddingLeft: '12px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                {navLink('Food Log', '/life-hub/nutrition')}
-                {navLink('Meal Plan', '/life-hub/nutrition/meal-plan')}
-                {navLink('Encyclopedia', '/life-hub/nutrition/encyclopedia')}
-              </div>
-            )}
+        {/* HEALTH */}
+        {sectionHeader('Health', SECTION_COLORS.health)}
+        {dropdownHeader('Health Tracking', healthOpen, setHealthOpen, healthActive, SECTION_COLORS.health)}
+        {healthOpen && (
+          <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+            {navLink('Overview', '/life-hub/health', SECTION_COLORS.health)}
+            {navLink('Step Tracker', '/life-hub/health/steps', SECTION_COLORS.health)}
+            {navLink('Sleep Tracker', '/life-hub/health/sleep', SECTION_COLORS.health)}
           </div>
-        )
-      })()}
+        )}
 
-      {navLink('Monthly Wrap', '/life-hub/monthly-wrap')}
-
-      {/* Workouts dropdown */}
-      {(() => {
-        const workoutsActive = pathname.startsWith('/life-hub/workouts')
-        return (
-          <div>
-            <div
-              onClick={() => setWorkoutsOpen(o => !o)}
-              style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: workoutsActive && !workoutsOpen ? 'rgba(123,47,190,0.12)' : 'transparent', color: workoutsActive ? 'var(--accent-purple)' : 'var(--text-secondary)', fontWeight: workoutsActive ? '600' : '400', borderLeft: workoutsActive ? '2px solid var(--accent-purple)' : '2px solid transparent' }}
-              onMouseEnter={e => { if (!workoutsActive) e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.08)' }}
-              onMouseLeave={e => { if (!workoutsActive) e.currentTarget.style.backgroundColor = workoutsActive && !workoutsOpen ? 'rgba(123,47,190,0.12)' : 'transparent' }}
-            >
-              <span>Workouts</span>
-              <span style={{ fontSize: '10px', transition: 'transform 0.2s', display: 'inline-block', transform: workoutsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
-            </div>
-            {workoutsOpen && (
-              <div style={{ paddingLeft: '12px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                {navLink('My Plan', '/life-hub/workouts')}
-                {navLink('Workout History', '/life-hub/workouts/history')}
-                {navLink('Exercise Library', '/life-hub/workouts/exercises')}
-              </div>
-            )}
+        {/* NUTRITION */}
+        {sectionHeader('Nutrition', SECTION_COLORS.nutrition)}
+        {dropdownHeader('Food & Nutrition', nutritionOpen, setNutritionOpen, nutritionActive, SECTION_COLORS.nutrition)}
+        {nutritionOpen && (
+          <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+            {navLink('Food Log', '/life-hub/nutrition', SECTION_COLORS.nutrition)}
+            {navLink('Meal Plan', '/life-hub/nutrition/meal-plan', SECTION_COLORS.nutrition)}
+            {navLink('Encyclopedia', '/life-hub/nutrition/encyclopedia', SECTION_COLORS.nutrition)}
+            {navLink('Hydration', '/life-hub/health/water', SECTION_COLORS.nutrition)}
+            {navLink('Supplements', '/life-hub/goals/supplements', SECTION_COLORS.nutrition)}
           </div>
-        )
-      })()}
+        )}
 
-      <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
-        <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '6px', textDecoration: 'none' }}
-          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(123,47,190,0.08)'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--accent-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', flexShrink: 0 }}>{initial}</div>
-          <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{displayName || 'Account'}</span>
-        </Link>
-      </div>
-    </aside>
+        {/* WORKOUTS */}
+        {sectionHeader('Workouts', SECTION_COLORS.workouts)}
+        {dropdownHeader('My Workouts', workoutsOpen, setWorkoutsOpen, workoutsActive, SECTION_COLORS.workouts)}
+        {workoutsOpen && (
+          <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+            {navLink('My Plan', '/life-hub/workouts', SECTION_COLORS.workouts)}
+            {navLink('Workout History', '/life-hub/workouts/history', SECTION_COLORS.workouts)}
+            {navLink('Exercise Library', '/life-hub/workouts/exercises', SECTION_COLORS.workouts)}
+          </div>
+        )}
+
+        <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '12px', marginTop: '16px' }}>
+          <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '6px', textDecoration: 'none' }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(167,139,250,0.08)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: SECTION_COLORS.overview, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', flexShrink: 0, color: '#fff' }}>{initial}</div>
+            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{displayName || 'Account'}</span>
+          </Link>
+        </div>
+      </aside>
     </>
   )
 }
