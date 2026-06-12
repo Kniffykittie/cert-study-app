@@ -1046,7 +1046,149 @@ const MEAL_NUTRITION_KEYS = [
   'caffeine_mg','water_g','omega3_g','vitamin_k_mcg','choline_mg',
 ]
 
-function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, todayEntries, workoutCtx }) {
+const CORE_MACRO_KEYS = ['calories','protein_g','carbs_g','fat_g']
+const TRACKED_MICRO_KEYS = ['fiber_g','sugar_g','sodium_mg','saturated_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','omega3_g','vitamin_k_mcg','choline_mg']
+
+function foodCompleteness(food) {
+  const missingMacro = CORE_MACRO_KEYS.some(k => food[k] == null)
+  if (missingMacro) return 'minimal'
+  const microCount = TRACKED_MICRO_KEYS.filter(k => food[k] != null).length
+  return microCount >= 6 ? 'complete' : 'partial'
+}
+
+function EditFoodModal({ food, onClose, onSave }) {
+  const ALL_NUM_KEYS = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg','saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','caffeine_mg','water_g','omega3_g','vitamin_k_mcg','choline_mg']
+  const toForm = f => {
+    const obj = { name: f.name || '', brand: f.brand || '', serving_size_label: f.serving_size_label || '1 serving', servings_per_container: f.servings_per_container != null ? String(f.servings_per_container) : '' }
+    for (const k of ALL_NUM_KEYS) obj[k] = f[k] != null ? String(f[k]) : ''
+    return obj
+  }
+  const [form, setForm] = useState(() => toForm(food))
+  const [saving, setSaving] = useState(false)
+  const [microFilling, setMicroFilling] = useState(false)
+  const [aiFilledFields, setAiFilledFields] = useState(new Set())
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  async function handleMicroFill() {
+    if (microFilling) return
+    setMicroFilling(true)
+    const res = await fetch('/api/nutrition/ai-micro-fill', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: food.name, brand: food.brand, calories: food.calories, protein_g: food.protein_g, carbs_g: food.carbs_g, fat_g: food.fat_g }),
+    })
+    const data = await res.json()
+    setMicroFilling(false)
+    if (!data.micros) return
+    const filled = new Set()
+    setForm(prev => {
+      const next = { ...prev }
+      for (const k of TRACKED_MICRO_KEYS) {
+        if (data.micros[k] != null && (prev[k] === '' || prev[k] == null)) {
+          next[k] = String(data.micros[k])
+          filled.add(k)
+        }
+      }
+      return next
+    })
+    setAiFilledFields(filled)
+  }
+
+  async function handleSave() {
+    if (!form.name.trim()) return
+    setSaving(true)
+    const body = { id: food.id, name: form.name, brand: form.brand || null, serving_size_label: form.serving_size_label || '1 serving', servings_per_container: form.servings_per_container !== '' ? parseFloat(form.servings_per_container) : null }
+    for (const k of ALL_NUM_KEYS) body[k] = form[k] !== '' ? Number(form[k]) || null : null
+    const res = await fetch('/api/nutrition/my-foods', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const data = await res.json()
+    setSaving(false)
+    if (data.food) onSave(data.food)
+  }
+
+  const missingMicros = TRACKED_MICRO_KEYS.filter(k => form[k] === '' || form[k] == null)
+
+  const fieldRow = (key, label, type = 'number') => (
+    <div key={key} style={{ display: 'grid', gridTemplateColumns: '160px 1fr', alignItems: 'center', gap: '10px' }}>
+      <label style={{ color: aiFilledFields.has(key) ? 'var(--warning)' : 'var(--text-secondary)', fontSize: '12px' }}>{label}{aiFilledFields.has(key) ? ' 🤖' : ''}</label>
+      <input type={type} value={form[key]} placeholder="0" onChange={e => { set(key, e.target.value); setAiFilledFields(s => { const n = new Set(s); n.delete(key); return n }) }}
+        style={{ backgroundColor: aiFilledFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiFilledFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+    </div>
+  )
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '16px' }}>
+      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', width: '100%', maxWidth: '520px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '16px 20px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', margin: 0 }}>✏️ Edit Favorite</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '22px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {[{ key: 'name', label: 'Name *', type: 'text' }, { key: 'brand', label: 'Brand', type: 'text' }, { key: 'serving_size_label', label: 'Serving Size', type: 'text' }, { key: 'servings_per_container', label: 'Servings/Container' }].map(({ key, label, type }) => (
+              <div key={key} style={{ display: 'grid', gridTemplateColumns: '160px 1fr', alignItems: 'center', gap: '10px' }}>
+                <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
+                <input type={type || 'number'} value={form[key]} onChange={e => set(key, e.target.value)}
+                  style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
+              </div>
+            ))}
+
+            <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Macros</div>
+            {fieldRow('calories', 'Calories')}
+            {fieldRow('protein_g', 'Protein (g)')}
+            {fieldRow('carbs_g', 'Carbs (g)')}
+            {fieldRow('fat_g', 'Fat (g)')}
+            {fieldRow('fiber_g', 'Fiber (g)')}
+            {fieldRow('sugar_g', 'Sugar (g)')}
+
+            <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Fats & Cholesterol</div>
+            {fieldRow('saturated_fat_g', 'Saturated Fat (g)')}
+            {fieldRow('trans_fat_g', 'Trans Fat (g)')}
+            {fieldRow('cholesterol_mg', 'Cholesterol (mg)')}
+
+            <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Minerals</div>
+            {fieldRow('sodium_mg', 'Sodium (mg)')}
+            {fieldRow('potassium_mg', 'Potassium (mg)')}
+            {fieldRow('calcium_mg', 'Calcium (mg)')}
+            {fieldRow('iron_mg', 'Iron (mg)')}
+            {fieldRow('magnesium_mg', 'Magnesium (mg)')}
+            {fieldRow('zinc_mg', 'Zinc (mg)')}
+
+            <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Vitamins</div>
+            {fieldRow('vitamin_a_mcg', 'Vitamin A (mcg)')}
+            {fieldRow('vitamin_c_mg', 'Vitamin C (mg)')}
+            {fieldRow('vitamin_d_mcg', 'Vitamin D (mcg)')}
+            {fieldRow('vitamin_b12_mcg', 'Vitamin B12 (mcg)')}
+            {fieldRow('vitamin_b6_mg', 'Vitamin B6 (mg)')}
+            {fieldRow('folate_mcg', 'Folate (mcg)')}
+            {fieldRow('omega3_g', 'Omega-3 (g)')}
+            {fieldRow('vitamin_k_mcg', 'Vitamin K (mcg)')}
+            {fieldRow('choline_mg', 'Choline (mg)')}
+
+            <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Other</div>
+            {fieldRow('caffeine_mg', 'Caffeine (mg)')}
+            {fieldRow('water_g', 'Water (g)')}
+          </div>
+        </div>
+
+        <div style={{ padding: '12px 20px 18px', borderTop: '1px solid var(--border)', flexShrink: 0, display: 'flex', gap: '8px' }}>
+          {missingMicros.length > 0 && (
+            <button onClick={handleMicroFill} disabled={microFilling}
+              style={{ backgroundColor: 'rgba(167,139,250,0.12)', color: 'var(--accent-purple)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', fontWeight: '600', cursor: microFilling ? 'default' : 'pointer', opacity: microFilling ? 0.6 : 1, flexShrink: 0 }}>
+              {microFilling ? '🤖 Estimating...' : `🤖 Fill ${missingMicros.length} missing`}
+            </button>
+          )}
+          <button onClick={handleSave} disabled={!form.name.trim() || saving}
+            style={{ flex: 1, backgroundColor: form.name.trim() ? 'var(--accent-blue)' : 'var(--border)', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: '600', cursor: form.name.trim() ? 'pointer' : 'default', opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Saving...' : '✓ Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, onEdit, todayEntries, workoutCtx }) {
   const [expandedId, setExpandedId] = useState(null)
   const [logServings, setLogServings] = useState('1')
 
@@ -1112,6 +1254,12 @@ function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, t
     const calPreview = f.calories != null ? Math.round(f.calories * sv) : null
     const todayCount = (todayEntries || []).filter(e => e.my_food_id === f.id).length
     const freqLabel = getFrequencyLabel(f)
+    const completeness = foodCompleteness(f)
+    const completenessStyle = completeness === 'complete'
+      ? { color: 'var(--success)', bg: 'rgba(46,204,113,0.1)', label: '✓' }
+      : completeness === 'partial'
+      ? { color: 'var(--warning)', bg: 'rgba(241,196,15,0.1)', label: '⚠' }
+      : { color: 'var(--error)', bg: 'rgba(231,76,60,0.1)', label: '✗' }
 
     return (
       <div key={f.id} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', border: isExpanded ? '1px solid var(--accent-blue)' : f.is_pinned ? '1px solid rgba(241,196,15,0.25)' : '1px solid transparent', overflow: 'hidden' }}>
@@ -1127,6 +1275,10 @@ function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, t
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
+              <span title={completeness === 'complete' ? 'All macros + 6+ micros filled' : completeness === 'partial' ? 'All macros filled, few micros' : 'Missing core macros'}
+                style={{ fontSize: '10px', color: completenessStyle.color, backgroundColor: completenessStyle.bg, borderRadius: '10px', padding: '1px 6px', flexShrink: 0, fontWeight: '700', cursor: 'default' }}>
+                {completenessStyle.label}
+              </span>
               {todayCount > 0 && (
                 <span style={{ fontSize: '10px', color: 'var(--success)', backgroundColor: 'rgba(46,204,113,0.12)', borderRadius: '10px', padding: '1px 6px', flexShrink: 0, fontWeight: '700' }}>
                   ✓ {todayCount}× today
@@ -1154,6 +1306,8 @@ function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, t
                 ↺
               </button>
             )}
+            <button onClick={() => onEdit(f)} title="Edit nutrition info"
+              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>✏️</button>
             <button onClick={() => handleLogClick(f.id)}
               style={{ backgroundColor: isExpanded ? 'transparent' : 'rgba(0,128,255,0.12)', color: isExpanded ? 'var(--text-secondary)' : 'var(--accent-blue)', border: isExpanded ? '1px solid var(--border)' : 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
               {isExpanded ? 'Cancel' : 'Log'}
@@ -1193,12 +1347,23 @@ function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, t
     )
   }
 
+  const completeCount = myFoods.filter(f => foodCompleteness(f) === 'complete').length
+  const partialCount = myFoods.filter(f => foodCompleteness(f) === 'partial').length
+  const minimalCount = myFoods.filter(f => foodCompleteness(f) === 'minimal').length
+
   return (
     <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
         <div>
           <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', margin: '0 0 4px' }}>My Favorites</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>📌 to pin · ↺ to repeat · Log to pick a meal</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 4px' }}>📌 to pin · ✏️ to edit · ↺ to repeat · Log to pick a meal</p>
+          {myFoods.length > 0 && (
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {completeCount > 0 && <span style={{ fontSize: '10px', color: 'var(--success)', fontWeight: '600' }}>✓ {completeCount} complete</span>}
+              {partialCount > 0 && <span style={{ fontSize: '10px', color: 'var(--warning)', fontWeight: '600' }}>⚠ {partialCount} partial</span>}
+              {minimalCount > 0 && <span style={{ fontSize: '10px', color: 'var(--error)', fontWeight: '600' }}>✗ {minimalCount} minimal</span>}
+            </div>
+          )}
         </div>
         <button onClick={onOpenLibrary}
           style={{ backgroundColor: 'rgba(167,139,250,0.12)', color: 'var(--accent-purple)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '8px', padding: '7px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -1632,6 +1797,7 @@ export default function NutritionPage() {
   const [logModal, setLogModal] = useState(null)
   const [libraryModal, setLibraryModal] = useState(false)
   const [mealBuilderModal, setMealBuilderModal] = useState(false)
+  const [editingFood, setEditingFood] = useState(null)
   const [activeTab, setActiveTab] = useState('log')
   const [microOpen, setMicroOpen] = useState(false)
   const [todayWorkout, setTodayWorkout] = useState(null)
@@ -1734,6 +1900,11 @@ export default function NutritionPage() {
     setMyFoods(prev => prev.filter(f => f.id !== id))
   }
 
+  async function handleEditMyFood(updatedFood) {
+    setMyFoods(prev => prev.map(f => f.id === updatedFood.id ? updatedFood : f))
+    setEditingFood(null)
+  }
+
   async function handleTdeeAction(action) {
     if (!tdeeSuggestion) return
     await fetch('/api/nutrition/tdee-check', {
@@ -1811,6 +1982,9 @@ export default function NutritionPage() {
         <MealBuilderModal onClose={() => setMealBuilderModal(false)} onSave={food => {
           setMyFoods(prev => [...prev, food])
         }} />
+      )}
+      {editingFood && (
+        <EditFoodModal food={editingFood} onClose={() => setEditingFood(null)} onSave={handleEditMyFood} />
       )}
 
       <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2043,7 +2217,7 @@ export default function NutritionPage() {
       {/* Saved Foods Tab */}
       {activeTab === 'myfoods' && (
         <SavedFoodsTab myFoods={mealFoods} onDirectLog={handleAddEntry} onDelete={handleDeleteMyFood}
-          onPin={handlePinMyFood} todayEntries={entries} onOpenLibrary={() => setLibraryModal(true)} workoutCtx={workoutCtx} />
+          onPin={handlePinMyFood} onEdit={setEditingFood} todayEntries={entries} onOpenLibrary={() => setLibraryModal(true)} workoutCtx={workoutCtx} />
       )}
 
       {/* Supplements Tab */}
