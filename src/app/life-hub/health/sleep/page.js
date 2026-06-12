@@ -21,6 +21,7 @@ export default function SleepTrackerPage() {
   const [syncing, setSyncing] = useState(false)
   const [tooltip, setTooltip] = useState(null)
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+  const [showWhy, setShowWhy] = useState(false)
 
   const handleMouseMove = useCallback((e) => setMousePos({ x: e.clientX, y: e.clientY }), [])
 
@@ -92,7 +93,29 @@ export default function SleepTrackerPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <h1 style={{ color: '#22c55e', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Sleep Tracker</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Last night's sleep from Google Pixel Watch 4</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Last night's sleep from Google Pixel Watch 4</p>
+            <button onClick={() => setShowWhy(o => !o)}
+              style={{ background: 'none', border: '1px solid #22c55e44', borderRadius: '20px', color: '#22c55e', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
+              ℹ️ Why track this?
+            </button>
+          </div>
+          {showWhy && (
+            <div style={{ marginTop: '12px', backgroundColor: '#22c55e0d', border: '1px solid #22c55e30', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Why sleep data changes your whole dashboard</div>
+              {[
+                { icon: '⚡', text: 'Sleep is worth 25 of 100 points in your Recovery Score — more than any other single factor. 8 hours earns the full 25; under 5 hours earns 0. It\'s the biggest lever you have for improving your score.' },
+                { icon: '🧠', text: 'Short sleep (under 6 hours) triggers a smarter Daily Check-In — the Energy question becomes "Mental Sharpness" with labels like "Brain fog → Locked in" because the app knows your context.' },
+                { icon: '🤖', text: 'Deep sleep and REM minutes from your watch feed directly into the Daily Brief. When you slept poorly, the AI knows — it references your actual sleep hours, not a guess.' },
+                { icon: '📊', text: 'Sleep data comes from Google Health (your connected Pixel Watch). If you\'re not seeing data, use the Refresh button or reconnect via Health Overview → Connect Google Health.' },
+              ].map(({ icon, text }) => (
+                <div key={icon} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '14px', flexShrink: 0 }}>{icon}</span>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>{text}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <button onClick={handleSync} disabled={syncing}
           style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: syncing ? 'not-allowed' : 'pointer', opacity: syncing ? 0.6 : 1 }}>

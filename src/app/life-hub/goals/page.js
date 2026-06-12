@@ -46,6 +46,7 @@ export default function GoalsPage() {
   const [loading, setLoading] = useState(true)
   const [regenerating, setRegenerating] = useState(false)
   const [regenMsg, setRegenMsg] = useState('')
+  const [showWhy, setShowWhy] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -106,7 +107,29 @@ export default function GoalsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#06b6d4', margin: 0 }}>My Goals</h1>
-          <p style={{ color: 'var(--text-secondary)', marginTop: '6px', fontSize: '14px' }}>Your personal profile powers AI recommendations across the Life Hub.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '6px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>Your personal profile powers AI recommendations across the Life Hub.</p>
+            <button onClick={() => setShowWhy(o => !o)}
+              style={{ background: 'none', border: '1px solid #06b6d444', borderRadius: '20px', color: '#06b6d4', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
+              ℹ️ How this works
+            </button>
+          </div>
+          {showWhy && (
+            <div style={{ marginTop: '12px', backgroundColor: '#06b6d40d', border: '1px solid #06b6d430', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.06em' }}>What your goals profile does</div>
+              {[
+                { icon: '🤖', text: 'The AI Overview above is generated from everything in your profile — your goals, body metrics, obstacles, motivations, dietary preferences, and sleep habits. Hit Regenerate any time you update your profile to get a fresh analysis.' },
+                { icon: '🍽️', text: 'Your TDEE (daily calorie target) is calculated from your profile. The more accurate your body stats and activity level, the more accurate your calorie and macro targets on the Nutrition page.' },
+                { icon: '💪', text: 'Your workout plan uses your goals, available equipment, fitness level, and any limitations you listed. The AI avoids suggesting exercises or cardio that don\'t fit your actual situation.' },
+                { icon: '📈', text: 'The more you fill in — biggest obstacles, primary motivations, why these goals matter — the more specific and useful the AI responses become across Daily Briefs, workout suggestions, and check-in context.' },
+              ].map(({ icon, text }) => (
+                <div key={icon} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '14px', flexShrink: 0 }}>{icon}</span>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>{text}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <Link href="/life-hub/goals/setup" style={{ padding: '10px 20px', backgroundColor: 'var(--accent-purple)', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>
           Edit Goals

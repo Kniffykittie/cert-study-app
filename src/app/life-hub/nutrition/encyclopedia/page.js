@@ -628,6 +628,7 @@ export default function EncyclopediaPage() {
   const [filter, setFilter] = useState('All')
   const [search, setSearch] = useState('')
   const [symptomCheckerOpen, setSymptomCheckerOpen] = useState(false)
+  const [showWhy, setShowWhy] = useState(false)
 
   useEffect(() => {
     fetch('/api/nutrition/encyclopedia').then(r => r.json()).then(setCtx).catch(() => {})
@@ -652,7 +653,29 @@ export default function EncyclopediaPage() {
     <div>
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ color: '#f97316', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Nutrient Encyclopedia</h1>
-        <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Every vitamin and mineral — what it does, where you stand, and what it means for your goals.</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Every vitamin and mineral — what it does, where you stand, and what it means for your goals.</p>
+          <button onClick={() => setShowWhy(o => !o)}
+            style={{ background: 'none', border: '1px solid #f9731644', borderRadius: '20px', color: '#f97316', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
+            ℹ️ How this works
+          </button>
+        </div>
+        {showWhy && (
+          <div style={{ marginTop: '12px', backgroundColor: '#f973160d', border: '1px solid #f9731630', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.06em' }}>How the Encyclopedia builds your picture</div>
+            {[
+              { icon: '📊', text: 'Your intake for each nutrient is calculated from three sources: your food log (last 30 days averaged), your supplement stack (nutrients you entered from labels), and your meal plan. All three combine into a single daily total.' },
+              { icon: '⚠️', text: 'The Gap Report at the top flags nutrients where you\'re consistently below 60% of the recommended daily value — based on real logged data, not estimates. These are the gaps most worth addressing.' },
+              { icon: '🔍', text: 'Click any nutrient card to open the detail panel — you\'ll see your food vs supplement split, a workout-specific note, which of your goals it affects, and an AI-generated profile with synergies and competitors.' },
+              { icon: '🩺', text: 'The "What\'s Going On With You?" symptom checker maps common symptoms — fatigue, muscle cramps, poor sleep — to the nutrients most likely involved, helping you investigate before assuming a deficiency.' },
+            ].map(({ icon, text }) => (
+              <div key={icon} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '14px', flexShrink: 0 }}>{icon}</span>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>{text}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Gap Report */}
