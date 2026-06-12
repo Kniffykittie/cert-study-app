@@ -128,7 +128,7 @@ export default function SleepTrackerPage() {
           {/* Stage breakdown bar */}
           {Object.keys(sleepStages).length > 0 && (
             <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
-              <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Sleep Stage Breakdown</div>
+              <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>💤 Sleep Stages</div>
               <div style={{ display: 'flex', gap: '4px', height: '24px', borderRadius: '6px', overflow: 'hidden', marginBottom: '12px' }}>
                 {Object.entries(sleepStages).map(([stage, mins]) => (
                   <div key={stage} style={{ flex: mins, backgroundColor: STAGE_COLORS[stage] ?? 'var(--border)', minWidth: '2px' }} title={`${stage}: ${mins}m`} />
@@ -151,7 +151,7 @@ export default function SleepTrackerPage() {
           {sleepTimeline.length > 0 && (
             <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}
               onMouseMove={handleMouseMove}>
-              <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Sleep Timeline</div>
+              <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>🌙 Sleep Timeline</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
                 {STAGE_ORDER.map(stage => (
                   <div key={stage} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

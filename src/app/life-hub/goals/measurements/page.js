@@ -178,7 +178,7 @@ export default function MeasurementsPage() {
     return (
       <div style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Weight Over Time</div>
+          <div style={{ color: '#06b6d4', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em' }}>📈 Weight Over Time</div>
           <div style={{ display: 'flex', gap: 12, fontSize: '11px', color: 'var(--text-secondary)' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{ width: 20, height: 2, background: 'rgba(167,139,250,0.35)', display: 'inline-block' }} /> Raw

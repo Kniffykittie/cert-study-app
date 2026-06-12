@@ -119,7 +119,7 @@ export default function GoalsPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '18px' }}>🤖</span>
-              <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Your Personalized Overview</span>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Your Personalized Overview</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               {regenMsg && <span style={{ fontSize: '12px', color: regenMsg === 'Updated!' ? 'var(--success)' : 'var(--error)' }}>{regenMsg}</span>}
@@ -136,7 +136,7 @@ export default function GoalsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         {/* Goals */}
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '16px' }}>Active Goals</div>
+          <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>🎯 Active Goals</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {(profile.goals ?? []).map(g => (
               <span key={g} style={{ padding: '6px 14px', backgroundColor: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '20px', fontSize: '13px', color: 'var(--accent-purple)', fontWeight: '500' }}>
@@ -148,7 +148,7 @@ export default function GoalsPage() {
 
         {/* Body Metrics */}
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '16px' }}>Body Metrics</div>
+          <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>📊 Body Metrics</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {heightFt && <MetricRow label="Height" value={heightFt} />}
             {profile.weight_lbs && (
@@ -173,7 +173,7 @@ export default function GoalsPage() {
 
         {/* Lifestyle */}
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '16px' }}>Lifestyle</div>
+          <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>🏃 Lifestyle</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {profile.activity_level && <MetricRow label="Activity" value={ACTIVITY_LABELS[profile.activity_level] || profile.activity_level} />}
             {profile.daily_steps && <MetricRow label="Daily Steps" value={`~${Number(profile.daily_steps).toLocaleString()} / day`} />}
@@ -184,7 +184,7 @@ export default function GoalsPage() {
         {/* Notes */}
         {profile.notes && (
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>Notes</div>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>📝 Notes</div>
             <p style={{ color: 'var(--text-primary)', fontSize: '14px', lineHeight: '1.6', margin: 0 }}>{profile.notes}</p>
           </div>
         )}

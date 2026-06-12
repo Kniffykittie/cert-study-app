@@ -290,7 +290,7 @@ export default function LifeHubPage() {
     const days = Array.from({ length: 28 }, (_, i) => dateStr(27 - i))
     return (
       <div>
-        <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>28-Day Check-In History</div>
+        <div style={{ color: '#a78bfa', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>📅 28-Day Check-In History</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '280px' }}>
           {days.map(date => {
             const entry = checkinMap[date]
@@ -402,7 +402,7 @@ export default function LifeHubPage() {
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
             <div>
-              <h2 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', marginBottom: '2px' }}>Recovery Score</h2>
+              <h2 style={{ color: '#a78bfa', fontSize: '16px', fontWeight: '700', marginBottom: '2px' }}>⚡ Recovery Score</h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>Based on yesterday's sleep, hydration, nutrition, and workout load</p>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -441,7 +441,7 @@ export default function LifeHubPage() {
       <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
           <div>
-            <h2 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', marginBottom: '2px' }}>Check In</h2>
+            <h2 style={{ color: '#a78bfa', fontSize: '16px', fontWeight: '700', marginBottom: '2px' }}>✍️ Today's Check-In</h2>
             {checkinContext?.contextNote ? (
               <p style={{ color: 'var(--accent-purple)', fontSize: '12px', fontWeight: '500', margin: 0 }}>
                 {checkinContext.contextNote}

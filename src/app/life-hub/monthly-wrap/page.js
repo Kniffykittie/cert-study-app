@@ -71,7 +71,7 @@ export default function MonthlyWrapPage() {
     <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
       {/* History sidebar */}
       <div style={{ width: '168px', flexShrink: 0 }}>
-        <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>Your Wraps</div>
+        <div style={{ color: '#a78bfa', fontSize: '11px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>📅 Your Wraps</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {history.length === 0 && (
             <div style={{ color: 'var(--text-secondary)', fontSize: '12px', padding: '8px 0' }}>No wraps yet</div>
@@ -88,7 +88,7 @@ export default function MonthlyWrapPage() {
 
         {/* Divider + manual month picker for viewing any month */}
         <div style={{ borderTop: '1px solid var(--border)', marginTop: '14px', paddingTop: '14px' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>Browse</div>
+          <div style={{ color: '#a78bfa', fontSize: '11px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>🔍 Browse</div>
           <input type="month" value={month} onChange={e => setMonth(e.target.value)}
             min={accountSince || undefined} max={getLastMonth()}
             style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '12px', outline: 'none' }} />

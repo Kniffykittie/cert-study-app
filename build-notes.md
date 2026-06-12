@@ -454,6 +454,7 @@ Returns: `{ servings_per_container, package_note, estimated_nutrition, confidenc
 |---|---|---|
 | 1A | ✅ Done | Sidebar restructure + section color system |
 | 1B | ✅ Done | Section color applied to all Life Hub page headers (title = section color) |
+| 1B.5 | ✅ Done | Colored + icon card section headers across all Life Hub pages |
 | 1C | 🔜 Next | Overview dashboard redesign (status bar row, compact brief, 2×2 section summary cards) |
 | 2A | ⏳ After 1C | `ai_food_intel_cache` DB table + `POST /api/nutrition/ai-food-intel` route (Haiku, cached by food_key) |
 | 2B | ⏳ After 2A | Servings-per-container on food cards + "Use whole container" button |

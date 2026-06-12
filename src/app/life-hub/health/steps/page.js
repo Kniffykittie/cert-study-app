@@ -124,7 +124,7 @@ export default function StepTrackerPage() {
           </div>
 
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-            <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Steps by Day</div>
+            <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>📅 Steps by Day</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '140px', marginBottom: '8px' }} onMouseMove={handleMouseMove}>
               {weeklySteps.map(({ date, label, steps: s }) => {
                 const pct = (s / maxSteps) * 100
@@ -199,7 +199,7 @@ export default function StepTrackerPage() {
       )}
 
       <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-        <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Steps by Hour (Eastern)</div>
+        <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>📊 Steps by Hour (Eastern)</div>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '120px', marginBottom: '8px' }} onMouseMove={handleMouseMove}>
           {hourlySteps.map(({ hour, steps: s }) => {
             const pct = (s / maxSteps) * 100

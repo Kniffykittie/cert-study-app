@@ -42,7 +42,7 @@ export default function WorkoutHistoryPage() {
       {/* PR section */}
       {prEntries.length > 0 && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 24 }}>
-          <h2 style={{ margin: '0 0 12px', fontSize: 15, color: 'var(--accent-purple)' }}>🏆 Personal Records (Working Sets)</h2>
+          <h2 style={{ margin: '0 0 12px', fontSize: 15, color: '#3b82f6' }}>🏆 Personal Records (Working Sets)</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {prEntries.map(([name, weight]) => (
               <div key={name} style={{ background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px', fontSize: 13 }}>

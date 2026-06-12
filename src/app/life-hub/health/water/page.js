@@ -777,7 +777,7 @@ export default function DrinksHydrationPage() {
 
       {/* Quick add water */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 12 }}>Quick Add Water</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>💧 Quick Add Water</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {[8, 12, 16, 20, 32].map(oz => (
             <button key={oz} onClick={() => addWaterNow(oz)} disabled={adding}
@@ -806,7 +806,7 @@ export default function DrinksHydrationPage() {
 
       {/* Log a Drink */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Log a Drink</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>🥤 Log a Drink</div>
         <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>Tracks calories, caffeine, and hydration from beverages</div>
 
         {/* Saved drinks chips */}
@@ -821,7 +821,7 @@ export default function DrinksHydrationPage() {
         {savedDrinks.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>My Drinks</div>
+              <div style={{ fontSize: 11, color: '#f97316', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>⭐ My Drinks</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <button onClick={openAddDrinkModal}
                   style={{ fontSize: 11, color: 'var(--accent-purple)', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: 6, cursor: 'pointer', padding: '3px 8px', fontWeight: 600 }}>
@@ -905,7 +905,7 @@ export default function DrinksHydrationPage() {
       {/* Today's log */}
       {allEntries.length > 0 && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 10 }}>Today's Log</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>📋 Today's Log</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {allEntries.map((entry, i) => (
               <div key={entry.type + entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: i < allEntries.length - 1 ? '1px solid var(--border)' : 'none' }}>
@@ -961,7 +961,7 @@ export default function DrinksHydrationPage() {
           : totalOz > 16 ? "Good pacing throughout the day." : null
         return (
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 14 }}>Hydration Timing Today</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>⏰ Hydration Timing Today</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 64 }}>
               {wakingHours.map(h => {
                 const oz = hourlyOz[h]
@@ -990,7 +990,7 @@ export default function DrinksHydrationPage() {
 
       {/* 7-day chart */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 14 }}>Last 7 Days</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>📈 Last 7 Days</div>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 90 }}>
           {week.map(d => {
             const barPct = maxWeekOz > 0 ? d.oz / maxWeekOz : 0

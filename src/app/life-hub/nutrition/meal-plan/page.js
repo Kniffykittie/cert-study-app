@@ -249,7 +249,7 @@ export default function MealPlanPage() {
       {/* Insights panel */}
       {insights && insights.length > 0 && (
         <div style={{ marginBottom: '24px' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>Plan Insights</div>
+          <div style={{ color: '#f97316', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>🤖 Plan Insights</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {insights.map((ins, i) => {
               const style = INSIGHT_COLORS[ins.type] || INSIGHT_COLORS.info

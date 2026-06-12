@@ -465,7 +465,7 @@ function DetailPanel({ slug, ctx, onClose }) {
         <div style={{ padding: '20px 24px', flex: 1 }}>
           {/* Your Status */}
           <div style={{ backgroundColor: 'var(--background)', borderRadius: '10px', padding: '14px 16px', marginBottom: '16px' }}>
-            <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>Your Status</div>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>📊 Your Status</div>
             {ctx?.log_days >= 5 ? (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
@@ -583,7 +583,7 @@ function DetailPanel({ slug, ctx, onClose }) {
             <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
               {nutrient.synergies.length > 0 && (
                 <div style={{ marginBottom: '10px' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', marginBottom: '6px' }}>Works Well With</div>
+                  <div style={{ fontSize: '11px', color: '#22c55e', fontWeight: '700', textTransform: 'uppercase', marginBottom: '6px' }}>✅ Works Well With</div>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {nutrient.synergies.map(s => (
                       <span key={s} style={{ fontSize: '12px', color: 'var(--success)', backgroundColor: 'rgba(46,204,113,0.1)', borderRadius: '5px', padding: '3px 8px' }}>
@@ -595,7 +595,7 @@ function DetailPanel({ slug, ctx, onClose }) {
               )}
               {nutrient.competitors.length > 0 && (
                 <div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', marginBottom: '6px' }}>Competes With</div>
+                  <div style={{ fontSize: '11px', color: 'var(--warning)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '6px' }}>⚡ Competes With</div>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {nutrient.competitors.map(s => (
                       <span key={s} style={{ fontSize: '12px', color: 'var(--warning)', backgroundColor: 'rgba(241,196,15,0.1)', borderRadius: '5px', padding: '3px 8px' }}>
@@ -616,7 +616,7 @@ function DetailPanel({ slug, ctx, onClose }) {
 function Section({ title, children }) {
   return (
     <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '12px 14px' }}>
-      <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>{title}</div>
+      <div style={{ fontSize: '11px', fontWeight: '700', color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>{title}</div>
       {children}
     </div>
   )
