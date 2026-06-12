@@ -18,6 +18,8 @@ export async function GET(req) {
     .from('my_foods')
     .select('*')
     .eq('user_id', user.id)
+    .order('last_logged_at', { ascending: false, nullsFirst: false })
+    .order('log_count', { ascending: false })
     .order('name', { ascending: true })
 
   return NextResponse.json({ foods: data || [] })

@@ -81,6 +81,11 @@ export async function POST(req) {
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (my_food_id) {
+    await supabase.rpc('bump_my_food_recency', { food_id: my_food_id, uid: user.id })
+  }
+
   return NextResponse.json({ entry: data })
 }
 

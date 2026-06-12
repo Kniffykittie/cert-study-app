@@ -742,13 +742,24 @@ function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary }) {
               <div key={f.id} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', border: isExpanded ? '1px solid var(--accent-blue)' : '1px solid transparent', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
+                      {f.log_count > 0 && (
+                        <span style={{ fontSize: '10px', color: 'var(--accent-blue)', backgroundColor: 'rgba(0,128,255,0.1)', borderRadius: '10px', padding: '1px 6px', flexShrink: 0, fontWeight: '600' }}>
+                          ×{f.log_count}
+                        </span>
+                      )}
+                    </div>
                     <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
                       {f.serving_size_label || '1 serving'}
                       {f.calories != null ? ` · ${Math.round(f.calories)} kcal` : ''}
                       {f.protein_g ? ` · ${Math.round(f.protein_g)}g P` : ''}
                       {f.carbs_g ? ` · ${Math.round(f.carbs_g)}g C` : ''}
                       {f.fat_g ? ` · ${Math.round(f.fat_g)}g F` : ''}
+                      {f.last_logged_at && (() => {
+                        const days = Math.floor((Date.now() - new Date(f.last_logged_at)) / 86400000)
+                        return days === 0 ? ' · logged today' : days === 1 ? ' · yesterday' : days < 7 ? ` · ${days}d ago` : null
+                      })()}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
@@ -1229,6 +1240,20 @@ export default function NutritionPage() {
     const res = await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry) })
     const data = await res.json()
     if (data.entry) setEntries(prev => [...prev, data.entry])
+    if (entry.my_food_id) {
+      const now = new Date().toISOString()
+      setMyFoods(prev => {
+        const updated = prev.map(f => f.id === entry.my_food_id
+          ? { ...f, last_logged_at: now, log_count: (f.log_count || 0) + 1 }
+          : f)
+        return [...updated].sort((a, b) => {
+          if (a.last_logged_at && b.last_logged_at) return new Date(b.last_logged_at) - new Date(a.last_logged_at)
+          if (a.last_logged_at) return -1
+          if (b.last_logged_at) return 1
+          return (b.log_count || 0) - (a.log_count || 0)
+        })
+      })
+    }
   }
 
   async function handleRemoveEntry(id) {
@@ -1241,7 +1266,7 @@ export default function NutritionPage() {
     if (food._source === 'my_foods') return
     const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(food) })
     const data = await res.json()
-    if (data.food) setMyFoods(prev => [...prev, data.food].sort((a, b) => a.name.localeCompare(b.name)))
+    if (data.food) setMyFoods(prev => [...prev, data.food])
   }
 
   async function handleDeleteMyFood(id) {
@@ -1319,12 +1344,12 @@ export default function NutritionPage() {
         <SearchModal slot={null} onClose={() => setLibraryModal(false)} onAdd={() => {}}
           myFoods={myFoods} onSaveFood={food => setMyFoods(prev => {
             if (prev.find(f => f.id === food.id)) return prev
-            return [...prev, food].sort((a, b) => a.name.localeCompare(b.name))
+            return [...prev, food]
           })} libraryOnly />
       )}
       {mealBuilderModal && (
         <MealBuilderModal onClose={() => setMealBuilderModal(false)} onSave={food => {
-          setMyFoods(prev => [...prev, food].sort((a, b) => a.name.localeCompare(b.name)))
+          setMyFoods(prev => [...prev, food])
         }} />
       )}
 
