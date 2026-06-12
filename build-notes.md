@@ -924,7 +924,7 @@ Returns: `{ servings_per_container, package_note, estimated_nutrition, confidenc
 
 ## Future Features
 
-> **Format:** Each item includes user intent, UX spec, data model notes, and AI context impact so it can be built the next day without re-discussing.
+> **Format:** Each item includes user intent, UX spec, data model notes, AI context impact, cross-system connections, gap analysis, and deeper expansions so it can be built the next day without re-discussing.
 
 ---
 
@@ -937,10 +937,83 @@ These pull from everything and are the surfaces the user actually reads daily:
 
 | Layer | Current inputs | What it should also pull from |
 |-------|---------------|-------------------------------|
-| **Recovery Score** | Sleep, hydration, protein, energy check-in, workout load | Resting HR trend, stretching consistency, hydration-from-food, workout HR zones |
-| **Daily Brief** | 10+ tables, Claude narrative | Workout HR from yesterday, today's pre/post meal alignment, supplement timing conflicts, hydration sources breakdown, planned stretches |
-| **Monthly Wrap** | Workouts, energy, mood, weight, calories, water | Avg workout HR per session + trend, resting HR change, stretching sessions count, meal plan adherence %, supplement consistency, food water contribution avg |
-| **Nutrient Encyclopedia** | Food logs, supplements, meal plan, check-in energy | Supplement active compounds (not label weight), food water toward hydration, ingredient-level micro tracking |
+| **Recovery Score** | Sleep, hydration, protein, energy check-in, workout load | Resting HR trend, stretching consistency, hydration-from-food (water_g from food entries), workout HR zones, supplement_logs Magnesium consistency |
+| **Daily Brief** | 10+ tables, Claude narrative | Workout HR from yesterday, today's pre/post meal alignment, supplement timing conflicts, hydration sources breakdown, planned stretches, soreness signals, resting HR vs baseline |
+| **Monthly Wrap** | Workouts, energy, mood, weight, calories, water | Avg workout HR per session + trend, resting HR change month-over-month, stretching sessions count + adherence %, meal plan adherence %, supplement consistency %, food water contribution avg, hydration score avg, HR efficiency trend ("your heart worked less hard for the same effort") |
+| **Nutrient Encyclopedia** | Food logs, supplements, meal plan, check-in energy | Supplement active compounds (not label weight), food water_g toward hydration, ingredient-level micro tracking, source confidence weighting (OFFs high / AI fill medium / manual unknown) |
+
+### The Data Flywheel
+Every feature that improves data quality improves every synthesis layer automatically:
+- **Better food data** (edit favorites, preview before save, AI micro-fill) → Encyclopedia gap report more accurate → Daily Brief more specific → Monthly Wrap nutrition section deeper
+- **Heart rate data** (intraday already available in sync route, just not stored by hour yet — no new API calls needed) → Recovery Score gains a real fitness signal → Monthly Wrap gains a cardiovascular progress narrative → Daily Brief can flag overtraining
+- **Stretching consistency** → Recovery Score mobility component → Daily Brief can recommend pre-stretch before today's workout → Monthly Wrap shows injury-prevention habits
+- **Supplement active compounds** → Encyclopedia shows real bioavailable intake not label weight → Daily Brief supplement timing nudges are accurate → Monthly Wrap supplement adherence meaningful
+- **Supplement logs** (daily taken/skipped tracking — currently missing entirely) → Monthly Wrap adherence % → Daily Brief timing nudges
+
+### Cross-Feature Signals That Should Exist
+| If this happens... | Then this should respond... |
+|---|---|
+| Resting HR drops 5+ bpm over 30 days | Monthly Wrap leads with it. Recovery Score resting HR component improves. Daily Brief mentions it. |
+| Workout HR in peak zone > 15 min today | Tomorrow's Recovery Score workout load component penalized. Daily Brief suggests lighter activity. |
+| Food water_g + water_logs + beverage water_g hits goal | Hydration ring shows full. Recovery Score hydration component maxes out. Daily Brief skips the water reminder. |
+| Meal plan has protein < 80% of target 3+ days | AI analysis callout fires. Daily Brief mentions it that week. Encyclopedia protein page shows red. |
+| Supplement active compounds cover a gap in Encyclopedia | Gap report chip changes from red to yellow/green. Daily Brief stops mentioning that gap. |
+| No stretching logged after 3 consecutive workouts | Recovery Score mobility component drops. Daily Brief suggests a 5-min post-workout routine. |
+| Pre/post meal alignment is poor on workout day | Meal plan badge turns yellow/red. AI analysis callout fires. Post-workout window card on food log page. |
+| supplement_logs show missed doses 3+ days | Daily Brief nudges: "You haven't logged your Vitamin D the last 3 days." |
+| Soreness ≥ 4 in same muscle group 3 days running | Gentle recovery suggestion. Stretch recommendation surfaces. Monthly Wrap injury-prevention notes. |
+
+### Critical Missing Foundation: `supplement_logs` Table
+> **This is a blocker for supplement adherence in Monthly Wrap, AI supplement search, and the Daily Brief supplement nudge system.**
+
+Currently `supplement_stack` stores what supplements the user *has*, but never logs what they *took on a given day*. Without daily logs, supplement consistency tracking is impossible.
+
+**Table spec:**
+```sql
+CREATE TABLE supplement_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  supplement_id UUID REFERENCES supplement_stack(id) ON DELETE CASCADE,
+  supplement_name TEXT NOT NULL, -- denormalized so logs survive stack edits
+  dose TEXT, -- from supplement_stack at time of log
+  timing TEXT, -- from supplement_stack at time of log
+  taken_at TIMESTAMPTZ DEFAULT now(),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE supplement_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users manage own supplement logs" ON supplement_logs FOR ALL USING (user_id = auth.uid());
+```
+
+**UI:** A simple "✓ Log today's supplements" button on the Supplement Stack page that generates one row per active supplement with a single tap. Or individual checkboxes per supplement. Either approach.
+
+**What this unlocks:**
+- Monthly Wrap: "You took your supplements on X% of days this month — Omega-3 was most consistent, Vitamin D least"
+- Daily Brief: "You haven't logged your supplements yet today — your stack is set for morning"
+- Recovery Score: Magnesium supplement consistency → sleep quality component
+- Streak tracking: "14-day supplement streak" visible on the stack page
+
+### Critical Missing Foundation: `source_confidence` on Food Data
+> **Without this, the Encyclopedia gap report and Daily Brief food references can't distinguish between verified OFFs data and AI-estimated guesses.**
+
+**Add to `my_foods` and `food_log_entries`:**
+```sql
+ALTER TABLE my_foods ADD COLUMN source_confidence TEXT DEFAULT 'manual' 
+  CHECK (source_confidence IN ('barcode', 'offs_search', 'ai_estimated', 'manual'));
+ALTER TABLE food_log_entries ADD COLUMN source_confidence TEXT DEFAULT 'manual'
+  CHECK (source_confidence IN ('barcode', 'offs_search', 'ai_estimated', 'manual'));
+```
+
+**Values:**
+- `barcode` — scanned directly; high accuracy
+- `offs_search` — matched from Open Food Facts; medium-high accuracy
+- `ai_estimated` — filled by Haiku; medium accuracy; amber-tinted fields
+- `manual` — user-entered; accuracy unknown
+
+**What this unlocks:**
+- Encyclopedia gap report shows confidence: "Based on verified data for 8 of your 14 foods. 6 are AI-estimated — edit them for better accuracy."
+- Sort/filter in My Favorites by completeness AND confidence
+- Daily Brief skips micro-specific comments when confidence is mostly `ai_estimated`
+- "Verify from label" mode (future camera scan) upgrades confidence from `ai_estimated` → `barcode`
 
 ### The Data Flywheel
 Every feature that improves data quality improves every synthesis layer automatically:
@@ -968,7 +1041,7 @@ Every feature that improves data quality improves every synthesis layer automati
 
 ### Pre/Post Workout Meal Advisor
 
-*A contextual tool that helps the user decide whether to eat something before or after a workout based on their goals, the food's macros, and their current day's logged data.*
+*A contextual tool that helps the user decide whether to eat something before or after a workout based on their goals, the food's macros, and their current day's logged data. This feature was explicitly noted as missing during session review and should be planned for a near-term phase.*
 
 **Trigger options (any of these could surface it):**
 - A dedicated page or card at `/life-hub/nutrition/workout-fuel`
@@ -987,6 +1060,8 @@ Every feature that improves data quality improves every synthesis layer automati
 - Workout timing (time of day the workout was logged vs current time)
 
 **AI surface:** Could be a small Haiku call (separate from food intel), or extend the existing `ai_food_intel_cache` schema with a `workout_fuel` field added to the prompt. The latter is cheaper since it piggybacks the existing cache.
+
+**Gap note — workout time storage:** The spec mentions "User can set a workout time per day in the meal plan." This should be stored as a `preferred_time` field added to the day objects inside `workout_plans.plan` JSONB — NOT a new column in meal_plans. The schedule JSONB already has per-day objects; add `preferred_time: "18:00"` to the schema there.
 
 ---
 
@@ -1010,17 +1085,23 @@ Every feature that improves data quality improves every synthesis layer automati
 - Saved meals show a 🍳 badge + the ingredient count ("3 ingredients") on the card
 - Scaling: the Meals tab lets you log "2× batch" which doubles all quantities — useful for meal prep days
 
+**Gap — existing food migration:** Users who already have 40+ saved foods need a way to classify them. Options: (a) auto-classify via a Haiku call on the name ("olive oil" → Ingredient, "Greek yogurt" → Food), or (b) a one-time "sort your library" prompt shown once after the feature launches, listing unclassified entries with a Food / Ingredient toggle per row. Option (a) is better UX. The AI call can run as a background batch with a loading state.
+
+**Gap — auto-classification at save time:** When a new food is added via the Preview Before Saving flow, Haiku looks at the name and suggests Food vs Ingredient automatically. One-tap confirm. No extra API call if we piggyback it on the ai-food-fill response schema (add a `suggested_type: "food" | "ingredient"` field to the prompt).
+
 **Cross-system connections:**
 - Meals tab feeds directly into the Meal Plan — drag or add a saved meal to any day's slot
 - Ingredient completeness (micro data) improves the Nutrient Encyclopedia gap report accuracy — if garlic is fully filled in, every meal containing garlic gets that micro data
 - The Meal Builder's live nutrition total teaches nutritional awareness — users can see that adding alfredo sauce spikes fat before they commit
 - Monthly Wrap can note: "You built X meals from scratch this month" as a habit indicator
 - Daily Brief can reference: "Your typical lunch (saved Chicken Alfredo meal) covers 38% of your daily protein"
+- source_confidence system: when an ingredient is AI-estimated, the Meal Builder shows an amber tint on the ingredient row and an aggregate confidence indicator on the meal total
 
 **Deeper expansion:**
 - **Ingredient frequency analysis:** the Encyclopedia gap report can say "You use white onion in 70% of your logged meals — it contributes meaningful quercetin (anti-inflammatory) to your diet"
 - **Cost tracking (optional):** add a `price_per_serving` field to ingredients — the Meal Builder shows an estimated meal cost as you add ingredients, weekly meal plan shows total estimated grocery cost
 - **AI meal critique:** when saving a meal in the Meal Builder, a quick Haiku call evaluates the macro balance and notes anything significant (e.g. "This meal is high in saturated fat from the cheese — consider reducing or swapping")
+- **Shareable meal card (future):** a saved meal can generate a shareable link showing the ingredient list, macro breakdown, and instructions — useful for sending to a friend or coach
 
 ---
 
@@ -1043,10 +1124,17 @@ Every feature that improves data quality improves every synthesis layer automati
   - ⚠️ Partial (amber) — has calories + macros, missing most micros
   - ✗ Minimal (red) — just a name and maybe calories
 - The My Favorites header shows: "14 foods complete · 6 partial · 2 minimal"
-- A "🤖 Fill all partial" button at the top iterates every partial/minimal entry and AI micro-fills it, one at a time, showing a progress indicator
+- A "🤖 Fill all partial" button at the top iterates every partial/minimal entry and AI micro-fills it one at a time, showing a progress bar ("Filling 6 of 15 partial entries...") — rate limited to avoid hammering the API; respect 15 req/min ceiling
+
+**Gap — "Fill all partial" UX detail:** The batch fill button is 15 AI calls if 15 partial entries exist. Show a queue-style UI: a progress row per food ("✓ Greek Yogurt · ⏳ Chicken Breast · — White Rice"), fills in sequence, user can cancel mid-batch. Store each result immediately after it comes back — don't batch-write at the end.
+
+**Gap — completeness affects sort order:** Complete foods should automatically float to the top of My Favorites, because they produce better Encyclopedia data. Partial/minimal foods sink to the bottom. This creates passive incentive without nagging.
+
+**Gap — "last logged data quality" note:** If a food has been logged 30+ times but still has null micros, show a small callout on the card: "Logged 30× — micro data would improve your Encyclopedia accuracy." This surfaces the importance without requiring the user to understand the system.
 
 **Cross-system connections:**
 - Completeness directly determines Nutrient Encyclopedia gap report accuracy — a food logged 30 times with null iron_mg is 30 missed data points for the iron gap analysis
+- `source_confidence` field: when edit mode upgrades AI-estimated fields to user-verified values, confidence upgrades from `ai_estimated` to `manual`; when OFFs data is verified by label scan, it upgrades to `barcode`
 - Daily Brief quality improves as foods become complete — Claude can say "You're consistently low in magnesium" instead of "Magnesium data is limited"
 - The TDEE calibration (tdee_suggestions) becomes more accurate when food calorie data is correct
 - Monthly Wrap nutrition narrative gets richer when micro data is available across the full log history
@@ -1054,7 +1142,7 @@ Every feature that improves data quality improves every synthesis layer automati
 **Deeper expansion:**
 - **Version history:** store previous versions of a food's nutrition data in a JSONB column — if you discover your portion size was wrong, you can see what changed and when
 - **Community corrections:** if a food came from OFFs and a user corrects it, optionally flag it for the shared food_cache (with confirmation) so everyone benefits
-- **"Verify from label" mode:** a camera scan of a nutrition label that extracts all values using Claude's vision capability — fills the form from a photo
+- **"Verify from label" mode:** a camera scan of a nutrition label that extracts all values using Claude's vision capability — fills the form from a photo; upgrades source_confidence to `barcode`
 
 ---
 
@@ -1078,15 +1166,25 @@ Every feature that improves data quality improves every synthesis layer automati
 - The Food vs Ingredient decision is made at save time, not later
 - Sparse OFFs entries get a chance to be completed before entering the library
 
+**Gap — different behavior by source:** Preview panel should adapt to how the food was found:
+- **Barcode scan:** Data is usually accurate; fewer fields need AI fill prompting. Source badge: "📷 From barcode — high confidence." AI micro-fill button still present but less prominently shown.
+- **OFFs search:** Medium confidence. Source badge: "🔍 Open Food Facts." AI micro-fill button prominent if micros are sparse.
+- **AI fallback (zero OFFs results):** All fields amber-tinted. Source badge: "🤖 AI estimated — these are estimates, verify if accuracy matters." AI micro-fill already ran; the badge is the warning.
+- The `source_confidence` field (see Critical Missing Foundation above) is set at save time based on which flow was used.
+
+**Gap — "notes" field storage:** The `my_foods` table doesn't have a `notes` column. Add it: `ALTER TABLE my_foods ADD COLUMN notes TEXT`. This field surfaces in the AI prompt for Daily Brief and can be shown in the expanded card view.
+
 **Cross-system connections:**
 - A clean, well-named library makes the Meal Builder, Daily Brief food references, and Monthly Wrap food mentions readable and useful
 - Notes surface in the AI prompt context for the Daily Brief if the user saves something like "this gives me GI issues" — Claude can note it contextually
 - The better the library data quality at entry time, the less cleanup work is needed on existing entries later
+- `source_confidence` set here flows through to every downstream feature that aggregates food data
 
 **Deeper expansion:**
-- **Smart rename suggestions:** Claude looks at the OFFs name and suggests a clean, readable version ("Plain Greek Yogurt, 2%" instead of "FAGE TOTAL 2% MILKFAT PLAIN")
+- **Smart rename suggestions:** Claude looks at the OFFs name and suggests a clean, readable version ("Plain Greek Yogurt, 2%" instead of "FAGE TOTAL 2% MILKFAT PLAIN") — run this in the ai-food-fill response as an optional `clean_name` field
 - **Duplicate detection at save time:** before committing, check if a similar name exists — prompt "You already have 'Chicken Breast' saved — update it instead?"
 - **Photo attachment:** take a photo of the package or serving to attach to the saved food — visible in the expanded panel later for reference
+- **Quick review mode:** for power users who save 10+ foods a week, a compact review queue — cards stack with swipe-to-approve or tap-to-edit; each confirmation takes 2 seconds instead of opening a full sheet
 
 ---
 
@@ -1165,13 +1263,31 @@ Every feature that improves data quality improves every synthesis layer automati
   - "Wednesday is a rest day but you've planned 3200 calories — that's above your estimated TDEE for a sedentary day"
   - "Your vitamin D is below 50% DV every day this week — your supplement covers some of this but you're still short"
   - "You're eating the same breakfast 6 days — consider variety for micronutrient coverage"
-- Pre/post workout alignment included as a callout type (see that feature below)
+- Pre/post workout alignment included as a callout type (see Pre/Post Workout Meal Advisor)
+
+**Gap — meal plan adherence tracking needs a lightweight anchor:**
+The Monthly Wrap "You followed your meal plan on X of 7 days" requires comparing planned vs logged — which is complex. A simpler anchor: add a `followed_meal_plan BOOLEAN` field to `daily_checkins`. One tap at end of day: "Did you stick to your plan today?" This makes the adherence stat possible without complex food-entry matching. Optional: after enough data, add automatic calculation as a secondary source.
+```sql
+ALTER TABLE daily_checkins ADD COLUMN followed_meal_plan BOOLEAN;
+```
+
+**Gap — template weeks:**
+Save the current week's meal plan as a named template ("Bulk Week", "Cut Week", "Lazy Week") stored in a `meal_plan_templates` table. Load any saved template on any Monday. Especially powerful combined with the Meals tab — a saved template pulls in all composite meals instantly. DB:
+```sql
+CREATE TABLE meal_plan_templates (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  name TEXT NOT NULL,
+  entries JSONB NOT NULL, -- array of { day_of_week, meal_slot, food_data }
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
 
 **Cross-system connections:**
-- Meal plan micro totals feed the Nutrient Encyclopedia as a "planned intake" preview — you can see if the week's plan would close your gaps before you eat it
+- Meal plan micro totals feed the Nutrient Encyclopedia as a "planned intake" preview — see if the week's plan would close your gaps before you eat it
 - Saved meals from the Meal Builder flow directly into meal plan slots — the three-tab favorites structure is shared
 - AI analysis references the active workout plan, TDEE from goals_profiles, supplement stack coverage, and current Encyclopedia gaps — it's the most data-rich AI call in the app
-- Monthly Wrap gains: "You followed your meal plan on X of 7 days" (compare meal_plan_entries to actual food_log_entries by date)
+- Monthly Wrap gains: "You followed your meal plan on X of 7 days" via the `followed_meal_plan` check-in field
 - Daily Brief on Monday mornings: "Your meal plan for this week is set — you're light on iron Tuesday and Thursday, worth noting"
 
 **Deeper expansion:**
@@ -1186,8 +1302,11 @@ Every feature that improves data quality improves every synthesis layer automati
 
 *User wants to search "Men's One A Day" or "1000mg Omega-3" and get accurate data, including the critical distinction between label weight and actual bioavailable compound.*
 
+> **Critical blocker note:** Build the `supplement_logs` table first (see Critical Missing Foundation above). Without daily logging, "You took your supplements on X% of days" is impossible to compute — the Monthly Wrap supplement consistency stat is blocked until this exists.
+
 **Search flow:**
 - Search bar at top of Supplement Stack page, same OFFs-first → Haiku-fallback pattern as food search
+- **Haiku is primary here, not fallback** — unlike food, many supplements won't exist in OFFs (store brands, boutique products). Design the flow as: OFFs check → if result → show it; if no result → Haiku fills immediately without a button (AI is the expected path)
 - Results show: name, brand, serving, and the key active compounds (not just total weight)
 - Preview panel before adding: full supplement profile with AI info card condensed view
 
@@ -1198,12 +1317,18 @@ Every feature that improves data quality improves every synthesis layer automati
 - Nutrient Encyclopedia uses `active_compound_mg` exclusively for gap calculations
 - The supplement card shows both: "Omega-3: 1000mg (300mg active EPA+DHA)"
 
+**Gap — `supplement_logs` is a dependency, not a "later" feature:**
+Once supplement_logs is built (see Critical Missing Foundation), the Supplement Stack page gains:
+- Checkboxes per supplement: "✓ Took today" — one tap per supplement or a global "Log all" button
+- Streak counter per supplement: "14-day streak" chip on each card
+- A last-taken timestamp: "last logged: 2 days ago" in amber if missed 2+ days
+
 **Cross-system connections:**
 - Active compound feeds the Nutrient Encyclopedia with accurate data — Omega-3 gap closes when the real EPA+DHA is logged, not the 1000mg softgel weight
 - Stack Interactions (already built) become more accurate — Iron/Caffeine interaction timing is only relevant at meaningful doses of each
 - Daily Brief supplement timing nudges are dose-aware: "Your Vitamin D at 400IU active is below the 800IU threshold where benefits become clear — consider checking your label"
-- Monthly Wrap gains: "You took your supplements consistently on X% of days this month" — comparing days with entries vs total days
-- Supplement gaps feed the Recovery Score: if Magnesium (a sleep mineral) is consistently under-dosed, the sleep component of Recovery Score can note the correlation
+- **Monthly Wrap** (blocked on supplement_logs): "You took your supplements consistently on X% of days this month — Omega-3 was most consistent (92%), Vitamin D least (61%)"
+- Supplement gaps feed Recovery Score: if Magnesium (a sleep mineral) is consistently under-dosed OR not logged (via supplement_logs), the sleep component of Recovery Score can note the correlation
 
 **Deeper expansion:**
 - **Brand comparison:** search "creatine" and see monohydrate vs HCl vs buffered — AI notes on bioavailability, cost per dose, and typical effective range for each form
@@ -1217,44 +1342,94 @@ Every feature that improves data quality improves every synthesis layer automati
 
 *Heart rate is the clearest objective fitness signal the app has access to. It should feed Recovery Score, Monthly Wrap, Daily Brief, and workout logging — not just sit on a health page.*
 
+> **Confirmed via Google Health API research (June 2026):** The existing `heart-rate` endpoint already returns ~10-second granularity samples. The sync route receives all of them — it just discards timestamp information after bucketing by date. No new API calls, no new scopes, no new permissions needed for intraday. `daily-resting-heart-rate` is a dedicated Google-calculated endpoint (same existing scope). HRV (`heart-rate-variability`) is available with existing scope. HR zones by workout are NOT a dedicated endpoint — must be computed by filtering intraday samples to the workout's timestamp window.
+
+**Phase 0 — Foundation (do this first, everything else builds on it):**
+
+Add a `health_heart_rate_intraday` table:
+```sql
+CREATE TABLE health_heart_rate_intraday (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  date DATE NOT NULL,
+  hour SMALLINT NOT NULL CHECK (hour >= 0 AND hour <= 23),
+  avg_bpm SMALLINT,
+  min_bpm SMALLINT,
+  max_bpm SMALLINT,
+  sample_count SMALLINT,
+  synced_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, date, hour)
+);
+ALTER TABLE health_heart_rate_intraday ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users read own HR intraday" ON health_heart_rate_intraday FOR ALL USING (user_id = auth.uid());
+```
+
+Modify `sync/route.js` — currently the HR processing loop buckets raw samples by date and discards sub-day timestamps. Change it to also bucket by hour:
+```js
+// Current: hrBucket[date].push(bpm)
+// New: also bucket by hour
+const hour = new Date(t).getHours() // convert to local/EST hour
+if (!hrHourBucket[date]) hrHourBucket[date] = {}
+if (!hrHourBucket[date][hour]) hrHourBucket[date][hour] = []
+hrHourBucket[date][hour].push(bpm)
+```
+Then upsert per-date-hour rows alongside the existing daily rows. Zero extra API calls.
+
+Also add `daily-resting-heart-rate` to the sync fetch list — Google computes this server-side more accurately than deriving it from sleep session timestamps:
+```js
+const restingHRPoints = await fetchDataType(accessToken, 'daily-resting-heart-rate', since)
+// returns beatsPerMinute per day; upsert into health_heart_rate_daily as a resting_bpm column
+```
+Add column: `ALTER TABLE health_heart_rate_daily ADD COLUMN resting_bpm SMALLINT;`
+
+Also add HRV (no scope change needed):
+```js
+const hrvPoints = await fetchDataType(accessToken, 'daily-heart-rate-variability', since)
+```
+Add column: `ALTER TABLE health_heart_rate_daily ADD COLUMN hrv_rmssd NUMERIC(6,2);`
+
 **Part A — Intraday HR page at `/life-hub/health/heart-rate`:**
-- New DB table: `health_heart_rate_intraday` — user_id, date, time_bucket (5-min interval), avg_bpm, min_bpm, max_bpm
-- Line chart (continuous, not bars): x-axis = time of day from wake to sleep, y-axis = bpm
-- Four HR zone bands drawn as colored horizontal regions (computed from 220 - age):
-  - Grey: Resting/Recovery (< 50% max)
-  - Blue: Fat Burn (50–65% max)
-  - Green: Cardio (65–80% max)
-  - Orange: Hard (80–90% max)
-  - Red: Peak (> 90% max)
-- Workout segments highlighted as a colored band behind the line using workout_logs timestamps
-- Today / Yesterday / Week selector (week view shows daily peak HR as a bar chart)
+- Line chart (continuous, not bars): x-axis = hours of day (0–23), y-axis = bpm, drawn from `health_heart_rate_intraday`
+- Four HR zone bands drawn as colored horizontal regions (computed from `220 - age` pulled from `goals_profiles`):
+  - Grey: Resting/Recovery (< 50% max HR)
+  - Blue: Fat Burn (50–65%)
+  - Green: Cardio (65–80%)
+  - Orange: Hard (80–90%)
+  - Red: Peak (> 90%)
+- Workout segments highlighted as a shaded band behind the chart line — match `workout_logs.created_at` and `duration_seconds` to time window
+- Today / Yesterday / Week selector (week view = daily peak HR as a bar chart)
+- Empty state: if no wearable synced today, show "Sync your device in Health Settings"
 
 **Part B — Workout HR zones on completion screen:**
-- After finishing a workout, the completion screen shows a zone breakdown bar: time spent in each HR zone during the session
+- After finishing a workout, compute zone breakdown by filtering `health_heart_rate_intraday` for today's workout time window (created_at → created_at + duration_seconds) and bucket each sample into a zone
 - "12 min fat-burn · 28 min cardio · 5 min peak" with a proportional colored bar
-- Stored as `hr_zones JSONB` in `workout_logs`: `{ fat_burn_min, cardio_min, hard_min, peak_min, avg_bpm, max_bpm }`
-- Over time: workout history page shows HR zones per session as a small colored chip row under each session
-- "Your heart worked less hard for the same workout" is shown when avg_bpm for the same workout type decreases over sessions
+- Store computed zones as `hr_zones JSONB` in `workout_logs`: `{ fat_burn_min, cardio_min, hard_min, peak_min, avg_bpm, max_bpm }`
+- Over time: workout history shows HR zones per session as small colored chips
+- Efficiency trend: "Your heart worked less hard for the same Push Day this month" — when avg_bpm for same day_label decreases over sessions
 
 **Part C — Resting HR trend (the most motivating metric):**
-- Resting HR = lowest 10-minute avg during the sleep window (cross-reference health_sleep_sessions timestamps)
-- 30-day trend card on Health Overview page: a single downward-trending line is the clearest proof cardiovascular fitness is improving
-- Benchmark context: "Your resting HR of 58 bpm puts you in the 'Good' fitness range for your age"
-- Alert when resting HR is elevated 5+ bpm above recent baseline — could indicate illness, overtraining, or insufficient recovery
+- Use `health_heart_rate_daily.resting_bpm` (Google-computed via the `daily-resting-heart-rate` endpoint — more accurate than deriving from sleep sessions)
+- 30-day trend card on Health Overview page: single downward line = proof cardiovascular fitness is improving
+- Benchmark context: "Your resting HR of 58 bpm puts you in the 'Good' fitness range for your age" — compute from published ranges by age/sex
+- Alert: if resting_bpm is elevated 5+ bpm above 30-day baseline, Daily Brief surfaces a recovery note
+
+**Part D — HRV (Heart Rate Variability) — free with existing scope:**
+- Store `hrv_rmssd` in `health_heart_rate_daily` from the `daily-heart-rate-variability` endpoint
+- HRV is a better recovery predictor than resting HR alone: low HRV = sympathetic nervous system dominant = stress / under-recovery
+- 7-day HRV trend card alongside resting HR on the Health Overview page
+- Feed into Recovery Score: if HRV is trending down (3+ days), Recovery Score drops and Daily Brief flags it
 
 **Cross-system connections:**
-- **Recovery Score:** add a resting HR component — if resting HR is below 30-day baseline, score up; if elevated, score down. This replaces or supplements the existing "workout load" component with an objective physiological signal
-- **Daily Brief:** "Your resting HR last night was 54 bpm — 3 below your 30-day average. Your cardiovascular system is adapting well."
-- **Monthly Wrap:** "Your average workout HR dropped from 152 bpm to 144 bpm over this month — your heart is becoming more efficient. Resting HR trend: down 4 bpm since last month." — this is exactly the kind of stat that motivates continued effort
-- **Workout logger:** live HR widget during workout (if Google Health syncs frequently enough) lets you see which zone you're in in real time
-- **Hard day detection → next day Recovery Score:** if yesterday's workout had > 15 min in peak zone, the Recovery Score workout load component is penalized appropriately, and Daily Brief suggests a lighter day
-- **Sleep correlation:** if resting HR is elevated and sleep was < 6 hours, Daily Brief can note the connection: "Your HR is a bit high today — you were short on sleep last night, that's likely why"
+- **Recovery Score:** add resting HR and HRV components — if resting_bpm below 30-day baseline → score up; if elevated → score down; if HRV trending down → score down; replaces the "workout load" estimate with objective physiological signals
+- **Daily Brief:** "Your resting HR last night was 54 bpm — 3 below your 30-day average. Your cardiovascular system is adapting well." OR "Your HRV is down 3 days running — your body may need more recovery time."
+- **Monthly Wrap:** "Your average workout HR dropped from 152 bpm to 144 bpm this month — your heart is becoming more efficient. Resting HR: down 4 bpm since last month. HRV: up 12 ms." — concrete fitness progress numbers
+- **Hard day detection → Recovery Score:** if yesterday's workout had > 15 min in peak zone (from hr_zones JSONB), penalize recovery score and Daily Brief suggests a lighter day
+- **Sleep correlation:** resting HR elevated on short-sleep nights → Daily Brief notes the connection
 
 **Deeper expansion:**
-- **HRV (Heart Rate Variability):** if Google Health exposes HRV data, add it — HRV is actually a better recovery predictor than resting HR alone. Low HRV = sympathetic nervous system dominant = stress/under-recovery. Build a 7-day HRV trend card alongside resting HR
-- **Cumulative training load:** sum of (workout_duration × avg_HR_zone_multiplier) over the past 7 days — a high load score means the user needs more rest. Feed this into Recovery Score
-- **Fitness age:** compute "cardiovascular fitness age" from resting HR, workout HR efficiency, and trend — show it alongside actual age ("Your heart performs like a 28-year-old's")
-- **Zone goal setting:** let the user set a "target zone" per workout type (e.g. "I want to stay in cardio zone for my Tuesday run") — post-workout completion screen grades adherence to that goal
+- **Cumulative training load:** sum of (workout_duration × avg_HR_zone_multiplier) over past 7 days → a high load score means the user needs more rest → feeds Recovery Score
+- **Fitness age:** compute "cardiovascular fitness age" from resting HR, workout HR efficiency trend, and HRV — show alongside actual age ("Your heart performs like a 28-year-old's")
+- **Zone goal setting:** user sets a target zone per workout type ("I want to stay in cardio zone for my Tuesday run") — post-workout screen grades adherence to that goal
 
 ---
 
@@ -1263,44 +1438,89 @@ Every feature that improves data quality improves every synthesis layer automati
 *A stretching encyclopedia and routine planner that ties directly to what muscle groups were worked, teaches the pre/post distinction, and contributes a mobility component to Recovery Score.*
 
 **DB: `stretches` table:**
-- `id`, `name`, `muscle_group[]` (array — a stretch can target multiple groups), `type` (pre / post / both / standalone), `duration_seconds`, `instructions TEXT[]`, `where_you_feel_it TEXT`, `common_mistakes TEXT[]`, `also_helps TEXT[]` (secondary benefits), `image_url`, `is_foam_roll BOOLEAN`
+- `id`, `name`, `muscle_group TEXT[]` (array — a stretch can target multiple groups), `type TEXT` (pre / post / both / standalone), `duration_seconds INT`, `instructions TEXT[]`, `where_you_feel_it TEXT`, `common_mistakes TEXT[]`, `also_helps TEXT[]` (secondary benefits, e.g. "reduces lower back tension"), `image_url TEXT`, `is_foam_roll BOOLEAN DEFAULT false`
 - Pre-loaded with ~50 stretches across all muscle groups
 - Foam rolling gets its own sub-category within each muscle group (technique differs pre vs post)
 
+**DB: `stretch_logs` table:**
+```sql
+CREATE TABLE stretch_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  date DATE NOT NULL,
+  stretch_id UUID REFERENCES stretches(id),
+  stretch_name TEXT NOT NULL, -- denormalized in case stretch is later edited
+  type TEXT CHECK (type IN ('pre', 'post', 'standalone', 'morning')),
+  workout_log_id UUID REFERENCES workout_logs(id), -- links stretch session to workout if applicable
+  completed_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE stretch_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users manage own stretch logs" ON stretch_logs FOR ALL USING (user_id = auth.uid());
+```
+
+**DB: `soreness_logs` table (critical companion — see gap below):**
+```sql
+CREATE TABLE soreness_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  date DATE NOT NULL,
+  muscle_group TEXT NOT NULL,
+  soreness_level SMALLINT CHECK (soreness_level BETWEEN 1 AND 5),
+  logged_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, date, muscle_group)
+);
+ALTER TABLE soreness_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users manage own soreness logs" ON soreness_logs FOR ALL USING (user_id = auth.uid());
+```
+
+**Gap — stretch data seeding is a real build cost:**
+Writing 50 stretches by hand is significant scope. Three options:
+1. **AI-generated seed file (recommended):** Have Claude generate the full 50-stretch JSON array in a single prompt — name, muscle_groups, type, instructions (3–5 steps), where_you_feel_it, common_mistakes, also_helps for each. Review and insert via Supabase SQL. One-time cost, consistent format.
+2. **Start with 20 (one per major muscle group):** Launch with minimal coverage, add more over time. Users won't notice if each muscle group has 3–4 options.
+3. **Phase 0 build:** Write the seeding script as part of the phase — Claude generates the JSON, we insert it, done. Same pattern as the exercise library.
+
+> **Recommended:** Option 1. Generate the JSON before writing any UI code. This is the fastest path to a complete library.
+
 **Routine generation — the smart part:**
 - After completing a workout, a "🧘 Your Recovery Stretches" card appears on the workout completion screen
-- Pulls the 4–6 most relevant post-workout static stretches based on the workout's muscle groups
+- Pulls the 4–6 most relevant post-workout static stretches based on the workout's muscle groups (match `exercises.body_part` values from the completed session to `stretches.muscle_group` array)
 - Pre-workout: when viewing the day's planned workout, a "Warm Up" card shows 3–4 dynamic stretches for that session's target muscles
 - The pre/post distinction is taught contextually: "Dynamic stretches now — save the deep holds for after your workout" with a one-line explanation
-- User can mark stretches as "Done" — this logs to a new `stretch_logs` table (user_id, date, stretch_id, type, completed_at)
+- User marks stretches as "Done" — logs to `stretch_logs` with `workout_log_id` linking to the session
 
 **Stretch encyclopedia at `/life-hub/workouts/stretches`:**
 - Same card layout as Exercise Library: sticky muscle-group nav, image cards, detail modal
 - Detail modal: full-width image, muscle tags, numbered instructions, where you should feel it (green), common mistakes (red), pre/post/both badge, duration recommendation
-- Foam rolling section: "💆 Foam Rolling" with technique differences for pre (fast rolling, 30s per spot) vs post (slow, 60–90s on tight spots)
-- A "Morning Mobility" tab: full-body dynamic routine not tied to any workout — 8–10 movements, 5 minutes total, designed to start the day
+- Foam rolling section: "💆 Foam Rolling" with technique note (pre = fast rolling 30s/spot; post = slow 60–90s on tight spots)
+- A "Morning Mobility" tab: full-body dynamic routine not tied to any workout — 8–10 movements, 5 minutes, designed to start the day
 
 **Mobility Score (new composite score):**
-- 0–100 score, similar to Recovery Score
+- 0–100 score, displayed on workout plan page as a card below Recovery Score
 - Components:
-  - Stretching after last workout: 0 or 30 pts (did you stretch after your most recent session?)
-  - Stretching consistency (last 7 days): 0–30 pts (stretch_logs count / workout_logs count × 30)
+  - Stretching after last workout: 0 or 30 pts
+  - Stretching consistency (last 7 days: stretch_logs count / workout_logs count × 30): 0–30 pts
   - Morning mobility (today): 0–20 pts
   - Workout warm-up (today): 0–20 pts
-- Displayed on the workout plan page as a small card below Recovery Score
+
+**Gap — soreness logging is undervalued and should be a first-class feature:**
+Soreness ratings at workout start are not a "deeper expansion" — they're the engine that makes the entire stretch recommendation system genuinely personalized. Without soreness data, the routine generator can only recommend by muscle group (which exercises were done). With soreness data, it recommends by what actually needs attention today. 
+- A 1–5 soreness prompt per muscle group at the start of each workout (or as a standalone "How are you feeling?" check-in on rest days) takes 15 seconds and produces extraordinary data
+- Soreness 4–5 in quads → prioritize hip flexors and quad stretches pre-workout AND flag for modified loading ("consider reducing leg day weight — your quads are very sore")
+- Soreness logged to `soreness_logs` table (see DB spec above)
+- Recovery Score gains a soreness component: high average soreness across multiple muscle groups = higher recovery need
 
 **Cross-system connections:**
-- **Recovery Score:** Mobility Score feeds in as a component — stretching after workouts reduces next-day soreness, which is relevant to recovery
-- **Daily Brief:** "You have push day today — your chest and shoulders are still tight from Monday's session. Don't skip the arm-across-chest stretch before you start." — this is only possible because stretch_logs exist
+- **Recovery Score:** Mobility Score feeds in as a component; soreness_logs add a soreness component ("How recovered are your muscles?")
+- **Daily Brief:** "You have push day today — your chest logged soreness 4/5 two days ago. Prioritize the chest opener and arm-across-chest stretch before you start." — only possible because soreness_logs + stretch_logs exist
 - **Monthly Wrap:** "You completed post-workout stretching after 8 of 12 workouts this month — up from 3 last month. Your Recovery Score averaged 4 points higher on days you stretched."
-- **Workout completion screen:** the first thing shown after the post-workout check-in is the auto-generated recovery stretch routine — makes it frictionless to do it right then
-- **Sleep correlation:** consistent stretching → better muscle relaxation → potentially better deep sleep — if the data shows this, Monthly Wrap can surface it: "On days you stretched post-workout, your average deep sleep was 18 min longer"
-- **HR connection:** if the user's HR is elevated (overtraining signal), Daily Brief can suggest prioritizing mobility work over another training session: "Your resting HR is up today — consider a stretching session instead of your scheduled workout"
+- **Workout completion screen:** first thing shown after post-workout check-in is the auto-generated recovery stretch routine — frictionless to complete right then
+- **Sleep correlation:** consistent stretching → better muscle relaxation → potentially better deep sleep — Monthly Wrap can surface it when data confirms: "On days you stretched post-workout, your average deep sleep was 18 min longer"
+- **HR connection (Phase HR):** if resting HR is elevated (overtraining signal), Daily Brief can suggest mobility work instead of training: "Your resting HR is up today — consider a stretching session instead of your scheduled workout"
+- **Injury flag:** if soreness_logs show ≥4 in the same muscle group 3 days running, surface a gentle warning on the workout plan page: "You've noted significant quad soreness for 3 days — consider a rest day or substituting today's leg exercises"
 
 **Deeper expansion:**
-- **Soreness logging:** a simple 1–5 soreness rating per muscle group, logged at the start of a workout — feeds into stretch recommendations (high soreness in legs → prioritize hip flexors and quads in the pre-stretch) and feeds Recovery Score
-- **Injury flag:** if the user marks soreness ≥ 4 for the same muscle group 3 days in a row, surface a gentle warning: "You've noted significant quad soreness for 3 days — it may be worth taking a rest day or substituting leg exercises"
-- **Progressive flexibility tracking:** for key stretches (hamstring reach, hip flexor depth), let the user log a subjective "how far did you get" score — track improvement over time as a flexibility trend
+- **Progressive flexibility tracking:** for key stretches (hamstring reach, hip flexor depth), let the user log a subjective "how far did you get" score — track improvement over time as a flexibility trend on the Health Overview page
+- **Yoga routines (future):** standalone sequences not tied to a workout — Morning Flow (10 min), Evening Wind-Down (15 min), rest day recovery (20 min) — each with curated stretches from the library
 
 ---
 
@@ -1520,6 +1740,22 @@ ALTER TABLE daily_checkins ADD COLUMN hydration_score SMALLINT;
 - Extract `caffeine_100mg` (note: OFF stores caffeine as mg per 100g, field name varies — check `nutriments.caffeine_100g`) → store as `caffeine_mg` per serving
 
 **Note on existing cached foods:** Existing `food_cache` rows won't have these fields populated. They'll be null. The hydration ring simply shows "—" for food water content on those entries rather than breaking. As new foods are searched they'll populate.
+
+**Additional columns needed (identified in feature gap review):**
+```sql
+-- Preview Before Saving: notes field
+ALTER TABLE my_foods ADD COLUMN notes TEXT;
+-- Meal plan adherence (see Meal Plan Improvements)
+ALTER TABLE daily_checkins ADD COLUMN followed_meal_plan BOOLEAN;
+-- Soreness logging (see Stretching feature)
+-- supplement_logs table (see Critical Missing Foundation above)
+-- heart rate intraday (see Heart Rate feature)
+ALTER TABLE health_heart_rate_daily ADD COLUMN resting_bpm SMALLINT;
+ALTER TABLE health_heart_rate_daily ADD COLUMN hrv_rmssd NUMERIC(6,2);
+```
+
+**Gap — hydration score trend surface:**
+The `hydration_score` column in `daily_checkins` will accumulate 30 days of data. Surface this as a 7-day bar chart on the Health Overview page (same row as resting HR trend) — not just today's ring. Users need the trend to understand their hydration patterns, not just the daily snapshot.
 
 ---
 
