@@ -1340,13 +1340,23 @@ Once supplement_logs is built (see Critical Missing Foundation), the Supplement 
 
 ### Feature: Heart Rate — Intraday View, Workout Zones, and Long-Term Fitness Signal
 
-*Heart rate is the clearest objective fitness signal the app has access to. It should feed Recovery Score, Monthly Wrap, Daily Brief, and workout logging — not just sit on a health page.*
+*Heart rate is the clearest objective fitness signal the app has access to. It feeds Recovery Score, Monthly Wrap, Daily Brief, and workout logging — not just a health page. The workout session itself becomes a live HR capture window, producing minute-by-minute data for the workout block while the rest of the day fills in via background sync.*
 
-> **Confirmed via Google Health API research (June 2026):** The existing `heart-rate` endpoint already returns ~10-second granularity samples. The sync route receives all of them — it just discards timestamp information after bucketing by date. No new API calls, no new scopes, no new permissions needed for intraday. `daily-resting-heart-rate` is a dedicated Google-calculated endpoint (same existing scope). HRV (`heart-rate-variability`) is available with existing scope. HR zones by workout are NOT a dedicated endpoint — must be computed by filtering intraday samples to the workout's timestamp window.
+> **Confirmed via Google Health API research (June 2026):**
+> - The existing `heart-rate` endpoint already returns ~10-second granularity samples (~8,728/day). The sync route receives all of them — it just discards timestamps after bucketing by date. Zero new API calls, zero new scopes needed for intraday.
+> - `daily-resting-heart-rate` is a Google-computed dedicated endpoint — more accurate than deriving it ourselves. Same existing scope.
+> - HRV (`heart-rate-variability`, `daily-heart-rate-variability`) is available with the exact scope the app already has.
+> - HR zones by workout are NOT a Google Health dedicated endpoint — they must be computed by filtering intraday samples to the workout's timestamp window.
+> - Live workout HR polling: Google Health is a pull API (not a push stream). "Live" during workout = periodic pulls every 60–90 seconds from the workout log page, fetching only the last 2 hours of HR data. This fills the intraday table with dense data during the active session.
 
-**Phase 0 — Foundation (do this first, everything else builds on it):**
+---
 
-Add a `health_heart_rate_intraday` table:
+#### Phase 0 — Data Foundation (no UI, no user-visible changes)
+
+> Build this entire phase before writing any UI. Every subsequent phase depends on this data existing.
+
+**Step 0A — New table: `health_heart_rate_intraday`**
+
 ```sql
 CREATE TABLE health_heart_rate_intraday (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -1356,80 +1366,558 @@ CREATE TABLE health_heart_rate_intraday (
   avg_bpm SMALLINT,
   min_bpm SMALLINT,
   max_bpm SMALLINT,
-  sample_count SMALLINT,
+  sample_count SMALLINT DEFAULT 0,
   synced_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(user_id, date, hour)
 );
 ALTER TABLE health_heart_rate_intraday ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users read own HR intraday" ON health_heart_rate_intraday FOR ALL USING (user_id = auth.uid());
+CREATE POLICY "Users manage own HR intraday" ON health_heart_rate_intraday
+  FOR ALL USING (user_id = auth.uid());
 ```
 
-Modify `sync/route.js` — currently the HR processing loop buckets raw samples by date and discards sub-day timestamps. Change it to also bucket by hour:
+**Step 0B — Extend `health_heart_rate_daily` with new columns**
+
+```sql
+ALTER TABLE health_heart_rate_daily ADD COLUMN resting_bpm SMALLINT;
+ALTER TABLE health_heart_rate_daily ADD COLUMN hrv_rmssd NUMERIC(6,2);
+```
+
+**Step 0C — Modify `sync/route.js` — dual-bucket HR processing**
+
+The current HR processing loop in the sync route:
 ```js
-// Current: hrBucket[date].push(bpm)
-// New: also bucket by hour
-const hour = new Date(t).getHours() // convert to local/EST hour
+// Current code (lines ~240-257):
+const t = p.heartRate?.sampleTime?.physicalTime
+const bpm = parseInt(p.heartRate?.beatsPerMinute)
+if (!t || isNaN(bpm) || bpm <= 0) return
+const date = estDateStr(new Date(t))
+if (!hrBucket[date]) hrBucket[date] = []
+hrBucket[date].push(bpm)
+```
+
+Change to:
+```js
+const t = p.heartRate?.sampleTime?.physicalTime
+const bpm = parseInt(p.heartRate?.beatsPerMinute)
+if (!t || isNaN(bpm) || bpm <= 0) return
+const ts = new Date(t)
+const date = estDateStr(ts)
+const hour = new Date(ts.toLocaleString('en-US', { timeZone: 'America/New_York' })).getHours()
+
+// Existing: bucket by date for daily aggregation
+if (!hrBucket[date]) hrBucket[date] = []
+hrBucket[date].push(bpm)
+
+// New: also bucket by date+hour for intraday
 if (!hrHourBucket[date]) hrHourBucket[date] = {}
 if (!hrHourBucket[date][hour]) hrHourBucket[date][hour] = []
 hrHourBucket[date][hour].push(bpm)
 ```
-Then upsert per-date-hour rows alongside the existing daily rows. Zero extra API calls.
 
-Also add `daily-resting-heart-rate` to the sync fetch list — Google computes this server-side more accurately than deriving it from sleep session timestamps:
+After the loop, add the intraday upsert alongside the existing daily upsert:
 ```js
-const restingHRPoints = await fetchDataType(accessToken, 'daily-resting-heart-rate', since)
-// returns beatsPerMinute per day; upsert into health_heart_rate_daily as a resting_bpm column
+const intradayRows = []
+for (const [date, hours] of Object.entries(hrHourBucket)) {
+  for (const [hour, vals] of Object.entries(hours)) {
+    intradayRows.push({
+      user_id: user.id,
+      date,
+      hour: parseInt(hour),
+      avg_bpm: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
+      min_bpm: Math.min(...vals),
+      max_bpm: Math.max(...vals),
+      sample_count: vals.length,
+      synced_at: new Date().toISOString(),
+    })
+  }
+}
+if (intradayRows.length > 0) {
+  await supabase.from('health_heart_rate_intraday')
+    .upsert(intradayRows, { onConflict: 'user_id,date,hour' })
+}
 ```
-Add column: `ALTER TABLE health_heart_rate_daily ADD COLUMN resting_bpm SMALLINT;`
 
-Also add HRV (no scope change needed):
+**Step 0D — Add resting HR and HRV to the sync fetch**
+
+Add two new parallel fetches in the same Promise.all block:
 ```js
-const hrvPoints = await fetchDataType(accessToken, 'daily-heart-rate-variability', since)
+const [stepsPoints, heartPoints, sleepPoints, restingHRPoints, hrvPoints] = await Promise.all([
+  fetchDataType(accessToken, 'steps', since),
+  fetchDataType(accessToken, 'heart-rate', since),
+  fetchDataType(accessToken, 'sleep', since),
+  fetchDataType(accessToken, 'daily-resting-heart-rate', since),
+  fetchDataType(accessToken, 'daily-heart-rate-variability', since),
+])
 ```
-Add column: `ALTER TABLE health_heart_rate_daily ADD COLUMN hrv_rmssd NUMERIC(6,2);`
 
-**Part A — Intraday HR page at `/life-hub/health/heart-rate`:**
-- Line chart (continuous, not bars): x-axis = hours of day (0–23), y-axis = bpm, drawn from `health_heart_rate_intraday`
-- Four HR zone bands drawn as colored horizontal regions (computed from `220 - age` pulled from `goals_profiles`):
-  - Grey: Resting/Recovery (< 50% max HR)
-  - Blue: Fat Burn (50–65%)
-  - Green: Cardio (65–80%)
-  - Orange: Hard (80–90%)
-  - Red: Peak (> 90%)
-- Workout segments highlighted as a shaded band behind the chart line — match `workout_logs.created_at` and `duration_seconds` to time window
-- Today / Yesterday / Week selector (week view = daily peak HR as a bar chart)
-- Empty state: if no wearable synced today, show "Sync your device in Health Settings"
+Process resting HR (structure: one data point per day with `beatsPerMinute` field):
+```js
+for (const p of restingHRPoints) {
+  const date = estDateStr(new Date(p.sampleTime?.physicalTime || p.dataTypeName))
+  const bpm = parseInt(p.heartRate?.beatsPerMinute ?? p.beatsPerMinute)
+  if (!date || isNaN(bpm)) continue
+  // upsert resting_bpm into health_heart_rate_daily
+  await supabase.from('health_heart_rate_daily')
+    .upsert({ user_id: user.id, date, resting_bpm: bpm }, { onConflict: 'user_id,date' })
+}
+```
 
-**Part B — Workout HR zones on completion screen:**
-- After finishing a workout, compute zone breakdown by filtering `health_heart_rate_intraday` for today's workout time window (created_at → created_at + duration_seconds) and bucket each sample into a zone
-- "12 min fat-burn · 28 min cardio · 5 min peak" with a proportional colored bar
-- Store computed zones as `hr_zones JSONB` in `workout_logs`: `{ fat_burn_min, cardio_min, hard_min, peak_min, avg_bpm, max_bpm }`
-- Over time: workout history shows HR zones per session as small colored chips
-- Efficiency trend: "Your heart worked less hard for the same Push Day this month" — when avg_bpm for same day_label decreases over sessions
+Process HRV (structure: one data point per day, RMSSD in ms):
+```js
+for (const p of hrvPoints) {
+  const date = estDateStr(new Date(p.sampleTime?.physicalTime))
+  const rmssd = parseFloat(p.heartRateVariability?.rmssd ?? p.rmssd)
+  if (!date || isNaN(rmssd)) continue
+  await supabase.from('health_heart_rate_daily')
+    .upsert({ user_id: user.id, date, hrv_rmssd: rmssd }, { onConflict: 'user_id,date' })
+}
+```
 
-**Part C — Resting HR trend (the most motivating metric):**
-- Use `health_heart_rate_daily.resting_bpm` (Google-computed via the `daily-resting-heart-rate` endpoint — more accurate than deriving from sleep sessions)
-- 30-day trend card on Health Overview page: single downward line = proof cardiovascular fitness is improving
-- Benchmark context: "Your resting HR of 58 bpm puts you in the 'Good' fitness range for your age" — compute from published ranges by age/sex
-- Alert: if resting_bpm is elevated 5+ bpm above 30-day baseline, Daily Brief surfaces a recovery note
+> **Note on exact field names:** The Google Health API RPC reference for HRV field names is behind auth. When building, log the raw response from `daily-heart-rate-variability` first to confirm the exact path to RMSSD value. The structure will be similar to heart-rate samples but for HRV. Adjust field paths as needed — the pattern is correct even if the leaf field name differs.
 
-**Part D — HRV (Heart Rate Variability) — free with existing scope:**
-- Store `hrv_rmssd` in `health_heart_rate_daily` from the `daily-heart-rate-variability` endpoint
-- HRV is a better recovery predictor than resting HR alone: low HRV = sympathetic nervous system dominant = stress / under-recovery
-- 7-day HRV trend card alongside resting HR on the Health Overview page
-- Feed into Recovery Score: if HRV is trending down (3+ days), Recovery Score drops and Daily Brief flags it
+**Step 0E — New API route: `POST /api/health/workout-hr-sync`**
 
-**Cross-system connections:**
-- **Recovery Score:** add resting HR and HRV components — if resting_bpm below 30-day baseline → score up; if elevated → score down; if HRV trending down → score down; replaces the "workout load" estimate with objective physiological signals
-- **Daily Brief:** "Your resting HR last night was 54 bpm — 3 below your 30-day average. Your cardiovascular system is adapting well." OR "Your HRV is down 3 days running — your body may need more recovery time."
-- **Monthly Wrap:** "Your average workout HR dropped from 152 bpm to 144 bpm this month — your heart is becoming more efficient. Resting HR: down 4 bpm since last month. HRV: up 12 ms." — concrete fitness progress numbers
-- **Hard day detection → Recovery Score:** if yesterday's workout had > 15 min in peak zone (from hr_zones JSONB), penalize recovery score and Daily Brief suggests a lighter day
-- **Sleep correlation:** resting HR elevated on short-sleep nights → Daily Brief notes the connection
+A lightweight route called by the workout log page during an active session. Fetches only the last 2 hours of HR data (not the full incremental sync) so it completes in < 2 seconds.
 
-**Deeper expansion:**
-- **Cumulative training load:** sum of (workout_duration × avg_HR_zone_multiplier) over past 7 days → a high load score means the user needs more rest → feeds Recovery Score
-- **Fitness age:** compute "cardiovascular fitness age" from resting HR, workout HR efficiency trend, and HRV — show alongside actual age ("Your heart performs like a 28-year-old's")
-- **Zone goal setting:** user sets a target zone per workout type ("I want to stay in cardio zone for my Tuesday run") — post-workout screen grades adherence to that goal
+```js
+// src/app/api/health/workout-hr-sync/route.js
+export async function POST(req) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Get tokens (same as sync/route.js)
+  const { data: tokenRow } = await supabase
+    .from('google_health_tokens')
+    .select('access_token, refresh_token, expires_at')
+    .eq('user_id', user.id).single()
+  if (!tokenRow) return NextResponse.json({ ok: false, reason: 'no_token' })
+
+  // Refresh if needed (same logic as sync route)
+  const accessToken = await getValidAccessToken(tokenRow, supabase, user.id)
+
+  // Fetch only last 2 hours
+  const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+  const heartPoints = await fetchDataType(accessToken, 'heart-rate', since)
+
+  // Process into intraday rows (same dual-bucket logic as above)
+  // ... bucket by hour, upsert to health_heart_rate_intraday
+
+  return NextResponse.json({ ok: true, samples: heartPoints.length })
+}
+```
+
+This route shares the `fetchDataType` and `getValidAccessToken` helper functions with `sync/route.js`. Extract those helpers to a shared `src/lib/googleHealth.js` file so both routes can import them without duplication.
+
+---
+
+#### Phase 1 — Resting HR Trend Card (first user-visible surface)
+
+> Quickest win. No new page — just a card added to the existing Health Overview page.
+
+**Location:** `/life-hub/health/page.js` — add below the existing stats row (Steps Today / Avg Heart Rate / Sleep Last Night).
+
+**Card contents:**
+- Title: "Resting Heart Rate"
+- Large number: today's `resting_bpm` from `health_heart_rate_daily` — or most recent day it exists
+- Trend indicator: compare today's resting_bpm to 30-day average. If today < avg by 3+: green arrow + "↓ below your average — good sign". If today > avg by 5+: amber + "↑ elevated — see note". Otherwise neutral.
+- Small sparkline: 30-day resting HR values as a thin SVG line (same no-library pattern as DomainTrend.js). Goal: one downward-trending line = motivation.
+- Benchmark context below the number (lookup table by age from goals_profiles.age and sex):
+
+```
+Resting HR ranges (all ages, general):
+  Athlete:      < 60 bpm
+  Excellent:    60–64
+  Good:         65–69
+  Above avg:    70–74
+  Average:      75–79
+  Below avg:    80–84
+  Poor:         85+
+```
+
+- HRV companion chip (small, below the sparkline): "HRV: 42 ms · 7-day avg 44 ms" — just a number, no deep explanation on this card. A "?" tooltip explains: "Higher HRV = better recovery. Normal range varies by person — track your personal trend."
+
+**Data fetch:** Add to the existing parallel data fetch in health/page.js:
+```js
+const [stepsData, hrData, sleepData, restingHRData] = await Promise.all([
+  // existing fetches...
+  supabase.from('health_heart_rate_daily')
+    .select('date, resting_bpm, hrv_rmssd')
+    .eq('user_id', user.id)
+    .not('resting_bpm', 'is', null)
+    .order('date', { ascending: false })
+    .limit(30)
+])
+```
+
+**Empty state:** If no resting HR data exists (user hasn't synced a wearable or wearable doesn't support continuous HR): show card with dimmed text "Connect a wearable to track resting HR" and a subtle lock icon. Don't hide the card — it teaches the user what's possible.
+
+---
+
+#### Phase 2 — Intraday HR Page
+
+**Route:** `/life-hub/health/heart-rate` (new page)
+**Sidebar:** Add under Health dropdown: "Heart Rate" link between "Overview" and "Steps"
+
+**Data fetch:**
+```js
+// Today's intraday data
+const { data: intradayRows } = await supabase
+  .from('health_heart_rate_intraday')
+  .select('hour, avg_bpm, min_bpm, max_bpm, sample_count')
+  .eq('user_id', user.id)
+  .eq('date', todayStr)
+  .order('hour')
+
+// Today's workouts (for shading)
+const { data: workouts } = await supabase
+  .from('workout_logs')
+  .select('created_at, duration_seconds, day_label')
+  .eq('user_id', user.id)
+  .gte('created_at', todayStr)
+  .is('is_partial', false)
+
+// 7-day peak HR for week view
+const { data: weekDailyHR } = await supabase
+  .from('health_heart_rate_daily')
+  .select('date, max_bpm, avg_bpm, resting_bpm')
+  .eq('user_id', user.id)
+  .gte('date', sevenDaysAgoStr)
+  .order('date')
+```
+
+**Chart implementation — SVG line chart (no library, same pattern as DomainTrend.js):**
+
+Plot points: one dot per hour where data exists (0–23 on x-axis). Connect dots with a smooth SVG polyline. Hours with no data (middle of night, user not wearing watch) show as a gap — don't interpolate.
+
+```
+Layout:
+  - Chart area: full width, ~200px tall
+  - X-axis: hour labels (6am, 9am, 12pm, 3pm, 6pm, 9pm)
+  - Y-axis: bpm labels (40, 60, 80, 100, 120, 140, 160, 180) — auto-scaled to data range
+  - Zone bands: colored horizontal fills between y-values (Grey/Blue/Green/Orange/Red)
+  - Workout shading: semi-transparent vertical rectangle over the workout time window
+  - Line: accent-blue, 2px stroke, dots at each hour point
+  - Tooltip on hover: "2:00 PM — 84 bpm avg (78–92 range, 412 samples)"
+```
+
+Zone band computation (runs client-side from goals_profiles.age):
+```js
+const maxHR = 220 - age
+const zones = {
+  recovery: [0, maxHR * 0.50],
+  fatBurn:  [maxHR * 0.50, maxHR * 0.65],
+  cardio:   [maxHR * 0.65, maxHR * 0.80],
+  hard:     [maxHR * 0.80, maxHR * 0.90],
+  peak:     [maxHR * 0.90, maxHR],
+}
+```
+
+Workout window shading:
+```js
+// For each completed workout today:
+const startHour = new Date(workout.created_at).getHours()
+const endHour = startHour + Math.ceil(workout.duration_seconds / 3600)
+// Draw semi-transparent rect from startHour to endHour x-positions
+// Label: workout.day_label ("Push Day") centered above the rect
+```
+
+**Today / Yesterday / Week tabs:**
+- Today: full intraday line chart
+- Yesterday: same chart, different date query
+- Week: switch to a bar chart showing `max_bpm` per day for the last 7 days (simpler view for the week)
+
+**Empty state:** If no intraday data for the selected day: "No heart rate data for this day. Make sure your wearable is synced." with a sync button that fires POST /api/health/sync.
+
+---
+
+#### Phase 3 — Live HR During Active Workout
+
+> This is the feature that makes the workout window in the intraday chart high-resolution. Without this, the workout block might only have hourly data points (one per hour). With this, it has data every minute — smooth and detailed exactly where you care most.
+
+**How it works:**
+When the user taps "Start Workout" in the workout log page, a polling interval starts:
+- Every 90 seconds: call `POST /api/health/workout-hr-sync`
+- This fetches the last 2 hours of HR data from Google Health and upserts into `health_heart_rate_intraday`
+- Each poll overwrites the current hour's row with updated avg/min/max/sample_count — the data gets richer with each poll as more samples accumulate
+- The poll is lightweight: only 2 hours of data, finishes in under 2 seconds
+
+When the user taps "Finish Workout":
+1. One final sync call to capture the tail end of the session
+2. Then compute zone breakdown for the workout window (query intraday rows for the session's hour range)
+3. Store `hr_zones` JSONB on the workout_logs row
+4. Show zone breakdown on the completion screen
+
+**Polling implementation in workout log page:**
+```js
+// In the component that handles the workout timer:
+const hrPollRef = useRef(null)
+
+function startWorkout() {
+  // existing start logic...
+  
+  // Start HR polling if Google Health is connected
+  if (healthConnected) {
+    hrPollRef.current = setInterval(async () => {
+      await fetch('/api/health/workout-hr-sync', { method: 'POST' })
+    }, 90 * 1000) // every 90 seconds
+  }
+}
+
+function finishWorkout() {
+  // Stop polling
+  if (hrPollRef.current) {
+    clearInterval(hrPollRef.current)
+    hrPollRef.current = null
+  }
+  
+  // Final sync
+  if (healthConnected) {
+    await fetch('/api/health/workout-hr-sync', { method: 'POST' })
+  }
+  
+  // existing finish logic...
+}
+
+// Cleanup on unmount
+useEffect(() => {
+  return () => { if (hrPollRef.current) clearInterval(hrPollRef.current) }
+}, [])
+```
+
+**Check if Google Health is connected:** The health status endpoint (`/api/health/status`) is already built. Add a check at workout log page load: if connected, set `healthConnected = true`. If not connected, polling is skipped silently — the user doesn't see anything different.
+
+**Zone breakdown computation (on workout finish):**
+```js
+async function computeWorkoutZones(workoutStartTime, durationSeconds, userId, age) {
+  const startHour = new Date(workoutStartTime).getHours()
+  const endHour = Math.min(23, startHour + Math.ceil(durationSeconds / 3600) + 1)
+  
+  const { data: intradayRows } = await supabase
+    .from('health_heart_rate_intraday')
+    .select('hour, avg_bpm, sample_count')
+    .eq('user_id', userId)
+    .eq('date', todayStr)
+    .gte('hour', startHour)
+    .lte('hour', endHour)
+  
+  const maxHR = 220 - age
+  let zones = { fat_burn_min: 0, cardio_min: 0, hard_min: 0, peak_min: 0 }
+  let totalBpm = 0, totalSamples = 0
+  
+  for (const row of intradayRows) {
+    const minutesInHour = row.sample_count / 6 // ~6 samples/minute at 10s intervals
+    const bpm = row.avg_bpm
+    const pct = bpm / maxHR
+    if (pct >= 0.90) zones.peak_min += minutesInHour
+    else if (pct >= 0.80) zones.hard_min += minutesInHour
+    else if (pct >= 0.65) zones.cardio_min += minutesInHour
+    else if (pct >= 0.50) zones.fat_burn_min += minutesInHour
+    totalBpm += bpm * row.sample_count
+    totalSamples += row.sample_count
+  }
+  
+  return {
+    ...zones,
+    avg_bpm: totalSamples > 0 ? Math.round(totalBpm / totalSamples) : null,
+    max_bpm: Math.max(...intradayRows.map(r => r.max_bpm || 0)) || null,
+  }
+}
+```
+
+Store result: `await supabase.from('workout_logs').update({ hr_zones: zones }).eq('id', workoutLogId)`
+
+**Add `hr_zones` column to `workout_logs`:**
+```sql
+ALTER TABLE workout_logs ADD COLUMN hr_zones JSONB;
+```
+
+**Completion screen zone bar:**
+```jsx
+{hrZones && (
+  <div style={{ marginTop: '16px' }}>
+    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+      Heart Rate Zones
+    </div>
+    <div style={{ display: 'flex', borderRadius: '6px', overflow: 'hidden', height: '12px' }}>
+      {hrZones.fat_burn_min > 0 && (
+        <div style={{ flex: hrZones.fat_burn_min, background: 'var(--accent-blue)' }} title={`Fat Burn: ${Math.round(hrZones.fat_burn_min)} min`} />
+      )}
+      {hrZones.cardio_min > 0 && (
+        <div style={{ flex: hrZones.cardio_min, background: 'var(--success)' }} title={`Cardio: ${Math.round(hrZones.cardio_min)} min`} />
+      )}
+      {hrZones.hard_min > 0 && (
+        <div style={{ flex: hrZones.hard_min, background: 'var(--warning)' }} title={`Hard: ${Math.round(hrZones.hard_min)} min`} />
+      )}
+      {hrZones.peak_min > 0 && (
+        <div style={{ flex: hrZones.peak_min, background: 'var(--error)' }} title={`Peak: ${Math.round(hrZones.peak_min)} min`} />
+      )}
+    </div>
+    <div style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+      {hrZones.fat_burn_min > 0 && <span>💙 Fat Burn {Math.round(hrZones.fat_burn_min)}m</span>}
+      {hrZones.cardio_min > 0 && <span>💚 Cardio {Math.round(hrZones.cardio_min)}m</span>}
+      {hrZones.hard_min > 0 && <span>🧡 Hard {Math.round(hrZones.hard_min)}m</span>}
+      {hrZones.peak_min > 0 && <span>❤️ Peak {Math.round(hrZones.peak_min)}m</span>}
+      {hrZones.avg_bpm && <span>· Avg {hrZones.avg_bpm} bpm</span>}
+    </div>
+  </div>
+)}
+```
+
+Only shown when `hrZones` is non-null and at least one zone has > 0 minutes. If no wearable: section doesn't render at all.
+
+---
+
+#### Phase 4 — Recovery Score Integration
+
+> Add resting HR and HRV as objective physiological components to the existing Recovery Score widget on Life Hub home.
+
+**Current Recovery Score components (0–100):**
+- Sleep quality: 0–25 pts
+- Hydration: 0–20 pts
+- Protein intake: 0–20 pts
+- Energy check-in: 0–20 pts
+- Workout load: 0–15 pts
+
+**New components (replace "Workout load" estimate with objective HR signals):**
+- Resting HR vs. 30-day baseline: 0–20 pts
+  - resting_bpm < 30d_avg by 5+: +20 (excellent recovery signal)
+  - resting_bpm within 4 of avg: +15 (normal)
+  - resting_bpm above avg by 5–9: +8 (slightly elevated — watch it)
+  - resting_bpm above avg by 10+: 0 (elevated — rest recommended)
+- HRV trend (7-day): 0–15 pts
+  - HRV trending up (today > 7d avg): +15
+  - HRV stable: +10
+  - HRV trending down 3+ days: 0
+- Workout load (adjusted — now based on actual hr_zones if available, estimated otherwise): 0–15 pts
+  - No workout yesterday: +15 (fully rested)
+  - Workout with < 10 min peak zone: +12
+  - Workout with 10–20 min peak zone: +8
+  - Workout with > 20 min peak zone: +3 (high intensity = more recovery needed)
+
+Total remains 0–100. Component weights adjusted; score meaning unchanged.
+
+**Graceful degradation:** If resting_bpm or hrv_rmssd is null for today (user didn't sync or doesn't have wearable), those components fall back to a neutral score (15/20 and 10/15 respectively — not penalized for missing data, just not awarded full points). The score card shows which components have data: "⚡ HR data not synced today" in small text if falling back.
+
+---
+
+#### Phase 5 — Daily Brief + Monthly Wrap Integration
+
+**Daily Brief (`/api/life-hub/daily-brief/route.js`):**
+
+Add to the data snapshot gathered before calling Claude:
+```js
+const { data: hrToday } = await supabase
+  .from('health_heart_rate_daily')
+  .select('resting_bpm, hrv_rmssd')
+  .eq('user_id', user.id)
+  .eq('date', yesterday) // yesterday's data = last night's resting HR
+  .single()
+
+const { data: hr30d } = await supabase
+  .from('health_heart_rate_daily')
+  .select('resting_bpm, hrv_rmssd')
+  .eq('user_id', user.id)
+  .gte('date', thirtyDaysAgo)
+  .not('resting_bpm', 'is', null)
+  .order('date')
+```
+
+Compute 30-day averages and include in the Claude context snapshot:
+```
+Resting HR last night: 54 bpm (30-day avg: 58 bpm — 4 below average, positive trend)
+HRV last night: 48 ms (7-day avg: 44 ms — trending up)
+```
+
+Claude prompt updated to reference HR when significant:
+- If resting HR ≥ 5 below avg: mention it as a positive signal
+- If resting HR ≥ 5 above avg: suggest recovery focus
+- If HRV trending down 3+ days: note nervous system stress
+- If all normal: don't mention HR at all — save the sentence budget for something more notable
+
+Example generated lines:
+> "Your resting HR last night was 54 bpm — 4 below your monthly average. Your cardiovascular system is adapting well to the training load."
+> "Your HRV has been declining for 3 days. This often means your body needs more recovery time — consider going lighter today even if energy feels okay."
+
+**Monthly Wrap (`/api/life-hub/monthly-wrap/route.js`):**
+
+Add to the 6-table data gather:
+```js
+const { data: monthlyHR } = await supabase
+  .from('health_heart_rate_daily')
+  .select('date, resting_bpm, avg_bpm, hrv_rmssd')
+  .eq('user_id', user.id)
+  .gte('date', monthStart)
+  .lte('date', monthEnd)
+  .not('resting_bpm', 'is', null)
+```
+
+Compute:
+- `avg_resting_bpm` for the month
+- `avg_resting_bpm_prev_month` (compare to prior month's avg from same query with different date range)
+- `resting_hr_change` = avg this month - avg last month (negative = improvement)
+- `avg_workout_bpm` from `workout_logs.hr_zones` JSONB avg_bpm field across all sessions
+
+Inject into Claude prompt:
+```
+Heart rate this month:
+  Avg resting HR: 61 bpm (last month: 65 bpm — down 4 bpm ✓)
+  Avg workout HR: 147 bpm (last month: 154 bpm — heart more efficient)
+  HRV avg: 42 ms
+```
+
+New stat card on monthly wrap page: "❤️ Cardiovascular" showing resting HR avg + trend arrow + workout HR avg + trend arrow.
+
+Example generated narrative:
+> "Your cardiovascular fitness made measurable progress this month. Resting HR dropped from 65 to 61 bpm — a 6% improvement that reflects real adaptation, not noise. Your average workout HR also decreased from 154 to 147, meaning your heart is doing the same work more efficiently. Keep the training consistency going."
+
+**This is the Monthly Wrap sentence that gets screenshots.** It's concrete, it's encouraging, and it's only possible because of the data pipeline built in Phases 0–3.
+
+---
+
+#### Phase 6 — Workout History HR Display
+
+**Workout history page (`/life-hub/workouts/history/page.js`):**
+
+For each session that has `hr_zones` data:
+- Add a small colored chip row under the session header: "💙 18m · 💚 32m · 🧡 6m · Avg 144 bpm"
+- Clicking it expands to show the full zone bar (same as completion screen)
+
+**Efficiency trend detection:**
+- For sessions with the same `day_label` (e.g., all "Push Day" sessions), compare avg_bpm over time
+- If avg_bpm for that workout type has decreased by 5+ bpm over 4+ sessions: show a green trend chip "↓ 8 bpm more efficient than your first Push Day"
+- This is the most motivating number in the workout history view
+
+---
+
+#### Phase Build Order Summary
+
+| Phase | What gets built | Why this order |
+|-------|----------------|----------------|
+| 0 | DB tables, sync route changes, workout-hr-sync route | Foundation — everything else is blocked on data existing |
+| 1 | Resting HR trend card on Health Overview | Quickest win, visible immediately after Phase 0 |
+| 2 | Intraday HR page | The main new feature surface |
+| 3 | Live polling during workout + zone breakdown on completion screen | Highest engagement feature; depends on intraday data from Phase 0 |
+| 4 | Recovery Score HR/HRV components | Connects HR to the most-seen Life Hub number |
+| 5 | Daily Brief + Monthly Wrap HR integration | Narrative payoff; Claude needs enough data accumulated |
+| 6 | Workout history HR chips + efficiency trend | Polish layer; everything feeds into this |
+
+**Do not skip Phase 0.** All subsequent phases assume intraday data, resting HR, and HRV are being stored. If Phase 0 ships and data starts accumulating, Phases 1–6 can be built in any order independently.
+
+---
+
+#### Key Technical Decisions (Don't Re-Litigate)
+
+| Decision | Reason |
+|----------|---------|
+| Hour-level granularity (not 5-min) | 24 rows/day vs 288 rows/day; hour is sufficient for the chart and zone computation; 5-min is overkill for storage |
+| 90-second polling during workout | Fast enough to give near-real-time data; slow enough not to hammer the API; matches ~wearable sync frequency |
+| EST timezone for hour bucketing | Consistent with existing step data bucketing in `estDateStr()` — must use the same timezone |
+| `getValidAccessToken` extracted to shared lib | Both sync and workout-hr-sync need it; don't duplicate the token refresh logic |
+| Zone computation at workout finish (not during) | No partial data mid-workout; compute once on complete when we have the full window |
+| Google resting HR endpoint over client-side derivation | More accurate; Google uses all-day data including sleep; our approach of "lowest 10-min avg during sleep" is a rough approximation |
+| HRV RMSSD field name to be confirmed at build time | The RPC reference page is auth-gated; log the raw response first, adapt field path |
+| Graceful degradation everywhere | No wearable = no HR data = features don't show, not broken states |
 
 ---
 
