@@ -239,23 +239,26 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly })
             </div>
 
             {selected && (
-              <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selected.name}</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-                    {selected.serving_size_label || '1 serving'}
-                    {selected.calories ? ` · ${Math.round(selected.calories * (parseFloat(servings) || 1))} kcal` : ''}
+              <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selected.name}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                      {selected.serving_size_label || '1 serving'}
+                      {selected.calories ? ` · ${Math.round(selected.calories * (parseFloat(servings) || 1))} kcal` : ''}
+                    </div>
                   </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Servings</span>
+                    <input type="number" min="0.25" step="0.25" value={servings} onChange={e => setServings(e.target.value)}
+                      style={{ width: '56px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
+                  </div>
+                  <button onClick={handleAdd} disabled={saving}
+                    style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: saving ? 0.6 : 1, flexShrink: 0 }}>
+                    {saving ? '...' : libraryOnly ? '⭐ Save' : '+ Add'}
+                  </button>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Servings</span>
-                  <input type="number" min="0.25" step="0.25" value={servings} onChange={e => setServings(e.target.value)}
-                    style={{ width: '56px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
-                </div>
-                <button onClick={handleAdd} disabled={saving}
-                  style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: saving ? 0.6 : 1, flexShrink: 0 }}>
-                  {saving ? '...' : libraryOnly ? '⭐ Save' : '+ Add'}
-                </button>
+                <FoodIntelCard foodName={selected.name} brand={selected.brand} calories={selected.calories} protein_g={selected.protein_g} carbs_g={selected.carbs_g} fat_g={selected.fat_g} fiber_g={selected.fiber_g} sugar_g={selected.sugar_g} />
               </div>
             )}
 
@@ -630,19 +633,22 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal 
             </div>
 
             {selected && (
-              <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selected.name}</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-                    {selected.serving_size_label || '1 serving'}{selected.calories ? ` · ${Math.round(selected.calories * (parseFloat(searchServings) || 1))} kcal` : ''}
+              <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selected.name}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                      {selected.serving_size_label || '1 serving'}{selected.calories ? ` · ${Math.round(selected.calories * (parseFloat(searchServings) || 1))} kcal` : ''}
+                    </div>
                   </div>
+                  <input type="number" min="0.25" step="0.25" value={searchServings} onChange={e => setSearchServings(e.target.value)}
+                    style={{ width: '56px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
+                  <button onClick={handleSearchLog} disabled={savingSearch}
+                    style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: savingSearch ? 0.6 : 1, flexShrink: 0 }}>
+                    {savingSearch ? '...' : '+ Log'}
+                  </button>
                 </div>
-                <input type="number" min="0.25" step="0.25" value={searchServings} onChange={e => setSearchServings(e.target.value)}
-                  style={{ width: '56px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
-                <button onClick={handleSearchLog} disabled={savingSearch}
-                  style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: savingSearch ? 0.6 : 1, flexShrink: 0 }}>
-                  {savingSearch ? '...' : '+ Log'}
-                </button>
+                <FoodIntelCard foodName={selected.name} brand={selected.brand} calories={selected.calories} protein_g={selected.protein_g} carbs_g={selected.carbs_g} fat_g={selected.fat_g} fiber_g={selected.fiber_g} sugar_g={selected.sugar_g} />
               </div>
             )}
 
@@ -654,6 +660,95 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal 
         )}
 
       </div>
+    </div>
+  )
+}
+
+const GL_COLOR = { low: 'var(--success)', medium: 'var(--warning)', high: 'var(--error)' }
+const PROCESSING_COLOR = { whole: 'var(--success)', minimal: 'var(--success)', processed: 'var(--warning)', ultra: 'var(--error)' }
+const PROCESSING_LABEL = { whole: 'Whole food', minimal: 'Minimally processed', processed: 'Processed', ultra: 'Ultra-processed' }
+const TIME_EMOJI = { morning: '🌅', 'pre-workout': '⚡', 'post-workout': '💪', evening: '🌙', anytime: '✅' }
+
+function FoodIntelCard({ foodName, brand, calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g }) {
+  const [intel, setIntel] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  async function load() {
+    if (intel || loading) return
+    setLoading(true)
+    const res = await fetch('/api/nutrition/ai-food-intel', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: foodName, brand, calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g }),
+    })
+    const data = await res.json()
+    if (data.intel) setIntel(data.intel)
+    setLoading(false)
+  }
+
+  function toggle() {
+    if (!open) load()
+    setOpen(o => !o)
+  }
+
+  const dotRow = (label, value, color) => (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+      <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: color, flexShrink: 0, marginTop: '4px' }} />
+      <div style={{ flex: 1 }}>
+        <span style={{ fontSize: '11px', fontWeight: '700', color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label} </span>
+        <span style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{value}</span>
+      </div>
+    </div>
+  )
+
+  return (
+    <div style={{ marginTop: '8px' }}>
+      <button onClick={toggle} style={{ background: 'none', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', color: 'var(--accent-purple)', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <span>🤖</span>
+        <span>{open ? 'Hide' : 'Food Intel'}</span>
+        {loading && <span style={{ opacity: 0.6 }}>...</span>}
+      </button>
+
+      {open && intel && (
+        <div style={{ marginTop: '8px', backgroundColor: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {/* Top row — GI, Satiety, Density chips */}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: GL_COLOR[intel.glycemic_load], backgroundColor: `${GL_COLOR[intel.glycemic_load]}18`, borderRadius: '8px', padding: '3px 9px', border: `1px solid ${GL_COLOR[intel.glycemic_load]}33` }}>
+              GI: {intel.glycemic_load}
+            </span>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent-blue)', backgroundColor: 'rgba(0,128,255,0.1)', borderRadius: '8px', padding: '3px 9px', border: '1px solid rgba(0,128,255,0.2)' }}>
+              Satiety {intel.satiety}/5
+            </span>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent-purple)', backgroundColor: 'rgba(167,139,250,0.1)', borderRadius: '8px', padding: '3px 9px', border: '1px solid rgba(167,139,250,0.2)' }}>
+              Density {intel.nutrient_density}/5
+            </span>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: PROCESSING_COLOR[intel.processing_level], backgroundColor: `${PROCESSING_COLOR[intel.processing_level]}18`, borderRadius: '8px', padding: '3px 9px', border: `1px solid ${PROCESSING_COLOR[intel.processing_level]}33` }}>
+              {PROCESSING_LABEL[intel.processing_level]}
+            </span>
+          </div>
+
+          {/* Detail rows */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {dotRow('Glycemic', intel.glycemic_note, GL_COLOR[intel.glycemic_load])}
+            {dotRow('Satiety', intel.satiety_note, 'var(--accent-blue)')}
+            {dotRow('Nutrients', intel.nutrient_density_note, 'var(--accent-purple)')}
+            {dotRow(TIME_EMOJI[intel.best_time] + ' Best time', intel.best_time_note, 'var(--text-primary)')}
+            {intel.pairs_well_with?.length > 0 && dotRow(
+              '🤝 Pairs with',
+              `${intel.pairs_well_with.join(' + ')} — ${intel.pairs_note}`,
+              'var(--success)'
+            )}
+          </div>
+
+          {/* Fun fact */}
+          {intel.fun_fact && (
+            <div style={{ borderTop: '1px solid rgba(167,139,250,0.15)', paddingTop: '8px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+              <span style={{ fontSize: '13px', flexShrink: 0 }}>💡</span>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.6', fontStyle: 'italic' }}>{intel.fun_fact}</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -820,6 +915,7 @@ function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, t
                 <span style={{ fontSize: '11px', color: 'var(--accent-blue)', fontWeight: '600' }}>You log this {freqLabel}</span>
               </div>
             )}
+            <FoodIntelCard foodName={f.name} brand={f.brand} calories={f.calories} protein_g={f.protein_g} carbs_g={f.carbs_g} fat_g={f.fat_g} fiber_g={f.fiber_g} sugar_g={f.sugar_g} />
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0 10px', flexWrap: 'wrap' }}>
               <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Servings:</span>
               <input type="number" min="0.25" step="0.25" value={logServings} onChange={e => setLogServings(e.target.value)}
