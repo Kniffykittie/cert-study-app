@@ -463,7 +463,7 @@ Returns: `{ servings_per_container, package_note, estimated_nutrition, confidenc
 | 1C.4 | ✅ Done | "ℹ️ How this works" explainer toggles added to Sleep Tracker (25 pts Recovery Score, smart check-in trigger, Daily Brief integration, Google Health setup note), Nutrient Encyclopedia (3-source intake calculation, Gap Report logic, detail panel guide, symptom checker explanation), and Goals page (AI Overview regeneration, TDEE calculation, workout plan personalization, motivations → AI quality). |
 | 2G | ✅ Done | My Favorites sorted by recency — `last_logged_at` + `log_count` + `is_pinned` columns on `my_foods`; `bump_my_food_recency` Postgres function; GET sorts pinned → recent → count → name; section dividers (Pinned / Logged Today / This Week / Logged Before / Never Logged); 📌 pin button per row (optimistic toggle); ↺ quick-repeat button on foods logged today (repeats same servings + meal slot instantly); frequency insight in expanded panel ("You log this ~3×/week"); "✓ Nx today" badge replaces count badge when logged today. |
 | 2A | ✅ Done | AI Food Intel — `ai_food_intel_cache` table (food_key, intel JSONB, generated_at); `POST /api/nutrition/ai-food-intel` calls Haiku, caches by normalized name, shared across users; `FoodIntelCard` component with 🤖 Food Intel toggle button; shows GI/satiety/density/processing chips + detail rows + best time + pairs well with + fun fact; appears in SearchModal selected food panel, AddFoodModal search tab selected panel, and SavedFoodsTab expanded row. |
-| 2A | 🔜 Next | `ai_food_intel_cache` DB table + `POST /api/nutrition/ai-food-intel` route (Haiku, cached by food_key) |
+| 2A.1 | ✅ Done | Personalized timing in FoodIntelCard — NutritionPage fetches active workout plan on load (today's day_of_week entry); passes `workoutCtx = { loggedToday: bool, plannedLabel: string|null }` down through AddFoodModal, SearchModal, SavedFoodsTab → FoodIntelCard; best_time_note overridden with "You already trained today" or "You have [Push Day] planned today" when relevant. |
 | 2B | ⏳ After 2A | Servings-per-container on food cards + "Use whole container" button |
 | 2C | ⏳ After 2A | AI autofill missing micronutrients (fills gaps from OFFs) + `~AI` amber markers, editable |
 | 2D | ⏳ After 2A | AI fallback search — triggers when OFFs < 2 results, pre-fills manual entry form |
@@ -925,6 +925,30 @@ Returns: `{ servings_per_container, package_note, estimated_nutrition, confidenc
 ## Future Features
 
 > **Format:** Each item includes user intent, UX spec, data model notes, and AI context impact so it can be built the next day without re-discussing.
+
+---
+
+### Pre/Post Workout Meal Advisor
+
+*A contextual tool that helps the user decide whether to eat something before or after a workout based on their goals, the food's macros, and their current day's logged data.*
+
+**Trigger options (any of these could surface it):**
+- A dedicated page or card at `/life-hub/nutrition/workout-fuel`
+- A contextual callout in the Food Log when a workout is detected (logged today or planned)
+- A tab inside the existing AI Food Intel card ("🏋️ Workout Fuel" tab, shown when workout is active that day)
+
+**What it would answer:**
+- "Should I eat this before or after my workout?" — considering the food's GI, protein content, fat content, and fiber (high fat/fiber = worse pre-workout)
+- "How long before my workout should I eat this?" — based on calorie density and macros
+- "Is this a good post-workout recovery meal?" — protein threshold check (≥20g), carb replenishment assessment
+
+**Data it uses:**
+- `intel.best_time` + `intel.glycemic_load` + `intel.satiety` from ai_food_intel_cache
+- User's `goals_profiles.goals` (muscle gain, weight loss, etc.)
+- Today's workout log (`workout_logs.day_label`, duration) or active plan's today entry
+- Workout timing (time of day the workout was logged vs current time)
+
+**AI surface:** Could be a small Haiku call (separate from food intel), or extend the existing `ai_food_intel_cache` schema with a `workout_fuel` field added to the prompt. The latter is cheaper since it piggybacks the existing cache.
 
 ---
 

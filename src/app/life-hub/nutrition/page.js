@@ -108,7 +108,7 @@ function MacroBar({ value, goal, color, warn }) {
 }
 
 // Search modal with saved foods quick-select and full micronutrient entry
-function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly }) {
+function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, workoutCtx }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
@@ -258,7 +258,7 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly })
                     {saving ? '...' : libraryOnly ? '⭐ Save' : '+ Add'}
                   </button>
                 </div>
-                <FoodIntelCard foodName={selected.name} brand={selected.brand} calories={selected.calories} protein_g={selected.protein_g} carbs_g={selected.carbs_g} fat_g={selected.fat_g} fiber_g={selected.fiber_g} sugar_g={selected.sugar_g} />
+                <FoodIntelCard foodName={selected.name} brand={selected.brand} calories={selected.calories} protein_g={selected.protein_g} carbs_g={selected.carbs_g} fat_g={selected.fat_g} fiber_g={selected.fiber_g} sugar_g={selected.sugar_g} workoutCtx={workoutCtx} />
               </div>
             )}
 
@@ -352,7 +352,7 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly })
   )
 }
 
-function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal }) {
+function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal, workoutCtx }) {
   const [tab, setTab] = useState('favorites')
   const [filter, setFilter] = useState('')
   const [expandedId, setExpandedId] = useState(null)
@@ -648,7 +648,7 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal 
                     {savingSearch ? '...' : '+ Log'}
                   </button>
                 </div>
-                <FoodIntelCard foodName={selected.name} brand={selected.brand} calories={selected.calories} protein_g={selected.protein_g} carbs_g={selected.carbs_g} fat_g={selected.fat_g} fiber_g={selected.fiber_g} sugar_g={selected.sugar_g} />
+                <FoodIntelCard foodName={selected.name} brand={selected.brand} calories={selected.calories} protein_g={selected.protein_g} carbs_g={selected.carbs_g} fat_g={selected.fat_g} fiber_g={selected.fiber_g} sugar_g={selected.sugar_g} workoutCtx={workoutCtx} />
               </div>
             )}
 
@@ -669,7 +669,7 @@ const PROCESSING_COLOR = { whole: 'var(--success)', minimal: 'var(--success)', p
 const PROCESSING_LABEL = { whole: 'Whole food', minimal: 'Minimally processed', processed: 'Processed', ultra: 'Ultra-processed' }
 const TIME_EMOJI = { morning: '🌅', 'pre-workout': '⚡', 'post-workout': '💪', evening: '🌙', anytime: '✅' }
 
-function FoodIntelCard({ foodName, brand, calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g }) {
+function FoodIntelCard({ foodName, brand, calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g, workoutCtx }) {
   const [intel, setIntel] = useState(null)
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
@@ -732,7 +732,18 @@ function FoodIntelCard({ foodName, brand, calories, protein_g, carbs_g, fat_g, f
             {dotRow('Glycemic', intel.glycemic_note, GL_COLOR[intel.glycemic_load])}
             {dotRow('Satiety', intel.satiety_note, 'var(--accent-blue)')}
             {dotRow('Nutrients', intel.nutrient_density_note, 'var(--accent-purple)')}
-            {dotRow(TIME_EMOJI[intel.best_time] + ' Best time', intel.best_time_note, 'var(--text-primary)')}
+            {dotRow(TIME_EMOJI[intel.best_time] + ' Best time', (() => {
+              if (workoutCtx?.loggedToday && (intel.best_time === 'post-workout' || intel.best_time === 'pre-workout')) {
+                return `You already trained today — ${intel.best_time_note}`
+              }
+              if (workoutCtx?.plannedLabel && intel.best_time === 'pre-workout') {
+                return `You have ${workoutCtx.plannedLabel} planned today — ${intel.best_time_note}`
+              }
+              if (workoutCtx?.plannedLabel && intel.best_time === 'post-workout') {
+                return `${workoutCtx.plannedLabel} is planned for today — ${intel.best_time_note}`
+              }
+              return intel.best_time_note
+            })(), 'var(--text-primary)')}
             {intel.pairs_well_with?.length > 0 && dotRow(
               '🤝 Pairs with',
               `${intel.pairs_well_with.join(' + ')} — ${intel.pairs_note}`,
@@ -790,7 +801,7 @@ const MEAL_NUTRITION_KEYS = [
   'caffeine_mg','water_g','omega3_g','vitamin_k_mcg','choline_mg',
 ]
 
-function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, todayEntries }) {
+function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, todayEntries, workoutCtx }) {
   const [expandedId, setExpandedId] = useState(null)
   const [logServings, setLogServings] = useState('1')
 
@@ -915,7 +926,7 @@ function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, t
                 <span style={{ fontSize: '11px', color: 'var(--accent-blue)', fontWeight: '600' }}>You log this {freqLabel}</span>
               </div>
             )}
-            <FoodIntelCard foodName={f.name} brand={f.brand} calories={f.calories} protein_g={f.protein_g} carbs_g={f.carbs_g} fat_g={f.fat_g} fiber_g={f.fiber_g} sugar_g={f.sugar_g} />
+            <FoodIntelCard foodName={f.name} brand={f.brand} calories={f.calories} protein_g={f.protein_g} carbs_g={f.carbs_g} fat_g={f.fat_g} fiber_g={f.fiber_g} sugar_g={f.sugar_g} workoutCtx={workoutCtx} />
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0 10px', flexWrap: 'wrap' }}>
               <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Servings:</span>
               <input type="number" min="0.25" step="0.25" value={logServings} onChange={e => setLogServings(e.target.value)}
@@ -1379,6 +1390,7 @@ export default function NutritionPage() {
   const [activeTab, setActiveTab] = useState('log')
   const [microOpen, setMicroOpen] = useState(false)
   const [todayWorkout, setTodayWorkout] = useState(null)
+  const [workoutCtx, setWorkoutCtx] = useState({ loggedToday: false, plannedLabel: null })
   const [copyingYesterday, setCopyingYesterday] = useState(false)
   const [tdeeSuggestion, setTdeeSuggestion] = useState(null)
   const [tdeeDismissed, setTdeeDismissed] = useState(false)
@@ -1391,16 +1403,25 @@ export default function NutritionPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setChecked(true); return }
-      const [{ data: goalsData }, { data: suppData }, { data: workoutData }] = await Promise.all([
+      const todayDow = new Date().getDay() // 0=Sun…6=Sat; plan uses 0=Mon…6=Sun
+      const planDow = todayDow === 0 ? 6 : todayDow - 1
+      const [{ data: goalsData }, { data: suppData }, { data: workoutData }, { data: planData }] = await Promise.all([
         supabase.from('goals_profiles').select('*').eq('user_id', user.id).single(),
         supabase.from('supplement_stack').select('name, dose, timing, nutrients').eq('user_id', user.id).eq('is_active', true).order('created_at'),
-        // Fetch today's completed (non-partial) workout
         supabase.from('workout_logs').select('duration_seconds, is_partial, day_label').eq('user_id', user.id).gte('created_at', today).is('is_partial', false).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+        supabase.from('workout_plans').select('plan').eq('user_id', user.id).eq('is_active', true).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       ])
       if (!goalsData) { setGoalsGated(true); setChecked(true); return }
       setGoals(goalsData)
       setSupplements(suppData ?? [])
       setTodayWorkout(workoutData || null)
+      const loggedToday = !!workoutData
+      let plannedLabel = null
+      if (!loggedToday && planData?.plan) {
+        const todayPlan = planData.plan.find(d => d.day_of_week === planDow)
+        if (todayPlan && todayPlan.exercises?.length > 0) plannedLabel = todayPlan.day_label || null
+      }
+      setWorkoutCtx({ loggedToday, plannedLabel })
       setChecked(true)
       const [logRes, foodsRes] = await Promise.all([
         fetch('/api/nutrition/log'),
@@ -1532,14 +1553,14 @@ export default function NutritionPage() {
     <div>
       {logModal && (
         <AddFoodModal slot={logModal} onClose={() => setLogModal(null)} onAdd={handleAddEntry}
-          myFoods={mealFoods} onSaveFood={handleSaveToMyFoods} onCreateMeal={() => setMealBuilderModal(true)} />
+          myFoods={mealFoods} onSaveFood={handleSaveToMyFoods} onCreateMeal={() => setMealBuilderModal(true)} workoutCtx={workoutCtx} />
       )}
       {libraryModal && (
         <SearchModal slot={null} onClose={() => setLibraryModal(false)} onAdd={() => {}}
           myFoods={myFoods} onSaveFood={food => setMyFoods(prev => {
             if (prev.find(f => f.id === food.id)) return prev
             return [...prev, food]
-          })} libraryOnly />
+          })} libraryOnly workoutCtx={workoutCtx} />
       )}
       {mealBuilderModal && (
         <MealBuilderModal onClose={() => setMealBuilderModal(false)} onSave={food => {
@@ -1777,7 +1798,7 @@ export default function NutritionPage() {
       {/* Saved Foods Tab */}
       {activeTab === 'myfoods' && (
         <SavedFoodsTab myFoods={mealFoods} onDirectLog={handleAddEntry} onDelete={handleDeleteMyFood}
-          onPin={handlePinMyFood} todayEntries={entries} onOpenLibrary={() => setLibraryModal(true)} />
+          onPin={handlePinMyFood} todayEntries={entries} onOpenLibrary={() => setLibraryModal(true)} workoutCtx={workoutCtx} />
       )}
 
       {/* Supplements Tab */}
