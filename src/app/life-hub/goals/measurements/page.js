@@ -41,6 +41,7 @@ export default function MeasurementsPage() {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
   const [showHowTo, setShowHowTo] = useState(false)
+  const [showWhy, setShowWhy] = useState(false)
   const [form, setForm] = useState(() => Object.fromEntries(FIELDS.map(f => [f.key, ''])))
   const [formDate, setFormDate] = useState(todayDate())
   const [deleteConfirm, setDeleteConfirm] = useState(null)
@@ -236,7 +237,29 @@ export default function MeasurementsPage() {
     <div style={{ maxWidth: '640px' }}>
       <div style={{ marginBottom: '28px' }}>
         <h1 style={{ color: '#06b6d4', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Body Measurements</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Track your measurements over time to see real progress beyond the scale.</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>Track your measurements over time to see real progress beyond the scale.</p>
+          <button onClick={() => setShowWhy(o => !o)}
+            style={{ background: 'none', border: '1px solid #06b6d444', borderRadius: '20px', color: '#06b6d4', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
+            ℹ️ Why track this?
+          </button>
+        </div>
+        {showWhy && (
+          <div style={{ marginTop: '12px', backgroundColor: '#06b6d40d', border: '1px solid #06b6d430', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Why body measurements matter</div>
+            {[
+              { icon: '⚖️', text: 'The scale lies — weight fluctuates 2–5 lbs daily from water, food, and hormones. Measurements like waist and hips reveal actual fat loss or muscle gain that the scale completely masks.' },
+              { icon: '📊', text: 'Delta indicators in your history table show direction over time. A shrinking waist + stable weight = body recomposition — you\'re losing fat and gaining muscle simultaneously.' },
+              { icon: '🤖', text: 'Your weight data feeds the Monthly Wrap AI summary and the TDEE calibration system. The more consistent your logging, the more accurate your calorie targets become over time.' },
+              { icon: '📸', text: 'Pair measurements with Progress Photos below — numbers tell you the trend, but photos show you the visual change that motivates you to keep going.' },
+            ].map(({ icon, text }) => (
+              <div key={icon} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '14px', flexShrink: 0 }}>{icon}</span>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>{text}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <WeightChart />

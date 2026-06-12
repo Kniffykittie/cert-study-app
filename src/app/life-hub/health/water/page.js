@@ -92,6 +92,7 @@ export default function DrinksHydrationPage() {
   const [week, setWeek] = useState([])
   const [loading, setLoading] = useState(true)
   const [foodWaterOz, setFoodWaterOz] = useState(0)
+  const [showWhy, setShowWhy] = useState(false)
   const [suppCaffeineMg, setSuppCaffeineMg] = useState(0)
   const [todayNutrients, setTodayNutrients] = useState({ sodium_mg: 0, potassium_mg: 0 })
   const [todayWorkoutMin, setTodayWorkoutMin] = useState(0)
@@ -681,9 +682,31 @@ export default function DrinksHydrationPage() {
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '24px 16px' }}>
       <h1 style={{ color: '#f97316', fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>💧 Drinks & Hydration</h1>
-      <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: '0 0 24px' }}>
-        {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: showWhy ? '12px' : '24px' }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: 0 }}>
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        </p>
+        <button onClick={() => setShowWhy(o => !o)}
+          style={{ background: 'none', border: '1px solid #f9731644', borderRadius: '20px', color: '#f97316', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
+          ℹ️ Why track this?
+        </button>
+      </div>
+      {showWhy && (
+        <div style={{ marginBottom: '24px', backgroundColor: '#f973160d', border: '1px solid #f9731630', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ fontSize: '12px', fontWeight: '700', color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Why hydration tracking pays off</div>
+          {[
+            { icon: '⚡', text: 'Even mild dehydration — just 1–2% of body weight — impairs focus, energy, and exercise performance noticeably. Most people don\'t feel thirsty until they\'re already past that point.' },
+            { icon: '🔢', text: 'Hydration is worth 20 points in your Recovery Score. Hit your daily goal consistently and you\'ll see it move — it\'s one of the easiest scores to improve.' },
+            { icon: '🏋️', text: 'Your water goal is set in your Goals profile. The app counts water from logged drinks, logged food water content, and plain water entries — everything combined gives you the real picture.' },
+            { icon: '🤖', text: 'Your hydration totals appear in the Daily Brief and Monthly Wrap. Patterns like a midday dry spell or back-loaded drinking show up in the Timing chart — which helps you fix habits, not just track them.' },
+          ].map(({ icon, text }) => (
+            <div key={icon} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+              <span style={{ fontSize: '14px', flexShrink: 0 }}>{icon}</span>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>{text}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Progress ring + summary */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px', marginBottom: 16 }}>

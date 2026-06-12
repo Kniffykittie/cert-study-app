@@ -1177,6 +1177,7 @@ function MicroNutrientPanel({ totals }) {
 export default function NutritionPage() {
   const [goalsGated, setGoalsGated] = useState(false)
   const [checked, setChecked] = useState(false)
+  const [showWhy, setShowWhy] = useState(false)
   const [goals, setGoals] = useState(null)
   const [supplements, setSupplements] = useState([])
   const [entries, setEntries] = useState([])
@@ -1330,7 +1331,29 @@ export default function NutritionPage() {
       <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ color: '#f97316', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Nutrition</h1>
-          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Track meals, macros, and every nutrient that matters.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Track meals, macros, and every nutrient that matters.</p>
+            <button onClick={() => setShowWhy(o => !o)}
+              style={{ background: 'none', border: '1px solid #f9731644', borderRadius: '20px', color: '#f97316', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
+              ℹ️ Why track this?
+            </button>
+          </div>
+          {showWhy && (
+            <div style={{ marginTop: '12px', backgroundColor: '#f973160d', border: '1px solid #f9731630', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Why logging food changes everything</div>
+              {[
+                { icon: '🧠', text: 'Awareness is the mechanism — most people eat 20–30% more than they think. Seeing the real number changes your choices without willpower.' },
+                { icon: '🎯', text: 'Your calorie target comes from your TDEE (your actual metabolic rate). The food log tells you how close you are each day, and after 14+ days with weight data, the app recalibrates your target to match reality.' },
+                { icon: '💪', text: 'Protein is tracked separately because it\'s the most important macro for body composition — muscle repair, satiety, and metabolism all depend on it. Your target is based on your body weight.' },
+                { icon: '🤖', text: 'Every meal you log feeds the Daily Brief AI, the Nutrient Encyclopedia gap analysis, and the Monthly Wrap — the more you log, the more useful all of those become.' },
+              ].map(({ icon, text }) => (
+                <div key={icon} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '14px', flexShrink: 0 }}>{icon}</span>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>{text}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

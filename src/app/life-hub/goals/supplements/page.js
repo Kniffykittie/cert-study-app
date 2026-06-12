@@ -358,6 +358,7 @@ export default function SupplementsPage() {
   const [saving, setSaving] = useState(false)
   const [infoModal, setInfoModal] = useState(null)
   const [editModal, setEditModal] = useState(null)
+  const [showWhy, setShowWhy] = useState(false)
 
   function updateNutrient(i, field, val) {
     setForm(prev => ({ ...prev, nutrients: prev.nutrients.map((n, idx) => idx === i ? { ...n, [field]: val } : n) }))
@@ -441,9 +442,31 @@ export default function SupplementsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
         <div>
           <h1 style={{ color: '#f97316', fontSize: 22, fontWeight: 700, margin: 0 }}>💊 My Supplement Stack</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: '4px 0 0' }}>
-            Supplements listed here automatically count toward your daily nutrient totals
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: 0 }}>
+              Supplements listed here automatically count toward your daily nutrient totals
+            </p>
+            <button onClick={() => setShowWhy(o => !o)}
+              style={{ background: 'none', border: '1px solid #f9731644', borderRadius: '20px', color: '#f97316', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
+              ℹ️ Why track this?
+            </button>
+          </div>
+          {showWhy && (
+            <div style={{ marginTop: '12px', backgroundColor: '#f973160d', border: '1px solid #f9731630', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.06em' }}>What your supplement stack does in the app</div>
+              {[
+                { icon: '🔬', text: 'Nutrients you enter from labels — like Vitamin D, Magnesium, Iron, Zinc — automatically add to your daily totals in the Nutrient Encyclopedia. That gap report shows what you\'re short on across food and supplements combined.' },
+                { icon: '⚠️', text: 'The Stack Interactions card below analyzes timing conflicts between your supplements — like Iron and Calcium blocking each other\'s absorption, or caffeine affecting Iron uptake in the morning.' },
+                { icon: '☕', text: 'Caffeine from supplements (pre-workouts, energy supplements) is counted in the Drinks & Hydration caffeine tracker, so you get one accurate total across all sources.' },
+                { icon: '🤖', text: 'Tap the 🤖 Info button on any supplement for a cached AI profile — what it does, deficiency signs, food sources, timing tips, and interactions with the rest of your stack.' },
+              ].map(({ icon, text }) => (
+                <div key={icon} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '14px', flexShrink: 0 }}>{icon}</span>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>{text}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <button onClick={() => { setShowAddForm(true); setForm(EMPTY_FORM) }}
           style={{ padding: '9px 16px', background: 'var(--accent-blue)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, marginTop: 4 }}>
