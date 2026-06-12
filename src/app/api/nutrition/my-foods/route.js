@@ -18,6 +18,7 @@ export async function GET(req) {
     .from('my_foods')
     .select('*')
     .eq('user_id', user.id)
+    .order('is_pinned', { ascending: false })
     .order('last_logged_at', { ascending: false, nullsFirst: false })
     .order('log_count', { ascending: false })
     .order('name', { ascending: true })
@@ -72,6 +73,22 @@ export async function PUT(req) {
     serving_size_label: rest.serving_size_label?.trim() || '1 serving',
     ...nutritionValues,
   }).eq('id', id).eq('user_id', user.id).select().single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ food: data })
+}
+
+export async function PATCH(req) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id, is_pinned } = await req.json()
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+  const { data, error } = await supabase.from('my_foods')
+    .update({ is_pinned: !!is_pinned })
+    .eq('id', id).eq('user_id', user.id).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ food: data })

@@ -695,7 +695,7 @@ const MEAL_NUTRITION_KEYS = [
   'caffeine_mg','water_g','omega3_g','vitamin_k_mcg','choline_mg',
 ]
 
-function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary }) {
+function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, todayEntries }) {
   const [expandedId, setExpandedId] = useState(null)
   const [logServings, setLogServings] = useState('1')
 
@@ -711,18 +711,149 @@ function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary }) {
     setExpandedId(null)
   }
 
+  async function quickRepeat(food) {
+    const prev = (todayEntries || []).filter(e => e.my_food_id === food.id)
+    const lastServings = prev.length ? prev[prev.length - 1].servings : 1
+    const slot = prev.length ? prev[prev.length - 1].meal_slot : 'snack'
+    const entry = { meal_slot: slot, servings: lastServings, source: 'my_foods', my_food_id: food.id }
+    for (const k of ['name', 'brand', 'serving_size_label', ...MEAL_NUTRITION_KEYS]) entry[k] = food[k] ?? null
+    await onDirectLog(entry)
+  }
+
+  function getFrequencyLabel(food) {
+    if (!food.log_count || food.log_count < 3) return null
+    const created = new Date(food.created_at || Date.now())
+    const weeks = Math.max(1, (Date.now() - created.getTime()) / (7 * 86400000))
+    const perWeek = food.log_count / weeks
+    if (perWeek >= 6) return '~daily'
+    if (perWeek >= 3) return `~${Math.round(perWeek)}×/week`
+    if (perWeek >= 1) return `~${Math.round(perWeek)}×/week`
+    const perMonth = perWeek * 4
+    if (perMonth >= 1) return `~${Math.round(perMonth)}×/month`
+    return null
+  }
+
+  const today = new Date().toISOString().split('T')[0]
+
+  // Group into sections
+  const pinned = myFoods.filter(f => f.is_pinned)
+  const unpinned = myFoods.filter(f => !f.is_pinned)
+  const loggedToday = unpinned.filter(f => f.last_logged_at && new Date(f.last_logged_at).toISOString().split('T')[0] === today)
+  const loggedThisWeek = unpinned.filter(f => {
+    if (!f.last_logged_at) return false
+    const days = Math.floor((Date.now() - new Date(f.last_logged_at)) / 86400000)
+    return days > 0 && days < 7
+  })
+  const loggedOlder = unpinned.filter(f => f.last_logged_at && Math.floor((Date.now() - new Date(f.last_logged_at)) / 86400000) >= 7)
+  const neverLogged = unpinned.filter(f => !f.last_logged_at)
+
+  const sections = [
+    { key: 'pinned', label: '📌 Pinned', items: pinned },
+    { key: 'today', label: '✅ Logged Today', items: loggedToday },
+    { key: 'week', label: 'This Week', items: loggedThisWeek },
+    { key: 'older', label: 'Logged Before', items: loggedOlder },
+    { key: 'never', label: 'Never Logged', items: neverLogged },
+  ].filter(s => s.items.length > 0)
+
+  function FoodRow({ f }) {
+    const isExpanded = expandedId === f.id
+    const sv = parseFloat(logServings) || 1
+    const calPreview = f.calories != null ? Math.round(f.calories * sv) : null
+    const todayCount = (todayEntries || []).filter(e => e.my_food_id === f.id).length
+    const freqLabel = getFrequencyLabel(f)
+
+    return (
+      <div key={f.id} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', border: isExpanded ? '1px solid var(--accent-blue)' : f.is_pinned ? '1px solid rgba(241,196,15,0.25)' : '1px solid transparent', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px' }}>
+          {/* Pin button */}
+          <button onClick={() => onPin(f.id, !f.is_pinned)} title={f.is_pinned ? 'Unpin' : 'Pin to top'}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', padding: '0 2px', opacity: f.is_pinned ? 1 : 0.25, flexShrink: 0, lineHeight: 1 }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = '1' }}
+            onMouseLeave={e => { e.currentTarget.style.opacity = f.is_pinned ? '1' : '0.25' }}>
+            📌
+          </button>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
+              {todayCount > 0 && (
+                <span style={{ fontSize: '10px', color: 'var(--success)', backgroundColor: 'rgba(46,204,113,0.12)', borderRadius: '10px', padding: '1px 6px', flexShrink: 0, fontWeight: '700' }}>
+                  ✓ {todayCount}× today
+                </span>
+              )}
+              {f.log_count > 0 && todayCount === 0 && (
+                <span style={{ fontSize: '10px', color: 'var(--accent-blue)', backgroundColor: 'rgba(0,128,255,0.1)', borderRadius: '10px', padding: '1px 6px', flexShrink: 0, fontWeight: '600' }}>
+                  ×{f.log_count}
+                </span>
+              )}
+            </div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+              {f.serving_size_label || '1 serving'}
+              {f.calories != null ? ` · ${Math.round(f.calories)} kcal` : ''}
+              {f.protein_g ? ` · ${Math.round(f.protein_g)}g P` : ''}
+              {f.carbs_g ? ` · ${Math.round(f.carbs_g)}g C` : ''}
+              {f.fat_g ? ` · ${Math.round(f.fat_g)}g F` : ''}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '5px', flexShrink: 0, alignItems: 'center' }}>
+            {todayCount > 0 && (
+              <button onClick={() => quickRepeat(f)} title="Log again with same serving & meal"
+                style={{ backgroundColor: 'rgba(46,204,113,0.12)', color: 'var(--success)', border: '1px solid rgba(46,204,113,0.25)', borderRadius: '6px', padding: '5px 10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                ↺
+              </button>
+            )}
+            <button onClick={() => handleLogClick(f.id)}
+              style={{ backgroundColor: isExpanded ? 'transparent' : 'rgba(0,128,255,0.12)', color: isExpanded ? 'var(--text-secondary)' : 'var(--accent-blue)', border: isExpanded ? '1px solid var(--border)' : 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+              {isExpanded ? 'Cancel' : 'Log'}
+            </button>
+            <button onClick={() => onDelete(f.id)}
+              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', padding: '0 2px' }}>×</button>
+          </div>
+        </div>
+
+        {isExpanded && (
+          <div style={{ padding: '0 12px 12px', borderTop: '1px solid var(--border)' }}>
+            {freqLabel && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', backgroundColor: 'rgba(0,128,255,0.08)', borderRadius: '6px', padding: '4px 10px', marginTop: '10px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '11px' }}>📊</span>
+                <span style={{ fontSize: '11px', color: 'var(--accent-blue)', fontWeight: '600' }}>You log this {freqLabel}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0 10px', flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Servings:</span>
+              <input type="number" min="0.25" step="0.25" value={logServings} onChange={e => setLogServings(e.target.value)}
+                style={{ width: '60px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
+              {calPreview != null && <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '700' }}>= {calPreview} kcal</span>}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Log to which meal?</div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {MEAL_SLOTS.map(slot => (
+                <button key={slot.key} onClick={() => confirmDirectLog(f, slot.key)}
+                  style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer', fontWeight: '500' }}>
+                  {slot.emoji} {slot.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
         <div>
           <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', margin: '0 0 4px' }}>My Favorites</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>Foods you eat often — tap Log, pick a meal, done.</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>📌 to pin · ↺ to repeat · Log to pick a meal</p>
         </div>
         <button onClick={onOpenLibrary}
           style={{ backgroundColor: 'rgba(167,139,250,0.12)', color: 'var(--accent-purple)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '8px', padding: '7px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
           + Add Favorite
         </button>
       </div>
+
       {myFoods.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '24px 0' }}>
           <div style={{ fontSize: '32px', marginBottom: '10px' }}>⭐</div>
@@ -733,66 +864,19 @@ function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary }) {
           </button>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {myFoods.map(f => {
-            const isExpanded = expandedId === f.id
-            const sv = parseFloat(logServings) || 1
-            const calPreview = f.calories != null ? Math.round(f.calories * sv) : null
-            return (
-              <div key={f.id} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', border: isExpanded ? '1px solid var(--accent-blue)' : '1px solid transparent', overflow: 'hidden' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
-                      {f.log_count > 0 && (
-                        <span style={{ fontSize: '10px', color: 'var(--accent-blue)', backgroundColor: 'rgba(0,128,255,0.1)', borderRadius: '10px', padding: '1px 6px', flexShrink: 0, fontWeight: '600' }}>
-                          ×{f.log_count}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-                      {f.serving_size_label || '1 serving'}
-                      {f.calories != null ? ` · ${Math.round(f.calories)} kcal` : ''}
-                      {f.protein_g ? ` · ${Math.round(f.protein_g)}g P` : ''}
-                      {f.carbs_g ? ` · ${Math.round(f.carbs_g)}g C` : ''}
-                      {f.fat_g ? ` · ${Math.round(f.fat_g)}g F` : ''}
-                      {f.last_logged_at && (() => {
-                        const days = Math.floor((Date.now() - new Date(f.last_logged_at)) / 86400000)
-                        return days === 0 ? ' · logged today' : days === 1 ? ' · yesterday' : days < 7 ? ` · ${days}d ago` : null
-                      })()}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                    <button onClick={() => handleLogClick(f.id)}
-                      style={{ backgroundColor: isExpanded ? 'transparent' : 'rgba(0,128,255,0.12)', color: isExpanded ? 'var(--text-secondary)' : 'var(--accent-blue)', border: isExpanded ? '1px solid var(--border)' : 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
-                      {isExpanded ? 'Cancel' : 'Log'}
-                    </button>
-                    <button onClick={() => onDelete(f.id)}
-                      style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', padding: '0 4px' }}>×</button>
-                  </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {sections.map(section => (
+            <div key={section.key}>
+              {sections.length > 1 && (
+                <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px', paddingLeft: '2px' }}>
+                  {section.label}
                 </div>
-                {isExpanded && (
-                  <div style={{ padding: '0 12px 12px', borderTop: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0 10px', flexWrap: 'wrap' }}>
-                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Servings:</span>
-                      <input type="number" min="0.25" step="0.25" value={logServings} onChange={e => setLogServings(e.target.value)}
-                        style={{ width: '60px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
-                      {calPreview != null && <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '700' }}>= {calPreview} kcal</span>}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Log to which meal?</div>
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                      {MEAL_SLOTS.map(slot => (
-                        <button key={slot.key} onClick={() => confirmDirectLog(f, slot.key)}
-                          style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer', fontWeight: '500' }}>
-                          {slot.emoji} {slot.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {section.items.map(f => <FoodRow key={f.id} f={f} />)}
               </div>
-            )
-          })}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -1269,6 +1353,20 @@ export default function NutritionPage() {
     if (data.food) setMyFoods(prev => [...prev, data.food])
   }
 
+  async function handlePinMyFood(id, pinned) {
+    await fetch('/api/nutrition/my-foods', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, is_pinned: pinned }) })
+    setMyFoods(prev => {
+      const updated = prev.map(f => f.id === id ? { ...f, is_pinned: pinned } : f)
+      return [...updated].sort((a, b) => {
+        if (a.is_pinned !== b.is_pinned) return b.is_pinned ? 1 : -1
+        if (a.last_logged_at && b.last_logged_at) return new Date(b.last_logged_at) - new Date(a.last_logged_at)
+        if (a.last_logged_at) return -1
+        if (b.last_logged_at) return 1
+        return (b.log_count || 0) - (a.log_count || 0)
+      })
+    })
+  }
+
   async function handleDeleteMyFood(id) {
     await fetch('/api/nutrition/my-foods', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     setMyFoods(prev => prev.filter(f => f.id !== id))
@@ -1583,7 +1681,7 @@ export default function NutritionPage() {
       {/* Saved Foods Tab */}
       {activeTab === 'myfoods' && (
         <SavedFoodsTab myFoods={mealFoods} onDirectLog={handleAddEntry} onDelete={handleDeleteMyFood}
-          onOpenLibrary={() => setLibraryModal(true)} />
+          onPin={handlePinMyFood} todayEntries={entries} onOpenLibrary={() => setLibraryModal(true)} />
       )}
 
       {/* Supplements Tab */}
