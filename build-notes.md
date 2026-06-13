@@ -303,9 +303,9 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ### Vercel Fix — Heart Rate page crash — Complete
 - Heart rate page was crashing the browser tab when navigating to it
-- Root cause: `fetch('/api/health/heart-rate')` could throw or return non-JSON if the API route errored, causing an uncaught exception in the `useEffect` load function
-- Fixed by wrapping the entire `load()` body in a try/catch with `console.error` logging; inner `fetch` also checks `res.ok` before calling `.json()`
-- Page now shows empty state gracefully if the API fails instead of crashing the tab
+- Fix 1: wrapped entire `load()` in try/catch so fetch errors don't propagate uncaught
+- Fix 2: guarded `yStep` with `Math.max(10, ...)` to prevent a zero-step value; added `yTicks.length < 20` cap on the tick loop as a hard safety net
+- Fix 3: replaced `Math.min(...spread)` / `Math.max(...spread)` with `.reduce()` to avoid potential stack overflow on large arrays
 
 ### Vercel Fix — SITE_URL self-reference bug in health callback — Complete
 - `replace_all` accidentally replaced `process.env.NEXT_PUBLIC_SITE_URL` inside the SITE_URL constant definition itself, creating `const SITE_URL = SITE_URL || ...` — fixed to use `process.env.NEXT_PUBLIC_SITE_URL`

@@ -95,8 +95,8 @@ export default function HeartRatePage() {
   const allBpm = chartPoints.map(p => p.avg_bpm).filter(Boolean)
   const allMin = useFiveMin ? chartPoints.map(p => p.min_bpm).filter(Boolean) : allBpm
   const allMax = useFiveMin ? chartPoints.map(p => p.max_bpm).filter(Boolean) : allBpm
-  const dataMin = allMin.length ? Math.min(...allMin) : 40
-  const dataMax = allMax.length ? Math.max(...allMax) : 120
+  const dataMin = allMin.length ? allMin.reduce((a, b) => Math.min(a, b), Infinity) : 40
+  const dataMax = allMax.length ? allMax.reduce((a, b) => Math.max(a, b), -Infinity) : 120
   const yMin = Math.max(0, dataMin - 15)
   const yMax = dataMax + 15
 
@@ -108,9 +108,9 @@ export default function HeartRatePage() {
   const yOf = (bpm) => PAD_TOP + plotH - ((bpm - yMin) / (yMax - yMin)) * plotH
 
   // Y-axis grid lines
-  const yStep = Math.ceil((yMax - yMin) / 4 / 10) * 10
+  const yStep = Math.max(10, Math.ceil((yMax - yMin) / 4 / 10) * 10)
   const yTicks = []
-  for (let v = Math.ceil(yMin / 10) * 10; v <= yMax; v += yStep) yTicks.push(v)
+  for (let v = Math.ceil(yMin / 10) * 10; v <= yMax && yTicks.length < 20; v += yStep) yTicks.push(v)
 
   // Build path strings
   const avgPath = chartPoints
