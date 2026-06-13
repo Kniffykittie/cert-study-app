@@ -29,15 +29,28 @@ export default function BarcodeScannerModal({ onResult, onClose }) {
 
         setStatus('scanning')
 
+        let lastSeen = null
+        let seenCount = 0
         async function tick() {
           if (!active || !videoRef.current) return
           try {
             const codes = await detector.detect(videoRef.current)
             if (codes.length > 0) {
-              active = false
-              stream.getTracks().forEach(t => t.stop())
-              onResult(codes[0].rawValue)
-              return
+              const val = codes[0].rawValue
+              if (val === lastSeen) {
+                seenCount++
+              } else {
+                lastSeen = val
+                seenCount = 1
+              }
+              if (seenCount >= 3) {
+                active = false
+                stream.getTracks().forEach(t => t.stop())
+                onResult(val)
+                return
+              }
+            } else {
+              seenCount = 0
             }
           } catch {}
           if (active) raf = requestAnimationFrame(tick)
