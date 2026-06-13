@@ -248,13 +248,7 @@ Currently collected in setup but only used in the AI overview paragraph. Every p
 
 ### 🍎 Nutrition
 
-**5. Sprint 3A — Contextual Banners + Better Empty States** — 📋 Fully Specced / ⏳ Pending Build
-- Lunch reminder banner (12–2pm, no lunch logged yet)
-- Water gap banner (past 3pm, water < 40% of goal — separate from workout page hydration banner)
-- Nutrient gap banner on Food Log (yesterday's protein < 80% of target)
-- Better empty states: Meal Plan → "Plan your week" prompt; Encyclopedia with no food data this week → explain gap report needs 7 days to run; Food Log slots → "Tap to log breakfast", etc.
-
-**9. Pre/Post Workout Meal Advisor** — 💬 Discussed / ⏳ Pending Build
+**5. Pre/Post Workout Meal Advisor** — 💬 Discussed / ⏳ Pending Build
 Contextual meal suggestions based on workout type and timing. Rule-based, not AI.
 - Pre-workout (1–2hrs before): fast carbs + moderate protein
 - Post-workout (within 45min): high protein + carbs — the anabolic window
@@ -569,6 +563,13 @@ A complete system parallel to Workouts but lighter in logging. No timer, no HR t
 
 ### Phase 43b - Complete
 - **Monthly Wrap notification popup** — bottom-right toast; "Take me there →" navigates; dismissal in localStorage
+
+### Sprint 3A: Contextual Banners + Better Empty States - Complete
+- **Lunch reminder** (12–2pm, no lunch logged) — orange banner with "Log Lunch" shortcut button + dismiss
+- **Water gap banner** (3pm+, today's water < 40% of goal) — cyan banner showing oz logged vs goal + dismiss; reads from `water_logs` + drink food entries
+- **Protein gap banner** (yesterday's protein < 80% of target) — green banner showing yesterday's actual vs target; fetches yesterday's log entries on page load
+- **Empty meal slot state** — replaced "Nothing logged yet." text with a dashed "+ Log breakfast…" button that opens the food modal directly
+- Nutrition page `load()` now fetches yesterday's log entries + today's water from `water_logs` in parallel
 
 ### Phase B: Age-Adjusted Micronutrient Targets + Teen Safety Gates - Complete
 - **`calcMicroTargets(age, sex)`** added to `src/lib/tdee.js` — returns NIH DRI-sourced per-nutrient daily targets keyed by DB column name (calcium_mg, vitamin_d_mcg, iron_mg, magnesium_mg, etc.) + `b12AbsorptionFlag` true when age ≥ 50

@@ -1865,6 +1865,9 @@ export default function NutritionPage() {
   const [copyingYesterday, setCopyingYesterday] = useState(false)
   const [tdeeSuggestion, setTdeeSuggestion] = useState(null)
   const [tdeeDismissed, setTdeeDismissed] = useState(false)
+  const [yesterdayProtein, setYesterdayProtein] = useState(null)
+  const [todayWaterOz, setTodayWaterOz] = useState(null)
+  const [dismissedBanners, setDismissedBanners] = useState(new Set())
 
   const today = new Date().toISOString().split('T')[0]
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
@@ -1894,13 +1897,27 @@ export default function NutritionPage() {
       }
       setWorkoutCtx({ loggedToday, plannedLabel })
       setChecked(true)
-      const [logRes, foodsRes] = await Promise.all([
+      const [logRes, foodsRes, yesterdayRes, waterRes] = await Promise.all([
         fetch('/api/nutrition/log'),
         fetch('/api/nutrition/my-foods'),
+        fetch(`/api/nutrition/log?date=${new Date(Date.now() - 86400000).toISOString().split('T')[0]}`),
+        fetch('/api/health/manual-steps').catch(() => null),
       ])
-      const [logData, foodsData] = await Promise.all([logRes.json(), foodsRes.json()])
+      const [logData, foodsData, yestData] = await Promise.all([logRes.json(), foodsRes.json(), yesterdayRes.json()])
       setEntries(logData.entries || [])
       setMyFoods(foodsData.foods || [])
+      const yestEntries = yestData.entries || []
+      const yestProtein = yestEntries.reduce((s, e) => s + (e.protein_g || 0), 0)
+      setYesterdayProtein(Math.round(yestProtein))
+
+      // Today's water from water_logs + drink entries
+      const supabase2 = createClient()
+      const todayStr = new Date().toISOString().split('T')[0]
+      const { data: waterLogs } = await supabase2.from('water_logs').select('amount_oz').eq('user_id', user.id).eq('date', todayStr)
+      const waterFromDrinks = (logData.entries || []).filter(e => e.meal_slot === 'drink').reduce((s, e) => s + (e.water_g ? e.water_g / 29.5735 : 0), 0)
+      const waterTotal = (waterLogs || []).reduce((s, w) => s + (w.amount_oz || 0), 0) + waterFromDrinks
+      setTodayWaterOz(Math.round(waterTotal))
+
       fetch('/api/nutrition/tdee-check').then(r => r.json()).then(d => {
         if (d.suggestion) setTdeeSuggestion(d.suggestion)
       })
@@ -2251,6 +2268,73 @@ export default function NutritionPage() {
             </button>
           </div>
 
+          {/* Contextual banners */}
+          {(() => {
+            const now = new Date()
+            const hour = now.getHours()
+            const macros = goals ? calcMacrosShared(
+              goals.custom_tdee || calcTDEEShared(goals) || 2000,
+              { weight_lbs: goals.weight_lbs }
+            ) : null
+            const proteinTarget = macros?.protein || null
+            const waterGoal = goals?.water_goal_oz || 64
+            const hasLunch = entries.some(e => e.meal_slot === 'lunch')
+            const banners = []
+
+            // Lunch reminder: 12–2pm, no lunch yet
+            if (hour >= 12 && hour < 14 && !hasLunch && !dismissedBanners.has('lunch')) {
+              banners.push(
+                <div key="lunch" style={{ backgroundColor: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '16px' }}>☀️</span>
+                    <div>
+                      <span style={{ color: '#f97316', fontSize: '13px', fontWeight: '700' }}>Lunch time — nothing logged yet</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block' }}>Logging lunch helps keep your calorie distribution on track.</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                    <button onClick={() => setLogModal('lunch')} style={{ backgroundColor: '#f97316', border: 'none', color: '#fff', borderRadius: '7px', padding: '6px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Log Lunch</button>
+                    <button onClick={() => setDismissedBanners(s => new Set([...s, 'lunch']))} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                  </div>
+                </div>
+              )
+            }
+
+            // Water gap: after 3pm, under 40% of goal
+            if (hour >= 15 && todayWaterOz !== null && todayWaterOz < waterGoal * 0.4 && !dismissedBanners.has('water')) {
+              banners.push(
+                <div key="water" style={{ backgroundColor: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.3)', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '16px' }}>💧</span>
+                    <div>
+                      <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '700' }}>Behind on water — {todayWaterOz}oz of {waterGoal}oz goal</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block' }}>You need {waterGoal - todayWaterOz}oz more. Mild dehydration impairs focus and digestion.</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setDismissedBanners(s => new Set([...s, 'water']))} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
+                </div>
+              )
+            }
+
+            // Protein gap: yesterday's protein < 80% of target
+            if (proteinTarget && yesterdayProtein !== null && yesterdayProtein < proteinTarget * 0.8 && yesterdayProtein > 0 && !dismissedBanners.has('protein')) {
+              banners.push(
+                <div key="protein" style={{ backgroundColor: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '16px' }}>💪</span>
+                    <div>
+                      <span style={{ color: 'var(--success)', fontSize: '13px', fontWeight: '700' }}>Yesterday's protein was low — {yesterdayProtein}g of {proteinTarget}g target</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block' }}>Prioritize a protein-rich breakfast or lunch today to make up the gap.</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setDismissedBanners(s => new Set([...s, 'protein']))} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
+                </div>
+              )
+            }
+
+            return banners.length > 0 ? <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>{banners}</div> : null
+          })()}
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {MEAL_SLOTS.map(slot => {
               const slotEntries = entries.filter(e => e.meal_slot === slot.key)
@@ -2292,7 +2376,10 @@ export default function NutritionPage() {
                     </div>
                   )}
                   {slotEntries.length === 0 && (
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '6px 0 0' }}>Nothing logged yet.</p>
+                    <button onClick={() => setLogModal(slot.key)}
+                      style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: '7px', padding: '8px 12px', cursor: 'pointer', textAlign: 'left', width: '100%', marginTop: '6px', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                      + Log {slot.label.toLowerCase()}…
+                    </button>
                   )}
                 </div>
               )
