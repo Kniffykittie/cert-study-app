@@ -301,9 +301,11 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ## Phase Log
 
-### Debug — Heart Rate page ErrorBoundary — In Progress
-- Added class-based ErrorBoundary wrapping HeartRatePageInner to catch render errors and display them on-screen instead of crashing the browser tab
-- Will remove once root cause is identified and fixed
+### Vercel Fix — Heart Rate page crash (Rules of Hooks) — Complete
+- Root cause: `useCallback` was declared after `if (loading) return` and `if (!connected) return` — violating Rules of Hooks (hooks must be called unconditionally). React error #310 in production.
+- Fix: moved ALL computation (fiveMin, chartPoints, avgPath, bandPath, yTicks, etc.) and `useCallback` to BEFORE the conditional returns; early returns now placed after all hooks
+- Also replaced `Math.min/max(...spread)` with `.reduce()` throughout, and added `Math.max(yMax, yMin+30)` guard so yMax is always > yMin
+- ErrorBoundary class component left in place (catches any future render errors gracefully)
 
 ### Vercel Fix — Heart Rate page crash — Complete
 - Heart rate page was crashing the browser tab when navigating to it
