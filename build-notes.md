@@ -294,12 +294,17 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 **Features that must be built AFTER Vercel deploy:**
 - Vercel Cron Job (health auto-sync) — Vercel-only, configured in `vercel.json`
-- PWA conversion — service workers require HTTPS
-- Barcode scanner — camera API requires HTTPS in most browsers
+- PWA conversion — service workers require HTTPS ✅ Built
 
 ---
 
 ## Phase Log
+
+### Barcode Scanner — Food Log + Drink Log — Complete
+- `BarcodeScannerModal` component (`src/components/BarcodeScannerModal.js`) — camera modal using native BarcodeDetector API; falls back to `barcode-detector/pure` (ZXing WASM) on iOS Safari; supports EAN-13/8, UPC-A/E, Code-128/39
+- 📷 button added next to search input in AddFoodModal "Search Database" tab (`nutrition/page.js`) — scans barcode and fires `/api/nutrition/search?barcode=` directly
+- 📷 button added next to drink search in Drinks & Hydration page (`health/water/page.js`) — same barcode → search flow
+- Supplements page skipped (supplements don't have barcodes)
 
 ### Mobile — Life Hub status pills responsive wrap — Complete
 - Replaced `repeat(4, 1fr)` with `repeat(auto-fit, minmax(140px, 1fr))` on the Zone 1 status bar grid

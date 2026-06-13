@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import BarcodeScannerModal from '@/components/BarcodeScannerModal'
 import { calcTDEE as calcTDEEShared, calcMacros as calcMacrosShared, calcGoalAdjustment, calcMicroTargets } from '@/lib/tdee'
 import { NUTRIENTS, matchSuppToNutrient, parseSuppAmount } from '@/data/nutrients'
 
@@ -484,6 +485,7 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
   const [microFilling, setMicroFilling] = useState(false)
   const [searchGramInput, setSearchGramInput] = useState('')
 
+  const [showScanner, setShowScanner] = useState(false)
   const debounceRef = useRef(null)
   const searchInputRef = useRef(null)
 
@@ -931,11 +933,31 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
         {/* ── Search Database tab ── */}
         {tab === 'search' && (
           <>
-            <div style={{ padding: '0 20px 10px', flexShrink: 0 }}>
+            <div style={{ padding: '0 20px 10px', flexShrink: 0, display: 'flex', gap: '8px' }}>
               <input ref={searchInputRef} value={query} onChange={e => handleQueryChange(e.target.value)}
                 placeholder="Search food name or brand..."
-                style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 14px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                style={{ flex: 1, boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 14px', color: 'var(--text-primary)', fontSize: '13px' }} />
+              <button onClick={() => setShowScanner(true)}
+                title="Scan barcode"
+                style={{ flexShrink: 0, padding: '9px 12px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}>
+                📷
+              </button>
             </div>
+            {showScanner && (
+              <BarcodeScannerModal
+                onResult={barcode => {
+                  setShowScanner(false)
+                  setQuery(barcode)
+                  setSelected(null)
+                  setSearching(true)
+                  fetch(`/api/nutrition/search?barcode=${encodeURIComponent(barcode)}`)
+                    .then(r => r.json())
+                    .then(d => { setResults(d.results || []); setSearching(false) })
+                    .catch(() => setSearching(false))
+                }}
+                onClose={() => setShowScanner(false)}
+              />
+            )}
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
               {searching && <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Searching...</p>}
