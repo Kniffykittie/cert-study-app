@@ -301,7 +301,7 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 ## Phase Log
 
 ### Barcode Scanner — Food Log + Drink Log — Complete
-- `BarcodeScannerModal` component (`src/components/BarcodeScannerModal.js`) — camera modal using native BarcodeDetector API (Android Chrome); WASM polyfill removed (was crashing mobile tab — ~1.2MB WebAssembly exhausts mobile memory); shows clear error if native API unavailable; requires same barcode detected 3 consecutive frames; uses onResultRef so effect runs exactly once; `barcode-detector` npm package added but only for type reference
+- `BarcodeScannerModal`: WASM polyfill removed; video resolution lowered to 640×480 (4× less frame buffer memory); srcObject nulled on stream stop to release video buffers; requires 3 consecutive detections; onResultRef pattern prevents effect restarts
 - 📷 button added next to search input in AddFoodModal "Search Database" tab (`nutrition/page.js`) — scans barcode and fires `/api/nutrition/search?barcode=` directly
 - 📷 button added next to drink search in Drinks & Hydration page (`health/water/page.js`) — same barcode → search flow
 - Supplements page skipped (supplements don't have barcodes)

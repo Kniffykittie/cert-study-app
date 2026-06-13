@@ -16,7 +16,7 @@ export default function BarcodeScannerModal({ onResult, onClose }) {
     async function start() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+          video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
         })
         if (!active) { stream.getTracks().forEach(t => t.stop()); return }
         videoRef.current.srcObject = stream
@@ -50,6 +50,7 @@ export default function BarcodeScannerModal({ onResult, onClose }) {
               if (seenCount >= 3) {
                 active = false
                 stream.getTracks().forEach(t => t.stop())
+                if (videoRef.current) videoRef.current.srcObject = null
                 onResultRef.current(val)
                 return
               }
@@ -76,6 +77,7 @@ export default function BarcodeScannerModal({ onResult, onClose }) {
       active = false
       if (raf) cancelAnimationFrame(raf)
       if (stream) stream.getTracks().forEach(t => t.stop())
+      if (videoRef.current) videoRef.current.srcObject = null
     }
   }, [])
 

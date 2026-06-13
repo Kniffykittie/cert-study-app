@@ -154,13 +154,16 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
   async function handleAiFill() {
     if (aiFilling) return
     setAiFilling(true)
-    const res = await fetch('/api/nutrition/ai-food-fill', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: query }),
-    })
-    const data = await res.json()
+    let data
+    try {
+      const res = await fetch('/api/nutrition/ai-food-fill', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: query }),
+      })
+      data = await res.json()
+    } catch { setAiFilling(false); return }
     setAiFilling(false)
-    if (!data.fill) return
+    if (!data?.fill) return
     const fill = data.fill
     const estimated = new Set()
     const numFields = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg','saturated_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','vitamin_c_mg','vitamin_d_mcg']
@@ -518,13 +521,16 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
   async function handleAiFill() {
     if (aiFilling) return
     setAiFilling(true)
-    const res = await fetch('/api/nutrition/ai-food-fill', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: query }),
-    })
-    const data = await res.json()
+    let data
+    try {
+      const res = await fetch('/api/nutrition/ai-food-fill', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: query }),
+      })
+      data = await res.json()
+    } catch { setAiFilling(false); return }
     setAiFilling(false)
-    if (!data.fill) return
+    if (!data?.fill) return
     const fill = data.fill
     const estimated = new Set()
     const filled = { ...BLANK_MANUAL }
