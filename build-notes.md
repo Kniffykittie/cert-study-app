@@ -214,16 +214,7 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ### 🎯 Goals & Body Setup
 
-**1. "What Happens Now" Full Expansion** — 📋 Fully Specced / ⏳ Pending Build
-The current step shows TDEE + eating target. Every number needs a named reason tied to the user's actual inputs. Build order: timeline math → macros with why → age callout → dietary pref callouts → scale expectations → soft confirmation card.
-- **Timeline math card** — "You want to lose X lbs over Y weeks = Z lbs/week." Recomp mode: "The scale may barely move for 6–8 weeks — that's the plan working, not failing."
-- **Macro targets with plain-language why** — protein/carbs/fat in grams, one sentence each: "Protein is Xg because you weigh Ylbs and are in a deficit — high protein protects muscle when calories drop." "Fat is 25% of calories to support hormones and fat-soluble vitamins." "Carbs are what's left — your primary fuel for workouts."
-- **Age-specific callout** — one sentence based on age bracket (see Age-Adjusted section below)
-- **Dietary preference callouts** — vegan: B12/iron/zinc risk note; picky/very picky: meal plan will favor familiar foods; gluten-free: noted
-- **Scale expectations callout** — recomp = plateau is normal; standard cut = X lbs/week; bulk = scale goes up, that's the goal
-- **Soft confirmation card at bottom** — "Based on your goals, here's your first month: eat ~X cal/day, hit Xg protein, expect [scale behavior]. Does this match?" with "Yes, let's go" and "Adjust something" links back to any step
-
-**2. Age-Adjusted Micronutrient Targets** — 📋 Fully Specced / ⏳ Pending Build
+**1. Age-Adjusted Micronutrient Targets** — 📋 Fully Specced / ⏳ Pending Build
 New `calcMicroTargets(age, sex, weightLbs, activityLevel)` exported from `src/lib/tdee.js`. Replaces hardcoded FDA values in Encyclopedia, nutrition page, and gap report. One function, one source of truth.
 - Calcium: teens (9–18) = 1,300mg; 19–50 = 1,000mg; 51+ = 1,200mg
 - Vitamin D: under 70 = 600 IU; 70+ = 800 IU (absorption drops with age)
@@ -233,19 +224,19 @@ New `calcMicroTargets(age, sex, weightLbs, activityLevel)` exported from `src/li
 - Protein floor: 65+ floors at 1.0–1.2g/kg lean mass (vs standard 0.82g/lb) — sarcopenia prevention
 - Potassium: scales roughly ~1mg per calorie of intake (active/higher-calorie users need more)
 
-**3. Age-Specific Framing Copy** — 📋 Fully Specced / ⏳ Pending Build (part of "What Happens Now")
+**2. Age-Specific Framing Copy** — 📋 Fully Specced / ⏳ Pending Build (part of "What Happens Now")
 - Under 18: "You're still growing — bone density builds during these years. We've kept your deficit conservative to protect this window." Deficit capped at 300 cal/day for teens.
 - 18–25: "Your body is in its peak building window — this is the best time to establish a strong base."
 - 25–35: "Your metabolism is beginning a gradual slowdown — the numbers reflect a small adjustment."
 - 35–50: "After 35, muscle is harder to maintain — your protein target is slightly higher to compensate."
 - 50+: "After 50, protein and calcium needs actually increase. Your targets are higher than the generic FDA averages on purpose."
 
-**4. Teen Safety Gates** — 📋 Fully Specced / ⏳ Pending Build
+**3. Teen Safety Gates** — 📋 Fully Specced / ⏳ Pending Build
 - Deficit capped at 300 cal/day (vs 1,000 for adults) — aggressive deficits suppress growth hormones and impair bone development
 - Explicit note: "Because you're still developing, we've kept your deficit conservative to protect healthy growth."
 - Under 16 with weight loss goals: note recommending they speak with a doctor first before pursuing a deficit
 
-**5. `gain_weight` Goal Option** — 📋 Fully Specced / ⏳ Pending Build
+**4. `gain_weight` Goal Option** — 📋 Fully Specced / ⏳ Pending Build
 Currently missing: someone who feels too skinny or wants to bulk. `build_muscle` is a lean bulk (+200 cal). This is different.
 - New goal option in setup: "I want to gain weight / I feel too skinny"
 - Surplus tier: 300–500 cal/day depending on target weight and timeline
@@ -253,14 +244,14 @@ Currently missing: someone who feels too skinny or wants to bulk. `build_muscle`
 - "What Happens Now": normalize scale going up, explain it's the goal, set weekly gain expectations
 - Age interaction: a 16-year-old trying to gain gets different advice (still growing, needs nutrient density not just calories) than a 35-year-old
 
-**6. Dietary Preferences Wired Downstream** — 📋 Fully Specced / ⏳ Pending Build
+**5. Dietary Preferences Wired Downstream** — 📋 Fully Specced / ⏳ Pending Build
 Currently collected in setup but only used in the AI overview paragraph. Every preference should mean something real.
 - Meal plan page: flag foods that conflict (vegan → warning on chicken; gluten-free → warning on wheat pasta)
 - Food search: compatibility chips on results
 - "What Happens Now": vegan → "Watch B12, iron, zinc — plant sources absorb at lower rates. The Encyclopedia will flag these."; gluten-free → noted in plan; picky eater → "Meal plan will favor simple familiar foods."
 - Encyclopedia gap report: vegan profile auto-flags B12, iron, zinc, omega-3 as risk nutrients even without logged intake data
 
-**7. Orphaned Inputs — Wire Up Remaining** — 💬 Discussed / 📋 Partially Specced
+**6. Orphaned Inputs — Wire Up Remaining** — 💬 Discussed / 📋 Partially Specced
 | Input | Current use | Planned use |
 |---|---|---|
 | Biggest obstacles | AI overview only | Workout plan prompt (injury-aware adjustments); nutrition coaching (budget → cheap high-protein suggestions) |
@@ -272,7 +263,7 @@ Currently collected in setup but only used in the AI overview paragraph. Every p
 
 ### 🍎 Nutrition
 
-**8. Sprint 3A — Contextual Banners + Better Empty States** — 📋 Fully Specced / ⏳ Pending Build
+**7. Sprint 3A — Contextual Banners + Better Empty States** — 📋 Fully Specced / ⏳ Pending Build
 - Lunch reminder banner (12–2pm, no lunch logged yet)
 - Water gap banner (past 3pm, water < 40% of goal — separate from workout page hydration banner)
 - Nutrient gap banner on Food Log (yesterday's protein < 80% of target)
@@ -593,6 +584,9 @@ A complete system parallel to Workouts but lighter in logging. No timer, no HR t
 
 ### Phase 43b - Complete
 - **Monthly Wrap notification popup** — bottom-right toast; "Take me there →" navigates; dismissal in localStorage
+
+### Phase A - Complete
+- **"What Happens Now" Full Expansion** — Goals Setup step 5 expanded with: timeline math card (lbs over weeks = lbs/week pace; recomp honest framing); macro targets grid (protein/carbs/fat in grams with per-macro plain-language why); age-specific callout (5 brackets: teen/young_adult/adult/midlife/older_adult); dietary pref callouts (vegan B12/iron/zinc, vegetarian iron note, picky eater framing); scale expectations card (Week 1–2 water weight/Week 3–6 fat loss/Plateaus); `calcMacros` added to import from `@/lib/tdee`
 
 ### Phase 43 - Complete
 - **TDEE Calibration** — `goals_profiles.custom_tdee`; `/api/nutrition/tdee-check`; calibration card on Nutrition page; `tdee_suggestions` table

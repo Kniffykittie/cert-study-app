@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { calcTDEE, tdeeBreakdown, calcGoalAdjustment } from '@/lib/tdee'
+import { calcTDEE, tdeeBreakdown, calcGoalAdjustment, calcMacros } from '@/lib/tdee'
 
 const GOALS = [
   { key: 'lose_weight', label: 'Lose Weight', desc: 'Reduce body fat and reach a healthier weight', icon: '🔥' },
@@ -830,6 +830,137 @@ export default function GoalsSetupPage() {
                   ) : (
                     <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px', textAlign: 'center' }}>
                       <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Add your weight and activity details to see your estimated calorie target.</p>
+                    </div>
+                  )}
+
+                  {/* Timeline math */}
+                  {eatingTarget && mode !== 'maintain' && mode !== 'build' && (
+                    <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px', marginBottom: '16px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>📅 Your Timeline</div>
+                      {mode === 'recomp' ? (
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6', margin: 0 }}>
+                          Body recomposition doesn't follow a straight line — fat loss and muscle gain happen simultaneously. <strong style={{ color: 'var(--text-primary)' }}>The scale may barely move for weeks while your body composition changes significantly.</strong> Progress shows in measurements, how your clothes fit, and strength gains — not just the number on the scale.
+                        </p>
+                      ) : targetWeight && weightLbs && timeline ? (
+                        (() => {
+                          const lbsToLose = Math.abs(parseFloat(weightLbs) - parseFloat(targetWeight))
+                          const timelineWeeks = { '1_month': 4, '3_months': 13, '6_months': 26, '1_year': 52, 'no_rush': 52 }[timeline] || 26
+                          const ratePerWeek = (lbsToLose / timelineWeeks).toFixed(2)
+                          return (
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                                <span style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: '700' }}>{lbsToLose.toFixed(1)} lbs</span>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>over</span>
+                                <span style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: '700' }}>{timelineWeeks} weeks</span>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>=</span>
+                                <span style={{ color: projectionColor, fontSize: '15px', fontWeight: '700' }}>~{ratePerWeek} lbs/week</span>
+                              </div>
+                              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.55', margin: 0 }}>
+                                That's {Math.abs(adjustment).toLocaleString()} fewer calories per day than you burn. Sustainable, safe fat loss for your timeline — no crash dieting.
+                              </p>
+                            </div>
+                          )
+                        })()
+                      ) : (
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>
+                          Using standard {Math.abs(adjustment)} cal/day deficit ≈ {weeklyRate} lbs/week. Add a target weight and timeline on the previous step for a personalized pace.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Macro targets */}
+                  {eatingTarget && (
+                    (() => {
+                      const macros = calcMacros(eatingTarget, { weight_lbs: weightLbs ? parseFloat(weightLbs) : 150 })
+                      const ageNum = parseInt(age) || 25
+                      const ageBracket = ageNum < 18 ? 'teen' : ageNum < 25 ? 'young_adult' : ageNum < 40 ? 'adult' : ageNum < 55 ? 'midlife' : 'older_adult'
+                      const ageNote = {
+                        teen: 'You\'re still growing — protein targets here are conservative. Teens generally need more calcium (1,300 mg/day) and should avoid aggressive deficits.',
+                        young_adult: 'Your mid-20s are peak metabolic years. Protein absorption and muscle synthesis are highly efficient right now.',
+                        adult: 'In your 30s, muscle synthesis slows slightly. Hitting your protein target daily becomes more important, not less.',
+                        midlife: 'After 40, you need ~10% more protein to maintain the same muscle mass. The target here already accounts for this.',
+                        older_adult: 'Protein becomes the #1 priority after 55 — muscle loss accelerates without it. Spread it across 3–4 meals for best absorption.',
+                      }[ageBracket]
+
+                      const isPicky = dietaryPreferences?.some(p => ['picky_eater', 'selective_eater'].includes(p))
+                      const isVegan = dietaryPreferences?.includes('vegan')
+                      const isVegetarian = dietaryPreferences?.includes('vegetarian')
+
+                      return (
+                        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px', marginBottom: '16px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>🍽️ Daily Macro Targets</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+                            <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                              <div style={{ color: 'var(--accent-blue)', fontSize: '22px', fontWeight: '800' }}>{macros.protein}g</div>
+                              <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', marginTop: '2px' }}>PROTEIN</div>
+                              <div style={{ color: 'var(--text-secondary)', fontSize: '10px', marginTop: '3px' }}>{(macros.protein * 4).toLocaleString()} cal</div>
+                            </div>
+                            <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                              <div style={{ color: 'var(--success)', fontSize: '22px', fontWeight: '800' }}>{macros.carbs}g</div>
+                              <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', marginTop: '2px' }}>CARBS</div>
+                              <div style={{ color: 'var(--text-secondary)', fontSize: '10px', marginTop: '3px' }}>{(macros.carbs * 4).toLocaleString()} cal</div>
+                            </div>
+                            <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                              <div style={{ color: 'var(--warning)', fontSize: '22px', fontWeight: '800' }}>{macros.fat}g</div>
+                              <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', marginTop: '2px' }}>FAT</div>
+                              <div style={{ color: 'var(--text-secondary)', fontSize: '10px', marginTop: '3px' }}>{(macros.fat * 9).toLocaleString()} cal</div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: ageNote || isVegan || isVegetarian || isPicky ? '12px' : '0' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                              <strong style={{ color: 'var(--text-primary)' }}>Protein ({macros.protein}g)</strong> — {Math.round(parseFloat(weightLbs || 150) * 0.82 / (parseFloat(weightLbs || 150))* 10)/10}g per lb of body weight. Protects muscle while you{selectedGoals.includes('lose_weight') ? ' lose fat' : ' train'}. The single most important number here.
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                              <strong style={{ color: 'var(--text-primary)' }}>Carbs ({macros.carbs}g)</strong> — your body's preferred fuel for workouts and daily energy. Adjust up/down based on how you feel — these are a starting point.
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                              <strong style={{ color: 'var(--text-primary)' }}>Fat ({macros.fat}g)</strong> — 25% of calories. Supports hormones, joints, and fat-soluble vitamins. Don't cut it much lower.
+                            </div>
+                          </div>
+
+                          {/* Age note */}
+                          {ageNote && (
+                            <div style={{ backgroundColor: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: '8px', padding: '10px 12px', marginBottom: isVegan || isVegetarian || isPicky ? '8px' : '0', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                              <span style={{ color: 'var(--accent-purple)', fontWeight: '700' }}>🧬 Age note ({ageNum}): </span>{ageNote}
+                            </div>
+                          )}
+
+                          {/* Dietary preference callouts */}
+                          {(isVegan || isVegetarian) && (
+                            <div style={{ backgroundColor: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: '8px', padding: '10px 12px', marginBottom: isPicky ? '8px' : '0', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                              <span style={{ color: 'var(--success)', fontWeight: '700' }}>🌱 {isVegan ? 'Vegan' : 'Vegetarian'} heads-up: </span>
+                              {isVegan
+                                ? 'B12, iron, zinc, and omega-3 are hardest to get from plants. The Encyclopedia will flag your gaps. Consider a B12 supplement — deficiency builds slowly and symptoms show up late.'
+                                : 'Iron and zinc absorption is lower from plant sources. Vitamin C with your meals helps. Check the Nutrient Encyclopedia for personalized coverage.'}
+                            </div>
+                          )}
+                          {isPicky && (
+                            <div style={{ backgroundColor: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                              <span style={{ color: 'var(--warning)', fontWeight: '700' }}>🍳 Selective eater: </span>The Meal Plan is designed around your preferences. Focus on repeating a small set of foods you enjoy — consistency beats variety for results.
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()
+                  )}
+
+                  {/* Scale expectations */}
+                  {(selectedGoals.includes('lose_weight') || selectedGoals.includes('build_muscle') || mode === 'recomp') && (
+                    <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px', marginBottom: '16px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>⚖️ What the Scale Will Do</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {[
+                          { label: 'Week 1–2', text: 'Mostly water weight shifts. Reducing carbs or sodium can drop 2–5 lbs fast — this isn\'t fat loss, it\'s fluid. Don\'t chase it.', color: 'var(--accent-blue)' },
+                          { label: 'Week 3–6', text: mode === 'recomp' ? 'Scale may barely move while body fat drops and muscle grows. Trust the tape measure and how clothes fit more than the number.' : 'Real fat loss starts showing here. Expect 0.5–1 lb/week. Daily swings of 2–4 lbs are completely normal (food weight, water, hormones).', color: 'var(--success)' },
+                          { label: 'Plateaus', text: 'Stalls for 1–2 weeks are normal — your metabolism is adjusting. Don\'t slash calories impulsively. The TDEE calibration system will tell you when a real adjustment is needed.', color: 'var(--warning)' },
+                        ].map(({ label, text, color }) => (
+                          <div key={label} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                            <span style={{ backgroundColor: `${color}18`, border: `1px solid ${color}40`, borderRadius: '5px', padding: '2px 7px', fontSize: '10px', fontWeight: '700', color, flexShrink: 0, marginTop: '1px' }}>{label}</span>
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.55' }}>{text}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
