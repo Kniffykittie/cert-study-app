@@ -712,6 +712,7 @@ export default function GoalsSetupPage() {
                 weightLbs ? parseFloat(weightLbs) : null,
                 targetWeight ? parseFloat(targetWeight) : null,
                 timeline,
+                age,
               )
               const { adjustment, mode, projectionLabel, projectionDetail, weeklyRate, capped } = goalAdj
               const eatingTarget = tdee ? tdee + adjustment : null

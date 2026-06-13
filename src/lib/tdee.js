@@ -2,10 +2,63 @@
 
 const TIMELINE_DAYS = { '1_month': 30, '3_months': 90, '6_months': 180, '1_year': 365 }
 
+// Returns age/sex-adjusted daily targets for key micronutrients.
+// Values sourced from NIH DRI tables.
+export function calcMicroTargets(age, sex) {
+  const a = parseInt(age) || 25
+  const isFemale = sex === 'Female'
+
+  const calcium = a <= 18 ? 1300 : a <= 50 ? 1000 : 1200
+  const vitaminD = a < 70 ? 15 : 20       // mcg (600 IU / 800 IU)
+  const iron = isFemale
+    ? (a <= 13 ? 8 : a <= 18 ? 15 : a <= 50 ? 18 : 8)
+    : (a <= 13 ? 8 : a <= 18 ? 11 : 8)
+  const magnesium = isFemale
+    ? (a <= 30 ? 310 : 320)
+    : (a <= 30 ? 400 : 420)
+  const b12 = 2.4  // mcg — same across adults; absorption flag kicks in at 50+
+  const zinc = isFemale ? 8 : 11
+  const vitaminC = isFemale ? 75 : 90
+  const vitaminA = isFemale ? 700 : 900  // mcg RAE
+  const folate = isFemale && a >= 15 && a <= 50 ? 400 : 400  // mcg DFE (same; pregnancy would raise to 600)
+  const potassium = 4700  // same across ages
+  const vitaminB6 = a <= 50 ? (isFemale ? 1.3 : 1.3) : (isFemale ? 1.5 : 1.7)
+  const vitaminK = isFemale ? 90 : 120   // mcg
+  const choline = isFemale ? 425 : 550   // mg
+  const fiber = a <= 50 ? (isFemale ? 25 : 38) : (isFemale ? 21 : 30)
+  const sodium = 2300
+  const omega3 = isFemale ? 1.1 : 1.6   // g/day ALA; EPA/DHA separate
+
+  // B12 absorption drops ~50% after 50 due to reduced stomach acid
+  const b12AbsorptionFlag = a >= 50
+
+  return {
+    calcium_mg: calcium,
+    vitamin_d_mcg: vitaminD,
+    iron_mg: iron,
+    magnesium_mg: magnesium,
+    vitamin_b12_mcg: b12,
+    zinc_mg: zinc,
+    vitamin_c_mg: vitaminC,
+    vitamin_a_mcg: vitaminA,
+    folate_mcg: folate,
+    potassium_mg: potassium,
+    vitamin_b6_mg: vitaminB6,
+    vitamin_k_mcg: vitaminK,
+    choline_mg: choline,
+    fiber_g: fiber,
+    sodium_mg: sodium,
+    omega3_g: omega3,
+    b12AbsorptionFlag,
+  }
+}
+
 // Returns { adjustment, mode, projectionLabel, projectionDetail, weeklyRate, capped, cappedReason }
-export function calcGoalAdjustment(goals = [], weightLbs, targetWeightLbs, timeline) {
+export function calcGoalAdjustment(goals = [], weightLbs, targetWeightLbs, timeline, age) {
   const wantsLose = goals.includes('lose_weight')
   const wantsMuscle = goals.includes('build_muscle')
+  const isTeen = parseInt(age) > 0 && parseInt(age) < 18
+  const maxDeficit = isTeen ? 300 : 1000
 
   if (wantsLose && wantsMuscle) {
     return {
@@ -24,9 +77,9 @@ export function calcGoalAdjustment(goals = [], weightLbs, targetWeightLbs, timel
 
     if (lbsToLose != null && lbsToLose > 0 && timelineDays) {
       const rawDeficit = Math.round((lbsToLose * 3500) / timelineDays)
-      const capped = rawDeficit > 1000
+      const capped = rawDeficit > maxDeficit
       const tooSlow = rawDeficit < 150
-      const deficit = capped ? 1000 : tooSlow ? 150 : rawDeficit
+      const deficit = capped ? maxDeficit : tooSlow ? 150 : rawDeficit
       const weeksNeeded = capped ? Math.round((lbsToLose * 3500) / (deficit * 7)) / 7 : null
       const weeklyLbs = Math.round((deficit * 7 / 3500) * 10) / 10
       return {
@@ -34,7 +87,9 @@ export function calcGoalAdjustment(goals = [], weightLbs, targetWeightLbs, timel
         mode: 'lose_timeline',
         projectionLabel: `Lose ${lbsToLose} lbs${timeline && timeline !== 'no_rush' ? ` in ${TIMELINE_DAYS[timeline] / 30} month${TIMELINE_DAYS[timeline] > 30 ? 's' : ''}` : ''}`,
         projectionDetail: capped
-          ? `Your goal needs a ${rawDeficit} cal/day deficit — that pace risks muscle loss and burnout. Capped at 1,000 cal/day (~2 lbs/week). You'll reach your goal in ~${Math.round((lbsToLose * 3500) / (1000 * 7))} weeks instead.`
+          ? isTeen
+            ? `Your goal needs a ${rawDeficit} cal/day deficit — capped at ${maxDeficit} cal/day to protect healthy development. You'll reach your goal in ~${Math.round((lbsToLose * 3500) / (maxDeficit * 7))} weeks.`
+            : `Your goal needs a ${rawDeficit} cal/day deficit — that pace risks muscle loss and burnout. Capped at 1,000 cal/day (~2 lbs/week). You'll reach your goal in ~${Math.round((lbsToLose * 3500) / (1000 * 7))} weeks instead.`
           : tooSlow
           ? `Your goal is very modest — the math gives only ${rawDeficit} cal/day deficit. Bumped to 150 cal to keep it worthwhile while still matching your relaxed pace.`
           : null,

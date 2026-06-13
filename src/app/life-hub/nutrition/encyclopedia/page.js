@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { NUTRIENTS, NUTRIENT_BY_SLUG, NUTRIENT_CATEGORIES } from '@/data/nutrients'
+import { calcMicroTargets } from '@/lib/tdee'
 
 const STATUS_COLORS = {
   low: 'var(--error)',
@@ -168,7 +169,7 @@ const CONNECTIONS = {
   },
 }
 
-function computeResults(selectedIds, ctx) {
+function computeResults(selectedIds, ctx, microTargets) {
   if (selectedIds.size === 0) return []
   const allSymptoms = SYMPTOM_CATEGORIES.flatMap(c => c.symptoms)
   const selectedSymptoms = allSymptoms.filter(s => selectedIds.has(s.id))
@@ -185,9 +186,8 @@ function computeResults(selectedIds, ctx) {
     .slice(0, 6)
     .map(([slug, matchCount]) => {
       const nutrient = NUTRIENT_BY_SLUG[slug]
-      const s = getStatus(nutrient, ctx)
+      const s = getStatus(nutrient, ctx, microTargets)
       const matchedSymptoms = selectedSymptoms.filter(sym => sym.slugs.includes(slug))
-      // Find best connection sentence
       let connection = null
       for (const sym of matchedSymptoms) {
         if (CONNECTIONS[sym.id]?.[slug]) { connection = CONNECTIONS[sym.id][slug]; break }
@@ -216,7 +216,7 @@ function getSynthesis(results, ctx, selectedIds) {
   return null
 }
 
-function SymptomCheckerModal({ ctx, onSelectNutrient, onClose }) {
+function SymptomCheckerModal({ ctx, microTargets, onSelectNutrient, onClose }) {
   const [selected, setSelected] = useState(new Set())
 
   function toggle(id) {
@@ -227,7 +227,7 @@ function SymptomCheckerModal({ ctx, onSelectNutrient, onClose }) {
     })
   }
 
-  const results = computeResults(selected, ctx)
+  const results = computeResults(selected, ctx, microTargets)
   const synthesis = getSynthesis(results, ctx, selected)
 
   return (
@@ -346,27 +346,28 @@ function SymptomCheckerModal({ ctx, onSelectNutrient, onClose }) {
   )
 }
 
-function getStatus(nutrient, ctx) {
-  if (!ctx) return { status: 'unknown', pct: 0, foodAvg: 0, suppAmt: 0, total: 0 }
+function getStatus(nutrient, ctx, microTargets) {
+  if (!ctx) return { status: 'unknown', pct: 0, foodAvg: 0, suppAmt: 0, total: 0, rdv: nutrient.rdv }
   const foodAvg = ctx.avg_intakes?.[nutrient.key] || 0
   const suppAmt = ctx.supp_coverage?.[nutrient.key] || 0
   const total = foodAvg + suppAmt
+  const rdv = microTargets?.[nutrient.key] ?? nutrient.rdv
 
   if (nutrient.isWarnHigh) {
-    const pct = Math.round((total / nutrient.rdv) * 100)
-    if (ctx.log_days < 5) return { status: 'unknown', pct: 0, foodAvg, suppAmt, total }
-    if (pct > 130) return { status: 'high', pct, foodAvg, suppAmt, total }
-    if (pct > 100) return { status: 'moderate', pct, foodAvg, suppAmt, total }
-    return { status: 'good', pct, foodAvg, suppAmt, total }
+    const pct = Math.round((total / rdv) * 100)
+    if (ctx.log_days < 5) return { status: 'unknown', pct: 0, foodAvg, suppAmt, total, rdv }
+    if (pct > 130) return { status: 'high', pct, foodAvg, suppAmt, total, rdv }
+    if (pct > 100) return { status: 'moderate', pct, foodAvg, suppAmt, total, rdv }
+    return { status: 'good', pct, foodAvg, suppAmt, total, rdv }
   }
 
   if (ctx.log_days < 5) {
-    return { status: suppAmt > 0 ? 'supplemented' : 'unknown', pct: 0, foodAvg: 0, suppAmt, total: suppAmt }
+    return { status: suppAmt > 0 ? 'supplemented' : 'unknown', pct: 0, foodAvg: 0, suppAmt, total: suppAmt, rdv }
   }
-  const pct = Math.round((total / nutrient.rdv) * 100)
-  if (pct < 50) return { status: 'low', pct, foodAvg, suppAmt, total }
-  if (pct < 80) return { status: 'moderate', pct, foodAvg, suppAmt, total }
-  return { status: 'good', pct, foodAvg, suppAmt, total }
+  const pct = Math.round((total / rdv) * 100)
+  if (pct < 50) return { status: 'low', pct, foodAvg, suppAmt, total, rdv }
+  if (pct < 80) return { status: 'moderate', pct, foodAvg, suppAmt, total, rdv }
+  return { status: 'good', pct, foodAvg, suppAmt, total, rdv }
 }
 
 function matchGoals(nutrient, userGoals) {
@@ -377,11 +378,12 @@ function matchGoals(nutrient, userGoals) {
   })
 }
 
-function NutrientCard({ nutrient, ctx, onClick, selected }) {
-  const s = getStatus(nutrient, ctx)
+function NutrientCard({ nutrient, ctx, onClick, selected, microTargets }) {
+  const s = getStatus(nutrient, ctx, microTargets)
+  const rdv = s.rdv
   const color = STATUS_COLORS[s.status]
   const pctCapped = Math.min(100, s.pct)
-  const suppPct = s.suppAmt > 0 ? Math.min(100 - Math.min(100, Math.round((s.foodAvg / nutrient.rdv) * 100)), Math.round((s.suppAmt / nutrient.rdv) * 100)) : 0
+  const suppPct = s.suppAmt > 0 ? Math.min(100 - Math.min(100, Math.round((s.foodAvg / rdv) * 100)), Math.round((s.suppAmt / rdv) * 100)) : 0
 
   return (
     <div onClick={onClick}
@@ -403,11 +405,11 @@ function NutrientCard({ nutrient, ctx, onClick, selected }) {
       {s.status !== 'unknown' && ctx?.log_days >= 5 && (
         <div>
           <div style={{ height: '5px', backgroundColor: 'var(--background)', borderRadius: '3px', overflow: 'hidden', display: 'flex' }}>
-            <div style={{ height: '100%', width: `${Math.min(100, Math.round((s.foodAvg / nutrient.rdv) * 100))}%`, backgroundColor: color, borderRadius: '3px', transition: 'width 0.4s' }} />
+            <div style={{ height: '100%', width: `${Math.min(100, Math.round((s.foodAvg / rdv) * 100))}%`, backgroundColor: color, borderRadius: '3px', transition: 'width 0.4s' }} />
             {suppPct > 0 && <div style={{ height: '100%', width: `${suppPct}%`, backgroundColor: 'var(--accent-purple)', opacity: 0.7 }} />}
           </div>
           <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '3px' }}>
-            {pctCapped}% of {nutrient.rdv}{nutrient.unit} RDV{s.suppAmt > 0 ? ' · +supp' : ''}
+            {pctCapped}% of {rdv}{nutrient.unit} RDV{s.suppAmt > 0 ? ' · +supp' : ''}
           </div>
         </div>
       )}
@@ -418,7 +420,7 @@ function NutrientCard({ nutrient, ctx, onClick, selected }) {
   )
 }
 
-function DetailPanel({ slug, ctx, onClose }) {
+function DetailPanel({ slug, ctx, onClose, microTargets }) {
   const nutrient = NUTRIENT_BY_SLUG[slug]
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -430,7 +432,6 @@ function DetailPanel({ slug, ctx, onClose }) {
       .then(r => r.json())
       .then(async d => {
         if (d.profile) { setProfile(d.profile); setLoading(false); return }
-        // Generate
         const gen = await fetch(`/api/nutrition/encyclopedia/${slug}`, { method: 'POST' })
         const gd = await gen.json()
         setProfile(gd.profile || null)
@@ -440,11 +441,12 @@ function DetailPanel({ slug, ctx, onClose }) {
   }, [slug])
 
   if (!nutrient) return null
-  const s = getStatus(nutrient, ctx)
+  const s = getStatus(nutrient, ctx, microTargets)
+  const rdv = s.rdv
   const color = STATUS_COLORS[s.status]
   const userGoals = matchGoals(nutrient, ctx?.goals)
   const mealPlanAmt = ctx?.meal_plan_avgs?.[nutrient.key]
-  const mealPlanPct = mealPlanAmt ? Math.round((mealPlanAmt / nutrient.rdv) * 100) : null
+  const mealPlanPct = mealPlanAmt ? Math.round((mealPlanAmt / rdv) * 100) : null
   const isActiveTrainer = ctx?.weekly_workouts >= 2 && nutrient.workoutRelevant
 
   return (
@@ -456,7 +458,7 @@ function DetailPanel({ slug, ctx, onClose }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <h2 style={{ color: 'var(--accent-purple)', fontSize: '20px', fontWeight: '700', margin: 0 }}>{nutrient.name}</h2>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>{nutrient.category} · RDV: {nutrient.rdv}{nutrient.unit}/day</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>{nutrient.category} · RDV: {rdv}{nutrient.unit}/day{rdv !== nutrient.rdv ? ' (adjusted for your age & sex)' : ''}</div>
             </div>
             <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', lineHeight: 1, padding: '2px' }}>✕</button>
           </div>
@@ -470,11 +472,11 @@ function DetailPanel({ slug, ctx, onClose }) {
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>30-day avg</span>
-                  <span style={{ color: color, fontWeight: '700' }}>{Math.round(s.total * 10) / 10}{nutrient.unit} / {nutrient.rdv}{nutrient.unit} ({Math.min(s.pct, 999)}%)</span>
+                  <span style={{ color: color, fontWeight: '700' }}>{Math.round(s.total * 10) / 10}{nutrient.unit} / {rdv}{nutrient.unit} ({Math.min(s.pct, 999)}%)</span>
                 </div>
                 <div style={{ height: '8px', backgroundColor: 'var(--border)', borderRadius: '4px', overflow: 'hidden', display: 'flex', marginBottom: '8px' }}>
-                  <div style={{ width: `${Math.min(100, Math.round((s.foodAvg / nutrient.rdv) * 100))}%`, backgroundColor: color, transition: 'width 0.5s' }} />
-                  {s.suppAmt > 0 && <div style={{ width: `${Math.min(100 - Math.min(100, Math.round((s.foodAvg / nutrient.rdv) * 100)), Math.round((s.suppAmt / nutrient.rdv) * 100))}%`, backgroundColor: 'var(--accent-purple)', opacity: 0.8 }} />}
+                  <div style={{ width: `${Math.min(100, Math.round((s.foodAvg / rdv) * 100))}%`, backgroundColor: color, transition: 'width 0.5s' }} />
+                  {s.suppAmt > 0 && <div style={{ width: `${Math.min(100 - Math.min(100, Math.round((s.foodAvg / rdv) * 100)), Math.round((s.suppAmt / rdv) * 100))}%`, backgroundColor: 'var(--accent-purple)', opacity: 0.8 }} />}
                 </div>
                 <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
                   <span>🍽️ Food: {Math.round(s.foodAvg * 10) / 10}{nutrient.unit}/day</span>
@@ -484,7 +486,7 @@ function DetailPanel({ slug, ctx, onClose }) {
             ) : (
               <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
                 {s.suppAmt > 0
-                  ? <span style={{ color: 'var(--accent-purple)' }}>💊 You're getting {Math.round(s.suppAmt)}{nutrient.unit}/day from supplements ({Math.round((s.suppAmt / nutrient.rdv) * 100)}% of RDV). Log your food to see full picture.</span>
+                  ? <span style={{ color: 'var(--accent-purple)' }}>💊 You're getting {Math.round(s.suppAmt)}{nutrient.unit}/day from supplements ({Math.round((s.suppAmt / rdv) * 100)}% of RDV). Log your food to see full picture.</span>
                   : 'Log at least 5 days of food to see your personalized intake data.'}
               </div>
             )}
@@ -624,6 +626,7 @@ function Section({ title, children }) {
 
 export default function EncyclopediaPage() {
   const [ctx, setCtx] = useState(null)
+  const [microTargets, setMicroTargets] = useState(null)
   const [selected, setSelected] = useState(null)
   const [filter, setFilter] = useState('All')
   const [search, setSearch] = useState('')
@@ -631,13 +634,19 @@ export default function EncyclopediaPage() {
   const [showWhy, setShowWhy] = useState(false)
 
   useEffect(() => {
-    fetch('/api/nutrition/encyclopedia').then(r => r.json()).then(setCtx).catch(() => {})
+    fetch('/api/nutrition/encyclopedia')
+      .then(r => r.json())
+      .then(d => {
+        setCtx(d)
+        if (d?.age && d?.sex) setMicroTargets(calcMicroTargets(d.age, d.sex))
+      })
+      .catch(() => {})
   }, [])
 
   const gaps = ctx?.log_days >= 7
     ? NUTRIENTS
         .filter(n => !n.isWarnHigh)
-        .map(n => ({ ...n, s: getStatus(n, ctx) }))
+        .map(n => ({ ...n, s: getStatus(n, ctx, microTargets) }))
         .filter(n => n.s.status === 'low' || (n.s.pct > 0 && n.s.pct < 60))
         .sort((a, b) => a.s.pct - b.s.pct)
         .slice(0, 4)
@@ -648,6 +657,7 @@ export default function EncyclopediaPage() {
     if (search && !n.name.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
+  const b12Flag = microTargets?.b12AbsorptionFlag
 
   return (
     <div>
@@ -709,6 +719,16 @@ export default function EncyclopediaPage() {
         </button>
       </div>
 
+      {/* B12 Absorption Banner for 50+ */}
+      {b12Flag && (
+        <div style={{ backgroundColor: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '10px', padding: '14px 18px', marginBottom: '16px' }}>
+          <div style={{ fontWeight: '700', color: 'var(--accent-purple)', fontSize: '13px', marginBottom: '4px' }}>🧬 B12 Absorption Note for 50+</div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.6', margin: 0 }}>
+            After 50, stomach acid production drops significantly — B12 absorption from food falls by ~50%. Your dietary intake number here may overstate what you're actually absorbing. Crystalline B12 in supplements and fortified foods bypasses this problem. If you're not supplementing, consider a sublingual or methylcobalamin form.
+          </p>
+        </div>
+      )}
+
       {/* Low Energy Banner */}
       {ctx?.low_energy_signal && (
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--warning)', borderRadius: '10px', padding: '16px 20px', marginBottom: '16px' }}>
@@ -760,7 +780,7 @@ export default function EncyclopediaPage() {
       {/* Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', paddingBottom: '40px' }}>
         {filtered.map(n => (
-          <NutrientCard key={n.slug} nutrient={n} ctx={ctx} selected={selected === n.slug} onClick={() => setSelected(selected === n.slug ? null : n.slug)} />
+          <NutrientCard key={n.slug} nutrient={n} ctx={ctx} microTargets={microTargets} selected={selected === n.slug} onClick={() => setSelected(selected === n.slug ? null : n.slug)} />
         ))}
       </div>
 
@@ -771,12 +791,13 @@ export default function EncyclopediaPage() {
       )}
 
       {/* Detail Panel */}
-      {selected && <DetailPanel slug={selected} ctx={ctx} onClose={() => setSelected(null)} />}
+      {selected && <DetailPanel slug={selected} ctx={ctx} microTargets={microTargets} onClose={() => setSelected(null)} />}
 
       {/* Symptom Checker Modal */}
       {symptomCheckerOpen && (
         <SymptomCheckerModal
           ctx={ctx}
+          microTargets={microTargets}
           onSelectNutrient={slug => { setSelected(slug); setSymptomCheckerOpen(false) }}
           onClose={() => setSymptomCheckerOpen(false)}
         />

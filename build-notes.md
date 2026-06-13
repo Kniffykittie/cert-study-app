@@ -214,29 +214,14 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ### 🎯 Goals & Body Setup
 
-**1. Age-Adjusted Micronutrient Targets** — 📋 Fully Specced / ⏳ Pending Build
-New `calcMicroTargets(age, sex, weightLbs, activityLevel)` exported from `src/lib/tdee.js`. Replaces hardcoded FDA values in Encyclopedia, nutrition page, and gap report. One function, one source of truth.
-- Calcium: teens (9–18) = 1,300mg; 19–50 = 1,000mg; 51+ = 1,200mg
-- Vitamin D: under 70 = 600 IU; 70+ = 800 IU (absorption drops with age)
-- Iron: women 19–50 = 18mg; women 51+ = 8mg (post-menopause); men = 8mg; teen boys = 11mg, teen girls = 15mg
-- Magnesium: men 19–30 = 400mg, 31+ = 420mg; women 19–30 = 310mg, 31+ = 320mg; scales slightly with activity level (~4mg per kg lean mass above sedentary)
-- B12: flag in Encyclopedia for users 50+ — stomach acid production drops, absorption decreases significantly
-- Protein floor: 65+ floors at 1.0–1.2g/kg lean mass (vs standard 0.82g/lb) — sarcopenia prevention
-- Potassium: scales roughly ~1mg per calorie of intake (active/higher-calorie users need more)
-
-**2. Age-Specific Framing Copy** — 📋 Fully Specced / ⏳ Pending Build (part of "What Happens Now")
+**1. Age-Specific Framing Copy** — ✅ Partially built (age callouts in Goals Setup step 5); remaining: nutrition page showing age-adjusted targets vs FDA defaults side-by-side
 - Under 18: "You're still growing — bone density builds during these years. We've kept your deficit conservative to protect this window." Deficit capped at 300 cal/day for teens.
 - 18–25: "Your body is in its peak building window — this is the best time to establish a strong base."
 - 25–35: "Your metabolism is beginning a gradual slowdown — the numbers reflect a small adjustment."
 - 35–50: "After 35, muscle is harder to maintain — your protein target is slightly higher to compensate."
 - 50+: "After 50, protein and calcium needs actually increase. Your targets are higher than the generic FDA averages on purpose."
 
-**3. Teen Safety Gates** — 📋 Fully Specced / ⏳ Pending Build
-- Deficit capped at 300 cal/day (vs 1,000 for adults) — aggressive deficits suppress growth hormones and impair bone development
-- Explicit note: "Because you're still developing, we've kept your deficit conservative to protect healthy growth."
-- Under 16 with weight loss goals: note recommending they speak with a doctor first before pursuing a deficit
-
-**4. `gain_weight` Goal Option** — 📋 Fully Specced / ⏳ Pending Build
+**2. `gain_weight` Goal Option** — 📋 Fully Specced / ⏳ Pending Build
 Currently missing: someone who feels too skinny or wants to bulk. `build_muscle` is a lean bulk (+200 cal). This is different.
 - New goal option in setup: "I want to gain weight / I feel too skinny"
 - Surplus tier: 300–500 cal/day depending on target weight and timeline
@@ -244,14 +229,14 @@ Currently missing: someone who feels too skinny or wants to bulk. `build_muscle`
 - "What Happens Now": normalize scale going up, explain it's the goal, set weekly gain expectations
 - Age interaction: a 16-year-old trying to gain gets different advice (still growing, needs nutrient density not just calories) than a 35-year-old
 
-**5. Dietary Preferences Wired Downstream** — 📋 Fully Specced / ⏳ Pending Build
+**3. Dietary Preferences Wired Downstream** — 📋 Fully Specced / ⏳ Pending Build
 Currently collected in setup but only used in the AI overview paragraph. Every preference should mean something real.
 - Meal plan page: flag foods that conflict (vegan → warning on chicken; gluten-free → warning on wheat pasta)
 - Food search: compatibility chips on results
 - "What Happens Now": vegan → "Watch B12, iron, zinc — plant sources absorb at lower rates. The Encyclopedia will flag these."; gluten-free → noted in plan; picky eater → "Meal plan will favor simple familiar foods."
 - Encyclopedia gap report: vegan profile auto-flags B12, iron, zinc, omega-3 as risk nutrients even without logged intake data
 
-**6. Orphaned Inputs — Wire Up Remaining** — 💬 Discussed / 📋 Partially Specced
+**4. Orphaned Inputs — Wire Up Remaining** — 💬 Discussed / 📋 Partially Specced
 | Input | Current use | Planned use |
 |---|---|---|
 | Biggest obstacles | AI overview only | Workout plan prompt (injury-aware adjustments); nutrition coaching (budget → cheap high-protein suggestions) |
@@ -263,7 +248,7 @@ Currently collected in setup but only used in the AI overview paragraph. Every p
 
 ### 🍎 Nutrition
 
-**7. Sprint 3A — Contextual Banners + Better Empty States** — 📋 Fully Specced / ⏳ Pending Build
+**5. Sprint 3A — Contextual Banners + Better Empty States** — 📋 Fully Specced / ⏳ Pending Build
 - Lunch reminder banner (12–2pm, no lunch logged yet)
 - Water gap banner (past 3pm, water < 40% of goal — separate from workout page hydration banner)
 - Nutrient gap banner on Food Log (yesterday's protein < 80% of target)
@@ -584,6 +569,13 @@ A complete system parallel to Workouts but lighter in logging. No timer, no HR t
 
 ### Phase 43b - Complete
 - **Monthly Wrap notification popup** — bottom-right toast; "Take me there →" navigates; dismissal in localStorage
+
+### Phase B: Age-Adjusted Micronutrient Targets + Teen Safety Gates - Complete
+- **`calcMicroTargets(age, sex)`** added to `src/lib/tdee.js` — returns NIH DRI-sourced per-nutrient daily targets keyed by DB column name (calcium_mg, vitamin_d_mcg, iron_mg, magnesium_mg, etc.) + `b12AbsorptionFlag` true when age ≥ 50
+- **Teen deficit cap** in `calcGoalAdjustment` — 4th `age` param; under-18 users capped at 300 cal/day deficit (vs 1,000 for adults) with teen-specific cap explanation text
+- **Encyclopedia page** — now fetches age+sex from goals_profiles (added to encyclopedia route query); computes `microTargets` from `calcMicroTargets`; passes to all `getStatus()` calls, NutrientCard, DetailPanel, and SymptomCheckerModal; RDV label in DetailPanel notes "adjusted for your age & sex" when different from FDA default
+- **B12 absorption banner** — shown on Encyclopedia page for users 50+ explaining stomach acid reduction + supplement recommendation
+- `encyclopedia/route.js` — adds `age` and `sex` to goals_profiles select + returns them
 
 ### Fix: measurements page handlePhotoUpload - Complete
 - `handlePhotoUpload` function was missing from measurements/page.js despite being referenced — added function that POSTs FormData to `/api/goals/progress-photos`, updates photo list, shows success/error in `photoMsg`
