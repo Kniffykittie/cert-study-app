@@ -1,4 +1,4 @@
-const CACHE = 'csa-shell-v1'
+const CACHE = 'csa-shell-v2'
 
 const SHELL = [
   '/',

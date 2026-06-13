@@ -301,6 +301,10 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ## Phase Log
 
+### Mobile — SW cache v2 bump — Complete
+- Bumped `CACHE` from `csa-shell-v1` to `csa-shell-v2` in `public/sw.js` to force full cache eviction on next SW update
+- Fixes stale LifeHubSidebar JS bundle being served from old cache on PWA
+
 ### Mobile — viewport meta tag fix — Complete
 - Added `<meta name="viewport" content="width=device-width, initial-scale=1">` to root layout
 - Without this, mobile browsers render at ~980px desktop width so `@media (max-width: 768px)` never fires — sidebar drawer never activates on phones
