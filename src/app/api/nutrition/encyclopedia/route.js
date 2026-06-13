@@ -32,7 +32,7 @@ export async function GET() {
     ).eq('user_id', user.id).gte('date', thirtyDaysAgo),
     supabase.from('supplement_stack').select('nutrients').eq('user_id', user.id).eq('is_active', true),
     supabase.from('daily_checkins').select('energy_level,mood_level').eq('user_id', user.id).gte('date', fourteenDaysAgo),
-    supabase.from('goals_profiles').select('goals,age,sex').eq('user_id', user.id).single(),
+    supabase.from('goals_profiles').select('goals,age,sex,dietary_preferences').eq('user_id', user.id).single(),
     supabase.from('workout_logs').select('created_at').eq('user_id', user.id).gte('created_at', thirtyDaysAgoTs),
     supabase.from('meal_plans').select('id').eq('user_id', user.id).eq('week_start', weekStart).single(),
   ])
@@ -102,6 +102,7 @@ export async function GET() {
     goals: goals?.goals || [],
     age: goals?.age || null,
     sex: goals?.sex || null,
+    dietary_preferences: goals?.dietary_preferences || [],
     low_energy_signal: lowEnergySignal,
     avg_energy_14d: avgEnergy14d ? Math.round(avgEnergy14d * 10) / 10 : null,
     weekly_workouts: weeklyWorkouts,

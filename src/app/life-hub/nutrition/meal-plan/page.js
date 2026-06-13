@@ -94,6 +94,21 @@ function formatWeekLabel(weekStart) {
   return `${d.toLocaleDateString('en-US', opts)} – ${end.toLocaleDateString('en-US', opts)}`
 }
 
+const MEAL_PLAN_DIETARY_RULES = {
+  vegan: (f) => { const t = `${f.name} ${f.brand||''}`.toLowerCase(); return ['chicken','beef','pork','turkey','lamb','fish','salmon','tuna','shrimp','crab','lobster','meat','steak','bacon','ham','sausage','milk','cheese','butter','cream','yogurt','whey','egg','gelatin','lard'].some(k=>t.includes(k)) ? '⚠️ May not be vegan' : null },
+  vegetarian: (f) => { const t = `${f.name} ${f.brand||''}`.toLowerCase(); return ['chicken','beef','pork','turkey','lamb','fish','salmon','tuna','shrimp','crab','lobster','meat','steak','bacon','ham','sausage','lard','gelatin','anchovy'].some(k=>t.includes(k)) ? '⚠️ Contains meat/fish' : null },
+  gluten_free: (f) => { const t = `${f.name} ${f.brand||''}`.toLowerCase(); return ['wheat','bread','pasta','flour','gluten','barley','rye','malt','couscous','seitan','cracker','pretzel','muffin','cookie','cake','biscuit','cereal','granola'].some(k=>t.includes(k)) ? '⚠️ May contain gluten' : null },
+  dairy_free: (f) => { const t = `${f.name} ${f.brand||''}`.toLowerCase(); return ['milk','cheese','butter','cream','yogurt','whey','lactose','casein','ghee','kefir','ricotta','mozzarella','cheddar','parmesan'].some(k=>t.includes(k)) ? '⚠️ Contains dairy' : null },
+  low_sodium: (f) => f.sodium_mg != null && f.sodium_mg > 600 ? `⚠️ High sodium (${Math.round(f.sodium_mg)}mg)` : null,
+  keto: (f) => f.carbs_g != null && f.carbs_g > 20 ? `⚠️ High carbs (${Math.round(f.carbs_g)}g)` : null,
+  low_carb: (f) => f.carbs_g != null && f.carbs_g > 30 ? `⚠️ High carbs (${Math.round(f.carbs_g)}g)` : null,
+}
+
+function getMealPlanWarnings(food, prefs) {
+  if (!prefs?.length) return []
+  return prefs.flatMap(p => { const fn = MEAL_PLAN_DIETARY_RULES[p]; const w = fn?.(food); return w ? [w] : [] })
+}
+
 export default function MealPlanPage() {
   const [weekOffset, setWeekOffset] = useState(0)
   const weekStart = getMondayOfWeek(weekOffset)
@@ -141,7 +156,7 @@ export default function MealPlanPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const [{ data: goals }, { data: suppData }] = await Promise.all([
-        supabase.from('goals_profiles').select('weight_lbs, job_activity, exercise_types, exercise_days_per_week, exercise_duration_min, exercise_consistency, body_composition, sex, age').eq('user_id', user.id).single(),
+        supabase.from('goals_profiles').select('weight_lbs, job_activity, exercise_types, exercise_days_per_week, exercise_duration_min, exercise_consistency, body_composition, sex, age, dietary_preferences').eq('user_id', user.id).single(),
         supabase.from('supplement_stack').select('nutrients').eq('user_id', user.id).eq('is_active', true),
       ])
       if (goals?.weight_lbs) {
@@ -503,16 +518,24 @@ export default function MealPlanPage() {
             <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
               {searchLoading && <div style={{ color: 'var(--text-secondary)', fontSize: '13px', padding: '12px 0', textAlign: 'center' }}>Searching...</div>}
 
-              {!selectedFood && searchResults.map(r => (
-                <button key={r.id || r.name} onClick={() => setSelectedFood(r)}
-                  style={{ width: '100%', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 12px', textAlign: 'left', cursor: 'pointer', marginBottom: '6px', display: 'block' }}>
-                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{r.name}</div>
-                  {r.brand && <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{r.brand}</div>}
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>
-                    {r.serving_size_label} · {Math.round(r.calories || 0)} cal · {Math.round(r.protein_g || 0)}g protein
-                  </div>
-                </button>
-              ))}
+              {!selectedFood && searchResults.map(r => {
+                const dietWarn = getMealPlanWarnings(r, goalsProfile?.dietary_preferences)
+                return (
+                  <button key={r.id || r.name} onClick={() => setSelectedFood(r)}
+                    style={{ width: '100%', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 12px', textAlign: 'left', cursor: 'pointer', marginBottom: '6px', display: 'block' }}>
+                    <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{r.name}</div>
+                    {r.brand && <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{r.brand}</div>}
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>
+                      {r.serving_size_label} · {Math.round(r.calories || 0)} cal · {Math.round(r.protein_g || 0)}g protein
+                    </div>
+                    {dietWarn.length > 0 && (
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                        {dietWarn.map((w, i) => <span key={i} style={{ fontSize: '10px', color: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '4px', padding: '1px 5px' }}>{w}</span>)}
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
 
               {!selectedFood && searchQuery && !searchLoading && searchResults.length === 0 && (
                 <div style={{ padding: '12px 0' }}>

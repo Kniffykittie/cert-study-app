@@ -109,7 +109,7 @@ function MacroBar({ value, goal, color, warn }) {
 }
 
 // Search modal with saved foods quick-select and full micronutrient entry
-function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, workoutCtx }) {
+function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, workoutCtx, dietaryPrefs }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
@@ -269,7 +269,7 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ fontSize: '11px', color: 'var(--accent-purple)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px', fontWeight: '600' }}>⭐ Saved Foods</div>
                   {filteredMyFoods.map(f => (
-                    <FoodRow key={f.id} food={{ ...f, _source: 'my_foods' }} selected={selected?.id === f.id && selected?._source === 'my_foods'} onSelect={setSelected} isSaved />
+                    <FoodRow key={f.id} food={{ ...f, _source: 'my_foods' }} selected={selected?.id === f.id && selected?._source === 'my_foods'} onSelect={setSelected} isSaved dietaryWarnings={getDietaryWarnings(f, dietaryPrefs)} />
                   ))}
                 </div>
               )}
@@ -281,7 +281,7 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
                   {query && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Results</div>}
                   {results.map((f, i) => (
                     <FoodRow key={f.id || i} food={f} selected={selected?.id === f.id && selected?._source !== 'my_foods'} onSelect={setSelected}
-                      onSave={handleQuickSave} savingId={savingFood} />
+                      onSave={handleQuickSave} savingId={savingFood} dietaryWarnings={getDietaryWarnings(f, dietaryPrefs)} />
                   ))}
                 </div>
               )}
@@ -457,7 +457,7 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
   )
 }
 
-function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal, workoutCtx }) {
+function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal, workoutCtx, dietaryPrefs }) {
   const [tab, setTab] = useState('favorites')
   const [filter, setFilter] = useState('')
   const [expandedId, setExpandedId] = useState(null)
@@ -679,6 +679,11 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
                               {food.carbs_g ? ` · ${Math.round(food.carbs_g)}g C` : ''}
                               {food.fat_g ? ` · ${Math.round(food.fat_g)}g F` : ''}
                             </div>
+                            {(() => { const w = getDietaryWarnings(food, dietaryPrefs); return w.length > 0 ? (
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
+                                {w.map((ww, i) => <span key={i} style={{ fontSize: '10px', color: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '4px', padding: '1px 5px' }}>{ww}</span>)}
+                              </div>
+                            ) : null })()}
                           </div>
                           <button onClick={() => handleExpandLog(food.id)}
                             style={{ backgroundColor: isExpanded ? 'transparent' : 'rgba(0,128,255,0.12)', color: isExpanded ? 'var(--text-secondary)' : 'var(--accent-blue)', border: isExpanded ? '1px solid var(--border)' : 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', flexShrink: 0 }}>
@@ -816,7 +821,7 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
                 <div style={{ marginBottom: '8px' }}>
                   {results.slice(0, 8).map((f, i) => (
                     <FoodRow key={f.id || i} food={f} selected={selected?.id === f.id} onSelect={setSelected}
-                      onSave={handleQuickSave} savingId={savingFood} />
+                      onSave={handleQuickSave} savingId={savingFood} dietaryWarnings={getDietaryWarnings(f, dietaryPrefs)} />
                   ))}
                 </div>
               )}
@@ -1010,7 +1015,38 @@ function FoodIntelCard({ foodName, brand, calories, protein_g, carbs_g, fat_g, f
   )
 }
 
-function FoodRow({ food, selected, onSelect, isSaved, onSave, savingId }) {
+const DIETARY_RULES = {
+  vegan: (food) => {
+    const t = `${food.name} ${food.brand || ''}`.toLowerCase()
+    const kw = ['chicken','beef','pork','turkey','lamb','fish','salmon','tuna','shrimp','crab','lobster','meat','steak','bacon','ham','sausage','pepperoni','milk','cheese','butter','cream','yogurt','whey','egg','gelatin','lard','anchovy','sardine','prawn','mussel','oyster','clam']
+    return kw.some(k => t.includes(k)) ? '⚠️ May not be vegan' : null
+  },
+  vegetarian: (food) => {
+    const t = `${food.name} ${food.brand || ''}`.toLowerCase()
+    const kw = ['chicken','beef','pork','turkey','lamb','fish','salmon','tuna','shrimp','crab','lobster','meat','steak','bacon','ham','sausage','pepperoni','lard','gelatin','anchovy','sardine','prawn','mussel','oyster','clam']
+    return kw.some(k => t.includes(k)) ? '⚠️ Contains meat/fish' : null
+  },
+  gluten_free: (food) => {
+    const t = `${food.name} ${food.brand || ''}`.toLowerCase()
+    const kw = ['wheat','bread','pasta','flour','gluten','barley','rye','malt','soy sauce','teriyaki','couscous','semolina','spelt','farro','bulgur','seitan','cracker','pretzel','muffin','cookie','cake','biscuit','cereal','granola','tortilla','wrap','naan','pita','bagel']
+    return kw.some(k => t.includes(k)) ? '⚠️ May contain gluten' : null
+  },
+  dairy_free: (food) => {
+    const t = `${food.name} ${food.brand || ''}`.toLowerCase()
+    const kw = ['milk','cheese','butter','cream','yogurt','whey','lactose','casein','ghee','kefir','ricotta','mozzarella','cheddar','parmesan','brie','gouda','custard','half and half']
+    return kw.some(k => t.includes(k)) ? '⚠️ Contains dairy' : null
+  },
+  low_sodium: (food) => food.sodium_mg != null && food.sodium_mg > 600 ? `⚠️ High sodium (${Math.round(food.sodium_mg)}mg)` : null,
+  keto: (food) => food.carbs_g != null && food.carbs_g > 20 ? `⚠️ High carbs for keto (${Math.round(food.carbs_g)}g)` : null,
+  low_carb: (food) => food.carbs_g != null && food.carbs_g > 30 ? `⚠️ High carbs (${Math.round(food.carbs_g)}g)` : null,
+}
+
+function getDietaryWarnings(food, prefs) {
+  if (!prefs || prefs.length === 0) return []
+  return prefs.flatMap(p => { const fn = DIETARY_RULES[p]; const w = fn?.(food); return w ? [w] : [] })
+}
+
+function FoodRow({ food, selected, onSelect, isSaved, onSave, savingId, dietaryWarnings }) {
   const cal = food.calories ? Math.round(food.calories) : '?'
   const p = food.protein_g ? `${Math.round(food.protein_g)}g P` : null
   const f = food.fat_g ? `${Math.round(food.fat_g)}g F` : null
@@ -1024,6 +1060,13 @@ function FoodRow({ food, selected, onSelect, isSaved, onSave, savingId }) {
           {food.brand ? `${food.brand} · ` : ''}{food.serving_size_label || '1 serving'}
           {p ? ` · ${p}` : ''}{f ? ` · ${f}` : ''}
         </div>
+        {dietaryWarnings?.length > 0 && (
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
+            {dietaryWarnings.map((w, i) => (
+              <span key={i} style={{ fontSize: '10px', color: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '4px', padding: '1px 5px' }}>{w}</span>
+            ))}
+          </div>
+        )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
         <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '700', minWidth: '54px', textAlign: 'right' }}>{cal} kcal</span>
@@ -2052,14 +2095,14 @@ export default function NutritionPage() {
     <div>
       {logModal && (
         <AddFoodModal slot={logModal} onClose={() => setLogModal(null)} onAdd={handleAddEntry}
-          myFoods={mealFoods} onSaveFood={handleSaveToMyFoods} onCreateMeal={() => setMealBuilderModal(true)} workoutCtx={workoutCtx} />
+          myFoods={mealFoods} onSaveFood={handleSaveToMyFoods} onCreateMeal={() => setMealBuilderModal(true)} workoutCtx={workoutCtx} dietaryPrefs={goals?.dietary_preferences || []} />
       )}
       {libraryModal && (
         <SearchModal slot={null} onClose={() => setLibraryModal(false)} onAdd={() => {}}
           myFoods={myFoods} onSaveFood={food => setMyFoods(prev => {
             if (prev.find(f => f.id === food.id)) return prev
             return [...prev, food]
-          })} libraryOnly workoutCtx={workoutCtx} />
+          })} libraryOnly workoutCtx={workoutCtx} dietaryPrefs={goals?.dietary_preferences || []} />
       )}
       {mealBuilderModal && (
         <MealBuilderModal onClose={() => setMealBuilderModal(false)} onSave={food => {

@@ -229,12 +229,7 @@ Currently missing: someone who feels too skinny or wants to bulk. `build_muscle`
 - "What Happens Now": normalize scale going up, explain it's the goal, set weekly gain expectations
 - Age interaction: a 16-year-old trying to gain gets different advice (still growing, needs nutrient density not just calories) than a 35-year-old
 
-**3. Dietary Preferences Wired Downstream** — 📋 Fully Specced / ⏳ Pending Build
-Currently collected in setup but only used in the AI overview paragraph. Every preference should mean something real.
-- Meal plan page: flag foods that conflict (vegan → warning on chicken; gluten-free → warning on wheat pasta)
-- Food search: compatibility chips on results
-- "What Happens Now": vegan → "Watch B12, iron, zinc — plant sources absorb at lower rates. The Encyclopedia will flag these."; gluten-free → noted in plan; picky eater → "Meal plan will favor simple familiar foods."
-- Encyclopedia gap report: vegan profile auto-flags B12, iron, zinc, omega-3 as risk nutrients even without logged intake data
+**3. Dietary Preferences Wired Downstream** — ✅ Built (Phase 50)
 
 **4. Orphaned Inputs — Wire Up Remaining** — 💬 Discussed / 📋 Partially Specced
 | Input | Current use | Planned use |
@@ -362,6 +357,13 @@ A complete system parallel to Workouts but lighter in logging. No timer, no HR t
 ---
 
 ## Phase Log
+
+### Phase 50 — Dietary Preferences Wired Downstream — Complete
+- Added `DIETARY_RULES` object and `getDietaryWarnings(food, prefs)` function to `nutrition/page.js` — keyword-based checks for vegan, vegetarian, gluten_free, dairy_free, low_sodium, keto, low_carb
+- Warning chips (amber) appear on food search results, saved favorites, and My Favorites list in `AddFoodModal` and `SearchModal` when food name/brand matches a restriction keyword
+- `AddFoodModal` and `SearchModal` accept `dietaryPrefs` prop; call sites pass `goals?.dietary_preferences || []`
+- Meal plan page: added `getMealPlanWarnings` inline function; search results show amber warning chips when food conflicts with stored dietary preferences; `goals_profiles` select expanded to include `dietary_preferences`
+- Encyclopedia: API route now returns `dietary_preferences` from `goals_profiles`; new "Vegan/Vegetarian Nutrient Watch List" panel renders above Low Energy banner when vegan/vegetarian pref detected — 6 at-risk nutrients (vegan) or 3 (vegetarian) with clickable buttons opening detail panel; panel always visible, not gated on log days
 
 ### Body Measurements — Intelligence Card + Goal Completion + Navy BF% — Complete
 - Added `calcNavyBfPct(entry, heightInches, sex)` using the U.S. Navy Method — accurate BF% from tape measurements (waist/neck/hips + height); shown as a badge on every history entry where neck + waist measurements are logged

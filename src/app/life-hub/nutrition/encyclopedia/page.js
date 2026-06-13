@@ -730,6 +730,53 @@ export default function EncyclopediaPage() {
         </div>
       )}
 
+      {/* Dietary Preferences Risk Banner */}
+      {(() => {
+        const prefs = ctx?.dietary_preferences || []
+        const isVegan = prefs.includes('vegan')
+        const isVegetarian = prefs.includes('vegetarian')
+        const isDairyFree = prefs.includes('dairy_free') || isVegan
+        if (!isVegan && !isVegetarian) return null
+        const riskNutrients = isVegan
+          ? [
+              { slug: 'vitamin-b12', reason: 'Found only in animal products — must supplement' },
+              { slug: 'iron', reason: 'Plant iron (non-heme) absorbs 2–3× less than animal iron' },
+              { slug: 'zinc', reason: 'Plant sources have lower bioavailability due to phytates' },
+              { slug: 'omega-3', reason: 'ALA from plants converts poorly to EPA/DHA' },
+              { slug: 'vitamin-d', reason: 'D3 from animals; D2 from plants is less potent' },
+              { slug: 'calcium', reason: 'No dairy — check fortified foods or supplements' },
+            ]
+          : [
+              { slug: 'iron', reason: 'Non-heme iron from plants absorbs less efficiently' },
+              { slug: 'zinc', reason: 'Lower bioavailability from plant sources' },
+              { slug: 'omega-3', reason: 'Seafood is the richest EPA/DHA source' },
+            ]
+        const color = '#22c55e'
+        return (
+          <div style={{ backgroundColor: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '16px 20px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+              <span style={{ fontSize: '15px' }}>🌱</span>
+              <span style={{ fontWeight: '700', color, fontSize: '14px' }}>
+                {isVegan ? 'Vegan' : 'Vegetarian'} Nutrient Watch List
+              </span>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+              These nutrients are most likely to be insufficient on a {isVegan ? 'vegan' : 'vegetarian'} diet — even with a varied diet. Click any to see your current intake and sources.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {riskNutrients.map(({ slug, reason }) => (
+                <button key={slug} onClick={() => setSelected(slug)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', textAlign: 'left', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(34,197,94,0.25)', backgroundColor: 'rgba(34,197,94,0.05)', cursor: 'pointer', background: 'none' }}>
+                  <span style={{ fontWeight: '700', color, fontSize: '12px', minWidth: '80px' }}>{NUTRIENT_BY_SLUG[slug]?.name}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{reason}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: '11px', color, flexShrink: 0 }}>See intake →</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Low Energy Banner */}
       {ctx?.low_energy_signal && (
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--warning)', borderRadius: '10px', padding: '16px 20px', marginBottom: '16px' }}>
