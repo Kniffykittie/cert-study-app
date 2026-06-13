@@ -24,8 +24,10 @@ export default function BarcodeScannerModal({ onResult, onClose }) {
 
         let Detector = window.BarcodeDetector
         if (!Detector) {
-          const mod = await import('barcode-detector/pure')
-          Detector = mod.BarcodeDetector ?? mod.default
+          setErrorMsg('Barcode scanning isn\'t supported in this browser. Please type the barcode number manually in the search box.')
+          setStatus('error')
+          if (stream) stream.getTracks().forEach(t => t.stop())
+          return
         }
         const detector = new Detector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'] })
 
