@@ -267,6 +267,15 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Recovery Score Upgrade — HRV Component + Normalization — Complete
+- Rebalanced point values: Sleep 25 + Hydration 20 + Protein 20 + Energy 15 + Workout Load 10 = 90 base; HRV adds 10 pts when smartwatch data is available (total 100)
+- Score normalized to 100 via `rawTotal / maxAvailable * 100` — users without Google Health can still earn a full 100 score based on their 5 components
+- HRV scoring: ≥60ms = 10 pts, ≥40ms = 8 pts, ≥20ms = 5 pts, <20ms = 2 pts, null = component excluded from scoring
+- Added 2 new Supabase queries to the load() Promise.all: `yesterdayHrData` (HRV + resting BPM for yesterday) and `recentHrData` (7-day resting HR trend)
+- HRV component only shown in expanded breakdown when `recoveryScore.hasHrv` is true — no empty/missing state shown for watch-less users
+- Footer text dynamically reflects whether HRV is contributing ("100 pts with smartwatch data" vs "90 pts without smartwatch · score normalized to 100")
+- Energy pts recalculated: 1–5 rating × 3 (was ×4); Workout Load max 10 (was 15); rest day = 10 pts, <45min = 8, 45–75min = 5, 75+ = 3
+
 ### Heart Rate Phase 3 — Workout Zone Breakdown — Complete
 - Added `computeHrZones(supabase, userId, logId, durationSeconds)` in `/api/workouts/log/route.js`:
   - Computes workout start/end from `Date.now()` and `duration_seconds`

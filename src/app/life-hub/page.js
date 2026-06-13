@@ -137,6 +137,8 @@ export default function LifeHubPage() {
         { data: todayFoodEntries },
         { data: todayStepsData },
         { data: activePlanData },
+        { data: yesterdayHrData },
+        { data: recentHrData },
       ] = await Promise.all([
         supabase.from('daily_checkins').select('*').eq('user_id', user.id).gte('date', twentyEightAgo).order('date', { ascending: false }),
         supabase.from('water_logs').select('amount_oz').eq('user_id', user.id).gte('created_at', `${today}T00:00:00`),
@@ -154,6 +156,8 @@ export default function LifeHubPage() {
         supabase.from('food_log_entries').select('calories, protein_g').eq('user_id', user.id).eq('date', today),
         supabase.from('health_steps_hourly').select('steps').eq('user_id', user.id).eq('date', today),
         supabase.from('workout_plans').select('plan, schedule').eq('user_id', user.id).eq('is_active', true).limit(1),
+        supabase.from('health_heart_rate_daily').select('hrv_rmssd, resting_bpm').eq('user_id', user.id).eq('date', yesterday).maybeSingle(),
+        supabase.from('health_heart_rate_daily').select('date, resting_bpm').eq('user_id', user.id).gte('date', (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().split('T')[0] })()).order('date'),
       ])
 
       setCheckins(checkinData ?? [])
@@ -194,12 +198,16 @@ export default function LifeHubPage() {
       const proteinRatio = yesterdayProtein > 0 && proteinTarget > 0 ? yesterdayProtein / proteinTarget : 0
       const proteinPts = proteinRatio >= 1 ? 20 : proteinRatio >= 0.8 ? 15 : proteinRatio >= 0.6 ? 10 : yesterdayProtein > 0 ? 5 : 0
       const yesterdayEnergy = checkinData?.find(r => r.date === yesterday)?.energy_level ?? null
-      const energyPts = yesterdayEnergy != null ? yesterdayEnergy * 4 : 0
-      const workoutPts = yesterdayWorkoutMin === 0 ? 15 : yesterdayWorkoutMin < 45 ? 12 : yesterdayWorkoutMin <= 75 ? 8 : 5
+      const energyPts = yesterdayEnergy != null ? yesterdayEnergy * 3 : 0
+      const workoutPts = yesterdayWorkoutMin === 0 ? 10 : yesterdayWorkoutMin < 45 ? 8 : yesterdayWorkoutMin <= 75 ? 5 : 3
+      const yesterdayHrv = yesterdayHrData?.hrv_rmssd ?? null
+      const hrvPts = yesterdayHrv == null ? null : yesterdayHrv >= 60 ? 10 : yesterdayHrv >= 40 ? 8 : yesterdayHrv >= 20 ? 5 : 2
+      const maxAvailable = 90 + (hrvPts != null ? 10 : 0)
       const hasEnoughData = sleepPts != null || yesterdayWaterOz > 0 || yesterdayProtein > 0
       if (hasEnoughData) {
-        const total = (sleepPts ?? 12) + hydrationPts + proteinPts + energyPts + workoutPts
-        setRecoveryScore({ total: Math.round(Math.min(100, total)), components: { sleepPts: sleepPts ?? null, hydrationPts: Math.round(hydrationPts), proteinPts, energyPts, workoutPts }, sleepHours, yesterdayWaterOz: Math.round(yesterdayWaterOz), waterGoal })
+        const rawTotal = (sleepPts ?? 12) + hydrationPts + proteinPts + energyPts + workoutPts + (hrvPts ?? 0)
+        const total = Math.round(Math.min(rawTotal, maxAvailable) / maxAvailable * 100)
+        setRecoveryScore({ total, components: { sleepPts: sleepPts ?? null, hydrationPts: Math.round(hydrationPts), proteinPts, energyPts, workoutPts, hrvPts }, sleepHours, yesterdayWaterOz: Math.round(yesterdayWaterOz), waterGoal, yesterdayHrv, hasHrv: hrvPts != null })
       }
 
       // Section card data
@@ -501,27 +509,40 @@ export default function LifeHubPage() {
             tip: rc.proteinPts < 20 && rc.proteinPts > 0 ? 'Add a protein-rich meal or snack to close the gap today.' : null,
           },
           {
-            icon: '⚡', label: 'Energy', pts: rc.energyPts, max: 20,
+            icon: '⚡', label: 'Energy', pts: rc.energyPts, max: 15,
             detail: rc.energyPts === 0
-              ? "Yesterday's energy wasn't logged. Check in daily to earn up to 20 pts here — your 1–5 rating is worth 4 pts each."
-              : rc.energyPts >= 16
-                ? `You logged energy ${rc.energyPts / 4}/5 yesterday — feeling great. ${rc.energyPts}/20 pts.`
-                : rc.energyPts >= 12
-                  ? `You logged energy ${rc.energyPts / 4}/5 yesterday — decent. ${rc.energyPts}/20 pts.`
-                  : `You logged energy ${rc.energyPts / 4}/5 yesterday — low. ${rc.energyPts}/20 pts. Sleep, calories, and hydration are often the culprits.`,
-            tip: rc.energyPts < 12 && rc.energyPts > 0 ? 'Log today\'s energy after workouts or meals to track patterns over time.' : null,
+              ? "Yesterday's energy wasn't logged. Check in daily to earn up to 15 pts here — your 1–5 rating is worth 3 pts each."
+              : rc.energyPts >= 12
+                ? `You logged energy ${rc.energyPts / 3}/5 yesterday — feeling great. ${rc.energyPts}/15 pts.`
+                : rc.energyPts >= 9
+                  ? `You logged energy ${rc.energyPts / 3}/5 yesterday — decent. ${rc.energyPts}/15 pts.`
+                  : `You logged energy ${rc.energyPts / 3}/5 yesterday — low. ${rc.energyPts}/15 pts. Sleep, calories, and hydration are often the culprits.`,
+            tip: rc.energyPts < 9 && rc.energyPts > 0 ? 'Log today\'s energy after workouts or meals to track patterns over time.' : null,
           },
           {
-            icon: '🏋️', label: 'Workout Load', pts: rc.workoutPts, max: 15,
-            detail: rc.workoutPts === 15
-              ? 'You rested yesterday — full 15 pts. Rest is when your body actually repairs and gets stronger.'
-              : rc.workoutPts >= 12
-                ? 'Short workout yesterday (under 45 min) — a little extra load, but mostly recovered. 12/15 pts.'
-                : rc.workoutPts >= 8
-                  ? 'Solid workout yesterday (45–75 min) — your body absorbed some stress. 8/15 pts. Normal recovery mode.'
-                  : 'Long or intense session yesterday (75+ min) — higher load means more recovery needed. 5/15 pts.',
-            tip: rc.workoutPts <= 8 ? 'This is normal after hard training. Keep nutrition and sleep dialed in today.' : null,
+            icon: '🏋️', label: 'Workout Load', pts: rc.workoutPts, max: 10,
+            detail: rc.workoutPts === 10
+              ? 'You rested yesterday — full 10 pts. Rest is when your body actually repairs and gets stronger.'
+              : rc.workoutPts >= 8
+                ? 'Short workout yesterday (under 45 min) — a little extra load, but mostly recovered. 8/10 pts.'
+                : rc.workoutPts >= 5
+                  ? 'Solid workout yesterday (45–75 min) — your body absorbed some stress. 5/10 pts. Normal recovery mode.'
+                  : 'Long or intense session yesterday (75+ min) — higher load means more recovery needed. 3/10 pts.',
+            tip: rc.workoutPts <= 5 ? 'This is normal after hard training. Keep nutrition and sleep dialed in today.' : null,
           },
+          ...(recoveryScore.hasHrv ? [{
+            icon: '💓', label: 'HRV', pts: rc.hrvPts, max: 10,
+            detail: rc.hrvPts == null
+              ? 'No HRV data. Connect Google Health with a compatible device to unlock this component.'
+              : rc.hrvPts >= 10
+                ? `Your HRV was ${recoveryScore.yesterdayHrv}ms — excellent autonomic recovery. Full 10 pts.`
+                : rc.hrvPts >= 8
+                  ? `Your HRV was ${recoveryScore.yesterdayHrv}ms — good recovery signal. 8/10 pts.`
+                : rc.hrvPts >= 5
+                  ? `Your HRV was ${recoveryScore.yesterdayHrv}ms — moderate. Your nervous system is still recovering. 5/10 pts.`
+                  : `Your HRV was ${recoveryScore.yesterdayHrv}ms — low. High stress, poor sleep, or overtraining can suppress HRV. 2/10 pts.`,
+            tip: rc.hrvPts != null && rc.hrvPts < 8 ? 'Low HRV often improves with better sleep and reduced training intensity.' : null,
+          }] : []),
         ]
 
         return (
@@ -596,7 +617,7 @@ export default function LifeHubPage() {
                 </div>
                 <div style={{ marginTop: '18px', padding: '12px 14px', backgroundColor: `${scoreColor}10`, border: `1px solid ${scoreColor}30`, borderRadius: '8px' }}>
                   <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.6' }}>
-                    <strong style={{ color: 'var(--text-primary)' }}>How it's calculated:</strong> Sleep (25 pts) + Hydration (20 pts) + Protein (20 pts) + Yesterday's Energy Check-In (20 pts) + Workout Load (15 pts). Score reflects how prepared your body is for today based on what you logged yesterday.
+                    <strong style={{ color: 'var(--text-primary)' }}>How it's calculated:</strong> Sleep (25 pts) + Hydration (20 pts) + Protein (20 pts) + Energy Check-In (15 pts) + Workout Load (10 pts){recoveryScore.hasHrv ? ' + HRV (10 pts) = 100 pts with smartwatch data' : ' = 90 pts without smartwatch · score normalized to 100'}. Score reflects how prepared your body is for today based on what you logged yesterday.
                   </p>
                 </div>
               </div>
