@@ -2,12 +2,40 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
+function ConnectModal({ onBack, onContinue }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', padding: '32px', maxWidth: '440px', width: '100%' }}>
+        <div style={{ fontSize: '36px', textAlign: 'center', marginBottom: '16px' }}>📱</div>
+        <h2 style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700', textAlign: 'center', marginBottom: '12px' }}>Before You Connect</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.7', marginBottom: '8px', textAlign: 'center' }}>
+          Google Health integration is currently in limited access. To ensure a proper connection, please contact the site owner before continuing so your account can be authorized.
+        </p>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6', marginBottom: '28px', textAlign: 'center', opacity: 0.7 }}>
+          Proceeding without authorization may result in a failed connection.
+        </p>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button onClick={onBack}
+            style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+            ← Go Back
+          </button>
+          <a href="/api/health/connect"
+            style={{ flex: 1, backgroundColor: 'rgba(66,133,244,0.15)', border: '1px solid rgba(66,133,244,0.4)', color: '#4285F4', borderRadius: '8px', padding: '12px', fontSize: '14px', fontWeight: '600', textDecoration: 'none', textAlign: 'center' }}>
+            I've Been Authorized →
+          </a>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function HealthPage() {
   const [connected, setConnected] = useState(null)
   const [data, setData] = useState(null)
   const [hrData, setHrData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [showConnectModal, setShowConnectModal] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -63,20 +91,23 @@ export default function HealthPage() {
   )
 
   if (!connected) return (
-    <div style={{ maxWidth: '480px', margin: '0 auto', textAlign: 'center', paddingTop: '48px' }}>
-      <div style={{ fontSize: '48px', marginBottom: '16px' }}>❤️</div>
-      <h2 style={{ color: 'var(--text-primary)', fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>Connect Google Health</h2>
-      <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px', lineHeight: '1.6' }}>
-        Connect your Google Health account to see your steps, heart rate, and sleep data here.
-      </p>
-      <a href="/api/health/connect"
-        style={{ display: 'inline-block', backgroundColor: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.4)', color: '#4285F4', borderRadius: '8px', padding: '12px 24px', fontSize: '14px', fontWeight: '600', textDecoration: 'none' }}>
-        Connect Google Health
-      </a>
-      <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '12px' }}>
-        Or go to <Link href="/settings" style={{ color: 'var(--accent-blue)' }}>Settings → Connected Apps</Link>
-      </p>
-    </div>
+    <>
+      {showConnectModal && <ConnectModal onBack={() => setShowConnectModal(false)} />}
+      <div style={{ maxWidth: '480px', margin: '0 auto', textAlign: 'center', paddingTop: '48px' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>❤️</div>
+        <h2 style={{ color: 'var(--text-primary)', fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>Connect Google Health</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px', lineHeight: '1.6' }}>
+          Connect your Google Health account to unlock step tracking, heart rate monitoring, and sleep analysis.
+        </p>
+        <button onClick={() => setShowConnectModal(true)}
+          style={{ display: 'inline-block', backgroundColor: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.4)', color: '#4285F4', borderRadius: '8px', padding: '12px 24px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+          Connect Google Health
+        </button>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '12px' }}>
+          Or go to <Link href="/settings" style={{ color: 'var(--accent-blue)' }}>Settings → Connected Apps</Link>
+        </p>
+      </div>
+    </>
   )
 
   const restingHR = hrData?.todayResting ?? data?.restingHR ?? null

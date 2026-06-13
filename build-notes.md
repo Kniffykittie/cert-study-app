@@ -267,6 +267,11 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Google Health — Connect Modal + Sidebar Gating — Complete
+- Health Overview page: "Connect Google Health" button now opens a confirmation modal (`ConnectModal`) warning users to contact the site owner first for authorization; two buttons: "← Go Back" and "I've Been Authorized →" (the latter proceeds to `/api/health/connect`)
+- LifeHubSidebar: fetches `/api/health/status` on mount; Step Tracker, Heart Rate, and Sleep Tracker links are hidden when Google Health is not connected; Overview link always visible
+- Owner-only restriction was already absent from `/api/health/connect/route.js` — all authenticated users can connect once authorized as a Google test user
+
 ### Manual Sleep Hours — Hide Field for Watch Users — Complete
 - `hasGoogleSleep` state flag set during load when Google Health returns sleep data for yesterday
 - "Hours slept?" input hidden when `hasGoogleSleep` is true — watch users never see the redundant field

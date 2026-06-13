@@ -26,6 +26,7 @@ function monthLabel(ym) {
 
 export default function LifeHubSidebar() {
   const [displayName, setDisplayName] = useState('')
+  const [healthConnected, setHealthConnected] = useState(false)
   const [healthOpen, setHealthOpen] = useState(false)
   const [workoutsOpen, setWorkoutsOpen] = useState(false)
   const [goalsOpen, setGoalsOpen] = useState(false)
@@ -43,6 +44,7 @@ export default function LifeHubSidebar() {
       if (data?.display_name) setDisplayName(data.display_name)
     }
     fetchProfile()
+    fetch('/api/health/status').then(r => r.json()).then(d => setHealthConnected(!!d.connected)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -195,9 +197,9 @@ export default function LifeHubSidebar() {
         {healthOpen && (
           <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
             {navLink('Overview', '/life-hub/health', SECTION_COLORS.health)}
-            {navLink('Step Tracker', '/life-hub/health/steps', SECTION_COLORS.health)}
-            {navLink('Heart Rate', '/life-hub/health/heart-rate', SECTION_COLORS.health)}
-            {navLink('Sleep Tracker', '/life-hub/health/sleep', SECTION_COLORS.health)}
+            {healthConnected && navLink('Step Tracker', '/life-hub/health/steps', SECTION_COLORS.health)}
+            {healthConnected && navLink('Heart Rate', '/life-hub/health/heart-rate', SECTION_COLORS.health)}
+            {healthConnected && navLink('Sleep Tracker', '/life-hub/health/sleep', SECTION_COLORS.health)}
           </div>
         )}
 
