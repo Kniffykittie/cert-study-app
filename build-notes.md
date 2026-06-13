@@ -301,6 +301,10 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ## Phase Log
 
+### Debug — Heart Rate page ErrorBoundary — In Progress
+- Added class-based ErrorBoundary wrapping HeartRatePageInner to catch render errors and display them on-screen instead of crashing the browser tab
+- Will remove once root cause is identified and fixed
+
 ### Vercel Fix — Heart Rate page crash — Complete
 - Heart rate page was crashing the browser tab when navigating to it
 - Fix 1: wrapped entire `load()` in try/catch so fetch errors don't propagate uncaught

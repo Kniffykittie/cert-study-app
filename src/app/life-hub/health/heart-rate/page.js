@@ -1,6 +1,19 @@
 'use client'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, Component } from 'react'
 import Link from 'next/link'
+
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(e) { return { error: e } }
+  render() {
+    if (this.state.error) return (
+      <div style={{ padding: '32px', color: 'var(--error)', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'pre-wrap', backgroundColor: 'var(--surface)', borderRadius: '10px', margin: '24px' }}>
+        <strong>Render error (please screenshot this):</strong>{'\n'}{this.state.error?.message}{'\n'}{this.state.error?.stack}
+      </div>
+    )
+    return this.props.children
+  }
+}
 
 function bpmColor(bpm) {
   if (!bpm) return 'var(--border)'
@@ -42,7 +55,8 @@ const PAD_RIGHT = 12
 const PAD_TOP = 12
 const PAD_BOTTOM = 24
 
-export default function HeartRatePage() {
+export default function HeartRatePage() { return <ErrorBoundary><HeartRatePageInner /></ErrorBoundary> }
+function HeartRatePageInner() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [tooltip, setTooltip] = useState(null)
