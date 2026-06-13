@@ -415,7 +415,7 @@ export default function LifeHubPage() {
 
       {/* Zone 1 — Status Bar */}
       {loaded && sd && (
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${sd.healthConnected ? 4 : 3}, 1fr)`, gap: '10px', marginBottom: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '20px' }}>
           <StatusPill
             color={SC.nutrition} icon="🍽️"
             value={sd.todayKcal > 0 ? `${sd.todayKcal.toLocaleString()} kcal` : '— kcal'}

@@ -301,6 +301,10 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ## Phase Log
 
+### Mobile — Life Hub status pills responsive wrap — Complete
+- Replaced `repeat(4, 1fr)` with `repeat(auto-fit, minmax(140px, 1fr))` on the Zone 1 status bar grid
+- On mobile (~390px): 2×2 grid; on desktop: all 4 pills in one row
+
 ### Mobile — LifeHubSidebar JS-based mobile detection — Complete
 - Replaced CSS `@media` class injection with `isMobile` state using `window.innerWidth <= 768` in a useEffect + resize listener
 - CSS-in-JSX `<style>` tags in Next.js App Router client components are unreliable for media queries; JS-driven conditional rendering is guaranteed to work
