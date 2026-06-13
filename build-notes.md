@@ -267,6 +267,11 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Manual Sleep Hours — Hide Field for Watch Users — Complete
+- `hasGoogleSleep` state flag set during load when Google Health returns sleep data for yesterday
+- "Hours slept?" input hidden when `hasGoogleSleep` is true — watch users never see the redundant field
+- Watch-less users see the field; watch users don't; Recovery Score logic unchanged (Google Health always takes priority)
+
 ### Manual Sleep Hours in Daily Check-In — Complete
 - Added `sleep_hours NUMERIC(4,1)` column to `daily_checkins` via migration
 - Check-in form has new "😴 Hours slept?" number input (step 0.5, 0–24); saved alongside energy/mood on every Save/Update

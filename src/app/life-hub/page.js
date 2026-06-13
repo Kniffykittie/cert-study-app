@@ -87,6 +87,7 @@ export default function LifeHubPage() {
   const [energy, setEnergy] = useState(0)
   const [mood, setMood] = useState(0)
   const [sleepHoursInput, setSleepHoursInput] = useState('')
+  const [hasGoogleSleep, setHasGoogleSleep] = useState(false)
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -179,6 +180,7 @@ export default function LifeHubPage() {
       const yesterdayCal = (yesterdayFood || []).reduce((s, r) => s + (r.calories || 0), 0)
       const calDiff = (tdee && yesterdayCal > 0) ? yesterdayCal - tdee : null
       const googleSleepHours = sleepData?.[0]?.sleep_minutes ? Math.round(sleepData[0].sleep_minutes / 60 * 10) / 10 : null
+      setHasGoogleSleep(googleSleepHours != null)
       const manualSleepHours = (() => { const v = parseFloat(checkinData?.find(r => r.date === yesterday)?.sleep_hours); return !isNaN(v) && v > 0 ? v : null })()
       const sleepHours = googleSleepHours ?? manualSleepHours
       const sleepSource = googleSleepHours != null ? 'google' : manualSleepHours != null ? 'manual' : null
@@ -726,17 +728,19 @@ export default function LifeHubPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <RatingRow label={checkinContext?.energyLabel || 'Energy'} sublabels={['', ...(checkinContext?.energySubs || ['Exhausted', 'Low', 'Okay', 'Good', 'Energized'])]} value={energy} setValue={setEnergy} />
                 <RatingRow label={checkinContext?.moodLabel || 'Mood'} sublabels={['', ...(checkinContext?.moodSubs || ['Rough', 'Meh', 'Okay', 'Good', 'Great'])]} value={mood} setValue={setMood} colors={MOOD_COLORS} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '13px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>😴 Hours slept?</span>
-                  <input
-                    type="number" min="0" max="24" step="0.5"
-                    value={sleepHoursInput}
-                    onChange={e => setSleepHoursInput(e.target.value)}
-                    placeholder="e.g. 7.5"
-                    style={{ width: '80px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '7px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }}
-                  />
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Used by Recovery Score if Google Health not connected</span>
-                </div>
+                {!hasGoogleSleep && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '13px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>😴 Hours slept?</span>
+                    <input
+                      type="number" min="0" max="24" step="0.5"
+                      value={sleepHoursInput}
+                      onChange={e => setSleepHoursInput(e.target.value)}
+                      placeholder="e.g. 7.5"
+                      style={{ width: '80px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '7px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }}
+                    />
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Used by Recovery Score</span>
+                  </div>
+                )}
                 {!microInsight && (
                   <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add a note (optional)..." rows={2}
                     style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
