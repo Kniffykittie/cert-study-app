@@ -129,6 +129,8 @@ export default function DrinksHydrationPage() {
   const [addDrinkForm, setAddDrinkForm] = useState({ name: '', serving_size_label: '', calories: '', protein_g: '', carbs_g: '', fat_g: '', sugar_g: '', sodium_mg: '', potassium_mg: '', vitamin_c_mg: '', caffeine_mg: '', water_oz: '' })
   const [addDrinkNutrition, setAddDrinkNutrition] = useState(false)
   const [savingAddDrink, setSavingAddDrink] = useState(false)
+  const [aiFillDrink, setAiFillDrink] = useState(false)
+  const [aiFillDrinkDone, setAiFillDrinkDone] = useState(false)
   const [editSavedModal, setEditSavedModal] = useState(null)
   const [savedEditForm, setSavedEditForm] = useState({ name: '', serving_size_label: '', calories: '', protein_g: '', carbs_g: '', fat_g: '', sugar_g: '', sodium_mg: '', potassium_mg: '', vitamin_c_mg: '', caffeine_mg: '', water_oz: '' })
   const [savingSaved, setSavingSaved] = useState(false)
@@ -420,7 +422,41 @@ export default function DrinksHydrationPage() {
   function openAddDrinkModal() {
     setAddDrinkForm({ name: '', serving_size_label: '1 serving', calories: '', protein_g: '', carbs_g: '', fat_g: '', sugar_g: '', sodium_mg: '', potassium_mg: '', vitamin_c_mg: '', caffeine_mg: '', water_oz: '' })
     setAddDrinkNutrition(false)
+    setAiFillDrinkDone(false)
     setAddDrinkModal(true)
+  }
+
+  async function handleAiFillDrink() {
+    if (!addDrinkForm.name.trim() || aiFillDrink) return
+    setAiFillDrink(true)
+    try {
+      const res = await fetch('/api/nutrition/ai-drink-fill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: addDrinkForm.name.trim() }),
+      })
+      const json = await res.json()
+      if (json.fill) {
+        const f = json.fill
+        setAddDrinkForm(prev => ({
+          ...prev,
+          name: f.name || prev.name,
+          serving_size_label: f.serving_size_label || prev.serving_size_label,
+          calories: f.calories != null ? String(f.calories) : prev.calories,
+          caffeine_mg: f.caffeine_mg != null ? String(f.caffeine_mg) : prev.caffeine_mg,
+          water_oz: f.water_oz != null ? String(Math.round(f.water_oz * 10) / 10) : prev.water_oz,
+          sugar_g: f.sugar_g != null ? String(f.sugar_g) : prev.sugar_g,
+          sodium_mg: f.sodium_mg != null ? String(f.sodium_mg) : prev.sodium_mg,
+          protein_g: f.protein_g != null ? String(f.protein_g) : prev.protein_g,
+          carbs_g: f.carbs_g != null ? String(f.carbs_g) : prev.carbs_g,
+          fat_g: f.fat_g != null ? String(f.fat_g) : prev.fat_g,
+          potassium_mg: f.potassium_mg != null ? String(f.potassium_mg) : prev.potassium_mg,
+          vitamin_c_mg: f.vitamin_c_mg != null ? String(f.vitamin_c_mg) : prev.vitamin_c_mg,
+        }))
+        setAiFillDrinkDone(true)
+      }
+    } catch {}
+    setAiFillDrink(false)
   }
 
   async function saveNewDrink() {
@@ -1052,18 +1088,28 @@ export default function DrinksHydrationPage() {
             </div>
             <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 16px' }}>Saved here — nothing gets logged to today. Tap the chip later to log instantly.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {[
-                { label: 'Name *', key: 'name', type: 'text', placeholder: 'e.g. Diet Coke, Orange Juice' },
-                { label: 'Serving Size', key: 'serving_size_label', type: 'text', placeholder: 'e.g. 1 can (12 fl oz)' },
-              ].map(f => (
-                <div key={f.key}>
-                  <label style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>{f.label}</label>
-                  <input type={f.type} value={addDrinkForm[f.key]} placeholder={f.placeholder}
-                    onChange={e => setAddDrinkForm(p => ({ ...p, [f.key]: e.target.value }))}
-                    autoFocus={f.key === 'name'}
-                    style={{ width: '100%', boxSizing: 'border-box', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text-primary)', fontSize: 13 }} />
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>Name *</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input type="text" value={addDrinkForm.name} placeholder="e.g. Diet Coke, Orange Juice"
+                    onChange={e => { setAddDrinkForm(p => ({ ...p, name: e.target.value })); setAiFillDrinkDone(false) }}
+                    autoFocus
+                    style={{ flex: 1, boxSizing: 'border-box', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text-primary)', fontSize: 13 }} />
+                  <button onClick={handleAiFillDrink} disabled={!addDrinkForm.name.trim() || aiFillDrink}
+                    style={{ padding: '8px 12px', background: aiFillDrinkDone ? 'rgba(46,204,113,0.15)' : 'rgba(96,165,250,0.1)', border: `1px solid ${aiFillDrinkDone ? 'rgba(46,204,113,0.5)' : 'var(--accent-blue)'}`, borderRadius: 8, color: aiFillDrinkDone ? 'var(--success)' : 'var(--accent-blue)', fontSize: 12, fontWeight: 600, cursor: addDrinkForm.name.trim() && !aiFillDrink ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', opacity: !addDrinkForm.name.trim() || aiFillDrink ? 0.5 : 1 }}>
+                    {aiFillDrink ? '⏳...' : aiFillDrinkDone ? '✓ Filled' : '🤖 AI Fill'}
+                  </button>
                 </div>
-              ))}
+                {aiFillDrinkDone && (
+                  <div style={{ marginTop: 4, fontSize: 11, color: 'var(--success)' }}>AI estimated nutrition — review and adjust before saving.</div>
+                )}
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>Serving Size</label>
+                <input type="text" value={addDrinkForm.serving_size_label} placeholder="e.g. 1 can (12 fl oz)"
+                  onChange={e => setAddDrinkForm(p => ({ ...p, serving_size_label: e.target.value }))}
+                  style={{ width: '100%', boxSizing: 'border-box', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text-primary)', fontSize: 13 }} />
+              </div>
               <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>Nutrition per serving</div>
               {[
                 { label: 'Calories', key: 'calories' },

@@ -128,6 +128,7 @@ src/
       nutrition/
         search/route.js                GET ?q= or ?barcode= — checks food_cache + my_foods first; falls back to Open Food Facts API; caches OFF results permanently (ODbL allows); uses getUser()
         ai-food-fill/route.js          POST { name } — Haiku estimates nutrition per typical serving; returns fill JSONB (name, serving_size_label, macros + subset of micros + servings_per_container); no cache (user reviews before saving); uses getUser() + is_disabled check
+        ai-drink-fill/route.js         POST { name } — Haiku estimates drink-specific nutrition (calories, caffeine_mg, water_oz, macros, sodium, potassium, vitamin_c); used by "🤖 AI Fill" button on Add to My Drinks modal (water/hydration page); uses getUser() + is_disabled check; name wrapped in user_input tags
         ai-micro-fill/route.js         POST { name, brand, calories, protein_g, carbs_g, fat_g } — Haiku estimates 15 micronutrient fields for an OFFs result with sparse micro data; no cache; uses getUser() + is_disabled check
         log/route.js                   GET ?date= today's entries; POST add entry (multiplies macros by servings); DELETE by id; uses getUser()
         my-foods/route.js              GET user's saved food library; POST save new food; DELETE by id (nulls food_log_entries.my_food_id first to avoid FK violation); uses getUser()

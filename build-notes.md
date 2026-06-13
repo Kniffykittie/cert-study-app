@@ -641,6 +641,11 @@ A complete system parallel to Workouts but lighter in logging. No timer, no HR t
 - **Same-day completion gate** — "✓ Done Today" on plan card
 - **Stale pause cleanup** — auto-cleared if paused workout is from previous day
 
+### Fix: AI Fill on Add to My Drinks modal (hydration page)
+- Added "🤖 AI Fill" button next to the Name field in the Add to My Drinks modal
+- Type a drink name → click AI Fill → Haiku returns calories, caffeine, water content, and macros; pre-fills all fields; user reviews before saving
+- New route: `POST /api/nutrition/ai-drink-fill` — drink-specific prompt (includes caffeine_mg and water_oz); Haiku; getUser() + is_disabled; name in user_input tags
+
 ### Fix: Saved drink delete not persisting (hydration page)
 - **Problem:** Deleting a drink from "MY DRINKS" appeared to work but came back after switching pages; the DB delete was silently failing due to a FK constraint (`food_log_entries.my_food_id` → `my_foods.id`)
 - **Fix:** `DELETE /api/nutrition/my-foods` now nulls out `food_log_entries.my_food_id` first, then deletes; returns a real error on failure; client only removes from state if `res.ok`
