@@ -130,10 +130,10 @@ src/
         manual-steps/route.js          GET today's manual step count; POST to upsert — shown on workouts page when Google Health not connected
         callback/route.js              Handles OAuth callback, saves tokens
         status/route.js                Checks if Google Health is connected
-        sync/route.js                  GET = read cache; POST = fetch from Google + write cache; now also stores intraday HR (health_heart_rate_intraday), resting_bpm, hrv_rmssd, and computed sleep quality metrics (onset, efficiency, awake_count, restlessness, sleep_score)
-        workout-hr-sync/route.js       POST — lightweight 2-hour HR fetch called every 90s during active workout; fills intraday table with dense data for the workout window; no auth.is_disabled check (not AI)
+        sync/route.js                  GET = read cache; POST = fetch from Google + write cache; stores intraday HR (health_heart_rate_intraday), 5-min HR (health_heart_rate_5min), resting_bpm, hrv_rmssd, and computed sleep quality metrics (onset, efficiency, awake_count, restlessness, sleep_score)
+        workout-hr-sync/route.js       POST — lightweight 2-hour HR fetch called every 90s during active workout; fills intraday + 5-min tables with dense data for the workout window; no auth.is_disabled check (not AI)
       health/
-        heart-rate/route.js            GET ?date= — returns intraday hourly HR (health_heart_rate_intraday), 7-day daily trend (health_heart_rate_daily), workoutWindow (start/end hour from workout_logs for that date), todayAvg/todayResting/todayHrv
+        heart-rate/route.js            GET ?date= — returns intraday hourly HR (health_heart_rate_intraday), fiveMin 5-minute HR (health_heart_rate_5min), 7-day daily trend (health_heart_rate_daily), workoutWindow (startMinute/endMinute/startHour/endHour), todayAvg/todayResting/todayHrv (RHR+HRV fall back to yesterdayDaily when today has no resting data)
         disconnect/route.js            Removes stored tokens
       workouts/
         generate-plan/route.js         AI workout plan generator; uses getUser() + is_disabled check; prompt injection protected on limitations + dumbbell_note fields
@@ -148,7 +148,7 @@ src/
       health/
         page.js                        Health Overview — 3 primary cards (Steps/HR/Sleep, each a link to sub-page) + 3 secondary cards (Resting HR / HRV / Sleep Score); all clickable to sub-pages; Refresh syncs health + heart-rate in parallel
         steps/page.js                  Step Tracker — hourly/weekly bar charts, goal progress, fixed tooltip
-        heart-rate/page.js             Heart Rate — 24-hour intraday bar chart (color-coded by zone, workout window annotated), 7-day resting HR trend (SVG polyline), HRV panel with zone chips; top cards: avg/resting/HRV
+        heart-rate/page.js             Heart Rate — SVG line chart using 5-minute data points (color-coded by zone, min/max shaded band, workout window as red band, hover tooltip shows time+BPM+range); falls back to hourly if 5-min table empty; 7-day resting HR trend (SVG polyline); HRV panel with zone chips; top cards: avg/resting/HRV; RHR+HRV fall back to yesterday's data
         sleep/page.js                  Sleep Tracker — Sleep Score ring (0–100, color-coded), quality metrics (onset/efficiency/awakenings/restlessness), stage summary cards with % + target ranges, stage breakdown bar, hypnogram timeline, 4 collapsible education cards (Deep/REM/Light/Awake) explaining physiology + "if you're low" warnings
         water/page.js                  Drinks & Hydration — stacked hydration ring (water blue, beverages purple), quick-add water buttons (8/12/16/20/32 oz + custom), drink search (logs to food_log_entries meal_slot='drink'), saved drinks chips (my_foods is_drink=true) with Manage mode (edit name/nutrition/delete), combined today's log with ✏️ edit button on drink entries, caffeine tracker, hydration timing chart (18-bar hourly), 7-day bar chart; goal synced to goals_profiles.water_goal_oz; listed under Nutrition in sidebar (not Health)
       goals/
@@ -235,6 +235,7 @@ src/
 | `health_steps_hourly` | Cached step counts — one row per user/date/hour (EST) |
 | `health_heart_rate_daily` | Cached daily HR — avg_bpm, min_bpm, max_bpm, sample_count per user/date; resting_bpm (Google-computed via daily-resting-heart-rate endpoint); hrv_rmssd NUMERIC (from daily-heart-rate-variability endpoint) |
 | `health_heart_rate_intraday` | Per-user per-date per-hour HR — avg_bpm, min_bpm, max_bpm, sample_count; populated by sync/route.js (background) and workout-hr-sync/route.js (every 90s during active workout); UNIQUE on user_id+date+hour; RLS enabled |
+| `health_heart_rate_5min` | Per-user per-date per-5-minute-bucket HR — avg_bpm, min_bpm, max_bpm, sample_count; minute_bucket = estHour*60 + floor(estMin/5)*5 (0–1435); powers the line chart on heart-rate page; UNIQUE on user_id+date+minute_bucket; RLS enabled |
 | `health_sleep_sessions` | Cached sleep sessions — stages JSONB, timeline JSONB, is_nap; computed quality columns: onset_minutes, efficiency_pct, awake_count, longest_stretch_min, restlessness TEXT, sleep_score SMALLINT (0–100); keyed by Google session_id |
 | `exercises` | Exercise library — name, body_part, equipment, target, secondary_muscles[], instructions[], gif_url (nullable) |
 | `workout_profiles` | User's fitness profile — experience, goal, days_per_week, fitness stats, equipment, limitations, available_weights |

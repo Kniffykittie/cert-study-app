@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 
 function bpmColor(bpm) {
@@ -27,14 +27,27 @@ function fmtHour(h) {
   return `${h - 12}p`
 }
 
+function fmtMinute(minuteBucket) {
+  const h = Math.floor(minuteBucket / 60)
+  const m = minuteBucket % 60
+  const label = h === 0 ? '12' : h <= 12 ? `${h}` : `${h - 12}`
+  const suffix = h < 12 ? 'a' : 'p'
+  return `${label}:${String(m).padStart(2, '0')}${suffix}`
+}
+
+const SVG_W = 900
+const SVG_H = 160
+const PAD_LEFT = 36
+const PAD_RIGHT = 12
+const PAD_TOP = 12
+const PAD_BOTTOM = 24
+
 export default function HeartRatePage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [tooltip, setTooltip] = useState(null)
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
   const [connected, setConnected] = useState(null)
-
-  const handleMouseMove = useCallback((e) => setMousePos({ x: e.clientX, y: e.clientY }), [])
+  const svgRef = useRef(null)
 
   useEffect(() => {
     async function load() {
@@ -59,31 +72,101 @@ export default function HeartRatePage() {
     </div>
   )
 
+  const fiveMin = data?.fiveMin ?? []
   const intraday = data?.intraday ?? []
   const daily = data?.daily ?? []
   const workoutWindow = data?.workoutWindow
-  const hasIntraday = intraday.length > 0
 
-  // Build 24-slot array for bar chart
-  const hourMap = {}
-  intraday.forEach(r => { hourMap[r.hour] = r })
-  const hours = Array.from({ length: 24 }, (_, h) => ({ hour: h, ...hourMap[h] }))
+  // Use 5-min data for line chart; fall back to hourly if empty
+  const useFiveMin = fiveMin.length > 0
+  const hasData = useFiveMin ? fiveMin.length > 0 : intraday.length > 0
 
-  const maxBpm = hasIntraday ? Math.max(...intraday.map(r => r.avg_bpm)) : 120
-  const chartMax = Math.max(maxBpm + 10, 100)
+  // Build chart points
+  const chartPoints = useFiveMin
+    ? fiveMin.sort((a, b) => a.minute_bucket - b.minute_bucket)
+    : intraday.sort((a, b) => a.hour - b.hour).map(r => ({ ...r, minute_bucket: r.hour * 60 }))
+
+  const allBpm = chartPoints.map(p => p.avg_bpm).filter(Boolean)
+  const allMin = useFiveMin ? chartPoints.map(p => p.min_bpm).filter(Boolean) : allBpm
+  const allMax = useFiveMin ? chartPoints.map(p => p.max_bpm).filter(Boolean) : allBpm
+  const dataMin = allMin.length ? Math.min(...allMin) : 40
+  const dataMax = allMax.length ? Math.max(...allMax) : 120
+  const yMin = Math.max(0, dataMin - 15)
+  const yMax = dataMax + 15
+
+  const plotW = SVG_W - PAD_LEFT - PAD_RIGHT
+  const plotH = SVG_H - PAD_TOP - PAD_BOTTOM
+
+  // x: minute 0–1439 (full day)
+  const xOf = (minute) => PAD_LEFT + (minute / 1439) * plotW
+  const yOf = (bpm) => PAD_TOP + plotH - ((bpm - yMin) / (yMax - yMin)) * plotH
+
+  // Y-axis grid lines
+  const yStep = Math.ceil((yMax - yMin) / 4 / 10) * 10
+  const yTicks = []
+  for (let v = Math.ceil(yMin / 10) * 10; v <= yMax; v += yStep) yTicks.push(v)
+
+  // Build path strings
+  const avgPath = chartPoints
+    .filter(p => p.avg_bpm)
+    .map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(p.minute_bucket).toFixed(1)},${yOf(p.avg_bpm).toFixed(1)}`)
+    .join(' ')
+
+  const bandPath = useFiveMin && chartPoints.filter(p => p.min_bpm && p.max_bpm).length > 1
+    ? (() => {
+        const pts = chartPoints.filter(p => p.min_bpm && p.max_bpm)
+        const top = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(p.minute_bucket).toFixed(1)},${yOf(p.max_bpm).toFixed(1)}`).join(' ')
+        const bot = pts.slice().reverse().map((p, i) => `${i === 0 ? 'L' : 'L'}${xOf(p.minute_bucket).toFixed(1)},${yOf(p.min_bpm).toFixed(1)}`).join(' ')
+        return top + ' ' + bot + ' Z'
+      })()
+    : null
+
+  // Hour labels at x positions
+  const hourLabels = [0, 3, 6, 9, 12, 15, 18, 21]
+
+  // Workout band x positions
+  const wStartX = workoutWindow ? xOf(workoutWindow.startMinute) : null
+  const wEndX = workoutWindow ? xOf(Math.min(workoutWindow.endMinute + 5, 1439)) : null
+
+  // Handle SVG hover for tooltip
+  const handleSvgMouseMove = useCallback((e) => {
+    if (!svgRef.current || !chartPoints.length) return
+    const rect = svgRef.current.getBoundingClientRect()
+    const relX = e.clientX - rect.left
+    const svgX = (relX / rect.width) * SVG_W
+    const minute = Math.round(((svgX - PAD_LEFT) / plotW) * 1439)
+    if (minute < 0 || minute > 1439) { setTooltip(null); return }
+    // Find closest point
+    let closest = null
+    let bestDist = Infinity
+    for (const p of chartPoints) {
+      if (!p.avg_bpm) continue
+      const d = Math.abs(p.minute_bucket - minute)
+      if (d < bestDist) { bestDist = d; closest = p }
+    }
+    if (!closest || bestDist > (useFiveMin ? 15 : 90)) { setTooltip(null); return }
+    const cx = xOf(closest.minute_bucket)
+    const cy = yOf(closest.avg_bpm)
+    const screenX = rect.left + (cx / SVG_W) * rect.width
+    const screenY = rect.top + (cy / SVG_H) * rect.height
+    const isWorkout = workoutWindow &&
+      closest.minute_bucket >= workoutWindow.startMinute &&
+      closest.minute_bucket <= workoutWindow.endMinute + 5
+    setTooltip({ point: closest, screenX, screenY, isWorkout })
+  }, [chartPoints, workoutWindow, useFiveMin])
 
   // 7-day resting HR trend
   const restingTrend = daily.filter(r => r.resting_bpm).slice(-7)
   const hasResting = restingTrend.length >= 2
-  const trendMax = hasResting ? Math.max(...restingTrend.map(r => r.resting_bpm)) + 10 : 80
-  const trendMin = hasResting ? Math.max(0, Math.min(...restingTrend.map(r => r.resting_bpm)) - 10) : 40
+  const trendMax = hasResting ? Math.max(...restingTrend.map(r => r.resting_bpm)) + 8 : 80
+  const trendMin = hasResting ? Math.max(0, Math.min(...restingTrend.map(r => r.resting_bpm)) - 8) : 40
 
   return (
-    <div onMouseMove={handleMouseMove}>
+    <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <h1 style={{ color: '#22c55e', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Heart Rate</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>24-hour view · {data?.date ?? 'Today'}</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>5-minute view · {data?.date ?? 'Today'}</p>
         </div>
       </div>
 
@@ -103,21 +186,21 @@ export default function HeartRatePage() {
         ))}
       </div>
 
-      {/* 24-hour intraday chart */}
+      {/* 24-hour line chart */}
       <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em' }}>❤️ Today's Heart Rate</div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {[['< 60', 'var(--accent-blue)', 'Resting'], ['60–80', 'var(--success)', 'Light'], ['80–100', '#f59e0b', 'Moderate'], ['100–120', 'var(--warning)', 'Hard'], ['120+', 'var(--error)', 'Peak']].map(([range, color, label]) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: color }} />
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: color }} />
                 <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{label}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {!hasIntraday ? (
+        {!hasData ? (
           <div style={{ textAlign: 'center', padding: '32px 0' }}>
             <div style={{ fontSize: '28px', marginBottom: '8px' }}>💓</div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>No heart rate data for today yet. Sync after wearing your watch.</p>
@@ -127,27 +210,85 @@ export default function HeartRatePage() {
             {workoutWindow && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                 <div style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.5)' }} />
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Workout window ({fmtHour(workoutWindow.startHour)}–{fmtHour(workoutWindow.endHour)})</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                  Workout window ({fmtMinute(workoutWindow.startMinute)}–{fmtMinute(workoutWindow.endMinute)})
+                </span>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '140px', paddingBottom: '20px', position: 'relative' }}>
-              {hours.map(({ hour, avg_bpm }) => {
-                const isWorkout = workoutWindow && hour >= workoutWindow.startHour && hour <= workoutWindow.endHour
-                const barHeight = avg_bpm ? Math.max(4, Math.round((avg_bpm / chartMax) * 120)) : 2
-                const color = isWorkout ? 'rgba(239,68,68,0.7)' : bpmColor(avg_bpm)
-                const now = new Date().getHours()
-                const isFuture = hour > now
-                return (
-                  <div key={hour} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end', position: 'relative' }}
-                    onMouseEnter={() => avg_bpm && setTooltip({ hour, avg_bpm, min_bpm: hourMap[hour]?.min_bpm, max_bpm: hourMap[hour]?.max_bpm, isWorkout })}
-                    onMouseLeave={() => setTooltip(null)}>
-                    <div style={{ width: '100%', height: `${barHeight}px`, backgroundColor: isFuture && !avg_bpm ? 'var(--border)' : color, borderRadius: '2px 2px 0 0', opacity: isFuture && !avg_bpm ? 0.3 : 1, transition: 'height 0.2s' }} />
-                    {hour % 4 === 0 && (
-                      <div style={{ position: 'absolute', bottom: '-18px', fontSize: '9px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{fmtHour(hour)}</div>
-                    )}
-                  </div>
-                )
-              })}
+            <div style={{ width: '100%', overflowX: 'auto' }}>
+              <svg
+                ref={svgRef}
+                width="100%"
+                viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+                preserveAspectRatio="none"
+                style={{ display: 'block', cursor: 'crosshair' }}
+                onMouseMove={handleSvgMouseMove}
+                onMouseLeave={() => setTooltip(null)}
+              >
+                {/* Workout band */}
+                {workoutWindow && wStartX && (
+                  <rect
+                    x={wStartX} y={PAD_TOP}
+                    width={Math.max(1, wEndX - wStartX)} height={plotH}
+                    fill="rgba(239,68,68,0.08)" stroke="rgba(239,68,68,0.25)" strokeWidth="0.5"
+                  />
+                )}
+
+                {/* Y-axis grid lines + labels */}
+                {yTicks.map(v => {
+                  const y = yOf(v)
+                  return (
+                    <g key={v}>
+                      <line x1={PAD_LEFT} y1={y} x2={SVG_W - PAD_RIGHT} y2={y}
+                        stroke="var(--border)" strokeWidth="0.7" strokeDasharray="3 3" />
+                      <text x={PAD_LEFT - 4} y={y + 3} textAnchor="end" fontSize="9" fill="var(--text-secondary)">{v}</text>
+                    </g>
+                  )
+                })}
+
+                {/* Min/max band */}
+                {bandPath && (
+                  <path d={bandPath} fill="rgba(34,197,94,0.1)" stroke="none" />
+                )}
+
+                {/* Zone color segments — color the line by zone */}
+                {chartPoints.filter(p => p.avg_bpm).map((p, i, arr) => {
+                  if (i === arr.length - 1) return null
+                  const next = arr[i + 1]
+                  if (!next.avg_bpm) return null
+                  const x1 = xOf(p.minute_bucket)
+                  const y1 = yOf(p.avg_bpm)
+                  const x2 = xOf(next.minute_bucket)
+                  const y2 = yOf(next.avg_bpm)
+                  const midBpm = (p.avg_bpm + next.avg_bpm) / 2
+                  return <line key={`${p.minute_bucket}-seg`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={bpmColor(midBpm)} strokeWidth="2.5" strokeLinecap="round" />
+                })}
+
+                {/* X-axis hour labels */}
+                {hourLabels.map(h => {
+                  const x = xOf(h * 60)
+                  return (
+                    <g key={h}>
+                      <line x1={x} y1={PAD_TOP + plotH} x2={x} y2={PAD_TOP + plotH + 4} stroke="var(--border)" strokeWidth="0.7" />
+                      <text x={x} y={SVG_H - 4} textAnchor="middle" fontSize="9" fill="var(--text-secondary)">{fmtHour(h)}</text>
+                    </g>
+                  )
+                })}
+
+                {/* Axes */}
+                <line x1={PAD_LEFT} y1={PAD_TOP} x2={PAD_LEFT} y2={PAD_TOP + plotH} stroke="var(--border)" strokeWidth="0.7" />
+                <line x1={PAD_LEFT} y1={PAD_TOP + plotH} x2={SVG_W - PAD_RIGHT} y2={PAD_TOP + plotH} stroke="var(--border)" strokeWidth="0.7" />
+
+                {/* Tooltip dot */}
+                {tooltip && (() => {
+                  const p = tooltip.point
+                  const cx = xOf(p.minute_bucket)
+                  const cy = yOf(p.avg_bpm)
+                  return (
+                    <circle cx={cx} cy={cy} r="4" fill={bpmColor(p.avg_bpm)} stroke="white" strokeWidth="1.5" />
+                  )
+                })()}
+              </svg>
             </div>
           </>
         )}
@@ -157,15 +298,12 @@ export default function HeartRatePage() {
       {hasResting && (
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
           <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>📉 7-Day Resting Heart Rate</div>
-          <div style={{ position: 'relative', height: '80px', marginBottom: '20px' }}>
-            <svg width="100%" height="80" viewBox={`0 0 ${restingTrend.length * 60} 80`} preserveAspectRatio="none"
-              style={{ overflow: 'visible' }}>
-              {/* Grid lines */}
+          <div style={{ position: 'relative', marginBottom: '8px' }}>
+            <svg width="100%" height="80" viewBox={`0 0 ${restingTrend.length * 60} 80`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
               {[0.25, 0.5, 0.75].map(pct => (
                 <line key={pct} x1="0" y1={pct * 70} x2={restingTrend.length * 60} y2={pct * 70}
                   stroke="var(--border)" strokeWidth="1" strokeDasharray="4 4" />
               ))}
-              {/* Line */}
               <polyline
                 points={restingTrend.map((r, i) => {
                   const x = i * 60 + 30
@@ -173,7 +311,6 @@ export default function HeartRatePage() {
                   return `${x},${y}`
                 }).join(' ')}
                 fill="none" stroke="var(--accent-blue)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-              {/* Dots */}
               {restingTrend.map((r, i) => {
                 const x = i * 60 + 30
                 const y = 70 - ((r.resting_bpm - trendMin) / (trendMax - trendMin)) * 70
@@ -187,7 +324,7 @@ export default function HeartRatePage() {
               })}
             </svg>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: '12px' }}>
             {restingTrend.map(r => (
               <div key={r.date} style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
@@ -196,15 +333,15 @@ export default function HeartRatePage() {
               </div>
             ))}
           </div>
-          <div style={{ marginTop: '12px', backgroundColor: 'rgba(0,128,255,0.06)', border: '1px solid rgba(0,128,255,0.15)', borderRadius: '8px', padding: '10px 14px' }}>
+          <div style={{ backgroundColor: 'rgba(0,128,255,0.06)', border: '1px solid rgba(0,128,255,0.15)', borderRadius: '8px', padding: '10px 14px' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.6', margin: 0 }}>
-              <strong style={{ color: 'var(--accent-blue)' }}>Resting HR</strong> is Google's own algorithm — more accurate than deriving it from raw samples. Lower is generally better for cardiovascular fitness. Elite athletes: 40–60 bpm. Most adults: 60–80 bpm. Consistent elevation can indicate stress, illness, or overtraining.
+              <strong style={{ color: 'var(--accent-blue)' }}>Resting HR</strong> is Google's algorithm — more accurate than raw sample averages. Lower is better for cardiovascular fitness. Elite athletes: 40–60 bpm. Healthy adults: 60–80 bpm. Consistent elevation can signal stress, illness, or overtraining.
             </p>
           </div>
         </div>
       )}
 
-      {/* HRV explanation */}
+      {/* HRV panel */}
       {data?.todayHrv != null && (
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
           <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>🧘 Heart Rate Variability (HRV)</div>
@@ -215,23 +352,18 @@ export default function HeartRatePage() {
             </div>
             <div style={{ flex: 1 }}>
               <p style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.6', margin: 0 }}>
-                HRV measures the variation in time between heartbeats. Higher = your autonomic nervous system is in a balanced, recovered state. Lower = stress, fatigue, or your body is fighting something. Typical adults: 20–60ms. Higher is better, but trends matter more than single values.
+                HRV measures variation in time between heartbeats. Higher = your autonomic nervous system is balanced and recovered. Lower = stress, fatigue, or your body is fighting something. Typical adults: 20–60ms. Trends matter more than any single reading.
               </p>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {[
-              { range: '< 20ms', label: 'High stress / fatigued', color: 'var(--error)' },
-              { range: '20–40ms', label: 'Average', color: 'var(--warning)' },
-              { range: '40–60ms', label: 'Good recovery', color: 'var(--success)' },
-              { range: '60ms+', label: 'Excellent', color: 'var(--accent-blue)' },
+              { range: '< 20ms', label: 'High stress / fatigued', color: 'var(--error)', check: v => v < 20 },
+              { range: '20–40ms', label: 'Average', color: 'var(--warning)', check: v => v >= 20 && v < 40 },
+              { range: '40–60ms', label: 'Good recovery', color: 'var(--success)', check: v => v >= 40 && v < 60 },
+              { range: '60ms+', label: 'Excellent', color: 'var(--accent-blue)', check: v => v >= 60 },
             ].map(z => {
-              const active = (
-                (z.range === '< 20ms' && data.todayHrv < 20) ||
-                (z.range === '20–40ms' && data.todayHrv >= 20 && data.todayHrv < 40) ||
-                (z.range === '40–60ms' && data.todayHrv >= 40 && data.todayHrv < 60) ||
-                (z.range === '60ms+' && data.todayHrv >= 60)
-              )
+              const active = z.check(data.todayHrv)
               return (
                 <div key={z.range} style={{ backgroundColor: active ? `${z.color}18` : 'var(--background)', border: `1px solid ${active ? z.color + '55' : 'var(--border)'}`, borderRadius: '7px', padding: '6px 10px' }}>
                   <div style={{ fontSize: '11px', fontWeight: '700', color: active ? z.color : 'var(--text-secondary)' }}>{z.range}</div>
@@ -243,13 +375,30 @@ export default function HeartRatePage() {
         </div>
       )}
 
+      {/* Floating tooltip */}
       {tooltip && (
-        <div style={{ position: 'fixed', left: mousePos.x + 12, top: mousePos.y - 60, backgroundColor: '#1A1A1A', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px 12px', fontSize: '13px', color: 'var(--text-primary)', pointerEvents: 'none', zIndex: 9999, whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
-          <div style={{ fontWeight: '600', color: tooltip.isWorkout ? 'var(--error)' : bpmColor(tooltip.avg_bpm), marginBottom: '2px' }}>
-            {fmtHour(tooltip.hour)} {tooltip.isWorkout ? '🏋️ Workout' : `— ${bpmZone(tooltip.avg_bpm)}`}
+        <div style={{
+          position: 'fixed',
+          left: tooltip.screenX + 14,
+          top: tooltip.screenY - 56,
+          backgroundColor: '#1A1A1A',
+          border: '1px solid var(--border)',
+          borderRadius: '6px',
+          padding: '8px 12px',
+          fontSize: '13px',
+          color: 'var(--text-primary)',
+          pointerEvents: 'none',
+          zIndex: 9999,
+          whiteSpace: 'nowrap',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+        }}>
+          <div style={{ fontWeight: '600', color: tooltip.isWorkout ? 'var(--error)' : bpmColor(tooltip.point.avg_bpm), marginBottom: '2px' }}>
+            {fmtMinute(tooltip.point.minute_bucket)} {tooltip.isWorkout ? '🏋️ Workout' : `— ${bpmZone(tooltip.point.avg_bpm)}`}
           </div>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Avg: {tooltip.avg_bpm} bpm</div>
-          {tooltip.min_bpm && <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Range: {tooltip.min_bpm}–{tooltip.max_bpm} bpm</div>}
+          <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Avg: {tooltip.point.avg_bpm} bpm</div>
+          {tooltip.point.min_bpm && (
+            <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Range: {tooltip.point.min_bpm}–{tooltip.point.max_bpm} bpm</div>
+          )}
         </div>
       )}
     </div>

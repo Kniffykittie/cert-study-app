@@ -326,6 +326,13 @@ Everything below was built but not yet tested by the user. Go through this list 
 - Footer text dynamically reflects whether HRV is contributing ("100 pts with smartwatch data" vs "90 pts without smartwatch · score normalized to 100")
 - Energy pts recalculated: 1–5 rating × 3 (was ×4); Workout Load max 10 (was 15); rest day = 10 pts, <45min = 8, 45–75min = 5, 75+ = 3
 
+### Heart Rate Phase 4 — 5-Minute Line Chart + RHR/HRV Fix — Complete
+- Created `health_heart_rate_5min` table (user_id, date, minute_bucket SMALLINT, avg/min/max_bpm, sample_count; UNIQUE on user_id+date+minute_bucket; RLS enabled)
+- Updated `sync/route.js`: added 5-minute bucketing alongside existing hourly; `minuteBucket = estHour*60 + floor(estMin/5)*5`; upserts to `health_heart_rate_5min` after hourly upsert
+- Updated `workout-hr-sync/route.js`: same 5-minute bucketing added for live workout HR polling
+- Updated `heart-rate/route.js`: added `fiveMinRes` query from `health_heart_rate_5min`; fixed RHR/HRV cards showing "—" — now falls back to `yesterdayDaily` when today has no resting data (Google stores resting HR under the sleep date, which is often yesterday); `workoutWindow` now exposes `startMinute`/`endMinute` in addition to hour fields; `fiveMin` included in response
+- Rebuilt `heart-rate/page.js`: replaced 24-bar chart with SVG line graph using 5-minute data points; line colored segment-by-segment by BPM zone; min/max shaded band behind line; hover on SVG finds closest data point and shows tooltip with time (e.g. "2:30p") + BPM + range; workout window drawn as a shaded red band; falls back to hourly intraday if 5-min table is empty (existing users before re-sync); X-axis labeled every 3 hours; Y-axis auto-scales to data range
+
 ### Heart Rate Phase 3 — Workout Zone Breakdown — Complete
 - Added `computeHrZones(supabase, userId, logId, durationSeconds)` in `/api/workouts/log/route.js`:
   - Computes workout start/end from `Date.now()` and `duration_seconds`

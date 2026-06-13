@@ -182,25 +182,40 @@ export async function POST(req) {
     await supabase.from('health_steps_hourly').upsert(stepsRows, { onConflict: 'user_id,date,hour' })
   }
 
-  // ── Write heart rate — daily AND intraday ──
+  // ── Write heart rate — daily, intraday, and 5-minute ──
   const hrDailyBucket = {}
   const hrHourBucket = {}
+  const hr5minBucket = {}
 
   heartPoints.forEach(p => {
     const t = p.heartRate?.sampleTime?.physicalTime
     const bpm = parseInt(p.heartRate?.beatsPerMinute)
     if (!t || isNaN(bpm) || bpm <= 0) return
-    const date = estDateStr(new Date(t))
+    const d = new Date(t)
+    const date = estDateStr(d)
     const hour = getEstHour(t)
 
-    // Daily bucket (existing)
+    // EST hour + minute
+    const estOffset = -5 * 60
+    const estMs = d.getTime() + estOffset * 60000
+    const estD = new Date(estMs)
+    const estHour = estD.getUTCHours()
+    const estMin = estD.getUTCMinutes()
+    const minuteBucket = estHour * 60 + Math.floor(estMin / 5) * 5
+
+    // Daily bucket
     if (!hrDailyBucket[date]) hrDailyBucket[date] = []
     hrDailyBucket[date].push(bpm)
 
-    // Intraday bucket (new)
+    // Hourly intraday bucket
     if (!hrHourBucket[date]) hrHourBucket[date] = {}
     if (!hrHourBucket[date][hour]) hrHourBucket[date][hour] = []
     hrHourBucket[date][hour].push(bpm)
+
+    // 5-minute bucket
+    if (!hr5minBucket[date]) hr5minBucket[date] = {}
+    if (!hr5minBucket[date][minuteBucket]) hr5minBucket[date][minuteBucket] = []
+    hr5minBucket[date][minuteBucket].push(bpm)
   })
 
   if (Object.keys(hrDailyBucket).length > 0) {
@@ -233,6 +248,24 @@ export async function POST(req) {
       }
     }
     await supabase.from('health_heart_rate_intraday').upsert(intradayRows, { onConflict: 'user_id,date,hour' })
+  }
+
+  if (Object.keys(hr5minBucket).length > 0) {
+    const fiveMinRows = []
+    for (const [date, buckets] of Object.entries(hr5minBucket)) {
+      for (const [bucket, vals] of Object.entries(buckets)) {
+        fiveMinRows.push({
+          user_id: user.id,
+          date,
+          minute_bucket: parseInt(bucket),
+          avg_bpm: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
+          min_bpm: Math.min(...vals),
+          max_bpm: Math.max(...vals),
+          sample_count: vals.length,
+        })
+      }
+    }
+    await supabase.from('health_heart_rate_5min').upsert(fiveMinRows, { onConflict: 'user_id,date,minute_bucket' })
   }
 
   // ── Write resting HR (Google-computed, more accurate than deriving ourselves) ──
