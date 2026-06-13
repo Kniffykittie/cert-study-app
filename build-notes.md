@@ -267,6 +267,14 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Manual Sleep Hours in Daily Check-In — Complete
+- Added `sleep_hours NUMERIC(4,1)` column to `daily_checkins` via migration
+- Check-in form has new "😴 Hours slept?" number input (step 0.5, 0–24); saved alongside energy/mood on every Save/Update
+- Recovery Score computation: Google Health sleep takes priority; falls back to yesterday's `sleep_hours` from check-in when Google Health not connected
+- `sleepSource` ('google' | 'manual' | null) passed into `recoveryScore` state; Sleep detail text shows "(from check-in)" label when manual
+- Sleep component tip changed: when no data at all, directs user to log "Hours slept?" in check-in instead of just saying "connect Google Health"
+- Watch-less users can now earn all 90 normalized points (full Recovery Score coverage) by logging energy, mood, sleep hours, food, water, and workouts
+
 ### Recovery Score Upgrade — HRV Component + Normalization — Complete
 - Rebalanced point values: Sleep 25 + Hydration 20 + Protein 20 + Energy 15 + Workout Load 10 = 90 base; HRV adds 10 pts when smartwatch data is available (total 100)
 - Score normalized to 100 via `rawTotal / maxAvailable * 100` — users without Google Health can still earn a full 100 score based on their 5 components

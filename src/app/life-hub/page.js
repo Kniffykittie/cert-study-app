@@ -86,6 +86,7 @@ export default function LifeHubPage() {
 
   const [energy, setEnergy] = useState(0)
   const [mood, setMood] = useState(0)
+  const [sleepHoursInput, setSleepHoursInput] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -165,6 +166,7 @@ export default function LifeHubPage() {
       if (todayEntry) {
         setEnergy(todayEntry.energy_level ?? 0)
         setMood(todayEntry.mood_level ?? 0)
+        setSleepHoursInput(todayEntry.sleep_hours != null ? String(todayEntry.sleep_hours) : '')
         setNote(todayEntry.note ?? '')
         setSaved(true)
       }
@@ -176,7 +178,10 @@ export default function LifeHubPage() {
       const tdee = goalsData ? calcTDEE(goalsData) : null
       const yesterdayCal = (yesterdayFood || []).reduce((s, r) => s + (r.calories || 0), 0)
       const calDiff = (tdee && yesterdayCal > 0) ? yesterdayCal - tdee : null
-      const sleepHours = sleepData?.[0]?.sleep_minutes ? Math.round(sleepData[0].sleep_minutes / 60 * 10) / 10 : null
+      const googleSleepHours = sleepData?.[0]?.sleep_minutes ? Math.round(sleepData[0].sleep_minutes / 60 * 10) / 10 : null
+      const manualSleepHours = (() => { const v = parseFloat(checkinData?.find(r => r.date === yesterday)?.sleep_hours); return !isNaN(v) && v > 0 ? v : null })()
+      const sleepHours = googleSleepHours ?? manualSleepHours
+      const sleepSource = googleSleepHours != null ? 'google' : manualSleepHours != null ? 'manual' : null
       const lastExercises = [...new Set((yesterdayWorkoutSets || []).filter(s => s.set_type === 'working').map(s => s.exercise_name))]
       const recentCheckins = (checkinData ?? []).slice(0, 7)
       const lowEnergyStreak = (() => { let streak = 0; for (const c of recentCheckins) { if ((c.energy_level || 0) <= 2) streak++; else break } return streak })()
@@ -207,7 +212,7 @@ export default function LifeHubPage() {
       if (hasEnoughData) {
         const rawTotal = (sleepPts ?? 12) + hydrationPts + proteinPts + energyPts + workoutPts + (hrvPts ?? 0)
         const total = Math.round(Math.min(rawTotal, maxAvailable) / maxAvailable * 100)
-        setRecoveryScore({ total, components: { sleepPts: sleepPts ?? null, hydrationPts: Math.round(hydrationPts), proteinPts, energyPts, workoutPts, hrvPts }, sleepHours, yesterdayWaterOz: Math.round(yesterdayWaterOz), waterGoal, yesterdayHrv, hasHrv: hrvPts != null })
+        setRecoveryScore({ total, components: { sleepPts: sleepPts ?? null, hydrationPts: Math.round(hydrationPts), proteinPts, energyPts, workoutPts, hrvPts }, sleepHours, sleepSource, yesterdayWaterOz: Math.round(yesterdayWaterOz), waterGoal, yesterdayHrv, hasHrv: hrvPts != null })
       }
 
       // Section card data
@@ -274,10 +279,12 @@ export default function LifeHubPage() {
     setSaving(true)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
+    const parsedSleep = parseFloat(sleepHoursInput)
     const { data: row } = await supabase.from('daily_checkins').upsert({
       user_id: user.id, date: today,
       energy_level: energy || null,
       mood_level: mood || null,
+      sleep_hours: !isNaN(parsedSleep) && parsedSleep >= 0 && parsedSleep <= 24 ? parsedSleep : null,
       note: note.trim() || null,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id,date' }).select().single()
@@ -478,15 +485,15 @@ export default function LifeHubPage() {
           {
             icon: '😴', label: 'Sleep', pts: rc.sleepPts, max: 25,
             detail: rc.sleepPts == null
-              ? 'No sleep data — connect Google Health to track sleep and earn up to 25 pts.'
+              ? 'No sleep data for yesterday. Log it in the check-in below ("Hours slept?") or connect Google Health to track automatically.'
               : recoveryScore.sleepHours >= 8
-                ? `You got ${recoveryScore.sleepHours}h — excellent. Full 25 pts.`
+                ? `You got ${recoveryScore.sleepHours}h — excellent. Full 25 pts.${recoveryScore.sleepSource === 'manual' ? ' (from check-in)' : ''}`
                 : recoveryScore.sleepHours >= 7
-                  ? `You got ${recoveryScore.sleepHours}h — solid. 7–8h earns 20 pts. Another 30–60 min would max this out.`
+                  ? `You got ${recoveryScore.sleepHours}h — solid. 7–8h earns 20 pts. Another 30–60 min would max this out.${recoveryScore.sleepSource === 'manual' ? ' (from check-in)' : ''}`
                   : recoveryScore.sleepHours >= 6
-                    ? `You got ${recoveryScore.sleepHours}h — below optimal. 7+ hours earns 20 pts and gives your body more repair time.`
-                    : `You got ${recoveryScore.sleepHours}h — that's rough. Under 6h earns only 6 pts. Prioritize sleep tonight.`,
-            tip: rc.sleepPts != null && rc.sleepPts < 20 ? 'Try going to bed 30 min earlier tonight.' : null,
+                    ? `You got ${recoveryScore.sleepHours}h — below optimal. 7+ hours earns 20 pts and gives your body more repair time.${recoveryScore.sleepSource === 'manual' ? ' (from check-in)' : ''}`
+                    : `You got ${recoveryScore.sleepHours}h — that's rough. Under 6h earns only 6 pts. Prioritize sleep tonight.${recoveryScore.sleepSource === 'manual' ? ' (from check-in)' : ''}`,
+            tip: rc.sleepPts == null ? 'Log "Hours slept?" in today\'s check-in so tomorrow\'s score reflects your actual sleep.' : rc.sleepPts < 20 ? 'Try going to bed 30 min earlier tonight.' : null,
           },
           {
             icon: '💧', label: 'Hydration', pts: rc.hydrationPts, max: 20,
@@ -719,6 +726,17 @@ export default function LifeHubPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <RatingRow label={checkinContext?.energyLabel || 'Energy'} sublabels={['', ...(checkinContext?.energySubs || ['Exhausted', 'Low', 'Okay', 'Good', 'Energized'])]} value={energy} setValue={setEnergy} />
                 <RatingRow label={checkinContext?.moodLabel || 'Mood'} sublabels={['', ...(checkinContext?.moodSubs || ['Rough', 'Meh', 'Okay', 'Good', 'Great'])]} value={mood} setValue={setMood} colors={MOOD_COLORS} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>😴 Hours slept?</span>
+                  <input
+                    type="number" min="0" max="24" step="0.5"
+                    value={sleepHoursInput}
+                    onChange={e => setSleepHoursInput(e.target.value)}
+                    placeholder="e.g. 7.5"
+                    style={{ width: '80px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '7px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }}
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Used by Recovery Score if Google Health not connected</span>
+                </div>
                 {!microInsight && (
                   <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add a note (optional)..." rows={2}
                     style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />

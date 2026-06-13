@@ -241,7 +241,7 @@ src/
 | `workout_plans` | AI-generated weekly plans — plan JSONB (7 day objects), plan_notes, progression_notes, schedule JSONB, is_active |
 | `goals_profiles` | User's health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, activity_level, activity_level_note TEXT, daily_steps, target_weight_lbs, timeline, notes, ai_overview, biggest_obstacles TEXT[], biggest_obstacles_other, primary_motivations TEXT[], primary_motivations_other, why_goals, dietary_preferences TEXT[], dietary_preferences_other, sleep_hours NUMERIC; UNIQUE on user_id |
 | `body_measurements` | Per-user dated body measurements — weight_lbs, waist_in, hips_in, chest_in, left/right arm/thigh, neck_in; UNIQUE on user_id + date; RLS enabled |
-| `daily_checkins` | Energy + mood check-ins per day — energy_level SMALLINT(1–5), mood_level SMALLINT(1–5), note TEXT; UNIQUE on user_id + date; RLS enabled |
+| `daily_checkins` | Energy + mood check-ins per day — energy_level SMALLINT(1–5), mood_level SMALLINT(1–5), sleep_hours NUMERIC(4,1) (manual fallback for Recovery Score when Google Health not connected), note TEXT; UNIQUE on user_id + date; RLS enabled |
 | `api_rate_limits` | Per-user per-route per-hour call counts; incremented atomically via `increment_rate_limit` Postgres function |
 | `recovery_codes` | 2FA recovery codes — user_id, code_hash TEXT (bcrypt), used_at TIMESTAMPTZ (null = unused); generated on 2FA enrollment, displayed once; RLS: user SELECT/UPDATE own rows |
 | `invite_codes` | Owner-generated one-time signup codes — code (unique), created_by, used_by (nullable), used_at; RLS: SELECT=public, INSERT=owner, UPDATE=authenticated |
