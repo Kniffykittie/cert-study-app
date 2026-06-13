@@ -301,6 +301,10 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ## Phase Log
 
+### Mobile — viewport meta tag fix — Complete
+- Added `<meta name="viewport" content="width=device-width, initial-scale=1">` to root layout
+- Without this, mobile browsers render at ~980px desktop width so `@media (max-width: 768px)` never fires — sidebar drawer never activates on phones
+
 ### Mobile — Life Hub sidebar drawer — Complete
 - LifeHubSidebar hidden on mobile (≤768px); hamburger button (☰) fixed top-left opens it as slide-in overlay
 - Backdrop tap and route change both close the drawer
