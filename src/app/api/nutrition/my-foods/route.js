@@ -47,6 +47,7 @@ export async function POST(req) {
     servings_per_container: body.servings_per_container != null ? Number(body.servings_per_container) : null,
     is_drink: body.is_drink === true,
     is_ingredient: body.is_ingredient === true,
+    is_snack: body.is_snack === true,
     ...nutritionValues,
   }).select().single()
 

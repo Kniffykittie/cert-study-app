@@ -476,6 +476,7 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
   const [manual, setManual] = useState(BLANK_MANUAL)
   const [manualSaveToLib, setManualSaveToLib] = useState(true)
   const [manualIsIngredient, setManualIsIngredient] = useState(false)
+  const [manualIsSnack, setManualIsSnack] = useState(false)
   const [savingManual, setSavingManual] = useState(false)
   const [manualServings, setManualServings] = useState('1')
   const [aiFilling, setAiFilling] = useState(false)
@@ -493,8 +494,9 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
 
   const mealInfo = MEAL_SLOTS.find(m => m.key === slot)
   const filtered = filter ? myFoods.filter(f => f.name.toLowerCase().includes(filter.toLowerCase())) : myFoods
-  const filteredFoods = filtered.filter(f => !f.is_ingredient)
   const filteredIngredients = filtered.filter(f => f.is_ingredient)
+  const filteredSnacks = filtered.filter(f => f.is_snack && !f.is_ingredient)
+  const filteredFoods = filtered.filter(f => !f.is_ingredient && !f.is_snack)
 
   useEffect(() => { if (tab === 'search') searchInputRef.current?.focus() }, [tab])
 
@@ -596,7 +598,7 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
     setSavingManual(true)
     let savedFood = null
     if (manualSaveToLib) {
-      const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...manual, source: 'manual', is_ingredient: manualIsIngredient }) })
+      const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...manual, source: 'manual', is_ingredient: manualIsIngredient, is_snack: manualIsSnack }) })
       const data = await res.json()
       if (data.food) { savedFood = data.food; onSaveFood(data.food) }
     }
@@ -715,8 +717,57 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
                       </div>
                     )
                   })}
-                  {filteredFoods.length > 0 && (
+                  {filteredSnacks.length > 0 && (
                     <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '6px 2px 4px', marginTop: filteredIngredients.length > 0 ? 8 : 0 }}>
+                      🍿 Snacks
+                    </div>
+                  )}
+                  {filteredSnacks.map(food => {
+                    const isExpanded3 = expandedId === food.id
+                    const sv3 = parseFloat(logServings) || 1
+                    const calPreview3 = food.calories != null ? Math.round(food.calories * (isExpanded3 ? sv3 : 1)) : null
+                    return (
+                      <div key={food.id} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', border: isExpanded3 ? '1px solid var(--accent-blue)' : '1px solid transparent', overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                              {food.serving_size_label || '1 serving'}
+                              {food.calories != null ? ` · ${Math.round(food.calories)} kcal` : ''}
+                              {food.protein_g ? ` · ${Math.round(food.protein_g)}g P` : ''}
+                              {food.carbs_g ? ` · ${Math.round(food.carbs_g)}g C` : ''}
+                              {food.fat_g ? ` · ${Math.round(food.fat_g)}g F` : ''}
+                            </div>
+                            {(() => { const w = getDietaryWarnings(food, dietaryPrefs); return w.length > 0 ? (
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
+                                {w.map((ww, i) => <span key={i} style={{ fontSize: '10px', color: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '4px', padding: '1px 5px' }}>{ww}</span>)}
+                              </div>
+                            ) : null })()}
+                          </div>
+                          <button onClick={() => handleExpandLog(food.id)}
+                            style={{ backgroundColor: isExpanded3 ? 'transparent' : 'rgba(0,128,255,0.12)', color: isExpanded3 ? 'var(--text-secondary)' : 'var(--accent-blue)', border: isExpanded3 ? '1px solid var(--border)' : 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', flexShrink: 0 }}>
+                            {isExpanded3 ? 'Cancel' : 'Log'}
+                          </button>
+                        </div>
+                        {isExpanded3 && (
+                          <div style={{ padding: '8px 12px 12px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Servings:</span>
+                              <input type="number" min="0.25" step="0.25" value={logServings} onChange={e => setLogServings(e.target.value)}
+                                style={{ width: '60px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
+                            </div>
+                            {calPreview3 != null && <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '700' }}>= {calPreview3} kcal</span>}
+                            <button onClick={() => confirmLogFav(food)}
+                              style={{ marginLeft: 'auto', backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '7px', padding: '7px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                              ✓ Add to {mealInfo?.label}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {filteredFoods.length > 0 && (
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '6px 2px 4px', marginTop: (filteredIngredients.length > 0 || filteredSnacks.length > 0) ? 8 : 0 }}>
                       🍽️ Foods & Meals
                     </div>
                   )}
@@ -845,13 +896,19 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '14px 0 4px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <input type="checkbox" id="mansavelib" checked={manualSaveToLib} onChange={e => { setManualSaveToLib(e.target.checked); if (!e.target.checked) setManualIsIngredient(false) }} style={{ accentColor: 'var(--accent-purple)', width: '14px', height: '14px' }} />
+                <input type="checkbox" id="mansavelib" checked={manualSaveToLib} onChange={e => { setManualSaveToLib(e.target.checked); if (!e.target.checked) { setManualIsIngredient(false); setManualIsSnack(false) } }} style={{ accentColor: 'var(--accent-purple)', width: '14px', height: '14px' }} />
                 <label htmlFor="mansavelib" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>⭐ Save to My Favorites for quick logging next time</label>
               </div>
               {manualSaveToLib && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '20px' }}>
-                  <input type="checkbox" id="manisIngredient" checked={manualIsIngredient} onChange={e => setManualIsIngredient(e.target.checked)} style={{ accentColor: 'var(--accent-blue)', width: '14px', height: '14px' }} />
-                  <label htmlFor="manisIngredient" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>🥚 This is an ingredient <span style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>(appears in Meal Builder)</span></label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <input type="checkbox" id="manisIngredient" checked={manualIsIngredient} onChange={e => { setManualIsIngredient(e.target.checked); if (e.target.checked) setManualIsSnack(false) }} style={{ accentColor: 'var(--accent-blue)', width: '14px', height: '14px' }} />
+                    <label htmlFor="manisIngredient" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>🥚 This is an ingredient <span style={{ opacity: 0.7 }}>(appears in Meal Builder)</span></label>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <input type="checkbox" id="manisSnack" checked={manualIsSnack} onChange={e => { setManualIsSnack(e.target.checked); if (e.target.checked) setManualIsIngredient(false) }} style={{ accentColor: 'var(--warning)', width: '14px', height: '14px' }} />
+                    <label htmlFor="manisSnack" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>🍿 This is a snack</label>
+                  </div>
                 </div>
               )}
             </div>
