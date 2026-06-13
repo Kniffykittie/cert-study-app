@@ -33,8 +33,16 @@ export default function LifeHubSidebar() {
   const [nutritionOpen, setNutritionOpen] = useState(false)
   const [wrapNotify, setWrapNotify] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   useEffect(() => {
     async function fetchProfile() {
@@ -221,37 +229,6 @@ export default function LifeHubSidebar() {
 
   return (
     <>
-      <style>{`
-        .lh-hamburger { display: none; }
-        .lh-sidebar-close-btn { display: none !important; }
-        .lh-backdrop { display: none; }
-        @media (max-width: 768px) {
-          .lh-hamburger {
-            display: flex; position: fixed; top: 12px; left: 12px; z-index: 200;
-            background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-            width: 40px; height: 40px; align-items: center; justify-content: center;
-            font-size: 18px; cursor: pointer; color: var(--text-primary);
-          }
-          .lh-sidebar-desktop { display: none !important; }
-          .lh-sidebar-close-btn { display: block !important; }
-          .lh-sidebar-overlay {
-            position: fixed; top: 0; left: 0; height: 100vh; z-index: 300;
-            transform: translateX(-100%); transition: transform 0.25s ease;
-          }
-          .lh-sidebar-overlay.is-open { transform: translateX(0); }
-          .lh-backdrop {
-            display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-            z-index: 299; opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
-          }
-          .lh-backdrop.is-open { opacity: 1; pointer-events: auto; }
-        }
-        @media (min-width: 769px) {
-          .lh-sidebar-overlay { display: none !important; }
-          .lh-backdrop { display: none !important; }
-          .lh-hamburger { display: none !important; }
-        }
-      `}</style>
-
       {wrapNotify && (
         <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 500, backgroundColor: 'var(--surface)', border: `1px solid ${SECTION_COLORS.overview}`, borderRadius: '14px', padding: '18px 20px', maxWidth: '300px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
@@ -270,13 +247,23 @@ export default function LifeHubSidebar() {
         </div>
       )}
 
-      <button className="lh-hamburger" onClick={() => setMobileOpen(true)} aria-label="Open sidebar">☰</button>
-      <div className={`lh-backdrop${mobileOpen ? ' is-open' : ''}`} onClick={() => setMobileOpen(false)} />
-
-      <div className="lh-sidebar-desktop" style={{ position: 'relative' }}>{sidebarContent}</div>
-      <div className={`lh-sidebar-overlay${mobileOpen ? ' is-open' : ''}`} style={{ position: 'fixed' }}>
+      {isMobile ? (
+        <>
+          <button onClick={() => setMobileOpen(true)} aria-label="Open sidebar"
+            style={{ display: 'flex', position: 'fixed', top: '12px', left: '12px', zIndex: 200, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', width: '40px', height: '40px', alignItems: 'center', justifyContent: 'center', fontSize: '18px', cursor: 'pointer', color: 'var(--text-primary)' }}>
+            ☰
+          </button>
+          {mobileOpen && (
+            <div onClick={() => setMobileOpen(false)}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 299 }} />
+          )}
+          <div style={{ position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 300, transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease' }}>
+            <div style={{ position: 'relative' }}>{sidebarContent}</div>
+          </div>
+        </>
+      ) : (
         <div style={{ position: 'relative' }}>{sidebarContent}</div>
-      </div>
+      )}
     </>
   )
 }

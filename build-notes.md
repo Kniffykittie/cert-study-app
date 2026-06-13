@@ -301,6 +301,11 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ## Phase Log
 
+### Mobile — LifeHubSidebar JS-based mobile detection — Complete
+- Replaced CSS `@media` class injection with `isMobile` state using `window.innerWidth <= 768` in a useEffect + resize listener
+- CSS-in-JSX `<style>` tags in Next.js App Router client components are unreliable for media queries; JS-driven conditional rendering is guaranteed to work
+- On mobile: renders hamburger button + backdrop + slide-in overlay; on desktop: renders sidebar in flow as before
+
 ### Mobile — SW cache v2 bump — Complete
 - Bumped `CACHE` from `csa-shell-v1` to `csa-shell-v2` in `public/sw.js` to force full cache eviction on next SW update
 - Fixes stale LifeHubSidebar JS bundle being served from old cache on PWA
