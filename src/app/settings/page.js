@@ -785,6 +785,7 @@ export default function SettingsPage() {
                     { scope: 'daily_checkins', label: 'Daily Check-In History', desc: 'Delete all energy and mood check-in entries' },
                     { scope: 'water_logs', label: 'Water Log History', desc: 'Delete all water intake entries' },
                     { scope: 'supplement_stack', label: 'Supplement Stack', desc: 'Remove all supplements from your stack' },
+                    { scope: 'supplement_logs', label: 'Supplement Log History', desc: 'Clear all "taken today" history — keeps your stack intact' },
                     { scope: 'food_log', label: 'Food Log History', desc: 'Delete all logged food entries' },
                     { scope: 'my_foods', label: 'My Foods Library', desc: 'Delete all saved custom foods' },
                     { scope: 'progress_photos', label: 'Progress Photos', desc: 'Delete all progress photos permanently' },

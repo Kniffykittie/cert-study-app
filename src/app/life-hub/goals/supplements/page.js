@@ -359,6 +359,11 @@ export default function SupplementsPage() {
   const [infoModal, setInfoModal] = useState(null)
   const [editModal, setEditModal] = useState(null)
   const [showWhy, setShowWhy] = useState(false)
+  const [todayLogs, setTodayLogs] = useState(new Set()) // supplement_ids taken today
+  const [adherence, setAdherence] = useState({}) // supplement_id → days taken in last 30
+  const [markingId, setMarkingId] = useState(null)
+
+  const today = new Date().toISOString().split('T')[0]
 
   function updateNutrient(i, field, val) {
     setForm(prev => ({ ...prev, nutrients: prev.nutrients.map((n, idx) => idx === i ? { ...n, [field]: val } : n) }))
@@ -372,12 +377,22 @@ export default function SupplementsPage() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { data } = await supabase
-      .from('supplement_stack')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('created_at', { ascending: true })
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]
+    const [{ data }, { data: logData }] = await Promise.all([
+      supabase.from('supplement_stack').select('*').eq('user_id', user.id).eq('is_active', true).order('created_at', { ascending: true }),
+      supabase.from('supplement_logs').select('supplement_id, date').eq('user_id', user.id).gte('date', thirtyDaysAgo),
+    ])
+
+    // Today's taken set
+    const takenToday = new Set((logData || []).filter(l => l.date === today).map(l => l.supplement_id))
+    setTodayLogs(takenToday)
+
+    // 30-day adherence per supplement
+    const adh = {}
+    for (const log of logData || []) {
+      adh[log.supplement_id] = (adh[log.supplement_id] || 0) + 1
+    }
+    setAdherence(adh)
 
     // Attach a flat nutrients_list for editing
     setStack((data || []).map(s => ({
@@ -388,6 +403,24 @@ export default function SupplementsPage() {
       }),
     })))
     setLoading(false)
+  }
+
+  async function handleMarkTaken(suppId) {
+    if (markingId) return
+    setMarkingId(suppId)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (todayLogs.has(suppId)) {
+      // Untoggle
+      await supabase.from('supplement_logs').delete().eq('user_id', user.id).eq('supplement_id', suppId).eq('date', today)
+      setTodayLogs(prev => { const n = new Set(prev); n.delete(suppId); return n })
+      setAdherence(prev => ({ ...prev, [suppId]: Math.max(0, (prev[suppId] || 1) - 1) }))
+    } else {
+      await supabase.from('supplement_logs').upsert({ user_id: user.id, supplement_id: suppId, date: today }, { onConflict: 'user_id,supplement_id,date' })
+      setTodayLogs(prev => new Set([...prev, suppId]))
+      setAdherence(prev => ({ ...prev, [suppId]: (prev[suppId] || 0) + 1 }))
+    }
+    setMarkingId(null)
   }
 
   async function handleAdd() {
@@ -501,16 +534,35 @@ export default function SupplementsPage() {
             <div style={{ fontSize: 13 }}>Add supplements you take regularly — they'll automatically<br />count toward your daily nutrient totals.</div>
           </div>
         )}
+        {stack.length > 0 && (() => {
+          const untakenCount = stack.filter(s => !todayLogs.has(s.id)).length
+          return untakenCount > 1 ? (
+            <button onClick={async () => {
+              for (const s of stack) { if (!todayLogs.has(s.id)) await handleMarkTaken(s.id) }
+            }} style={{ alignSelf: 'flex-start', background: 'rgba(46,204,113,0.1)', border: '1px solid rgba(46,204,113,0.3)', borderRadius: 8, padding: '7px 16px', color: 'var(--success)', fontSize: 12, fontWeight: 600, cursor: 'pointer', marginBottom: 4 }}>
+              ✓ Mark All as Taken Today
+            </button>
+          ) : null
+        })()}
         {stack.map(s => {
           const nutrientEntries = Object.entries(s.nutrients || {})
+          const takenToday = todayLogs.has(s.id)
+          const adh30 = adherence[s.id] || 0
+          const adhPct = Math.round((adh30 / 30) * 100)
+          const adhColor = adhPct >= 70 ? 'var(--success)' : adhPct >= 40 ? 'var(--warning)' : 'var(--text-secondary)'
           return (
-            <div key={s.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px' }}>
+            <div key={s.id} style={{ background: 'var(--surface)', border: `1px solid ${takenToday ? 'rgba(46,204,113,0.4)' : 'var(--border)'}`, borderRadius: 12, padding: '16px 18px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 15, textTransform: 'capitalize' }}>{s.name}</span>
                     <span style={{ fontSize: 12, color: 'var(--text-secondary)', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 8px' }}>{s.dose}</span>
                     <span style={{ fontSize: 11, color: 'var(--accent-purple)', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: 5, padding: '2px 8px' }}>{TIMING_LABELS[s.timing]}</span>
+                    {adh30 > 0 && (
+                      <span style={{ fontSize: 11, color: adhColor, background: 'var(--background)', border: `1px solid ${adhColor}44`, borderRadius: 5, padding: '2px 8px' }}>
+                        {adhPct}% last 30d
+                      </span>
+                    )}
                   </div>
                   {nutrientEntries.length > 0 && (
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
@@ -522,20 +574,26 @@ export default function SupplementsPage() {
                     </div>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => setInfoModal(s)}
-                    style={{ padding: '6px 12px', background: 'rgba(96,165,250,0.1)', border: '1px solid var(--accent-blue)', borderRadius: 7, color: 'var(--accent-blue)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                    🤖 Info
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, alignItems: 'flex-end' }}>
+                  <button onClick={() => handleMarkTaken(s.id)} disabled={markingId === s.id}
+                    style={{ padding: '6px 12px', background: takenToday ? 'rgba(46,204,113,0.15)' : 'var(--background)', border: `1px solid ${takenToday ? 'rgba(46,204,113,0.5)' : 'var(--border)'}`, borderRadius: 7, color: takenToday ? 'var(--success)' : 'var(--text-secondary)', fontSize: 12, fontWeight: takenToday ? 700 : 400, cursor: 'pointer', opacity: markingId === s.id ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                    {takenToday ? '✓ Taken Today' : '○ Mark Taken'}
                   </button>
-                  <button onClick={() => setEditModal(s)}
-                    style={{ padding: '6px 10px', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer' }}>
-                    Edit
-                  </button>
-                  <button onClick={() => handleRemove(s.id)}
-                    style={{ padding: '6px 10px', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer' }}
-                    title="Remove from stack">
-                    ×
-                  </button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => setInfoModal(s)}
+                      style={{ padding: '5px 10px', background: 'rgba(96,165,250,0.1)', border: '1px solid var(--accent-blue)', borderRadius: 7, color: 'var(--accent-blue)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                      🤖 Info
+                    </button>
+                    <button onClick={() => setEditModal(s)}
+                      style={{ padding: '5px 9px', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-secondary)', fontSize: 11, cursor: 'pointer' }}>
+                      Edit
+                    </button>
+                    <button onClick={() => handleRemove(s.id)}
+                      style={{ padding: '5px 9px', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-secondary)', fontSize: 11, cursor: 'pointer' }}
+                      title="Remove from stack">
+                      ×
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

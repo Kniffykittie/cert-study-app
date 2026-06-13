@@ -127,6 +127,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `meal_plan_entries` | Planned foods per day/slot — plan_id, day_of_week SMALLINT (0=Mon), meal_slot, name, servings, full nutrition fields; RLS user-scoped |
 | `supplement_stack` | Active supplements — name, dose, timing, nutrients JSONB (nutrient→"amount unit"), is_active BOOLEAN; RLS user-scoped |
 | `supplement_profiles` | Cached AI supplement info cards — supplement_name (unique normalized), ai_profile JSONB; shared across users |
+| `supplement_logs` | Daily adherence log — user_id, supplement_id (FK), date, taken_at; UNIQUE on user_id+supplement_id+date; RLS user-scoped |
 | `nutrient_profiles` | Cached AI nutrient encyclopedia entries — nutrient_key (unique slug), ai_profile JSONB; shared across users |
 
 ### Workouts
@@ -221,13 +222,7 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 - 35–50: "After 35, muscle is harder to maintain — your protein target is slightly higher to compensate."
 - 50+: "After 50, protein and calcium needs actually increase. Your targets are higher than the generic FDA averages on purpose."
 
-**2. `gain_weight` Goal Option** — 📋 Fully Specced / ⏳ Pending Build
-Currently missing: someone who feels too skinny or wants to bulk. `build_muscle` is a lean bulk (+200 cal). This is different.
-- New goal option in setup: "I want to gain weight / I feel too skinny"
-- Surplus tier: 300–500 cal/day depending on target weight and timeline
-- Framing: caloric density approach — eating more is genuinely hard for some people; suggest dense whole foods
-- "What Happens Now": normalize scale going up, explain it's the goal, set weekly gain expectations
-- Age interaction: a 16-year-old trying to gain gets different advice (still growing, needs nutrient density not just calories) than a 35-year-old
+**2. `gain_weight` Goal Option** — ✅ Built (Phase 51)
 
 **3. Dietary Preferences Wired Downstream** — ✅ Built (Phase 50)
 
@@ -243,20 +238,9 @@ Currently missing: someone who feels too skinny or wants to bulk. `build_muscle`
 
 ### 🍎 Nutrition
 
-**5. Pre/Post Workout Meal Advisor** — 💬 Discussed / ⏳ Pending Build
-Contextual meal suggestions based on workout type and timing. Rule-based, not AI.
-- Pre-workout (1–2hrs before): fast carbs + moderate protein
-- Post-workout (within 45min): high protein + carbs — the anabolic window
-- Logic: pulls today's workout plan entry and current time; surfaces a soft suggestion banner on the Food Log page
-- No new DB needed — uses existing workout_plans and food_log_entries
+**5. Pre/Post Workout Meal Advisor** — ✅ Built (Phase 51)
 
-**10. Supplement Logs Table + Adherence Tracking** — 💬 Discussed / ⏳ Pending Build
-Currently no way to log that you actually took your supplements today. Planned:
-- New `supplement_logs` table: user_id, date, supplement_id, taken_at TIMESTAMPTZ; RLS user-scoped
-- "Mark taken" button per supplement on the stack page; optional "all taken" bulk-mark
-- Adherence % shown on stack page ("You've taken Magnesium 18 of last 30 days — 60%")
-- Encyclopedia gap report: supplement coverage only credited when adherence ≥ 70% — occasional use shouldn't count as coverage
-- Recovery Score: consistent adherence (≥70%) for relevant supplements adds a small bonus to the component they affect
+**10. Supplement Logs Table + Adherence Tracking** — ✅ Built (Phase 51)
 
 ---
 
@@ -357,6 +341,11 @@ A complete system parallel to Workouts but lighter in logging. No timer, no HR t
 ---
 
 ## Phase Log
+
+### Phase 51 — Pre/Post Workout Meal Advisor + gain_weight Goal + Supplement Adherence — Complete
+- **Pre/Post Workout Meal Advisor**: two dismissible banners on Food Log tab — post-workout (blue, shows minutes since completion, protein target + 30-50g carbs, "Log Snack" CTA, visible for 2 hrs after workout finish); pre-workout (blue, shows planned workout label, timing tip, visible all day until workout logged); `workout_logs` query updated to include `created_at`; `workoutFinishedAt` state added
+- **gain_weight Goal Option**: added `{ key: 'gain_weight', label: 'Gain Weight / Bulk Up', ... }` to GOALS array in setup page; `calcGoalAdjustment` now handles `gain_weight` — timeline-based surplus (200–500 cal, capped at 500, min 200) or standard 350 cal/day surplus; modes: `gain_timeline` and `gain_standard`; modeExplanation dict updated with gain entries; Timeline card has gain variant framing (scale going up is the goal, Week 1-2 glycogen note, Week 3+ steady gain, "gaining too fast" warning); Scale Expectations card gain variant (different labels/text); gain works alongside build_muscle
+- **Supplement Adherence Tracking**: new `supplement_logs` table (user_id, supplement_id, date, taken_at; UNIQUE on user+supp+date; RLS); `loadStack()` now fetches 30-day logs in parallel — derives `todayLogs` Set and `adherence` map (days taken/30); "✓ Taken Today" / "○ Mark Taken" toggle button per supplement card (green border + color when taken); adherence % chip on each card (green ≥70%, yellow ≥40%, grey otherwise); "✓ Mark All as Taken Today" bulk button appears when ≥2 supplements untaken; `handleMarkTaken` upserts/deletes with optimistic UI; reset route + Settings page reset row added
 
 ### Phase 50 — Dietary Preferences Wired Downstream — Complete
 - Added `DIETARY_RULES` object and `getDietaryWarnings(food, prefs)` function to `nutrition/page.js` — keyword-based checks for vegan, vegetarian, gluten_free, dairy_free, low_sodium, keto, low_carb

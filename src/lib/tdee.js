@@ -108,6 +108,41 @@ export function calcGoalAdjustment(goals = [], weightLbs, targetWeightLbs, timel
     }
   }
 
+  const wantsGain = goals.includes('gain_weight')
+
+  if (wantsGain) {
+    const lbsToGain = (weightLbs && targetWeightLbs && targetWeightLbs > weightLbs)
+      ? targetWeightLbs - weightLbs
+      : null
+    const timelineDays = timeline ? TIMELINE_DAYS[timeline] : null
+
+    if (lbsToGain != null && timelineDays) {
+      const rawSurplus = Math.round((lbsToGain * 3500) / timelineDays)
+      const capped = rawSurplus > 500
+      const surplus = Math.max(200, Math.min(500, rawSurplus))
+      const weeklyLbs = Math.round((surplus * 7 / 3500) * 10) / 10
+      return {
+        adjustment: surplus,
+        mode: 'gain_timeline',
+        projectionLabel: `Gain ${lbsToGain} lbs in ${TIMELINE_DAYS[timeline] / 30} month${TIMELINE_DAYS[timeline] > 30 ? 's' : ''}`,
+        projectionDetail: capped
+          ? `Your goal needs a ${rawSurplus} cal/day surplus — capped at 500 cal to minimize fat gain. Focus on protein and training to ensure the weight is muscle.`
+          : `${surplus} cal/day surplus → ~${weeklyLbs} lbs/week. Pair with consistent resistance training to maximize muscle vs fat gain.`,
+        weeklyRate: weeklyLbs,
+        capped,
+      }
+    }
+
+    return {
+      adjustment: 350,
+      mode: 'gain_standard',
+      projectionLabel: '~0.7 lb / week mass gain',
+      projectionDetail: 'A 350 cal/day surplus supports steady weight gain. Pair with progressive resistance training to build muscle, not just fat.',
+      weeklyRate: 0.7,
+      capped: false,
+    }
+  }
+
   if (wantsMuscle) {
     return {
       adjustment: 200,

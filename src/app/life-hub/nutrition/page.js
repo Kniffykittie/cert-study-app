@@ -1911,6 +1911,7 @@ export default function NutritionPage() {
   const [yesterdayProtein, setYesterdayProtein] = useState(null)
   const [todayWaterOz, setTodayWaterOz] = useState(null)
   const [dismissedBanners, setDismissedBanners] = useState(new Set())
+  const [workoutFinishedAt, setWorkoutFinishedAt] = useState(null)
 
   const today = new Date().toISOString().split('T')[0]
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
@@ -1925,13 +1926,14 @@ export default function NutritionPage() {
       const [{ data: goalsData }, { data: suppData }, { data: workoutData }, { data: planData }] = await Promise.all([
         supabase.from('goals_profiles').select('*').eq('user_id', user.id).single(),
         supabase.from('supplement_stack').select('name, dose, timing, nutrients').eq('user_id', user.id).eq('is_active', true).order('created_at'),
-        supabase.from('workout_logs').select('duration_seconds, is_partial, day_label').eq('user_id', user.id).gte('created_at', today).is('is_partial', false).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+        supabase.from('workout_logs').select('duration_seconds, is_partial, day_label, created_at').eq('user_id', user.id).gte('created_at', today).is('is_partial', false).order('created_at', { ascending: false }).limit(1).maybeSingle(),
         supabase.from('workout_plans').select('plan').eq('user_id', user.id).eq('is_active', true).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       ])
       if (!goalsData) { setGoalsGated(true); setChecked(true); return }
       setGoals(goalsData)
       setSupplements(suppData ?? [])
       setTodayWorkout(workoutData || null)
+      if (workoutData?.created_at) setWorkoutFinishedAt(new Date(workoutData.created_at))
       const loggedToday = !!workoutData
       let plannedLabel = null
       if (!loggedToday && planData?.plan) {
@@ -2371,6 +2373,45 @@ export default function NutritionPage() {
                     </div>
                   </div>
                   <button onClick={() => setDismissedBanners(s => new Set([...s, 'protein']))} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
+                </div>
+              )
+            }
+
+            // Post-workout window: completed workout < 2 hours ago
+            if (workoutFinishedAt && !dismissedBanners.has('post_workout')) {
+              const minsAgo = Math.round((now - workoutFinishedAt) / 60000)
+              if (minsAgo <= 120) {
+                const postProtein = proteinTarget ? Math.round(proteinTarget * 0.3) : 30
+                banners.push(
+                  <div key="post_workout" style={{ backgroundColor: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.4)', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '16px' }}>🏋️</span>
+                      <div>
+                        <span style={{ color: '#3b82f6', fontSize: '13px', fontWeight: '700' }}>Post-workout window — {minsAgo < 60 ? `${minsAgo} min` : `${Math.round(minsAgo/60*10)/10} hr`} ago</span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block' }}>Eat {postProtein}g+ protein + 30–50g fast carbs now to maximize muscle recovery.</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                      <button onClick={() => setLogModal('snack')} style={{ backgroundColor: '#3b82f6', border: 'none', color: '#fff', borderRadius: '7px', padding: '6px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Log Snack</button>
+                      <button onClick={() => setDismissedBanners(s => new Set([...s, 'post_workout']))} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                    </div>
+                  </div>
+                )
+              }
+            }
+
+            // Pre-workout reminder: workout planned but not logged yet
+            if (workoutCtx.plannedLabel && !workoutFinishedAt && !dismissedBanners.has('pre_workout')) {
+              banners.push(
+                <div key="pre_workout" style={{ backgroundColor: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '16px' }}>⚡</span>
+                    <div>
+                      <span style={{ color: '#3b82f6', fontSize: '13px', fontWeight: '700' }}>{workoutCtx.plannedLabel} planned today</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block' }}>1–2 hrs before: fast carbs + moderate protein. Avoid heavy fat/fiber right before lifting.</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setDismissedBanners(s => new Set([...s, 'pre_workout']))} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
                 </div>
               )
             }

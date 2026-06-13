@@ -6,6 +6,7 @@ import { calcTDEE, tdeeBreakdown, calcGoalAdjustment, calcMacros } from '@/lib/t
 
 const GOALS = [
   { key: 'lose_weight', label: 'Lose Weight', desc: 'Reduce body fat and reach a healthier weight', icon: '🔥' },
+  { key: 'gain_weight', label: 'Gain Weight / Bulk Up', desc: 'Add mass — eating more is part of the plan', icon: '⬆️' },
   { key: 'build_muscle', label: 'Build Muscle', desc: 'Gain strength and increase lean muscle mass', icon: '💪' },
   { key: 'improve_endurance', label: 'Improve Endurance', desc: 'Build cardio fitness and stamina', icon: '🏃' },
   { key: 'better_sleep', label: 'Better Sleep', desc: 'Improve sleep quality and feel more rested', icon: '😴' },
@@ -728,6 +729,8 @@ export default function GoalsSetupPage() {
                 lose_timeline: weeklyRate ? `${Math.abs(adjustment)} cal/day deficit → ~${weeklyRate} lbs/week → on pace for your goal.` : null,
                 recomp: 'Body recomposition: 250 cal/day deficit + high protein. You lose fat and build muscle simultaneously. This works best for beginners and those returning after time off — the deficit is small to protect muscle while you build.',
                 build: 'A 200 cal/day surplus gives your muscles the fuel to grow without excessive fat gain. Bigger surpluses mostly add fat, not muscle.',
+                gain_standard: 'A 350 cal/day surplus supports steady weight gain. Pair with progressive resistance training to maximize how much of this goes to muscle rather than fat.',
+                gain_timeline: null,
                 maintain: 'Eating at TDEE maintains your current weight.',
               }[mode]
 
@@ -842,6 +845,26 @@ export default function GoalsSetupPage() {
                         <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6', margin: 0 }}>
                           Body recomposition doesn't follow a straight line — fat loss and muscle gain happen simultaneously. <strong style={{ color: 'var(--text-primary)' }}>The scale may barely move for weeks while your body composition changes significantly.</strong> Progress shows in measurements, how your clothes fit, and strength gains — not just the number on the scale.
                         </p>
+                      ) : (mode === 'gain_timeline' || mode === 'gain_standard') ? (
+                        <div>
+                          {targetWeight && weightLbs && timeline && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                              <span style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: '700' }}>{Math.abs(parseFloat(targetWeight) - parseFloat(weightLbs)).toFixed(1)} lbs</span>
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>over</span>
+                              <span style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: '700' }}>{ ({ '1_month': 4, '3_months': 13, '6_months': 26, '1_year': 52, 'no_rush': 52 }[timeline] || 26)} weeks</span>
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>=</span>
+                              <span style={{ color: projectionColor, fontSize: '15px', fontWeight: '700' }}>~{weeklyRate} lbs/week</span>
+                            </div>
+                          )}
+                          <p style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.55', margin: '0 0 8px' }}>
+                            That's {adjustment.toLocaleString()} extra calories per day above your maintenance. The scale going up is the <strong style={{ color: 'var(--text-primary)' }}>goal</strong> — not a mistake.
+                          </p>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                            <div>📈 <strong style={{ color: 'var(--text-primary)' }}>Weeks 1–2:</strong> Scale may jump 2–5 lbs fast — mostly glycogen and water, not fat. Normal.</div>
+                            <div>🏋️ <strong style={{ color: 'var(--text-primary)' }}>Week 3+:</strong> Steady slow gain. Train hard — surplus calories go to muscle when you're lifting consistently.</div>
+                            <div>⚠️ <strong style={{ color: 'var(--text-primary)' }}>Gaining too fast?</strong> More than 1 lb/week is mostly fat. Dial the surplus down 100–150 cal.</div>
+                          </div>
+                        </div>
                       ) : targetWeight && weightLbs && timeline ? (
                         (() => {
                           const lbsToLose = Math.abs(parseFloat(weightLbs) - parseFloat(targetWeight))
@@ -947,14 +970,14 @@ export default function GoalsSetupPage() {
                   )}
 
                   {/* Scale expectations */}
-                  {(selectedGoals.includes('lose_weight') || selectedGoals.includes('build_muscle') || mode === 'recomp') && (
+                  {(selectedGoals.includes('lose_weight') || selectedGoals.includes('gain_weight') || selectedGoals.includes('build_muscle') || mode === 'recomp') && (
                     <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px', marginBottom: '16px' }}>
                       <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>⚖️ What the Scale Will Do</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {[
-                          { label: 'Week 1–2', text: 'Mostly water weight shifts. Reducing carbs or sodium can drop 2–5 lbs fast — this isn\'t fat loss, it\'s fluid. Don\'t chase it.', color: 'var(--accent-blue)' },
-                          { label: 'Week 3–6', text: mode === 'recomp' ? 'Scale may barely move while body fat drops and muscle grows. Trust the tape measure and how clothes fit more than the number.' : 'Real fat loss starts showing here. Expect 0.5–1 lb/week. Daily swings of 2–4 lbs are completely normal (food weight, water, hormones).', color: 'var(--success)' },
-                          { label: 'Plateaus', text: 'Stalls for 1–2 weeks are normal — your metabolism is adjusting. Don\'t slash calories impulsively. The TDEE calibration system will tell you when a real adjustment is needed.', color: 'var(--warning)' },
+                          { label: 'Week 1–2', text: (mode === 'gain_timeline' || mode === 'gain_standard') ? 'Scale may jump 3–6 lbs quickly — mostly glycogen and water filling up. This is normal and expected, not fat.' : 'Mostly water weight shifts. Reducing carbs or sodium can drop 2–5 lbs fast — this isn\'t fat loss, it\'s fluid. Don\'t chase it.', color: 'var(--accent-blue)' },
+                          { label: 'Week 3–6', text: mode === 'recomp' ? 'Scale may barely move while body fat drops and muscle grows. Trust the tape measure and how clothes fit more than the number.' : (mode === 'gain_timeline' || mode === 'gain_standard') ? 'Steady slow gain begins. Track weekly, not daily — daily swings of 2–4 lbs are just food weight and water.' : 'Real fat loss starts showing here. Expect 0.5–1 lb/week. Daily swings of 2–4 lbs are completely normal (food weight, water, hormones).', color: 'var(--success)' },
+                          { label: (mode === 'gain_timeline' || mode === 'gain_standard') ? 'Gaining too fast?' : 'Plateaus', text: (mode === 'gain_timeline' || mode === 'gain_standard') ? 'If you\'re gaining more than 1 lb/week consistently, most of it is fat. Reduce the surplus by 100–150 cal and keep training.' : 'Stalls for 1–2 weeks are normal — your metabolism is adjusting. Don\'t slash calories impulsively. The TDEE calibration system will tell you when a real adjustment is needed.', color: 'var(--warning)' },
                         ].map(({ label, text, color }) => (
                           <div key={label} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                             <span style={{ backgroundColor: `${color}18`, border: `1px solid ${color}40`, borderRadius: '5px', padding: '2px 7px', fontSize: '10px', fontWeight: '700', color, flexShrink: 0, marginTop: '1px' }}>{label}</span>

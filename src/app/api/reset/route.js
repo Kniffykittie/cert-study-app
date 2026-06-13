@@ -85,6 +85,11 @@ export async function POST(req) {
     return NextResponse.json({ ok: true })
   }
 
+  if (scope === 'supplement_logs') {
+    await supabase.from('supplement_logs').delete().eq('user_id', userId)
+    return NextResponse.json({ ok: true })
+  }
+
   if (scope === 'food_log') {
     await supabase.from('food_log_entries').delete().eq('user_id', userId)
     return NextResponse.json({ ok: true })
