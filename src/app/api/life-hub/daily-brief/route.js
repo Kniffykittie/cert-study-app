@@ -58,7 +58,7 @@ export async function POST(req) {
     supabase.from('food_log_entries').select('date, calories, protein_g').eq('user_id', user.id).gte('date', sevenAgo),
     supabase.from('workout_logs').select('id, day_label, duration_seconds, created_at').eq('user_id', user.id).gte('created_at', `${twentyoneAgo}T00:00:00`).order('created_at', { ascending: false }).limit(20),
     supabase.from('workout_log_sets').select('exercise_name, set_type').eq('user_id', user.id).gte('created_at', `${yesterday}T00:00:00`).lt('created_at', `${today}T00:00:00`),
-    supabase.from('daily_checkins').select('date, energy_level, mood_level').eq('user_id', user.id).gte('date', fourteenAgo).order('date', { ascending: false }),
+    supabase.from('daily_checkins').select('date, energy_level, mood_level, sleep_hours').eq('user_id', user.id).gte('date', fourteenAgo).order('date', { ascending: false }),
     supabase.from('water_logs').select('amount_oz').eq('user_id', user.id).gte('created_at', `${yesterday}T00:00:00`).lt('created_at', `${today}T00:00:00`),
     supabase.from('supplement_stack').select('name, nutrients').eq('user_id', user.id).eq('is_active', true),
     supabase.from('food_log_entries').select('caffeine_mg, water_g').eq('user_id', user.id).eq('date', yesterday).eq('meal_slot', 'drink'),
@@ -128,7 +128,9 @@ export async function POST(req) {
 
   // Sleep, steps, water + hydration
   const sleepRow = (sleepRows || [])[0]
-  const sleepHours = sleepRow?.sleep_minutes ? Math.round((sleepRow.sleep_minutes / 60) * 10) / 10 : null
+  const googleSleepHours = sleepRow?.sleep_minutes ? Math.round((sleepRow.sleep_minutes / 60) * 10) / 10 : null
+  const manualSleepHours = (() => { const v = parseFloat((checkins || []).find(c => c.date === yesterday)?.sleep_hours); return !isNaN(v) && v > 0 ? v : null })()
+  const sleepHours = googleSleepHours ?? manualSleepHours
   const deepSleepMin = sleepRow?.stages?.deep ?? null
   const remSleepMin = sleepRow?.stages?.rem ?? null
   const stepsYesterday = (stepsRows || []).reduce((s, r) => s + (r.steps || 0), 0) || null
@@ -193,7 +195,7 @@ export async function POST(req) {
     `WELLNESS:`,
     avgEnergy ? `  Energy trend: ${avgEnergy}/5 average over last 7 check-ins` : '  No check-in data',
     lowEnergyStreak >= 3 ? `  ⚠ ${lowEnergyStreak} consecutive low-energy days` : '',
-    sleepHours ? `  Sleep last night: ${sleepHours} hours${deepSleepMin != null ? ` (${deepSleepMin}min deep, ${remSleepMin ?? '?'}min REM)` : ''}` : '  Sleep: no data (Google Health not connected or not worn)',
+    sleepHours ? `  Sleep last night: ${sleepHours} hours${deepSleepMin != null ? ` (${deepSleepMin}min deep, ${remSleepMin ?? '?'}min REM)` : ''}` : '',
     stepsYesterday ? `  Steps yesterday: ${stepsYesterday.toLocaleString()}` : '',
     waterYestOz > 0 ? `  Hydration yesterday: ${waterYestOz} oz total${drinkWaterOz > 0 ? ` (${waterLogOz} oz water + ${drinkWaterOz} oz from beverages)` : ''}` : '  Hydration yesterday: not logged',
     totalCaffeineYest > 0 ? `  Caffeine yesterday: ${totalCaffeineYest}mg${totalCaffeineYest >= 400 ? ' — HIGH' : ''}` : '',

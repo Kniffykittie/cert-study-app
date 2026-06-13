@@ -267,6 +267,12 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Daily Brief — Graceful Watch-less Handling — Complete
+- Sleep line silently omitted from Claude's context when no data (was passing "Google Health not connected" string — could appear in the brief as a nag)
+- Steps line already omitted when no data — consistent pattern now across both
+- Manual sleep hours from `daily_checkins.sleep_hours` (yesterday's check-in) used as fallback when Google Health sleep not available — same priority logic as Recovery Score (Google first, manual second, omit if neither)
+- Monthly Wrap already had no Google Health dependency — no changes needed there
+
 ### Google Health — Connect Modal + Sidebar Gating — Complete
 - Health Overview page: "Connect Google Health" button now opens a confirmation modal (`ConnectModal`) warning users to contact the site owner first for authorization; two buttons: "← Go Back" and "I've Been Authorized →" (the latter proceeds to `/api/health/connect`)
 - LifeHubSidebar: fetches `/api/health/status` on mount; Step Tracker, Heart Rate, and Sleep Tracker links are hidden when Google Health is not connected; Overview link always visible
