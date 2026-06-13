@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import BookmarkModal from '@/components/BookmarkModal'
@@ -211,7 +211,7 @@ function RealExam({ cert, questions, answers, setAnswers, current, setCurrent, s
   )
 }
 
-export default function TestPage() {
+function TestPageInner() {
   const [cert, setCert] = useState(null)
   const [count, setCount] = useState(10)
   const [selectedTopics, setSelectedTopics] = useState([])
@@ -1336,4 +1336,8 @@ export default function TestPage() {
       {isPractice && <FloatingReferencePanel cert={cert} />}
     </>
   )
+}
+
+export default function TestPage() {
+  return <Suspense><TestPageInner /></Suspense>
 }

@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -219,7 +219,7 @@ function buildDefaultSets(ex) {
   }))
 }
 
-export default function LogWorkoutPage() {
+function LogWorkoutPageInner() {
   const router = useRouter()
   const params = useSearchParams()
   const day = params.get('day') || ''
@@ -798,4 +798,8 @@ export default function LogWorkoutPage() {
       {detailModal && <ExerciseDetailModal exercise={detailModal} onClose={() => setDetailModal(null)} />}
     </div>
   )
+}
+
+export default function LogWorkoutPage() {
+  return <Suspense><LogWorkoutPageInner /></Suspense>
 }

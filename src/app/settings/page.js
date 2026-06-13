@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -23,7 +23,7 @@ const TABS = [
   { key: 'danger', label: '⚠ Danger Zone' },
 ]
 
-export default function SettingsPage() {
+function SettingsPageInner() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('account')
   const [displayName, setDisplayName] = useState('')
@@ -1386,4 +1386,8 @@ export default function SettingsPage() {
       )}
     </div>
   )
+}
+
+export default function SettingsPage() {
+  return <Suspense><SettingsPageInner /></Suspense>
 }

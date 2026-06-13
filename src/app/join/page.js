@@ -1,9 +1,9 @@
 'use client'
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function JoinPage() {
+function JoinPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [code, setCode] = useState(searchParams.get('code') || '')
@@ -134,4 +134,8 @@ export default function JoinPage() {
       </div>
     </div>
   )
+}
+
+export default function JoinPage() {
+  return <Suspense><JoinPageInner /></Suspense>
 }

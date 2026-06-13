@@ -536,6 +536,9 @@ src/
 
 ---
 
+## Vercel Build Notes
+- **`useSearchParams()` requires Suspense** in Next.js production builds — any page using it must wrap the component in `<Suspense>`. Pattern: rename default export to `XxxInner`, export `default function Xxx() { return <Suspense><XxxInner /></Suspense> }`. Fixed on: join, study-hub/test, life-hub/workouts/log, settings, life-hub/goals/setup.
+
 ## Important Decisions & Constraints (Don't Re-Litigate These)
 | Decision | Reason |
 |----------|---------|

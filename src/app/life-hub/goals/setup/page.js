@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { calcTDEE, tdeeBreakdown, calcGoalAdjustment, calcMacros } from '@/lib/tdee'
@@ -143,7 +143,7 @@ function ChipSelect({ options, selected, onSelect, multi = false }) {
   )
 }
 
-export default function GoalsSetupPage() {
+function GoalsSetupPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/life-hub/goals'
@@ -1074,4 +1074,8 @@ export default function GoalsSetupPage() {
       )}
     </div>
   )
+}
+
+export default function GoalsSetupPage() {
+  return <Suspense><GoalsSetupPageInner /></Suspense>
 }
