@@ -301,6 +301,15 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ## Phase Log
 
+### PWA — Progressive Web App (installable) — Complete
+- `public/manifest.json` — app name "Cert Study App", short_name "CSA", display standalone, theme #a78bfa, 192+512 icons
+- `public/sw.js` — cache-shell service worker; caches `/` and `/offline`; cache-first for static assets; network-first for navigation; skips all `/api/`, Supabase, non-GET requests
+- `src/app/offline/page.js` — offline fallback page ("You're offline" + Try Again)
+- `src/components/ServiceWorkerRegistrar.js` — client component that registers `/sw.js` on mount, renders null
+- `src/app/layout.js` — added manifest link, theme-color meta, Apple PWA meta tags, apple-touch-icon, mounts ServiceWorkerRegistrar
+- `public/icons/icon-192.png` + `icon-512.png` — generated via sharp (dark bg + purple CSA text)
+- Install on iPhone: Safari → Share → Add to Home Screen; Android: browser menu → Install App
+
 ### Vercel Fix — Heart Rate page crash (Rules of Hooks) — Complete
 - Root cause: `useCallback` was declared after `if (loading) return` and `if (!connected) return` — violating Rules of Hooks (hooks must be called unconditionally). React error #310 in production.
 - Fix: moved ALL computation (fiveMin, chartPoints, avgPath, bandPath, yTicks, etc.) and `useCallback` to BEFORE the conditional returns; early returns now placed after all hooks
