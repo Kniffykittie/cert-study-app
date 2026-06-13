@@ -301,6 +301,12 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ## Phase Log
 
+### Mobile — Life Hub sidebar drawer — Complete
+- LifeHubSidebar hidden on mobile (≤768px); hamburger button (☰) fixed top-left opens it as slide-in overlay
+- Backdrop tap and route change both close the drawer
+- life-hub/layout.js adds `padding-top: 64px` on mobile so content clears the hamburger
+- Matches the existing StudyHubSidebar mobile pattern (same CSS class naming convention, different prefix `lh-`)
+
 ### PWA — Progressive Web App (installable) — Complete
 - `public/manifest.json` — app name "Cert Study App", short_name "CSA", display standalone, theme #a78bfa, 192+512 icons
 - `public/sw.js` — cache-shell service worker; caches `/` and `/offline`; cache-first for static assets; network-first for navigation; skips all `/api/`, Supabase, non-GET requests

@@ -32,6 +32,7 @@ export default function LifeHubSidebar() {
   const [goalsOpen, setGoalsOpen] = useState(false)
   const [nutritionOpen, setNutritionOpen] = useState(false)
   const [wrapNotify, setWrapNotify] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
 
@@ -92,6 +93,7 @@ export default function LifeHubSidebar() {
     if (pathname.startsWith('/life-hub/workouts') || pathname.startsWith('/life-hub/workouts/stretching')) setWorkoutsOpen(true)
     if (pathname.startsWith('/life-hub/goals')) setGoalsOpen(true)
     if (pathname.startsWith('/life-hub/nutrition') || pathname.startsWith('/life-hub/goals/supplements') || pathname.startsWith('/life-hub/health/water')) setNutritionOpen(true)
+    setMobileOpen(false)
   }, [pathname])
 
   function dismissWrap() {
@@ -142,8 +144,114 @@ export default function LifeHubSidebar() {
   const workoutsActive = pathname.startsWith('/life-hub/workouts')
   const goalsActive = pathname.startsWith('/life-hub/goals') && pathname !== '/life-hub/goals/supplements'
 
+  const sidebarContent = (
+    <aside style={{ width: '220px', minHeight: '100vh', backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '12px 8px', gap: '2px', flexShrink: 0, overflowY: 'auto' }}>
+      <button className="lh-sidebar-close-btn" onClick={() => setMobileOpen(false)}
+        style={{ display: 'none', position: 'absolute', top: '12px', right: '12px', background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', lineHeight: 1, padding: '4px' }}>✕</button>
+
+      <div style={{ backgroundColor: '#0A0A0A', borderRadius: '8px', padding: '8px 12px', marginBottom: '8px', textAlign: 'center', fontWeight: '700', fontSize: '20px', color: SECTION_COLORS.overview }}>
+        CSA
+      </div>
+
+      <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', marginBottom: '4px' }}
+        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(167,139,250,0.08)'}
+        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+        ← Home
+      </Link>
+
+      {sectionHeader('Overview', SECTION_COLORS.overview)}
+      {navLink('Dashboard', '/life-hub', SECTION_COLORS.overview)}
+      {navLink('Monthly Wrap', '/life-hub/monthly-wrap', SECTION_COLORS.overview)}
+
+      {sectionHeader('Goals', SECTION_COLORS.goals)}
+      {dropdownHeader('My Goals', goalsOpen, setGoalsOpen, goalsActive, SECTION_COLORS.goals)}
+      {goalsOpen && (
+        <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+          {navLink('Overview', '/life-hub/goals', SECTION_COLORS.goals)}
+          {navLink('Measurements', '/life-hub/goals/measurements', SECTION_COLORS.goals)}
+          {navLink('Setup', '/life-hub/goals/setup', SECTION_COLORS.goals)}
+        </div>
+      )}
+
+      {sectionHeader('Health', SECTION_COLORS.health)}
+      {dropdownHeader('Health Tracking', healthOpen, setHealthOpen, healthActive, SECTION_COLORS.health)}
+      {healthOpen && (
+        <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+          {navLink('Overview', '/life-hub/health', SECTION_COLORS.health)}
+          {healthConnected && navLink('Step Tracker', '/life-hub/health/steps', SECTION_COLORS.health)}
+          {healthConnected && navLink('Heart Rate', '/life-hub/health/heart-rate', SECTION_COLORS.health)}
+          {healthConnected && navLink('Sleep Tracker', '/life-hub/health/sleep', SECTION_COLORS.health)}
+        </div>
+      )}
+
+      {sectionHeader('Nutrition', SECTION_COLORS.nutrition)}
+      {dropdownHeader('Food & Nutrition', nutritionOpen, setNutritionOpen, nutritionActive, SECTION_COLORS.nutrition)}
+      {nutritionOpen && (
+        <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+          {navLink('Food Log', '/life-hub/nutrition', SECTION_COLORS.nutrition)}
+          {navLink('Meal Plan', '/life-hub/nutrition/meal-plan', SECTION_COLORS.nutrition)}
+          {navLink('Encyclopedia', '/life-hub/nutrition/encyclopedia', SECTION_COLORS.nutrition)}
+          {navLink('Hydration', '/life-hub/health/water', SECTION_COLORS.nutrition)}
+          {navLink('Supplements', '/life-hub/goals/supplements', SECTION_COLORS.nutrition)}
+        </div>
+      )}
+
+      {sectionHeader('Workouts', SECTION_COLORS.workouts)}
+      {dropdownHeader('My Workouts', workoutsOpen, setWorkoutsOpen, workoutsActive, SECTION_COLORS.workouts)}
+      {workoutsOpen && (
+        <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+          {navLink('My Plan', '/life-hub/workouts', SECTION_COLORS.workouts)}
+          {navLink('Workout History', '/life-hub/workouts/history', SECTION_COLORS.workouts)}
+          {navLink('Exercise Library', '/life-hub/workouts/exercises', SECTION_COLORS.workouts)}
+          {navLink('Stretching & Mobility', '/life-hub/workouts/stretching', SECTION_COLORS.workouts)}
+          {navLink('Stretch Library', '/life-hub/workouts/stretching/library', SECTION_COLORS.workouts)}
+        </div>
+      )}
+
+      <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '12px', marginTop: '16px' }}>
+        <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '6px', textDecoration: 'none' }}
+          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(167,139,250,0.08)'}
+          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: SECTION_COLORS.overview, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', flexShrink: 0, color: '#fff' }}>{initial}</div>
+          <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{displayName || 'Account'}</span>
+        </Link>
+      </div>
+    </aside>
+  )
+
   return (
     <>
+      <style>{`
+        .lh-hamburger { display: none; }
+        .lh-sidebar-close-btn { display: none !important; }
+        .lh-backdrop { display: none; }
+        @media (max-width: 768px) {
+          .lh-hamburger {
+            display: flex; position: fixed; top: 12px; left: 12px; z-index: 200;
+            background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+            width: 40px; height: 40px; align-items: center; justify-content: center;
+            font-size: 18px; cursor: pointer; color: var(--text-primary);
+          }
+          .lh-sidebar-desktop { display: none !important; }
+          .lh-sidebar-close-btn { display: block !important; }
+          .lh-sidebar-overlay {
+            position: fixed; top: 0; left: 0; height: 100vh; z-index: 300;
+            transform: translateX(-100%); transition: transform 0.25s ease;
+          }
+          .lh-sidebar-overlay.is-open { transform: translateX(0); }
+          .lh-backdrop {
+            display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            z-index: 299; opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+          }
+          .lh-backdrop.is-open { opacity: 1; pointer-events: auto; }
+        }
+        @media (min-width: 769px) {
+          .lh-sidebar-overlay { display: none !important; }
+          .lh-backdrop { display: none !important; }
+          .lh-hamburger { display: none !important; }
+        }
+      `}</style>
+
       {wrapNotify && (
         <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 500, backgroundColor: 'var(--surface)', border: `1px solid ${SECTION_COLORS.overview}`, borderRadius: '14px', padding: '18px 20px', maxWidth: '300px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
@@ -151,93 +259,24 @@ export default function LifeHubSidebar() {
               <span style={{ fontSize: '20px' }}>📅</span>
               <span style={{ color: SECTION_COLORS.overview, fontWeight: '700', fontSize: '14px' }}>Monthly Wrap is Ready</span>
             </div>
-            <button onClick={dismissWrap}
-              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1, padding: '0 0 0 8px', flexShrink: 0 }}>✕</button>
+            <button onClick={dismissWrap} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1, padding: '0 0 0 8px', flexShrink: 0 }}>✕</button>
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 14px', lineHeight: '1.5' }}>
             Your {monthLabel(getLastMonth())} summary is ready — workouts, energy, weight, and your AI wrap-up.
           </p>
-          <button onClick={goToWrap}
-            style={{ width: '100%', backgroundColor: SECTION_COLORS.overview, border: 'none', color: '#fff', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+          <button onClick={goToWrap} style={{ width: '100%', backgroundColor: SECTION_COLORS.overview, border: 'none', color: '#fff', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
             Take me there →
           </button>
         </div>
       )}
 
-      <aside style={{ width: '220px', minHeight: '100vh', backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '12px 8px', gap: '2px', flexShrink: 0, overflowY: 'auto' }}>
-        <div style={{ backgroundColor: '#0A0A0A', borderRadius: '8px', padding: '8px 12px', marginBottom: '8px', textAlign: 'center', fontWeight: '700', fontSize: '20px', color: SECTION_COLORS.overview }}>
-          CSA
-        </div>
+      <button className="lh-hamburger" onClick={() => setMobileOpen(true)} aria-label="Open sidebar">☰</button>
+      <div className={`lh-backdrop${mobileOpen ? ' is-open' : ''}`} onClick={() => setMobileOpen(false)} />
 
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', marginBottom: '4px' }}
-          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(167,139,250,0.08)'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-          ← Home
-        </Link>
-
-        {/* OVERVIEW */}
-        {sectionHeader('Overview', SECTION_COLORS.overview)}
-        {navLink('Dashboard', '/life-hub', SECTION_COLORS.overview)}
-        {navLink('Monthly Wrap', '/life-hub/monthly-wrap', SECTION_COLORS.overview)}
-
-        {/* BODY & GOALS */}
-        {sectionHeader('Goals', SECTION_COLORS.goals)}
-        {dropdownHeader('My Goals', goalsOpen, setGoalsOpen, goalsActive, SECTION_COLORS.goals)}
-        {goalsOpen && (
-          <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
-            {navLink('Overview', '/life-hub/goals', SECTION_COLORS.goals)}
-            {navLink('Measurements', '/life-hub/goals/measurements', SECTION_COLORS.goals)}
-            {navLink('Setup', '/life-hub/goals/setup', SECTION_COLORS.goals)}
-          </div>
-        )}
-
-        {/* HEALTH */}
-        {sectionHeader('Health', SECTION_COLORS.health)}
-        {dropdownHeader('Health Tracking', healthOpen, setHealthOpen, healthActive, SECTION_COLORS.health)}
-        {healthOpen && (
-          <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
-            {navLink('Overview', '/life-hub/health', SECTION_COLORS.health)}
-            {healthConnected && navLink('Step Tracker', '/life-hub/health/steps', SECTION_COLORS.health)}
-            {healthConnected && navLink('Heart Rate', '/life-hub/health/heart-rate', SECTION_COLORS.health)}
-            {healthConnected && navLink('Sleep Tracker', '/life-hub/health/sleep', SECTION_COLORS.health)}
-          </div>
-        )}
-
-        {/* NUTRITION */}
-        {sectionHeader('Nutrition', SECTION_COLORS.nutrition)}
-        {dropdownHeader('Food & Nutrition', nutritionOpen, setNutritionOpen, nutritionActive, SECTION_COLORS.nutrition)}
-        {nutritionOpen && (
-          <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
-            {navLink('Food Log', '/life-hub/nutrition', SECTION_COLORS.nutrition)}
-            {navLink('Meal Plan', '/life-hub/nutrition/meal-plan', SECTION_COLORS.nutrition)}
-            {navLink('Encyclopedia', '/life-hub/nutrition/encyclopedia', SECTION_COLORS.nutrition)}
-            {navLink('Hydration', '/life-hub/health/water', SECTION_COLORS.nutrition)}
-            {navLink('Supplements', '/life-hub/goals/supplements', SECTION_COLORS.nutrition)}
-          </div>
-        )}
-
-        {/* WORKOUTS */}
-        {sectionHeader('Workouts', SECTION_COLORS.workouts)}
-        {dropdownHeader('My Workouts', workoutsOpen, setWorkoutsOpen, workoutsActive, SECTION_COLORS.workouts)}
-        {workoutsOpen && (
-          <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
-            {navLink('My Plan', '/life-hub/workouts', SECTION_COLORS.workouts)}
-            {navLink('Workout History', '/life-hub/workouts/history', SECTION_COLORS.workouts)}
-            {navLink('Exercise Library', '/life-hub/workouts/exercises', SECTION_COLORS.workouts)}
-            {navLink('Stretching & Mobility', '/life-hub/workouts/stretching', SECTION_COLORS.workouts)}
-            {navLink('Stretch Library', '/life-hub/workouts/stretching/library', SECTION_COLORS.workouts)}
-          </div>
-        )}
-
-        <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '12px', marginTop: '16px' }}>
-          <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '6px', textDecoration: 'none' }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(167,139,250,0.08)'}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: SECTION_COLORS.overview, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', flexShrink: 0, color: '#fff' }}>{initial}</div>
-            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{displayName || 'Account'}</span>
-          </Link>
-        </div>
-      </aside>
+      <div className="lh-sidebar-desktop" style={{ position: 'relative' }}>{sidebarContent}</div>
+      <div className={`lh-sidebar-overlay${mobileOpen ? ' is-open' : ''}`} style={{ position: 'fixed' }}>
+        <div style={{ position: 'relative' }}>{sidebarContent}</div>
+      </div>
     </>
   )
 }
