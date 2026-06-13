@@ -1950,7 +1950,14 @@ export default function NutritionPage() {
   const tdee = calcTDEE(goals)
   const macros = calcMacros(tdee, goals)
   const { bonus: workoutBonus, reason: bonusReason, grossBurn, duration: workoutDuration } = calcWorkoutBonus(todayWorkout, goals)
-  const effectiveTarget = tdee ? tdee + workoutBonus : null
+  // Apply goal-based adjustment to eating target
+  const goalAdjustment = (() => {
+    const g = goals?.goals ?? []
+    if (g.includes('lose_weight')) return -500
+    if (g.includes('build_muscle') && !g.includes('lose_weight')) return 200
+    return 0
+  })()
+  const effectiveTarget = tdee ? tdee + goalAdjustment + workoutBonus : null
 
   const totals = entries.reduce((acc, e) => {
     for (const k of ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg',
@@ -2060,12 +2067,20 @@ export default function NutritionPage() {
           {/* Right side */}
           <div style={{ flex: 1, minWidth: '200px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Target</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+                {goalAdjustment < 0 ? 'Eating Target 🔥' : goalAdjustment > 0 ? 'Eating Target 💪' : 'Target'}
+              </span>
               <span style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>
                 {effectiveTarget ? `${effectiveTarget} kcal` : '—'}
                 {workoutBonus > 0 && <span style={{ color: 'var(--success)', fontSize: '11px', marginLeft: '6px' }}>+{workoutBonus} workout</span>}
               </span>
             </div>
+            {goalAdjustment !== 0 && tdee && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Maintenance (TDEE)</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{(tdee + workoutBonus).toLocaleString()} kcal</span>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px' }}>
               <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Remaining</span>
               <span style={{ color: remaining === null ? 'var(--text-secondary)' : overBudget ? 'var(--error)' : 'var(--success)', fontSize: '13px', fontWeight: '600' }}>

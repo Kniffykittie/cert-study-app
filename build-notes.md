@@ -326,6 +326,13 @@ Everything below was built but not yet tested by the user. Go through this list 
 - Footer text dynamically reflects whether HRV is contributing ("100 pts with smartwatch data" vs "90 pts without smartwatch · score normalized to 100")
 - Energy pts recalculated: 1–5 rating × 3 (was ×4); Workout Load max 10 (was 15); rest day = 10 pts, <45min = 8, 45–75min = 5, 75+ = 3
 
+### Goals Setup + Nutrition — Eating Target vs Maintenance Clarification — Complete
+- Goals setup Step 4 now shows two distinct numbers: "Eating Target" (goal-adjusted) as the primary large number with goal-colored border, and TDEE (maintenance) as a smaller secondary figure labeled "maintenance"
+- Eating target formula: lose_weight = TDEE − 500, build_muscle = TDEE + 200, maintain/other = TDEE
+- For weight loss/muscle: shows the deficit/surplus math inline (TDEE ± X = eating target), plus a brief explanation of WHY that specific number (1 lb/week fat loss pace; lean bulk with minimal fat gain)
+- Projection badge shown: "~1 lb / week fat loss" or "~0.5 lb / week lean gain" or "Weight maintenance"
+- Nutrition page calorie ring updated: `effectiveTarget` now applies the same goal adjustment before adding workout bonus; "Target" label updated to "Eating Target 🔥" (lose) or "Eating Target 💪" (build); a secondary line shows "Maintenance (TDEE)" when a deficit/surplus is active so user can see both numbers
+
 ### Heart Rate Phase 4 — 5-Minute Line Chart + RHR/HRV Fix — Complete
 - Created `health_heart_rate_5min` table (user_id, date, minute_bucket SMALLINT, avg/min/max_bpm, sample_count; UNIQUE on user_id+date+minute_bucket; RLS enabled)
 - Updated `sync/route.js`: added 5-minute bucketing alongside existing hourly; `minuteBucket = estHour*60 + floor(estMin/5)*5`; upserts to `health_heart_rate_5min` after hourly upsert

@@ -706,18 +706,73 @@ export default function GoalsSetupPage() {
         {/* Step 4 — What Happens Now */}
         {step === 4 && (
           <div>
-            <h2 style={{ color: 'var(--text-primary)', fontSize: '17px', fontWeight: '700', marginBottom: '6px' }}>Here's what we calculated</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>
-              Your calorie target is a smart starting estimate — it gets more accurate the more you use the app.
-            </p>
+            {(() => {
+              const isLoseWeight = selectedGoals.includes('lose_weight')
+              const isBuildMuscle = selectedGoals.includes('build_muscle') && !isLoseWeight
+              const deficit = isLoseWeight ? -500 : isBuildMuscle ? 200 : 0
+              const eatingTarget = tdee ? tdee + deficit : null
+              const projectionLabel = isLoseWeight
+                ? '~1 lb / week fat loss'
+                : isBuildMuscle
+                ? '~0.5 lb / week lean gain'
+                : 'Weight maintenance'
+              const projectionColor = isLoseWeight ? 'var(--success)' : isBuildMuscle ? 'var(--accent-blue)' : 'var(--text-secondary)'
+              const deficitLabel = isLoseWeight ? '500 cal daily deficit' : isBuildMuscle ? '200 cal daily surplus' : null
 
-            {tdee ? (
-              <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--accent-purple)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
-                  <span style={{ color: 'var(--accent-purple)', fontSize: '36px', fontWeight: '800' }}>{tdee.toLocaleString()}</span>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>calories / day (estimated TDEE)</span>
-                </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '16px' }}>Total Daily Energy Expenditure — what your body burns on an average day.</p>
+              return (
+                <>
+                  <h2 style={{ color: 'var(--text-primary)', fontSize: '17px', fontWeight: '700', marginBottom: '6px' }}>Here's your plan</h2>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>
+                    Two numbers matter: what your body <em>burns</em> (TDEE) and what you should <em>eat</em> to hit your goal.
+                  </p>
+
+                  {eatingTarget && (
+                    <div style={{ backgroundColor: 'var(--surface)', border: `2px solid ${projectionColor}`, borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: projectionColor, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
+                        🎯 Your Eating Target
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
+                        <span style={{ color: projectionColor, fontSize: '40px', fontWeight: '800' }}>{eatingTarget.toLocaleString()}</span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>calories / day</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                        <span style={{ backgroundColor: `${projectionColor}18`, border: `1px solid ${projectionColor}55`, borderRadius: '6px', padding: '3px 10px', fontSize: '12px', fontWeight: '700', color: projectionColor }}>
+                          {projectionLabel}
+                        </span>
+                        {deficitLabel && (
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>({deficitLabel})</span>
+                        )}
+                      </div>
+                      {deficit !== 0 && (
+                        <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>TDEE</span>
+                            <span style={{ color: 'var(--text-primary)', fontWeight: '700' }}>{tdee?.toLocaleString()}</span>
+                            <span style={{ color: 'var(--text-secondary)' }}>{deficit < 0 ? '−' : '+'}</span>
+                            <span style={{ color: projectionColor, fontWeight: '700' }}>{Math.abs(deficit).toLocaleString()} cal {deficit < 0 ? 'deficit' : 'surplus'}</span>
+                            <span style={{ color: 'var(--text-secondary)' }}>=</span>
+                            <span style={{ color: projectionColor, fontWeight: '700' }}>{eatingTarget.toLocaleString()} cal eating target</span>
+                          </div>
+                          <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '6px', lineHeight: '1.5', margin: '6px 0 0' }}>
+                            {isLoseWeight
+                              ? 'A 500-calorie daily deficit creates a 3,500 cal/week shortfall — roughly 1 lb of fat. This is the standard sustainable pace. Going lower is not better; it increases muscle loss and makes adherence much harder.'
+                              : 'A 200-calorie daily surplus gives your muscles the raw material to grow without excessive fat gain. Bigger surpluses mostly add fat, not muscle.'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {tdee ? (
+                    <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', flexWrap: 'wrap', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '22px', fontWeight: '700' }}>{tdee.toLocaleString()}</span>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>calories / day (TDEE)</span>
+                        </div>
+                        <span style={{ backgroundColor: 'rgba(136,136,136,0.12)', border: '1px solid var(--border)', borderRadius: '6px', padding: '2px 8px', fontSize: '11px', color: 'var(--text-secondary)' }}>maintenance</span>
+                      </div>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '16px' }}>Total Daily Energy Expenditure — what your body burns on an average day at current activity levels.</p>
 
                 {breakdown && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -753,41 +808,44 @@ export default function GoalsSetupPage() {
                   </div>
                 )}
               </div>
-            ) : (
-              <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px', textAlign: 'center' }}>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Add your weight and activity details to see your estimated calorie target.</p>
-              </div>
-            )}
+                  ) : (
+                    <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px', textAlign: 'center' }}>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Add your weight and activity details to see your estimated calorie target.</p>
+                    </div>
+                  )}
 
-            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-              <h3 style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: '700', marginBottom: '4px' }}>📈 This number gets smarter over time</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6', marginBottom: '16px' }}>
-                Right now this is a formula-based estimate. It's a solid starting point — but <strong style={{ color: 'var(--text-primary)' }}>your real number comes from your data.</strong> After 2 weeks of consistent logging, the app can calculate what you're actually burning based on real weight changes and food intake.
-              </p>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6', marginBottom: '16px' }}>
-                <strong style={{ color: 'var(--text-primary)' }}>Nothing changes without you approving it.</strong> When there's enough data for a calibrated estimate, you'll see a review card — you decide whether to update your target.
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {[
-                  { icon: '⚖️', text: 'Weigh yourself once a week, same conditions', key: 'weight' },
-                  { icon: '🍽️', text: 'Log your food — even rough estimates count', key: 'food' },
-                  { icon: '💪', text: 'Log your workouts when you complete them', key: 'workouts' },
-                  { icon: '📊', text: 'Check in daily — energy + mood takes 5 seconds', key: 'checkin' },
-                ].map(item => (
-                  <div key={item.key} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '16px', flexShrink: 0 }}>{item.icon}</span>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5' }}>{item.text}</span>
+                  <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+                    <h3 style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: '700', marginBottom: '4px' }}>📈 These numbers get smarter over time</h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6', marginBottom: '16px' }}>
+                      Right now this is a formula-based estimate. It's a solid starting point — but <strong style={{ color: 'var(--text-primary)' }}>your real number comes from your data.</strong> After 2 weeks of consistent logging, the app can calculate what you're actually burning based on real weight changes and food intake.
+                    </p>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6', marginBottom: '16px' }}>
+                      <strong style={{ color: 'var(--text-primary)' }}>Nothing changes without you approving it.</strong> When there's enough data for a calibrated estimate, you'll see a review card — you decide whether to update your target.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {[
+                        { icon: '⚖️', text: 'Weigh yourself once a week, same conditions', key: 'weight' },
+                        { icon: '🍽️', text: 'Log your food — even rough estimates count', key: 'food' },
+                        { icon: '💪', text: 'Log your workouts when you complete them', key: 'workouts' },
+                        { icon: '📊', text: 'Check in daily — energy + mood takes 5 seconds', key: 'checkin' },
+                      ].map(item => (
+                        <div key={item.key} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '16px', flexShrink: 0 }}>{item.icon}</span>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5' }}>{item.text}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            <div style={{ backgroundColor: 'rgba(123,47,190,0.08)', border: '1px solid rgba(123,47,190,0.25)', borderRadius: '10px', padding: '16px', marginBottom: '4px' }}>
-              <p style={{ color: 'var(--accent-purple)', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>The more consistent you are, the more accurate it gets.</p>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.5' }}>
-                Most calorie apps give you a number and leave you to figure out if it's right. This one watches your results and tells you. Treat the first 2 weeks as an experiment.
-              </p>
-            </div>
+                  <div style={{ backgroundColor: 'rgba(123,47,190,0.08)', border: '1px solid rgba(123,47,190,0.25)', borderRadius: '10px', padding: '16px', marginBottom: '4px' }}>
+                    <p style={{ color: 'var(--accent-purple)', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>The more consistent you are, the more accurate it gets.</p>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.5' }}>
+                      Most calorie apps give you a number and leave you to figure out if it's right. This one watches your results and tells you. Treat the first 2 weeks as an experiment.
+                    </p>
+                  </div>
+                </>
+              )
+            })()}
           </div>
         )}
 
