@@ -5,6 +5,8 @@ export default function BarcodeScannerModal({ onResult, onClose }) {
   const videoRef = useRef(null)
   const [status, setStatus] = useState('starting')
   const [errorMsg, setErrorMsg] = useState(null)
+  const onResultRef = useRef(onResult)
+  useEffect(() => { onResultRef.current = onResult })
 
   useEffect(() => {
     let active = true
@@ -46,7 +48,7 @@ export default function BarcodeScannerModal({ onResult, onClose }) {
               if (seenCount >= 3) {
                 active = false
                 stream.getTracks().forEach(t => t.stop())
-                onResult(val)
+                onResultRef.current(val)
                 return
               }
             } else {
@@ -73,7 +75,7 @@ export default function BarcodeScannerModal({ onResult, onClose }) {
       if (raf) cancelAnimationFrame(raf)
       if (stream) stream.getTracks().forEach(t => t.stop())
     }
-  }, [onResult])
+  }, [])
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 900, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
