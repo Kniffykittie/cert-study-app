@@ -267,6 +267,12 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Monthly Wrap + Daily Brief — Watch Data + Educational AI — Complete
+- Monthly Wrap: 3 new queries added (health_heart_rate_daily, health_sleep_sessions, workout_logs hr_zones); computes avg resting HR + trend direction, avg HRV, avg sleep hours, aggregated workout HR zone minutes across all sessions
+- Monthly Wrap AI prompt updated: Claude now explains what each biometric means (resting HR drop = heart efficiency, HRV = nervous system recovery, HR zones = training adaptation) — never just states a number
+- Daily Brief: resting HR and HRV for yesterday added to Claude context; system prompt instructs Claude to explain elevated/low values in plain language
+- All health data additions are gated: only included in Claude's context when the data actually exists — watch-less users see no difference
+
 ### Daily Brief — Graceful Watch-less Handling — Complete
 - Sleep line silently omitted from Claude's context when no data (was passing "Google Health not connected" string — could appear in the brief as a nag)
 - Steps line already omitted when no data — consistent pattern now across both

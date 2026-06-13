@@ -70,6 +70,9 @@ export async function POST(req) {
     { data: goals },
     { data: waterLogs },
     { data: foodLogs },
+    { data: hrDaily },
+    { data: sleepSessions },
+    { data: workoutHrLogs },
   ] = await Promise.all([
     supabase.from('daily_checkins').select('date, energy_level, mood_level').eq('user_id', user.id).gte('date', start).lte('date', end),
     supabase.from('workout_logs').select('created_at, duration_seconds, day_label').eq('user_id', user.id).gte('created_at', start).lte('created_at', end + 'T23:59:59Z'),
@@ -77,6 +80,24 @@ export async function POST(req) {
     supabase.from('goals_profiles').select('goals, weight_lbs, target_weight_lbs').eq('user_id', user.id).single(),
     supabase.from('water_logs').select('amount_oz, date').eq('user_id', user.id).gte('date', start).lte('date', end),
     supabase.from('food_log_entries').select('calories, protein_g, date, meal_slot, caffeine_mg, water_g').eq('user_id', user.id).gte('date', start).lte('date', end),
+    supabase.from('health_heart_rate_daily')
+      .select('date, resting_bpm, hrv_rmssd, avg_bpm')
+      .eq('user_id', user.id)
+      .gte('date', start)
+      .lte('date', end)
+      .not('resting_bpm', 'is', null),
+    supabase.from('health_sleep_sessions')
+      .select('date, sleep_minutes')
+      .eq('user_id', user.id)
+      .gte('date', start)
+      .lte('date', end)
+      .eq('is_nap', false),
+    supabase.from('workout_logs')
+      .select('hr_zones')
+      .eq('user_id', user.id)
+      .gte('created_at', start)
+      .lte('created_at', end + 'T23:59:59Z')
+      .not('hr_zones', 'is', null),
   ])
 
   const avgEnergy = checkins?.length ? (checkins.reduce((s, c) => s + c.energy_level, 0) / checkins.length).toFixed(1) : null
@@ -113,6 +134,32 @@ export async function POST(req) {
   const foodDates = Object.keys(foodByDate)
   const avgCalories = foodDates.length ? Math.round(foodDates.reduce((s, d) => s + foodByDate[d], 0) / foodDates.length) : null
 
+  // HR stats (watch only — gracefully null when not connected)
+  const restingHrValues = (hrDaily || []).map(r => r.resting_bpm).filter(Boolean)
+  const avgRestingHr = restingHrValues.length ? Math.round(restingHrValues.reduce((s, v) => s + v, 0) / restingHrValues.length) : null
+  const firstRestingHr = restingHrValues.length >= 7 ? Math.round(restingHrValues.slice(0, Math.ceil(restingHrValues.length / 2)).reduce((s,v)=>s+v,0) / Math.ceil(restingHrValues.length/2)) : null
+  const lastRestingHr = restingHrValues.length >= 7 ? Math.round(restingHrValues.slice(Math.floor(restingHrValues.length/2)).reduce((s,v)=>s+v,0) / Math.floor(restingHrValues.length/2)) : null
+  const restingHrTrend = firstRestingHr && lastRestingHr ? lastRestingHr - firstRestingHr : null
+
+  const hrvValues = (hrDaily || []).map(r => r.hrv_rmssd).filter(v => v != null && v > 0)
+  const avgHrv = hrvValues.length ? Math.round(hrvValues.reduce((s,v)=>s+v,0) / hrvValues.length) : null
+
+  // Sleep stats
+  const sleepMinValues = (sleepSessions || []).map(s => s.sleep_minutes).filter(Boolean)
+  const avgSleepHours = sleepMinValues.length ? Math.round((sleepMinValues.reduce((s,v)=>s+v,0) / sleepMinValues.length) / 60 * 10) / 10 : null
+
+  // Workout HR zones aggregate
+  const zoneAgg = { fat_burn_min: 0, cardio_min: 0, hard_min: 0, peak_min: 0, sessions: 0 }
+  for (const w of workoutHrLogs || []) {
+    if (!w.hr_zones) continue
+    zoneAgg.fat_burn_min += w.hr_zones.fat_burn_min || 0
+    zoneAgg.cardio_min += w.hr_zones.cardio_min || 0
+    zoneAgg.hard_min += w.hr_zones.hard_min || 0
+    zoneAgg.peak_min += w.hr_zones.peak_min || 0
+    zoneAgg.sessions++
+  }
+  const hasWorkoutHrData = zoneAgg.sessions > 0
+
   const daysInMonth = new Date(y, m, 0).getDate()
 
   const reportData = {
@@ -132,6 +179,14 @@ export async function POST(req) {
     days_in_month: daysInMonth,
     goals: goals?.goals || [],
     target_weight: goals?.target_weight_lbs || null,
+    avg_resting_hr: avgRestingHr,
+    resting_hr_trend: restingHrTrend,
+    first_resting_hr: firstRestingHr,
+    last_resting_hr: lastRestingHr,
+    avg_hrv: avgHrv,
+    avg_sleep_hours: avgSleepHours,
+    sleep_days_tracked: sleepMinValues.length,
+    workout_hr_zones: hasWorkoutHrData ? zoneAgg : null,
   }
 
   const dataText = `Month: ${month} (${daysInMonth} days)
@@ -142,13 +197,24 @@ Avg daily hydration: ${avgWater ? avgWater + ' oz (water + beverages)' : 'not tr
 Avg daily calories: ${avgCalories ? avgCalories + ' cal' : 'not tracked'} (logged ${foodDates.length}/${daysInMonth} days)
 Goals: ${(goals?.goals || []).join(', ') || 'not set'}`
 
+  const healthLines = [
+    avgRestingHr ? `Avg resting HR: ${avgRestingHr} bpm${restingHrTrend !== null ? ` (${restingHrTrend > 0 ? '+' : ''}${restingHrTrend} bpm trend across month — ${restingHrTrend < -2 ? 'improving cardiovascular fitness' : restingHrTrend > 2 ? 'slight elevation — check recovery habits' : 'stable'})` : ''}` : '',
+    avgHrv ? `Avg HRV (RMSSD): ${avgHrv}ms` : '',
+    avgSleepHours ? `Avg sleep: ${avgSleepHours} hours/night (${sleepMinValues.length} nights tracked)` : '',
+    hasWorkoutHrData ? `Workout HR zones (${zoneAgg.sessions} sessions with HR data): Fat Burn ${zoneAgg.fat_burn_min}min | Cardio ${zoneAgg.cardio_min}min | Hard ${zoneAgg.hard_min}min | Peak ${zoneAgg.peak_min}min` : '',
+  ].filter(Boolean)
+
+  const fullDataText = dataText + (healthLines.length ? '\nHEALTH METRICS (from smartwatch):\n' + healthLines.map(l => '  ' + l).join('\n') : '')
+
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 400,
-    system: `You are writing a one-paragraph monthly wrap-up for someone's personal health app. Be specific using the numbers provided. Acknowledge real wins, name actual gaps honestly (e.g. "only logged food 8 of 30 days"). Be encouraging but not sycophantic. Sound like a coach reviewing film — direct, warm, constructive. 3-5 sentences max.`,
+    system: `You are writing a one-paragraph monthly wrap-up for someone's personal health app. Be specific using the numbers provided. Acknowledge real wins, name actual gaps honestly (e.g. "only logged food 8 of 30 days"). Be encouraging but not sycophantic. Sound like a coach reviewing film — direct, warm, constructive. 3-5 sentences max.
+
+When including biometric data (resting HR, HRV, sleep, workout HR zones): always explain briefly what the number means and why it matters — don't just state it. For example, instead of "your resting HR dropped 4 bpm", say "your resting HR dropped from 68 to 64 bpm — your heart is becoming more efficient, needing fewer beats to do the same work, which is one of the clearest signs of improving cardiovascular fitness." Same principle for HRV (higher = nervous system recovering better), sleep (context on why it matters), and HR zones (fat burn vs cardio vs hard zones reflect different training adaptations). Only include biometric data if it was provided — never invent or estimate it.`,
     messages: [{
       role: 'user',
-      content: `Write a monthly wrap-up paragraph for this data:\n<user_input>${dataText}</user_input>`,
+      content: `Write a monthly wrap-up paragraph for this data:\n<user_input>${fullDataText}</user_input>`,
     }],
   })
 

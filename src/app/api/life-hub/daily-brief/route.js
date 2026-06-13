@@ -52,6 +52,7 @@ export async function POST(req) {
     { data: sleepRows },
     { data: stepsRows },
     { data: drinkEntries },
+    { data: hrYesterday },
   ] = await Promise.all([
     supabase.from('goals_profiles').select('*').eq('user_id', user.id).single(),
     supabase.from('body_measurements').select('date, weight_lbs').eq('user_id', user.id).order('date', { ascending: false }).limit(5),
@@ -64,6 +65,11 @@ export async function POST(req) {
     supabase.from('food_log_entries').select('caffeine_mg, water_g').eq('user_id', user.id).eq('date', yesterday).eq('meal_slot', 'drink'),
     supabase.from('health_sleep_sessions').select('sleep_minutes, date, stages').eq('user_id', user.id).gte('date', yesterday).order('date', { ascending: false }).limit(1),
     supabase.from('health_steps_hourly').select('steps').eq('user_id', user.id).eq('date', yesterday),
+    supabase.from('health_heart_rate_daily')
+      .select('resting_bpm, hrv_rmssd, avg_bpm')
+      .eq('user_id', user.id)
+      .eq('date', yesterday)
+      .maybeSingle(),
   ])
 
   // No goals → generic nudge
@@ -131,6 +137,8 @@ export async function POST(req) {
   const googleSleepHours = sleepRow?.sleep_minutes ? Math.round((sleepRow.sleep_minutes / 60) * 10) / 10 : null
   const manualSleepHours = (() => { const v = parseFloat((checkins || []).find(c => c.date === yesterday)?.sleep_hours); return !isNaN(v) && v > 0 ? v : null })()
   const sleepHours = googleSleepHours ?? manualSleepHours
+  const restingHr = hrYesterday?.resting_bpm ?? null
+  const hrv = hrYesterday?.hrv_rmssd ?? null
   const deepSleepMin = sleepRow?.stages?.deep ?? null
   const remSleepMin = sleepRow?.stages?.rem ?? null
   const stepsYesterday = (stepsRows || []).reduce((s, r) => s + (r.steps || 0), 0) || null
@@ -197,6 +205,8 @@ export async function POST(req) {
     lowEnergyStreak >= 3 ? `  ⚠ ${lowEnergyStreak} consecutive low-energy days` : '',
     sleepHours ? `  Sleep last night: ${sleepHours} hours${deepSleepMin != null ? ` (${deepSleepMin}min deep, ${remSleepMin ?? '?'}min REM)` : ''}` : '',
     stepsYesterday ? `  Steps yesterday: ${stepsYesterday.toLocaleString()}` : '',
+    restingHr ? `  Resting HR yesterday: ${restingHr} bpm` : '',
+    hrv ? `  HRV (RMSSD) yesterday: ${Math.round(hrv)}ms` : '',
     waterYestOz > 0 ? `  Hydration yesterday: ${waterYestOz} oz total${drinkWaterOz > 0 ? ` (${waterLogOz} oz water + ${drinkWaterOz} oz from beverages)` : ''}` : '  Hydration yesterday: not logged',
     totalCaffeineYest > 0 ? `  Caffeine yesterday: ${totalCaffeineYest}mg${totalCaffeineYest >= 400 ? ' — HIGH' : ''}` : '',
     (supplements || []).length ? `  Supplements: ${supplements.map(s => s.name).join(', ')}` : '',
@@ -217,7 +227,8 @@ export async function POST(req) {
 - Reference what actually happened recently — food, workouts, weight, sleep, energy.
 - End with exactly one specific, actionable thing for today.
 - If data is sparse, note what tracking would unlock (make it feel like opportunity, not a scolding).
-- If they're on a streak or doing something well, say so — but be specific about what.`,
+- If they're on a streak or doing something well, say so — but be specific about what.
+- When citing resting HR or HRV: briefly explain what the number signals (e.g. elevated resting HR can mean incomplete recovery or stress; low HRV means the nervous system is still taxed; high HRV means you're well-recovered). Only reference these if the data was provided.`,
     messages: [{ role: 'user', content: `Write my daily brief. Today is ${today}.\n\n${dataSummary}` }],
   })
 
