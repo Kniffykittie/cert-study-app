@@ -641,6 +641,12 @@ A complete system parallel to Workouts but lighter in logging. No timer, no HR t
 - **Same-day completion gate** — "✓ Done Today" on plan card
 - **Stale pause cleanup** — auto-cleared if paused workout is from previous day
 
+### Fix: Colorful bars in Nutrient Encyclopedia dashboard view
+- Added `NUTRIENT_COLORS` map — each of the 16 nutrients gets a distinct vivid hue (red/blue/purple/orange/emerald/amber/cyan/pink etc.)
+- Dashboard bars now use a per-nutrient gradient fill (`linear-gradient` from 80% to 100% opacity of the nutrient color) instead of a flat status color; bars are 1px taller (8px)
+- Status color still appears on the text label (green/yellow/red) so deficiency info is clear
+- Legend updated to dots instead of rectangles, clarified as "Status labels"
+
 ### Ingredients vs Snacks vs Foods distinction + Meal Builder integration
 - Added `is_ingredient BOOLEAN DEFAULT false` and `is_snack BOOLEAN DEFAULT false` columns to `my_foods` table
 - **My Favorites tab** in AddFoodModal now shows three sections: "🥚 Ingredients", "🍿 Snacks", "🍽️ Foods & Meals"; sections only appear when they have items; ingredient and snack are mutually exclusive

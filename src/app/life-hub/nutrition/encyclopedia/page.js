@@ -3,6 +3,25 @@ import { useState, useEffect } from 'react'
 import { NUTRIENTS, NUTRIENT_BY_SLUG, NUTRIENT_CATEGORIES } from '@/data/nutrients'
 import { calcMicroTargets } from '@/lib/tdee'
 
+const NUTRIENT_COLORS = {
+  'iron':       '#f87171', // red
+  'calcium':    '#60a5fa', // blue
+  'magnesium':  '#a78bfa', // purple
+  'potassium':  '#fb923c', // orange
+  'zinc':       '#34d399', // emerald
+  'sodium':     '#94a3b8', // slate
+  'vitamin-d':  '#fbbf24', // amber
+  'vitamin-c':  '#f97316', // orange-red
+  'vitamin-a':  '#facc15', // yellow
+  'vitamin-b12':'#c084fc', // violet
+  'vitamin-b6': '#38bdf8', // sky
+  'folate':     '#4ade80', // green
+  'fiber':      '#a3e635', // lime
+  'omega-3':    '#22d3ee', // cyan
+  'vitamin-k':  '#86efac', // light green
+  'choline':    '#f472b6', // pink
+}
+
 const STATUS_COLORS = {
   low: 'var(--error)',
   moderate: 'var(--warning)',
@@ -872,21 +891,22 @@ export default function EncyclopediaPage() {
                       const rdv = s.rdv
                       const foodPct = Math.min(100, Math.round((s.foodAvg / rdv) * 100))
                       const suppPct = s.suppAmt > 0 ? Math.min(100 - foodPct, Math.round((s.suppAmt / rdv) * 100)) : 0
-                      const color = STATUS_COLORS[s.status]
+                      const statusColor = STATUS_COLORS[s.status]
+                      const barColor = NUTRIENT_COLORS[n.slug] || statusColor
                       return (
                         <div key={n.slug} onClick={() => { setSelected(n.slug); setView('grid') }} style={{ cursor: 'pointer' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px' }}>
                             <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500' }}>{n.name}</span>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                               {s.suppAmt > 0 && <span style={{ fontSize: '10px', color: 'var(--accent-purple)' }}>+{Math.round(s.suppAmt)}{n.unit} supp</span>}
-                              <span style={{ fontSize: '11px', color, fontWeight: '600' }}>
+                              <span style={{ fontSize: '11px', color: statusColor, fontWeight: '600' }}>
                                 {Math.round(s.foodAvg * 10) / 10} / {rdv}{n.unit}
                               </span>
                               <span style={{ fontSize: '10px', color: 'var(--text-secondary)', minWidth: '34px', textAlign: 'right' }}>{Math.min(s.pct, 999)}%</span>
                             </div>
                           </div>
-                          <div style={{ height: '7px', backgroundColor: 'var(--background)', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
-                            <div style={{ height: '100%', width: `${foodPct}%`, backgroundColor: color, borderRadius: '4px', transition: 'width 0.4s' }} />
+                          <div style={{ height: '8px', backgroundColor: 'var(--background)', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
+                            <div style={{ height: '100%', width: `${foodPct}%`, background: `linear-gradient(90deg, ${barColor}cc, ${barColor})`, borderRadius: '4px', transition: 'width 0.4s' }} />
                             {suppPct > 0 && <div style={{ height: '100%', width: `${suppPct}%`, backgroundColor: 'var(--accent-purple)', opacity: 0.75 }} />}
                           </div>
                         </div>
@@ -898,9 +918,10 @@ export default function EncyclopediaPage() {
             })}
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', paddingTop: '16px', marginTop: '4px', borderTop: '1px solid var(--border)' }}>
-            {[['var(--success)','≥80% from food'],['var(--warning)','40–79%'],['var(--error)','<40% or over limit'],['var(--accent-purple)','supplements']].map(([c,l]) => (
-              <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <div style={{ width: '10px', height: '6px', borderRadius: '2px', backgroundColor: c, opacity: c.includes('purple') ? 0.75 : 1 }} />
+            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: '600' }}>Status labels:</span>
+            {[['var(--success)','≥80%'],['var(--warning)','40–79%'],['var(--error)','<40%'],['var(--accent-purple)','+ supp']].map(([c,l]) => (
+              <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: c, opacity: c.includes('purple') ? 0.85 : 1 }} />
                 <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{l}</span>
               </div>
             ))}
