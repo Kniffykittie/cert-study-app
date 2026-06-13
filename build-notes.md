@@ -585,6 +585,9 @@ A complete system parallel to Workouts but lighter in logging. No timer, no HR t
 ### Phase 43b - Complete
 - **Monthly Wrap notification popup** — bottom-right toast; "Take me there →" navigates; dismissal in localStorage
 
+### Fix: measurements page handlePhotoUpload - Complete
+- `handlePhotoUpload` function was missing from measurements/page.js despite being referenced — added function that POSTs FormData to `/api/goals/progress-photos`, updates photo list, shows success/error in `photoMsg`
+
 ### Phase A - Complete
 - **"What Happens Now" Full Expansion** — Goals Setup step 5 expanded with: timeline math card (lbs over weeks = lbs/week pace; recomp honest framing); macro targets grid (protein/carbs/fat in grams with per-macro plain-language why); age-specific callout (5 brackets: teen/young_adult/adult/midlife/older_adult); dietary pref callouts (vegan B12/iron/zinc, vegetarian iron note, picky eater framing); scale expectations card (Week 1–2 water weight/Week 3–6 fat loss/Plateaus); `calcMacros` added to import from `@/lib/tdee`
 

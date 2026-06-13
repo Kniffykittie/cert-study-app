@@ -216,6 +216,26 @@ export default function MeasurementsPage() {
     setPhotos(data.photos || [])
   }
 
+  async function handlePhotoUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoUploading(true)
+    setPhotoMsg('')
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('taken_date', new Date().toISOString().slice(0, 10))
+    const res = await fetch('/api/goals/progress-photos', { method: 'POST', body: formData })
+    const data = await res.json()
+    if (res.ok) {
+      setPhotos(prev => [data.photo, ...prev])
+      setPhotoMsg('Photo uploaded!')
+    } else {
+      setPhotoMsg(data.error || 'Upload failed')
+    }
+    setPhotoUploading(false)
+    e.target.value = ''
+  }
+
   function getGoalCompletion(hist, gp) {
     if (!gp?.target_weight_lbs || !gp?.goals?.includes('lose_weight') || !hist.length) return null
     const latest = hist[0]?.weight_lbs
