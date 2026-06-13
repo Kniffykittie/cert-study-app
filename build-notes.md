@@ -301,7 +301,7 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 ## Phase Log
 
 ### Barcode Scanner — Food Log + Drink Log — Complete
-- `BarcodeScannerModal` component (`src/components/BarcodeScannerModal.js`) — camera modal using native BarcodeDetector API; falls back to `barcode-detector/pure` (ZXing WASM) on iOS Safari; supports EAN-13/8, UPC-A/E, Code-128/39
+- `BarcodeScannerModal` component (`src/components/BarcodeScannerModal.js`) — camera modal using native BarcodeDetector API; falls back to `barcode-detector/pure` (ZXing WASM) on iOS Safari; supports EAN-13/8, UPC-A/E, Code-128/39; `barcode-detector` npm package added to package.json
 - 📷 button added next to search input in AddFoodModal "Search Database" tab (`nutrition/page.js`) — scans barcode and fires `/api/nutrition/search?barcode=` directly
 - 📷 button added next to drink search in Drinks & Hydration page (`health/water/page.js`) — same barcode → search flow
 - Supplements page skipped (supplements don't have barcodes)
