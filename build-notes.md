@@ -326,6 +326,14 @@ Everything below was built but not yet tested by the user. Go through this list 
 - Footer text dynamically reflects whether HRV is contributing ("100 pts with smartwatch data" vs "90 pts without smartwatch · score normalized to 100")
 - Energy pts recalculated: 1–5 rating × 3 (was ×4); Workout Load max 10 (was 15); rest day = 10 pts, <45min = 8, 45–75min = 5, 75+ = 3
 
+### Goals Setup + Nutrition — Timeline-Aware Calorie Target + Body Recomp — Complete
+- Added `calcGoalAdjustment(goals, weightLbs, targetWeightLbs, timeline)` to `src/lib/tdee.js` — now exported and shared
+- When target_weight_lbs + timeline both provided for lose_weight: calculates exact daily deficit from (lbs to lose × 3500) ÷ timeline days; capped 150–1,000 cal/day with explanation when adjusted
+- Body recomposition mode: lose_weight + build_muscle selected simultaneously → 250 cal/day deficit with high-protein framing (not 500 cal pure cut)
+- "No target weight" fallback: still defaults to 500 cal/day deficit with a note explaining how to get a personalized number
+- Step 4 now shows: personalized eating target with math breakdown (TDEE ± X = target); projection badge (e.g. "Lose 6 lbs in 6 months"); ⚠ safety cap badge when timeline was too aggressive; explanation card per mode
+- Nutrition page: now imports `calcGoalAdjustment` from shared lib; uses goals.weight_lbs + goals.target_weight_lbs + goals.timeline to compute the same adjustment; label shows ⚡ for recomp, 🔥 for deficit, 💪 for surplus
+
 ### Goals Setup + Nutrition — Eating Target vs Maintenance Clarification — Complete
 - Goals setup Step 4 now shows two distinct numbers: "Eating Target" (goal-adjusted) as the primary large number with goal-colored border, and TDEE (maintenance) as a smaller secondary figure labeled "maintenance"
 - Eating target formula: lose_weight = TDEE − 500, build_muscle = TDEE + 200, maintain/other = TDEE

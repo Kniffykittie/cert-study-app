@@ -1,5 +1,79 @@
 // Shared TDEE calculation — imported by setup page and nutrition page
 
+const TIMELINE_DAYS = { '1_month': 30, '3_months': 90, '6_months': 180, '1_year': 365 }
+
+// Returns { adjustment, mode, projectionLabel, projectionDetail, weeklyRate, capped, cappedReason }
+export function calcGoalAdjustment(goals = [], weightLbs, targetWeightLbs, timeline) {
+  const wantsLose = goals.includes('lose_weight')
+  const wantsMuscle = goals.includes('build_muscle')
+
+  if (wantsLose && wantsMuscle) {
+    return {
+      adjustment: -250,
+      mode: 'recomp',
+      projectionLabel: 'Body Recomposition',
+      projectionDetail: 'Lose fat and build muscle at the same time — works best for beginners and those returning after a break.',
+      weeklyRate: null,
+      capped: false,
+    }
+  }
+
+  if (wantsLose) {
+    const lbsToLose = (weightLbs && targetWeightLbs) ? weightLbs - targetWeightLbs : null
+    const timelineDays = timeline ? TIMELINE_DAYS[timeline] : null
+
+    if (lbsToLose != null && lbsToLose > 0 && timelineDays) {
+      const rawDeficit = Math.round((lbsToLose * 3500) / timelineDays)
+      const capped = rawDeficit > 1000
+      const tooSlow = rawDeficit < 150
+      const deficit = capped ? 1000 : tooSlow ? 150 : rawDeficit
+      const weeksNeeded = capped ? Math.round((lbsToLose * 3500) / (deficit * 7)) / 7 : null
+      const weeklyLbs = Math.round((deficit * 7 / 3500) * 10) / 10
+      return {
+        adjustment: -deficit,
+        mode: 'lose_timeline',
+        projectionLabel: `Lose ${lbsToLose} lbs${timeline && timeline !== 'no_rush' ? ` in ${TIMELINE_DAYS[timeline] / 30} month${TIMELINE_DAYS[timeline] > 30 ? 's' : ''}` : ''}`,
+        projectionDetail: capped
+          ? `Your goal needs a ${rawDeficit} cal/day deficit — that pace risks muscle loss and burnout. Capped at 1,000 cal/day (~2 lbs/week). You'll reach your goal in ~${Math.round((lbsToLose * 3500) / (1000 * 7))} weeks instead.`
+          : tooSlow
+          ? `Your goal is very modest — the math gives only ${rawDeficit} cal/day deficit. Bumped to 150 cal to keep it worthwhile while still matching your relaxed pace.`
+          : null,
+        weeklyRate: weeklyLbs,
+        capped,
+      }
+    }
+
+    return {
+      adjustment: -500,
+      mode: 'lose_standard',
+      projectionLabel: '~1 lb / week fat loss',
+      projectionDetail: null,
+      weeklyRate: 1,
+      capped: false,
+    }
+  }
+
+  if (wantsMuscle) {
+    return {
+      adjustment: 200,
+      mode: 'build',
+      projectionLabel: '~0.5 lb / week lean gain',
+      projectionDetail: null,
+      weeklyRate: 0.5,
+      capped: false,
+    }
+  }
+
+  return {
+    adjustment: 0,
+    mode: 'maintain',
+    projectionLabel: 'Maintain current weight',
+    projectionDetail: null,
+    weeklyRate: null,
+    capped: false,
+  }
+}
+
 const BF_ESTIMATES = {
   Male: { lean_muscular: 0.10, athletic: 0.15, average: 0.22, overweight: 0.30, obese: 0.40 },
   Female: { lean_toned: 0.17, athletic: 0.22, average: 0.28, overweight: 0.36, obese: 0.44 },

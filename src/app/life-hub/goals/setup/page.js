@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { calcTDEE, tdeeBreakdown } from '@/lib/tdee'
+import { calcTDEE, tdeeBreakdown, calcGoalAdjustment } from '@/lib/tdee'
 
 const GOALS = [
   { key: 'lose_weight', label: 'Lose Weight', desc: 'Reduce body fat and reach a healthier weight', icon: '🔥' },
@@ -707,23 +707,34 @@ export default function GoalsSetupPage() {
         {step === 4 && (
           <div>
             {(() => {
-              const isLoseWeight = selectedGoals.includes('lose_weight')
-              const isBuildMuscle = selectedGoals.includes('build_muscle') && !isLoseWeight
-              const deficit = isLoseWeight ? -500 : isBuildMuscle ? 200 : 0
-              const eatingTarget = tdee ? tdee + deficit : null
-              const projectionLabel = isLoseWeight
-                ? '~1 lb / week fat loss'
-                : isBuildMuscle
-                ? '~0.5 lb / week lean gain'
-                : 'Weight maintenance'
-              const projectionColor = isLoseWeight ? 'var(--success)' : isBuildMuscle ? 'var(--accent-blue)' : 'var(--text-secondary)'
-              const deficitLabel = isLoseWeight ? '500 cal daily deficit' : isBuildMuscle ? '200 cal daily surplus' : null
+              const goalAdj = calcGoalAdjustment(
+                selectedGoals,
+                weightLbs ? parseFloat(weightLbs) : null,
+                targetWeight ? parseFloat(targetWeight) : null,
+                timeline,
+              )
+              const { adjustment, mode, projectionLabel, projectionDetail, weeklyRate, capped } = goalAdj
+              const eatingTarget = tdee ? tdee + adjustment : null
+              const isDeficit = adjustment < 0
+              const isSurplus = adjustment > 0
+              const projectionColor = mode === 'recomp' ? 'var(--accent-purple)'
+                : isDeficit ? 'var(--success)'
+                : isSurplus ? 'var(--accent-blue)'
+                : 'var(--text-secondary)'
+
+              const modeExplanation = {
+                lose_standard: 'No target weight entered — using the standard 500 cal/day deficit (~1 lb/week). Add a target weight and timeline on the previous screen to get a personalized calculation.',
+                lose_timeline: weeklyRate ? `${Math.abs(adjustment)} cal/day deficit → ~${weeklyRate} lbs/week → on pace for your goal.` : null,
+                recomp: 'Body recomposition: 250 cal/day deficit + high protein. You lose fat and build muscle simultaneously. This works best for beginners and those returning after time off — the deficit is small to protect muscle while you build.',
+                build: 'A 200 cal/day surplus gives your muscles the fuel to grow without excessive fat gain. Bigger surpluses mostly add fat, not muscle.',
+                maintain: 'Eating at TDEE maintains your current weight.',
+              }[mode]
 
               return (
                 <>
                   <h2 style={{ color: 'var(--text-primary)', fontSize: '17px', fontWeight: '700', marginBottom: '6px' }}>Here's your plan</h2>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>
-                    Two numbers matter: what your body <em>burns</em> (TDEE) and what you should <em>eat</em> to hit your goal.
+                    Two numbers matter: what your body <em>burns</em> (TDEE) and what you should <em>eat</em> to reach your goal.
                   </p>
 
                   {eatingTarget && (
@@ -739,24 +750,32 @@ export default function GoalsSetupPage() {
                         <span style={{ backgroundColor: `${projectionColor}18`, border: `1px solid ${projectionColor}55`, borderRadius: '6px', padding: '3px 10px', fontSize: '12px', fontWeight: '700', color: projectionColor }}>
                           {projectionLabel}
                         </span>
-                        {deficitLabel && (
-                          <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>({deficitLabel})</span>
+                        {capped && (
+                          <span style={{ backgroundColor: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.4)', borderRadius: '6px', padding: '3px 8px', fontSize: '11px', color: 'var(--warning)' }}>
+                            ⚠ pace adjusted for safety
+                          </span>
                         )}
                       </div>
-                      {deficit !== 0 && (
-                        <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px' }}>
+
+                      {/* Math breakdown */}
+                      {adjustment !== 0 && (
+                        <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 14px', marginBottom: projectionDetail || modeExplanation ? '8px' : '0', fontSize: '12px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                             <span style={{ color: 'var(--text-secondary)' }}>TDEE</span>
                             <span style={{ color: 'var(--text-primary)', fontWeight: '700' }}>{tdee?.toLocaleString()}</span>
-                            <span style={{ color: 'var(--text-secondary)' }}>{deficit < 0 ? '−' : '+'}</span>
-                            <span style={{ color: projectionColor, fontWeight: '700' }}>{Math.abs(deficit).toLocaleString()} cal {deficit < 0 ? 'deficit' : 'surplus'}</span>
+                            <span style={{ color: 'var(--text-secondary)' }}>{isDeficit ? '−' : '+'}</span>
+                            <span style={{ color: projectionColor, fontWeight: '700' }}>{Math.abs(adjustment).toLocaleString()} cal {isDeficit ? 'deficit' : 'surplus'}</span>
                             <span style={{ color: 'var(--text-secondary)' }}>=</span>
-                            <span style={{ color: projectionColor, fontWeight: '700' }}>{eatingTarget.toLocaleString()} cal eating target</span>
+                            <span style={{ color: projectionColor, fontWeight: '700' }}>{eatingTarget.toLocaleString()} cal/day</span>
                           </div>
-                          <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '6px', lineHeight: '1.5', margin: '6px 0 0' }}>
-                            {isLoseWeight
-                              ? 'A 500-calorie daily deficit creates a 3,500 cal/week shortfall — roughly 1 lb of fat. This is the standard sustainable pace. Going lower is not better; it increases muscle loss and makes adherence much harder.'
-                              : 'A 200-calorie daily surplus gives your muscles the raw material to grow without excessive fat gain. Bigger surpluses mostly add fat, not muscle.'}
+                        </div>
+                      )}
+
+                      {/* Explanation / cap warning */}
+                      {(projectionDetail || modeExplanation) && (
+                        <div style={{ backgroundColor: capped ? 'rgba(245,158,11,0.06)' : 'var(--background)', border: `1px solid ${capped ? 'rgba(245,158,11,0.25)' : 'var(--border)'}`, borderRadius: '8px', padding: '10px 14px', fontSize: '12px' }}>
+                          <p style={{ color: 'var(--text-secondary)', lineHeight: '1.55', margin: 0 }}>
+                            {projectionDetail || modeExplanation}
                           </p>
                         </div>
                       )}

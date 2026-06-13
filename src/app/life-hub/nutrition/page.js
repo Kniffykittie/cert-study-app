@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { calcTDEE as calcTDEEShared, calcMacros as calcMacrosShared } from '@/lib/tdee'
+import { calcTDEE as calcTDEEShared, calcMacros as calcMacrosShared, calcGoalAdjustment } from '@/lib/tdee'
 
 const TIMING_LABELS = {
   morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening',
@@ -1950,13 +1950,12 @@ export default function NutritionPage() {
   const tdee = calcTDEE(goals)
   const macros = calcMacros(tdee, goals)
   const { bonus: workoutBonus, reason: bonusReason, grossBurn, duration: workoutDuration } = calcWorkoutBonus(todayWorkout, goals)
-  // Apply goal-based adjustment to eating target
-  const goalAdjustment = (() => {
-    const g = goals?.goals ?? []
-    if (g.includes('lose_weight')) return -500
-    if (g.includes('build_muscle') && !g.includes('lose_weight')) return 200
-    return 0
-  })()
+  const { adjustment: goalAdjustment, mode: goalMode } = calcGoalAdjustment(
+    goals?.goals ?? [],
+    goals?.weight_lbs,
+    goals?.target_weight_lbs,
+    goals?.timeline,
+  )
   const effectiveTarget = tdee ? tdee + goalAdjustment + workoutBonus : null
 
   const totals = entries.reduce((acc, e) => {
@@ -2068,7 +2067,7 @@ export default function NutritionPage() {
           <div style={{ flex: 1, minWidth: '200px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
               <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-                {goalAdjustment < 0 ? 'Eating Target 🔥' : goalAdjustment > 0 ? 'Eating Target 💪' : 'Target'}
+                {goalMode === 'recomp' ? 'Eating Target ⚡' : goalAdjustment < 0 ? 'Eating Target 🔥' : goalAdjustment > 0 ? 'Eating Target 💪' : 'Target'}
               </span>
               <span style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>
                 {effectiveTarget ? `${effectiveTarget} kcal` : '—'}

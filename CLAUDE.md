@@ -155,7 +155,7 @@ src/
         page.js                        Goals overview — AI overview panel, active goals chips, body metrics card (BMI + disclaimer + build label), lifestyle card (activity + daily steps + timeline), notes; Edit Goals button
         measurements/page.js           Body Measurements — how-to guide, log form (9 fields: weight/waist/hips/chest/neck/arms/thighs), history table with delta indicators, weight-over-time SVG chart; Progress Photos section (private Supabase Storage, lightbox, delete)
         supplements/page.js            Supplement Stack — add/edit/remove supplements (name, dose, timing, optional nutrient content from label); 🤖 Info button fetches AI-generated card per supplement (cached in supplement_profiles); nutrient chips shown on each card; empty state with explainer; listed under Nutrition in sidebar (not Goals)
-        setup/page.js                  5-step goals onboarding; supports ?redirect= param
+        setup/page.js                  5-step goals onboarding; supports ?redirect= param; Step 5 "What Happens Now" shows personalized eating target using calcGoalAdjustment (timeline + target weight → exact deficit; body recomp mode for lose+build simultaneously; 150–1,000 cal cap)
       workouts/
         page.js                        My Workout Plan — weekly plan cards sorted Mon-Sun, day reassignment, add/remove exercises with AI check-in, add/change cardio on rest days; Start Workout / ▶ Resume Workout / ✓ Done Today button logic per day; Add Exercise modal grouped by muscle group with ? detail popup; gates on goals profile
         setup/page.js                  7-step onboarding: experience, goals (multi-select), days, schedule, fitness check, cardio preferences, equipment; gates on goals profile
