@@ -141,6 +141,7 @@ export default function LifeHubPage() {
         { data: activePlanData },
         { data: yesterdayHrData },
         { data: recentHrData },
+        { data: healthTokenData },
       ] = await Promise.all([
         supabase.from('daily_checkins').select('*').eq('user_id', user.id).gte('date', twentyEightAgo).order('date', { ascending: false }),
         supabase.from('water_logs').select('amount_oz').eq('user_id', user.id).gte('created_at', `${today}T00:00:00`),
@@ -160,6 +161,7 @@ export default function LifeHubPage() {
         supabase.from('workout_plans').select('plan, schedule').eq('user_id', user.id).eq('is_active', true).limit(1),
         supabase.from('health_heart_rate_daily').select('hrv_rmssd, resting_bpm').eq('user_id', user.id).eq('date', yesterday).maybeSingle(),
         supabase.from('health_heart_rate_daily').select('date, resting_bpm').eq('user_id', user.id).gte('date', (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().split('T')[0] })()).order('date'),
+        supabase.from('google_health_tokens').select('id').eq('user_id', user.id).maybeSingle(),
       ])
 
       setCheckins(checkinData ?? [])
@@ -220,6 +222,7 @@ export default function LifeHubPage() {
       // Section card data
       const todayKcal = (todayFoodEntries || []).reduce((s, r) => s + (r.calories || 0), 0)
       const todaySteps = (todayStepsData || []).reduce((s, r) => s + (r.steps || 0), 0)
+      const healthConnected = !!healthTokenData
       const workoutsThisWeek = (workoutData ?? []).length
       const supplementCount = (suppData ?? []).length
 
@@ -252,6 +255,7 @@ export default function LifeHubPage() {
         weightDelta,
         weightDays,
         sleepHours,
+        healthConnected,
       })
 
       setLoaded(true)
@@ -406,7 +410,7 @@ export default function LifeHubPage() {
 
       {/* Zone 1 — Status Bar */}
       {loaded && sd && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${sd.healthConnected ? 4 : 3}, 1fr)`, gap: '10px', marginBottom: '20px' }}>
           <StatusPill
             color={SC.nutrition} icon="🍽️"
             value={sd.todayKcal > 0 ? `${sd.todayKcal.toLocaleString()} kcal` : '— kcal'}
@@ -421,13 +425,15 @@ export default function LifeHubPage() {
             label="today's workout"
             href="/life-hub/workouts"
           />
-          <StatusPill
-            color={SC.health} icon="👟"
-            value={sd.todaySteps > 0 ? sd.todaySteps.toLocaleString() : '— steps'}
-            sub={sd.sleepHours ? `${sd.sleepHours}h sleep last night` : null}
-            label="steps today"
-            href="/life-hub/health/steps"
-          />
+          {sd.healthConnected && (
+            <StatusPill
+              color={SC.health} icon="👟"
+              value={sd.todaySteps > 0 ? sd.todaySteps.toLocaleString() : '— steps'}
+              sub={sd.sleepHours ? `${sd.sleepHours}h sleep last night` : null}
+              label="steps today"
+              href="/life-hub/health/steps"
+            />
+          )}
           <StatusPill
             color={SC.nutrition} icon="💧"
             value={sd.totalWaterOz > 0 ? `${sd.totalWaterOz} oz` : '— oz'}
@@ -654,8 +660,8 @@ export default function LifeHubPage() {
           />
           <SectionCard
             color={SC.health} icon="❤️" sectionLabel="Health"
-            hero={sd.todaySteps > 0 ? `${sd.todaySteps.toLocaleString()} steps` : 'No step data'}
-            heroSub={sd.sleepHours ? `${sd.sleepHours}h sleep last night` : 'Connect Google Health for sleep data'}
+            hero={sd.healthConnected ? (sd.todaySteps > 0 ? `${sd.todaySteps.toLocaleString()} steps` : '— steps today') : (sd.sleepHours ? `${sd.sleepHours}h sleep` : 'Health Tracking')}
+            heroSub={sd.healthConnected ? (sd.sleepHours ? `${sd.sleepHours}h sleep last night` : 'Sleep data syncing...') : 'Connect Google Health to unlock'}
             actionLabel="→ Health Overview"
             actionHref="/life-hub/health"
           />

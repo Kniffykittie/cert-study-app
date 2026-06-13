@@ -280,6 +280,19 @@ Everything below was built but not yet tested by the user. Go through this list 
 - Daily Brief: resting HR and HRV for yesterday added to Claude context; system prompt instructs Claude to explain elevated/low values in plain language
 - All health data additions are gated: only included in Claude's context when the data actually exists — watch-less users see no difference
 
+### Settings — Danger Zone Tab + Gate — Complete
+- Danger Zone moved from Account tab to its own "⚠ Danger Zone" tab
+- Gate page shown first: warning about irreversible actions, "← Take Me Back" and "I understand, continue →" buttons
+- Continuing through gate shows the actual Delete Account section
+- Gate resets whenever user navigates away from the Danger Zone tab — always shows warning on re-entry
+- Delete Account modal unchanged; still requires typing DELETE to confirm
+
+### Life Hub — Steps Pill Hidden Without Watch — Complete
+- Added `google_health_tokens` check to load() Promise.all to detect watch connection
+- Status bar switches between 4-column (watch connected) and 3-column (watch disconnected) grid
+- Steps pill hidden entirely when watch not connected
+- Health section card hero text updates: shows steps + sleep when connected, shows manual sleep or "Connect Google Health" prompt when not
+
 ### Daily Brief — Graceful Watch-less Handling — Complete
 - Sleep line silently omitted from Claude's context when no data (was passing "Google Health not connected" string — could appear in the brief as a nag)
 - Steps line already omitted when no data — consistent pattern now across both

@@ -20,6 +20,7 @@ const TABS = [
   { key: 'study', label: 'Study' },
   { key: 'data', label: 'Data & Reset' },
   { key: 'security', label: 'Security' },
+  { key: 'danger', label: '⚠ Danger Zone' },
 ]
 
 export default function SettingsPage() {
@@ -105,6 +106,7 @@ export default function SettingsPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [dangerGatePassed, setDangerGatePassed] = useState(false)
 
   const searchParams = useSearchParams()
 
@@ -553,7 +555,7 @@ export default function SettingsPage() {
           {TABS.map(tab => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => { setActiveTab(tab.key); if (tab.key !== 'danger') setDangerGatePassed(false) }}
               style={{ flex: 1, padding: '8px 12px', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: activeTab === tab.key ? '600' : '400', cursor: 'pointer', backgroundColor: activeTab === tab.key ? 'var(--accent-blue)' : 'transparent', color: activeTab === tab.key ? '#E8E8E8' : 'var(--text-secondary)', transition: 'all 0.15s' }}
             >
               {tab.label}
@@ -599,17 +601,6 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Danger Zone */}
-            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid rgba(204,0,0,0.3)', borderRadius: '10px', padding: '20px' }}>
-              <h2 style={{ color: 'var(--error)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Danger Zone</h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>Permanently delete your account and all associated data. This cannot be undone.</p>
-              <button
-                onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError('') }}
-                style={{ backgroundColor: 'transparent', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '9px 20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
-              >
-                Delete My Account
-              </button>
-            </div>
           </div>
         )}
 
@@ -1315,6 +1306,51 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Danger Zone tab */}
+      {activeTab === 'danger' && (
+        !dangerGatePassed ? (
+          <div style={{ maxWidth: '480px', margin: '0 auto', paddingTop: '32px', textAlign: 'center' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+            <h2 style={{ color: 'var(--error)', fontSize: '20px', fontWeight: '700', marginBottom: '12px' }}>Danger Zone</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.7', marginBottom: '8px' }}>
+              This section contains <strong style={{ color: 'var(--text-primary)' }}>permanent, irreversible actions</strong> — including the ability to delete your account and all associated data.
+            </p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.7', marginBottom: '28px' }}>
+              There is no undo, no recovery, and no way to restore deleted data. Only continue if you know what you're doing.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button onClick={() => setActiveTab('account')}
+                style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '12px 24px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                ← Take Me Back
+              </button>
+              <button onClick={() => setDangerGatePassed(true)}
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '12px 24px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                I understand, continue →
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ maxWidth: '480px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+              <button onClick={() => setDangerGatePassed(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', padding: 0 }}>← Back</button>
+              <h2 style={{ color: 'var(--error)', fontSize: '16px', fontWeight: '700', margin: 0 }}>Danger Zone</h2>
+            </div>
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid rgba(204,0,0,0.3)', borderRadius: '10px', padding: '20px' }}>
+              <h3 style={{ color: 'var(--error)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Delete Account</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px', lineHeight: '1.6' }}>
+                Permanently deletes your account and <strong style={{ color: 'var(--text-primary)' }}>all associated data</strong> — study history, test scores, health data, workout plans, goals, food logs, and everything else. This cannot be undone.
+              </p>
+              <button
+                onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError('') }}
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--error)', color: 'var(--error)', borderRadius: '8px', padding: '9px 20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                Delete My Account
+              </button>
+            </div>
+          </div>
+        )
       )}
 
       {/* Delete Account modal */}
