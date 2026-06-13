@@ -301,6 +301,11 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ## Phase Log
 
+### Vercel Fix — Google Health OAuth redirect_uri undefined — Complete
+- `NEXT_PUBLIC_SITE_URL` was undefined in server-side API routes on Vercel (env var with `NEXT_PUBLIC_` prefix is only guaranteed in client bundles)
+- Both `connect/route.js` and `callback/route.js` now use a `SITE_URL` constant: `NEXT_PUBLIC_SITE_URL || (VERCEL_URL ? https://VERCEL_URL : localhost:3000)`
+- `VERCEL_URL` is auto-injected by Vercel at build time — no env var needed
+
 ### Vercel Build Fix — useSearchParams Suspense Boundaries — Complete
 - Wrapped `useSearchParams()` in `<Suspense>` on 5 pages that failed production build: `/join`, `/study-hub/test`, `/life-hub/workouts/log`, `/settings`, `/life-hub/goals/setup`
 - Pattern: renamed default export to `XxxInner`, added Suspense wrapper as new default export; added `Suspense` to React import in each file

@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+
 const SCOPES = [
   'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
   'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
@@ -15,7 +17,7 @@ export async function GET() {
   const state = crypto.randomUUID()
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_HEALTH_CLIENT_ID,
-    redirect_uri: `${process.env.NEXT_PUBLIC_SITE_URL}/api/health/callback`,
+    redirect_uri: `${SITE_URL}/api/health/callback`,
     response_type: 'code',
     scope: SCOPES,
     access_type: 'offline',
