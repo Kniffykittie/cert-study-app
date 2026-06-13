@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { calcMicroTargets } from '@/lib/tdee'
+import { matchSuppToNutrient, parseSuppAmount } from '@/data/nutrients'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const DAY_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -13,6 +15,68 @@ const INSIGHT_COLORS = {
   tip: { bg: 'rgba(0,128,255,0.08)', border: 'rgba(0,128,255,0.25)', icon: '💡', label: 'var(--accent-blue)' },
   praise: { bg: 'rgba(46,204,113,0.08)', border: 'rgba(46,204,113,0.25)', icon: '✅', label: 'var(--success)' },
   info: { bg: 'rgba(123,47,190,0.08)', border: 'rgba(123,47,190,0.2)', icon: '📊', label: 'var(--accent-purple)' },
+}
+
+const PLAN_NUTRIENT_KEYS = ['calcium_mg','iron_mg','magnesium_mg','potassium_mg','fiber_g','sodium_mg','vitamin_d_mcg']
+const PLAN_NUTRIENT_META = {
+  calcium_mg: { label: 'Calcium', unit: 'mg' },
+  iron_mg: { label: 'Iron', unit: 'mg' },
+  magnesium_mg: { label: 'Magnesium', unit: 'mg' },
+  potassium_mg: { label: 'Potassium', unit: 'mg' },
+  fiber_g: { label: 'Fiber', unit: 'g' },
+  sodium_mg: { label: 'Sodium', unit: 'mg', warnHigh: true },
+  vitamin_d_mcg: { label: 'Vitamin D', unit: 'mcg' },
+}
+const PLAN_DV = { calcium_mg: 1000, iron_mg: 18, magnesium_mg: 420, potassium_mg: 4700, fiber_g: 28, sodium_mg: 2300, vitamin_d_mcg: 20 }
+
+function PlanNutrientBars({ entries, suppCoverage, microTargets }) {
+  // 7-day averages from plan entries
+  const totals = {}
+  for (const e of entries) {
+    for (const k of PLAN_NUTRIENT_KEYS) totals[k] = (totals[k] || 0) + (e[k] || 0)
+  }
+  const days = 7
+  const avgTotals = {}
+  for (const k of PLAN_NUTRIENT_KEYS) avgTotals[k] = (totals[k] || 0) / days
+
+  const hasData = PLAN_NUTRIENT_KEYS.some(k => avgTotals[k] > 0)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+      {!hasData && <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Add foods to your plan to see nutrient coverage.</p>}
+      {PLAN_NUTRIENT_KEYS.map(key => {
+        const meta = PLAN_NUTRIENT_META[key]
+        const food = avgTotals[key] || 0
+        const supp = suppCoverage?.[key] || 0
+        const target = microTargets?.[key] ?? PLAN_DV[key]
+        const foodPct = Math.min(100, Math.round((food / target) * 100))
+        const suppPct = Math.min(100 - foodPct, Math.round((supp / target) * 100))
+        const total = food + supp
+        const totalPct = Math.min(100, Math.round((total / target) * 100))
+        const over = total > target && meta.warnHigh
+        const status = meta.warnHigh ? (over ? 'high' : 'ok') : totalPct >= 80 ? 'good' : totalPct >= 40 ? 'moderate' : 'low'
+        const barColor = meta.warnHigh ? (over ? 'var(--error)' : 'var(--warning)') : status === 'good' ? 'var(--success)' : status === 'moderate' ? 'var(--warning)' : 'var(--error)'
+        return (
+          <div key={key}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>{meta.label}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {supp > 0 && <span style={{ fontSize: '10px', color: 'var(--accent-purple)' }}>+{Math.round(supp)}{meta.unit} supp</span>}
+                <span style={{ fontSize: '11px', color: status === 'good' ? 'var(--success)' : status === 'low' ? 'var(--error)' : status === 'high' ? 'var(--error)' : 'var(--warning)', fontWeight: '600' }}>
+                  {food < 1 && food > 0 ? food.toFixed(1) : Math.round(food)} / {target}{meta.unit}
+                </span>
+                <span style={{ fontSize: '10px', color: 'var(--text-secondary)', minWidth: '32px', textAlign: 'right' }}>{totalPct}%</span>
+              </div>
+            </div>
+            <div style={{ height: '6px', backgroundColor: 'var(--background)', borderRadius: '3px', overflow: 'hidden', display: 'flex' }}>
+              <div style={{ height: '100%', width: `${foodPct}%`, backgroundColor: barColor, borderRadius: '3px', transition: 'width 0.4s' }} />
+              {suppPct > 0 && <div style={{ height: '100%', width: `${suppPct}%`, backgroundColor: 'var(--accent-purple)', opacity: 0.75 }} />}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 function getMondayOfWeek(offset = 0) {
@@ -39,6 +103,9 @@ export default function MealPlanPage() {
   const [loading, setLoading] = useState(true)
   const [tdee, setTdee] = useState(null)
   const [proteinTarget, setProteinTarget] = useState(null)
+  const [goalsProfile, setGoalsProfile] = useState(null)
+  const [supplements, setSupplements] = useState([])
+  const [microOpen, setMicroOpen] = useState(false)
 
   // Add modal state
   const [addModal, setAddModal] = useState(null) // { day, slot }
@@ -73,15 +140,18 @@ export default function MealPlanPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data: goals } = await supabase.from('goals_profiles').select('weight_lbs, job_activity, exercise_types, exercise_days_per_week, exercise_duration_min, exercise_consistency, body_composition, sex').eq('user_id', user.id).single()
+      const [{ data: goals }, { data: suppData }] = await Promise.all([
+        supabase.from('goals_profiles').select('weight_lbs, job_activity, exercise_types, exercise_days_per_week, exercise_duration_min, exercise_consistency, body_composition, sex, age').eq('user_id', user.id).single(),
+        supabase.from('supplement_stack').select('nutrients').eq('user_id', user.id).eq('is_active', true),
+      ])
       if (goals?.weight_lbs) {
-        // Simple TDEE via goals_profiles — import calcTDEE
         const res = await fetch('/api/life-hub/daily-brief')
         const json = await res.json()
-        // Extract from snapshot if available
         if (json.snapshot?.avgCal) setTdee(json.snapshot.avgCal)
         if (goals.weight_lbs) setProteinTarget(Math.round(goals.weight_lbs * 0.82))
       }
+      setGoalsProfile(goals || null)
+      setSupplements(suppData || [])
     }
     loadGoals()
   }, [])
@@ -233,6 +303,39 @@ export default function MealPlanPage() {
           <button onClick={() => { setWeekOffset(w => w + 1) }}
             style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '8px 12px', fontSize: '14px', cursor: 'pointer' }}>→</button>
         </div>
+      </div>
+
+      {/* Micronutrient Tracker */}
+      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', marginBottom: '20px', overflow: 'hidden' }}>
+        <button onClick={() => setMicroOpen(o => !o)}
+          style={{ width: '100%', background: 'none', border: 'none', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', color: 'var(--text-primary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '14px', fontWeight: '600' }}>Weekly Nutrient Coverage</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>7-day avg vs your daily targets</span>
+          </div>
+          <span style={{ fontSize: '11px', color: 'var(--text-secondary)', transform: microOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
+        </button>
+        {microOpen && (
+          <div style={{ padding: '0 20px 20px' }}>
+            {(() => {
+              const suppCov = {}
+              for (const s of supplements) {
+                for (const [label, valueStr] of Object.entries(s.nutrients || {})) {
+                  const nutrient = matchSuppToNutrient(label)
+                  if (nutrient) {
+                    const amt = parseSuppAmount(valueStr, nutrient)
+                    suppCov[nutrient.key] = (suppCov[nutrient.key] || 0) + amt
+                  }
+                }
+              }
+              const mt = goalsProfile?.age && goalsProfile?.sex ? calcMicroTargets(goalsProfile.age, goalsProfile.sex) : null
+              return <PlanNutrientBars entries={entries} suppCoverage={suppCov} microTargets={mt} />
+            })()}
+            <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '10px', marginBottom: 0 }}>
+              Meal plan only tracks select nutrients (iron, calcium, magnesium, potassium, vitamin D, fiber, sodium). For full micronutrient tracking, log foods in your Food Log.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Analyze button */}

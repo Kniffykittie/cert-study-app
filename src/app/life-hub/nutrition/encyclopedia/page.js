@@ -632,6 +632,7 @@ export default function EncyclopediaPage() {
   const [search, setSearch] = useState('')
   const [symptomCheckerOpen, setSymptomCheckerOpen] = useState(false)
   const [showWhy, setShowWhy] = useState(false)
+  const [view, setView] = useState('grid') // 'grid' | 'dashboard'
 
   useEffect(() => {
     fetch('/api/nutrition/encyclopedia')
@@ -749,16 +750,26 @@ export default function EncyclopediaPage() {
         </div>
       )}
 
-      {/* Filters */}
+      {/* View toggle + Filters */}
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-        {NUTRIENT_CATEGORIES.map(cat => (
+        <div style={{ display: 'flex', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '2px', gap: '2px', marginRight: '6px' }}>
+          {[['grid','⊞ Cards'],['dashboard','▬ Bars']].map(([v, label]) => (
+            <button key={v} onClick={() => setView(v)}
+              style={{ padding: '5px 12px', borderRadius: '6px', border: 'none', fontSize: '12px', fontWeight: view === v ? '700' : '400', cursor: 'pointer', backgroundColor: view === v ? 'var(--accent-blue)' : 'transparent', color: view === v ? '#fff' : 'var(--text-secondary)', transition: 'all 0.15s' }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {view === 'grid' && NUTRIENT_CATEGORIES.map(cat => (
           <button key={cat} onClick={() => setFilter(cat)}
             style={{ padding: '7px 14px', borderRadius: '7px', border: 'none', fontSize: '13px', fontWeight: filter === cat ? '600' : '400', cursor: 'pointer', backgroundColor: filter === cat ? 'var(--accent-blue)' : 'var(--surface)', color: filter === cat ? '#E8E8E8' : 'var(--text-secondary)' }}>
             {cat}
           </button>
         ))}
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search nutrient..."
-          style={{ marginLeft: 'auto', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '7px', padding: '7px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', width: '160px' }} />
+        {view === 'grid' && (
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search nutrient..."
+            style={{ marginLeft: 'auto', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '7px', padding: '7px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', width: '160px' }} />
+        )}
       </div>
 
       {/* Legend */}
@@ -777,17 +788,78 @@ export default function EncyclopediaPage() {
         </div>
       )}
 
-      {/* Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', paddingBottom: '40px' }}>
-        {filtered.map(n => (
-          <NutrientCard key={n.slug} nutrient={n} ctx={ctx} microTargets={microTargets} selected={selected === n.slug} onClick={() => setSelected(selected === n.slug ? null : n.slug)} />
-        ))}
-      </div>
+      {/* Grid view */}
+      {view === 'grid' && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', paddingBottom: '40px' }}>
+            {filtered.map(n => (
+              <NutrientCard key={n.slug} nutrient={n} ctx={ctx} microTargets={microTargets} selected={selected === n.slug} onClick={() => setSelected(selected === n.slug ? null : n.slug)} />
+            ))}
+          </div>
+          {ctx?.log_days < 5 && ctx !== null && (
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', textAlign: 'center', marginTop: '8px' }}>
+              Log at least 5 days of food to see your personalized status on each nutrient.
+            </p>
+          )}
+        </>
+      )}
 
-      {ctx?.log_days < 5 && ctx !== null && (
-        <p style={{ color: 'var(--text-secondary)', fontSize: '13px', textAlign: 'center', marginTop: '8px' }}>
-          Log at least 5 days of food to see your personalized status on each nutrient.
-        </p>
+      {/* Dashboard view — all nutrients as horizontal bars */}
+      {view === 'dashboard' && (
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', paddingBottom: '28px' }}>
+          {ctx?.log_days < 5 && (
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>
+              30-day food log averages shown below. Log at least 5 days for color-coded status.
+            </p>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {['Minerals','Vitamins','Other'].map(groupLabel => {
+              const groupNutrients = NUTRIENTS.filter(n => n.category === groupLabel)
+              if (!groupNutrients.length) return null
+              return (
+                <div key={groupLabel}>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>{groupLabel}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {groupNutrients.map(n => {
+                      const s = getStatus(n, ctx, microTargets)
+                      const rdv = s.rdv
+                      const foodPct = Math.min(100, Math.round((s.foodAvg / rdv) * 100))
+                      const suppPct = s.suppAmt > 0 ? Math.min(100 - foodPct, Math.round((s.suppAmt / rdv) * 100)) : 0
+                      const color = STATUS_COLORS[s.status]
+                      return (
+                        <div key={n.slug} onClick={() => { setSelected(n.slug); setView('grid') }} style={{ cursor: 'pointer' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500' }}>{n.name}</span>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              {s.suppAmt > 0 && <span style={{ fontSize: '10px', color: 'var(--accent-purple)' }}>+{Math.round(s.suppAmt)}{n.unit} supp</span>}
+                              <span style={{ fontSize: '11px', color, fontWeight: '600' }}>
+                                {Math.round(s.foodAvg * 10) / 10} / {rdv}{n.unit}
+                              </span>
+                              <span style={{ fontSize: '10px', color: 'var(--text-secondary)', minWidth: '34px', textAlign: 'right' }}>{Math.min(s.pct, 999)}%</span>
+                            </div>
+                          </div>
+                          <div style={{ height: '7px', backgroundColor: 'var(--background)', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
+                            <div style={{ height: '100%', width: `${foodPct}%`, backgroundColor: color, borderRadius: '4px', transition: 'width 0.4s' }} />
+                            {suppPct > 0 && <div style={{ height: '100%', width: `${suppPct}%`, backgroundColor: 'var(--accent-purple)', opacity: 0.75 }} />}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', paddingTop: '16px', marginTop: '4px', borderTop: '1px solid var(--border)' }}>
+            {[['var(--success)','≥80% from food'],['var(--warning)','40–79%'],['var(--error)','<40% or over limit'],['var(--accent-purple)','supplements']].map(([c,l]) => (
+              <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <div style={{ width: '10px', height: '6px', borderRadius: '2px', backgroundColor: c, opacity: c.includes('purple') ? 0.75 : 1 }} />
+                <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{l}</span>
+              </div>
+            ))}
+            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: 'auto' }}>click any row to open detail</span>
+          </div>
+        </div>
       )}
 
       {/* Detail Panel */}

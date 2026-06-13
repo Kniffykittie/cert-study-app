@@ -2,7 +2,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { calcTDEE as calcTDEEShared, calcMacros as calcMacrosShared, calcGoalAdjustment } from '@/lib/tdee'
+import { calcTDEE as calcTDEEShared, calcMacros as calcMacrosShared, calcGoalAdjustment, calcMicroTargets } from '@/lib/tdee'
+import { NUTRIENTS, matchSuppToNutrient, parseSuppAmount } from '@/data/nutrients'
 
 const TIMING_LABELS = {
   morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening',
@@ -1739,49 +1740,108 @@ function MealBuilderModal({ onClose, onSave }) {
   )
 }
 
-function MicroNutrientPanel({ totals }) {
-  const hasAnyData = MICRO_GROUPS.some(g => g.items.some(item => totals[item.key] > 0))
-  if (!hasAnyData) return (
-    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>
-      Micronutrient data will appear here once you log foods from the database. Manually entered foods require you to fill in the values.
-    </p>
-  )
+// Shared nutrient bar panel — food totals (blue/green/red) + supplement layer (purple) stacked
+const NUTRIENT_BAR_GROUPS = [
+  { label: 'Minerals', keys: ['calcium_mg','iron_mg','magnesium_mg','potassium_mg','zinc_mg','sodium_mg'] },
+  { label: 'Vitamins', keys: ['vitamin_d_mcg','vitamin_c_mg','vitamin_a_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg'] },
+  { label: 'Other', keys: ['fiber_g','omega3_g','vitamin_k_mcg','choline_mg'] },
+]
+
+const NUTRIENT_META = {
+  calcium_mg: { label: 'Calcium', unit: 'mg' },
+  iron_mg: { label: 'Iron', unit: 'mg' },
+  magnesium_mg: { label: 'Magnesium', unit: 'mg' },
+  potassium_mg: { label: 'Potassium', unit: 'mg' },
+  zinc_mg: { label: 'Zinc', unit: 'mg' },
+  sodium_mg: { label: 'Sodium', unit: 'mg', warnHigh: true },
+  vitamin_d_mcg: { label: 'Vitamin D', unit: 'mcg' },
+  vitamin_c_mg: { label: 'Vitamin C', unit: 'mg' },
+  vitamin_a_mcg: { label: 'Vitamin A', unit: 'mcg' },
+  vitamin_b12_mcg: { label: 'Vitamin B12', unit: 'mcg' },
+  vitamin_b6_mg: { label: 'Vitamin B6', unit: 'mg' },
+  folate_mcg: { label: 'Folate', unit: 'mcg' },
+  fiber_g: { label: 'Fiber', unit: 'g' },
+  omega3_g: { label: 'Omega-3', unit: 'g' },
+  vitamin_k_mcg: { label: 'Vitamin K', unit: 'mcg' },
+  choline_mg: { label: 'Choline', unit: 'mg' },
+}
+
+function NutrientBars({ foodTotals, suppCoverage, microTargets, compact }) {
+  const allGroups = NUTRIENT_BAR_GROUPS.map(g => ({
+    ...g,
+    items: g.keys.map(key => {
+      const meta = NUTRIENT_META[key]
+      const food = foodTotals?.[key] || 0
+      const supp = suppCoverage?.[key] || 0
+      const target = microTargets?.[key] ?? DV[key]
+      if (!target) return null
+      const total = food + supp
+      const foodPct = Math.min(100, Math.round((food / target) * 100))
+      const suppPct = Math.min(100 - foodPct, Math.round((supp / target) * 100))
+      const totalPct = Math.min(100, Math.round((total / target) * 100))
+      const over = total > target && meta.warnHigh
+      const status = meta.warnHigh
+        ? (over ? 'high' : 'ok')
+        : totalPct >= 80 ? 'good' : totalPct >= 40 ? 'moderate' : 'low'
+      const barColor = meta.warnHigh
+        ? (over ? 'var(--error)' : 'var(--warning)')
+        : status === 'good' ? 'var(--success)' : status === 'moderate' ? 'var(--warning)' : 'var(--error)'
+      return { key, ...meta, food, supp, target, foodPct, suppPct, totalPct, over, status, barColor }
+    }).filter(Boolean),
+  })).filter(g => g.items.length > 0)
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {MICRO_GROUPS.map(group => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? '12px' : '20px' }}>
+      {allGroups.map(group => (
         <div key={group.label}>
-          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px', fontWeight: '600' }}>{group.label}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px' }}>
-            {group.items.map(item => {
-              const val = totals[item.key] || 0
-              const dv = DV[item.key]
-              const pct = dv ? Math.min(100, Math.round((val / dv) * 100)) : null
-              const over = dv && val > dv
-              const barColor = item.warn && over ? 'var(--error)' : item.warn ? 'var(--warning)' : 'var(--accent-blue)'
-              return (
-                <div key={item.key} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{item.label}</span>
-                    {pct !== null && <span style={{ fontSize: '10px', color: over && item.warn ? 'var(--error)' : 'var(--text-secondary)' }}>{pct}% DV</span>}
+          <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>{group.label}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+            {group.items.map(item => (
+              <div key={item.key}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>{item.label}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {item.supp > 0 && (
+                      <span style={{ fontSize: '10px', color: 'var(--accent-purple)' }}>+{item.supp < 1 ? item.supp.toFixed(1) : Math.round(item.supp)}{item.unit} supp</span>
+                    )}
+                    <span style={{ fontSize: '11px', color: item.status === 'good' ? 'var(--success)' : item.status === 'low' ? 'var(--error)' : item.status === 'high' ? 'var(--error)' : 'var(--warning)', fontWeight: '600' }}>
+                      {item.food < 1 && item.food > 0 ? item.food.toFixed(2) : Math.round(item.food)}{item.supp > 0 ? `+${Math.round(item.supp)}` : ''} / {item.target}{item.unit}
+                    </span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)', minWidth: '32px', textAlign: 'right' }}>{item.totalPct}%</span>
                   </div>
-                  <div style={{ color: over && item.warn ? 'var(--error)' : 'var(--text-primary)', fontSize: '15px', fontWeight: '700', marginTop: '2px' }}>
-                    {val < 1 && val > 0 ? val.toFixed(2) : Math.round(val)}<span style={{ fontSize: '10px', fontWeight: '400', color: 'var(--text-secondary)', marginLeft: '2px' }}>{item.unit}</span>
-                  </div>
-                  {item.noDV ? (
-                    <div style={{ fontSize: '10px', color: val > 0 ? 'var(--error)' : 'var(--text-secondary)', marginTop: '3px' }}>
-                      {val > 0 ? '⚠ Aim for 0' : 'None logged ✓'}
-                    </div>
-                  ) : dv ? (
-                    <div style={{ height: '4px', backgroundColor: 'var(--border)', borderRadius: '2px', marginTop: '6px' }}>
-                      <div style={{ height: '100%', width: `${pct}%`, backgroundColor: barColor, borderRadius: '2px', transition: 'width 0.3s' }} />
-                    </div>
-                  ) : null}
                 </div>
-              )
-            })}
+                <div style={{ height: '6px', backgroundColor: 'var(--background)', borderRadius: '3px', overflow: 'hidden', display: 'flex' }}>
+                  <div style={{ height: '100%', width: `${item.foodPct}%`, backgroundColor: item.barColor, borderRadius: '3px', transition: 'width 0.4s' }} />
+                  {item.suppPct > 0 && (
+                    <div style={{ height: '100%', width: `${item.suppPct}%`, backgroundColor: 'var(--accent-purple)', opacity: 0.75 }} />
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ))}
+      {allGroups.length === 0 && (
+        <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>No nutrient data yet. Log foods from the database to see your micronutrient breakdown.</p>
+      )}
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', paddingTop: '4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ width: '10px', height: '6px', borderRadius: '2px', backgroundColor: 'var(--success)' }} />
+          <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>≥80% from food</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ width: '10px', height: '6px', borderRadius: '2px', backgroundColor: 'var(--accent-purple)', opacity: 0.75 }} />
+          <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>from supplements</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ width: '10px', height: '6px', borderRadius: '2px', backgroundColor: 'var(--warning)' }} />
+          <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>40–79%</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ width: '10px', height: '6px', borderRadius: '2px', backgroundColor: 'var(--error)' }} />
+          <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>&lt;40% or over limit</span>
+        </div>
+      </div>
     </div>
   )
 }
@@ -2127,14 +2187,27 @@ export default function NutritionPage() {
         <button onClick={() => setMicroOpen(o => !o)}
           style={{ width: '100%', background: 'none', border: 'none', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', color: 'var(--text-primary)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '14px', fontWeight: '600' }}>Full Nutrition Breakdown</span>
-            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Sodium, Vitamins, Minerals & more</span>
+            <span style={{ fontSize: '14px', fontWeight: '600' }}>Micronutrient Tracker</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Vitamins, Minerals & Supplements</span>
           </div>
           <span style={{ fontSize: '11px', color: 'var(--text-secondary)', transform: microOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
         </button>
         {microOpen && (
           <div style={{ padding: '0 20px 20px' }}>
-            <MicroNutrientPanel totals={totals} />
+            {(() => {
+              const suppCov = {}
+              for (const s of supplements) {
+                for (const [label, valueStr] of Object.entries(s.nutrients || {})) {
+                  const nutrient = matchSuppToNutrient(label)
+                  if (nutrient) {
+                    const amt = parseSuppAmount(valueStr, nutrient)
+                    suppCov[nutrient.key] = (suppCov[nutrient.key] || 0) + amt
+                  }
+                }
+              }
+              const mt = goals?.age && goals?.sex ? calcMicroTargets(goals.age, goals.sex) : null
+              return <NutrientBars foodTotals={totals} suppCoverage={suppCov} microTargets={mt} />
+            })()}
           </div>
         )}
       </div>
