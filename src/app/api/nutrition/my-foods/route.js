@@ -102,6 +102,9 @@ export async function DELETE(req) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await req.json()
-  await supabase.from('my_foods').delete().eq('id', id).eq('user_id', user.id)
+  // Null out FK references in food_log_entries before deleting to avoid constraint violations
+  await supabase.from('food_log_entries').update({ my_food_id: null }).eq('my_food_id', id).eq('user_id', user.id)
+  const { error } = await supabase.from('my_foods').delete().eq('id', id).eq('user_id', user.id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

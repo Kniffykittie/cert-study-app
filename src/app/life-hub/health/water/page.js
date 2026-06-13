@@ -500,8 +500,8 @@ export default function DrinksHydrationPage() {
   }
 
   async function deleteSavedDrink(id) {
-    await fetch('/api/nutrition/my-foods', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    setSavedDrinks(prev => prev.filter(d => d.id !== id))
+    const res = await fetch('/api/nutrition/my-foods', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+    if (res.ok) setSavedDrinks(prev => prev.filter(d => d.id !== id))
   }
 
   function openLogModal(item) {

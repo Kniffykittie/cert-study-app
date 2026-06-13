@@ -641,6 +641,10 @@ A complete system parallel to Workouts but lighter in logging. No timer, no HR t
 - **Same-day completion gate** — "✓ Done Today" on plan card
 - **Stale pause cleanup** — auto-cleared if paused workout is from previous day
 
+### Fix: Saved drink delete not persisting (hydration page)
+- **Problem:** Deleting a drink from "MY DRINKS" appeared to work but came back after switching pages; the DB delete was silently failing due to a FK constraint (`food_log_entries.my_food_id` → `my_foods.id`)
+- **Fix:** `DELETE /api/nutrition/my-foods` now nulls out `food_log_entries.my_food_id` first, then deletes; returns a real error on failure; client only removes from state if `res.ok`
+
 ### Phase 52 - Complete
 - **AI Supplement Fill** — "🤖 AI Fill" button in the add supplement form
 - Type a supplement name → click 🤖 AI Fill → Haiku returns dose, timing, and nutrients; pre-fills form fields; user reviews and adjusts before saving

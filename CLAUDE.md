@@ -130,7 +130,7 @@ src/
         ai-food-fill/route.js          POST { name } — Haiku estimates nutrition per typical serving; returns fill JSONB (name, serving_size_label, macros + subset of micros + servings_per_container); no cache (user reviews before saving); uses getUser() + is_disabled check
         ai-micro-fill/route.js         POST { name, brand, calories, protein_g, carbs_g, fat_g } — Haiku estimates 15 micronutrient fields for an OFFs result with sparse micro data; no cache; uses getUser() + is_disabled check
         log/route.js                   GET ?date= today's entries; POST add entry (multiplies macros by servings); DELETE by id; uses getUser()
-        my-foods/route.js              GET user's saved food library; POST save new food; DELETE by id; uses getUser()
+        my-foods/route.js              GET user's saved food library; POST save new food; DELETE by id (nulls food_log_entries.my_food_id first to avoid FK violation); uses getUser()
         tdee-check/route.js            GET pending tdee_suggestion; POST calculates implied TDEE from food logs + weight measurements (needs 14+ days + 2+ measurements); PATCH accept (writes custom_tdee) or dismiss; uses getUser()
         encyclopedia/route.js          GET aggregates user context (30d food avgs, supplement coverage, check-in energy signal, workout frequency, meal plan avgs, goals); used by encyclopedia page
         encyclopedia/[nutrient]/route.js  GET cached AI profile from nutrient_profiles; POST generates via Claude and caches; uses getUser() + is_disabled check
