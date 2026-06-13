@@ -267,6 +267,13 @@ Everything below was built but not yet tested by the user. Go through this list 
 
 ## Phase Log
 
+### Monthly Wrap — Previous Month Comparison — Complete
+- On generation, fetches previous month's cached `report_data` from `monthly_wraps` table
+- Builds a `comparisonLines` block comparing: workouts, avg calories, avg energy, hydration, weight, resting HR, HRV, sleep hours — only for metrics that exist in both months
+- Comparison block appended to Claude's context as "COMPARED TO LAST MONTH (YYYY-MM):" section
+- System prompt updated: when comparison data exists Claude weaves month-over-month changes naturally into the narrative; when absent, no mention of previous month at all
+- First-month users see no difference — `prev` is null and comparison block is silently omitted
+
 ### Monthly Wrap + Daily Brief — Watch Data + Educational AI — Complete
 - Monthly Wrap: 3 new queries added (health_heart_rate_daily, health_sleep_sessions, workout_logs hr_zones); computes avg resting HR + trend direction, avg HRV, avg sleep hours, aggregated workout HR zone minutes across all sessions
 - Monthly Wrap AI prompt updated: Claude now explains what each biometric means (resting HR drop = heart efficiency, HRV = nervous system recovery, HR zones = training adaptation) — never just states a number

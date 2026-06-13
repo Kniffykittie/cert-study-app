@@ -59,7 +59,18 @@ export async function POST(req) {
   const { data: cached } = await supabase.from('monthly_wraps').select('*').eq('user_id', user.id).eq('month', month).single()
   if (cached) return NextResponse.json({ wrap: cached })
 
+  // Fetch previous month's report_data for comparison (gracefully null if first month)
   const [y, m] = month.split('-').map(Number)
+  const prevY = m === 1 ? y - 1 : y
+  const prevM = m === 1 ? 12 : m - 1
+  const prevMonth = `${prevY}-${String(prevM).padStart(2, '0')}`
+  const { data: prevWrap } = await supabase
+    .from('monthly_wraps')
+    .select('report_data')
+    .eq('user_id', user.id)
+    .eq('month', prevMonth)
+    .single()
+  const prev = prevWrap?.report_data || null
   const start = `${month}-01`
   const end = new Date(y, m, 0).toISOString().slice(0, 10) // last day of month
 
@@ -204,14 +215,31 @@ Goals: ${(goals?.goals || []).join(', ') || 'not set'}`
     hasWorkoutHrData ? `Workout HR zones (${zoneAgg.sessions} sessions with HR data): Fat Burn ${zoneAgg.fat_burn_min}min | Cardio ${zoneAgg.cardio_min}min | Hard ${zoneAgg.hard_min}min | Peak ${zoneAgg.peak_min}min` : '',
   ].filter(Boolean)
 
-  const fullDataText = dataText + (healthLines.length ? '\nHEALTH METRICS (from smartwatch):\n' + healthLines.map(l => '  ' + l).join('\n') : '')
+  // Previous month comparison (only when prev wrap exists)
+  const comparisonLines = []
+  if (prev) {
+    if (workoutCount !== null && prev.workout_count != null) comparisonLines.push(`Workouts: ${workoutCount} this month vs ${prev.workout_count} last month (${workoutCount - prev.workout_count > 0 ? '+' : ''}${workoutCount - prev.workout_count})`)
+    if (avgCalories && prev.avg_calories) comparisonLines.push(`Avg calories: ${avgCalories} this month vs ${prev.avg_calories} last month`)
+    if (avgEnergy && prev.avg_energy) comparisonLines.push(`Avg energy: ${avgEnergy}/5 this month vs ${prev.avg_energy}/5 last month`)
+    if (avgWater && prev.avg_water_oz) comparisonLines.push(`Avg hydration: ${avgWater} oz this month vs ${prev.avg_water_oz} oz last month`)
+    if (endWeight && prev.end_weight) comparisonLines.push(`Weight: ${endWeight} lbs this month vs ${prev.end_weight} lbs last month (${Math.round((endWeight - prev.end_weight) * 10) / 10 > 0 ? '+' : ''}${Math.round((endWeight - prev.end_weight) * 10) / 10} lbs month-over-month)`)
+    if (avgRestingHr && prev.avg_resting_hr) comparisonLines.push(`Avg resting HR: ${avgRestingHr} bpm this month vs ${prev.avg_resting_hr} bpm last month (${avgRestingHr - prev.avg_resting_hr > 0 ? '+' : ''}${avgRestingHr - prev.avg_resting_hr} bpm)`)
+    if (avgHrv && prev.avg_hrv) comparisonLines.push(`Avg HRV: ${avgHrv}ms this month vs ${prev.avg_hrv}ms last month (${avgHrv - prev.avg_hrv > 0 ? '+' : ''}${avgHrv - prev.avg_hrv}ms)`)
+    if (avgSleepHours && prev.avg_sleep_hours) comparisonLines.push(`Avg sleep: ${avgSleepHours}h this month vs ${prev.avg_sleep_hours}h last month`)
+  }
+
+  const fullDataText = dataText
+    + (healthLines.length ? '\nHEALTH METRICS (from smartwatch):\n' + healthLines.map(l => '  ' + l).join('\n') : '')
+    + (comparisonLines.length ? '\nCOMPARED TO LAST MONTH (' + prevMonth + '):\n' + comparisonLines.map(l => '  ' + l).join('\n') : '')
 
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 400,
     system: `You are writing a one-paragraph monthly wrap-up for someone's personal health app. Be specific using the numbers provided. Acknowledge real wins, name actual gaps honestly (e.g. "only logged food 8 of 30 days"). Be encouraging but not sycophantic. Sound like a coach reviewing film — direct, warm, constructive. 3-5 sentences max.
 
-When including biometric data (resting HR, HRV, sleep, workout HR zones): always explain briefly what the number means and why it matters — don't just state it. For example, instead of "your resting HR dropped 4 bpm", say "your resting HR dropped from 68 to 64 bpm — your heart is becoming more efficient, needing fewer beats to do the same work, which is one of the clearest signs of improving cardiovascular fitness." Same principle for HRV (higher = nervous system recovering better), sleep (context on why it matters), and HR zones (fat burn vs cardio vs hard zones reflect different training adaptations). Only include biometric data if it was provided — never invent or estimate it.`,
+When including biometric data (resting HR, HRV, sleep, workout HR zones): always explain briefly what the number means and why it matters — don't just state it. For example, instead of "your resting HR dropped 4 bpm", say "your resting HR dropped from 68 to 64 bpm — your heart is becoming more efficient, needing fewer beats to do the same work, which is one of the clearest signs of improving cardiovascular fitness." Same principle for HRV (higher = nervous system recovering better), sleep (context on why it matters), and HR zones (fat burn vs cardio vs hard zones reflect different training adaptations). Only include biometric data if it was provided — never invent or estimate it.
+
+If a "COMPARED TO LAST MONTH" section is provided: weave the most meaningful month-over-month changes naturally into the narrative — don't list them, just reference the most impactful ones conversationally. If no comparison data is provided, write the wrap-up without referencing any previous month.`,
     messages: [{
       role: 'user',
       content: `Write a monthly wrap-up paragraph for this data:\n<user_input>${fullDataText}</user_input>`,
