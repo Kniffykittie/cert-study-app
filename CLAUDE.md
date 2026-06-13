@@ -146,6 +146,7 @@ src/
         heart-rate/route.js            GET ?date= — returns intraday hourly HR (health_heart_rate_intraday), fiveMin 5-minute HR (health_heart_rate_5min), 7-day daily trend (health_heart_rate_daily), workoutWindow (startMinute/endMinute/startHour/endHour), todayAvg/todayResting/todayHrv (RHR+HRV fall back to yesterdayDaily when today has no resting data)
         disconnect/route.js            Removes stored tokens
       workouts/
+        stretch-log/route.js           GET ?date= today's stretch logs; POST log session (stretch_ids, session_type, duration_seconds); uses getUser()
         generate-plan/route.js         AI workout plan generator; uses getUser() + is_disabled check; prompt injection protected on limitations + dumbbell_note fields
         exercise-chat/route.js         POST — mid-workout trainer chatbot (Haiku); exercise context in system prompt; user message wrapped in user_input tags; uses getUser() + is_disabled check
       life-hub/
@@ -172,6 +173,8 @@ src/
         exercises/page.js              Exercise Library — sticky muscle-group nav, scrollable grouped sections, image cards, detail modal with form cues, Cardio section
         log/page.js                    Active workout logger — live timer, exercise cards with set rows (type badge cycles warmup/working/dropset, weight+reps inputs, ✓ complete, × remove), ? button opens exercise detail modal with trainer chatbot (Haiku, multi-turn), drop set contextual explanation per exercise type, add set/drop set, prev session hints, rest timer bar (auto-starts 90s on working set complete, 30s/60s/90s/2m quick buttons, dismissable), Pause (saves partial to DB + localStorage), fixed "Finish Workout" → post-workout check-in (difficulty/energy/note) → completion screen with stats + overload suggestions
         history/page.js                Workout history — all sessions expandable, PR section (heaviest working set per exercise ever), set chips colored by type
+        stretching/page.js             Stretching & Mobility — daily recommendations based on today's workout body parts + sore spots; session type toggle (Pre/Post/Standalone); dynamic+static sections with check-off cards; sticky log button; duration tracked from first check
+        stretching/library/page.js     Stretch Library — all 38 stretches; filter by type (dynamic/static) and muscle group; expandable rows with how-to, mistake warnings, contraindications
       nutrition/
         page.js                        Nutrition dashboard — TDEE + macro targets from goals_profiles, calorie ring, food log by meal slot (breakfast/lunch/dinner/snack/other), food search via Open Food Facts + My Foods library, manual entry with save-to-library, Supplements tab; TDEE calibration card (pending suggestion from tdee_suggestions); gates on goals profile; SavedFoodsTab has ✏️ edit button per food (EditFoodModal with all 27 fields + AI micro-fill) and completeness chips (✓/⚠/✗) per food
         meal-plan/page.js              Weekly Meal Plan — Mon–Sun grid, meal slot rows, food search, AI insight analysis (typed callouts citing specific days and foods)
@@ -209,9 +212,10 @@ src/
       small-office-network.js          Small Office series — 5 labs, 27 steps — all steps have document arrays
       network-plus-fundamentals.js     Network+ lab set — 5 labs, 25 steps — all steps have document arrays
       security-plus-labs.js            Security+ lab set — 4 labs, 20 steps — all steps have document arrays
+    stretches.js                       38 stretches across 10 muscle groups; exports STRETCHES, STRETCH_MUSCLE_GROUPS, BODY_PART_TO_STRETCH_GROUPS, STRETCH_BY_ID, STRETCH_BY_GROUP, getRecommendedStretches(bodyParts, soreSpots); each stretch: id, name, muscle_group, stretch_type (dynamic/static/both), how_to, common_mistakes, contraindications, duration_seconds
   components/
     StudyHubSidebar.js                 Nav sidebar with test-in-progress guard
-    LifeHubSidebar.js                  Life Hub nav — section color system (overview=purple, health=green, nutrition=orange, workouts=blue, goals=teal); Overview section (Dashboard + Monthly Wrap), Goals dropdown (Overview + Measurements + Setup), Health dropdown (Overview + Step Tracker + Heart Rate + Sleep Tracker), Nutrition dropdown (Food Log + Meal Plan + Encyclopedia + Hydration + Supplements), Workouts dropdown (My Plan + History + Exercise Library); Hydration and Supplements live under Nutrition group; auto-opens on active routes; SECTION_COLORS constant defines all section accent colors
+    LifeHubSidebar.js                  Life Hub nav — section color system (overview=purple, health=green, nutrition=orange, workouts=blue, goals=teal); Overview section (Dashboard + Monthly Wrap), Goals dropdown (Overview + Measurements + Setup), Health dropdown (Overview + Step Tracker + Heart Rate + Sleep Tracker), Nutrition dropdown (Food Log + Meal Plan + Encyclopedia + Hydration + Supplements), Workouts dropdown (My Plan + History + Exercise Library + Stretching & Mobility + Stretch Library); Hydration and Supplements live under Nutrition group; auto-opens on active routes; SECTION_COLORS constant defines all section accent colors
     BookmarkModal.js                   Bookmark reason + notes modal
     DailyStreak.js                     30q/day streak tracker with 28-day calendar heatmap
     DomainTrend.js                     Per-domain score trend SVG chart (no library)
@@ -268,6 +272,7 @@ src/
 | `food_log_entries` | Individual food log entries per user/date/meal_slot — name, brand, serving_size_label, servings, all macro + micronutrient fields (already multiplied by servings), source, food_cache_id, my_food_id; RLS user-scoped |
 | `workout_logs` | One row per completed workout session — user_id, plan_id (nullable), day_of_week, day_label, duration_seconds, created_at; hr_zones JSONB (fat_burn_min, cardio_min, hard_min, peak_min, avg_bpm, max_bpm — computed from intraday HR on finish via computeHrZones(); uses 220-age max HR from goals_profiles); RLS enabled |
 | `workout_log_sets` | Individual sets per session — log_id, user_id, exercise_id (nullable), exercise_name, set_number, set_type (warmup/working/dropset), weight_lbs, reps, rep_range, created_at; RLS enabled |
+| `stretch_logs` | Stretch session logs — user_id, date, stretch_ids TEXT[], session_type (pre_workout/post_workout/standalone), duration_seconds, logged_at; RLS user-scoped |
 | `daily_briefs` | Cached AI daily brief — brief_text, data_snapshot JSONB; UNIQUE on user_id + date; generated once per day on first Life Hub visit; never regenerates same day automatically; RLS user-scoped |
 | `meal_plans` | Weekly meal plan headers — week_start DATE (always a Monday); UNIQUE on user_id + week_start; RLS user-scoped |
 | `meal_plan_entries` | Individual planned foods per day/slot — plan_id, day_of_week SMALLINT (0=Mon…6=Sun), meal_slot, name, servings, macros + iron/calcium/vitamin_d/magnesium/potassium; completely separate from food_log_entries (planning only); RLS user-scoped |

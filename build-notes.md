@@ -138,6 +138,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `workout_plans` | AI-generated weekly plans — plan JSONB (7 day objects), plan_notes, progression_notes, schedule JSONB, is_active |
 | `workout_logs` | Completed sessions — plan_id, day_of_week, day_label, duration_seconds, hr_zones JSONB, is_partial, post_workout_difficulty/energy/note; RLS enabled |
 | `workout_log_sets` | Sets per session — log_id, exercise_name, set_number, set_type (warmup/working/dropset), weight_lbs, reps, rep_range; RLS enabled |
+| `stretch_logs` | Stretch session logs — user_id, date, stretch_ids TEXT[], session_type (pre_workout/post_workout/standalone), duration_seconds, logged_at; RLS user-scoped |
 
 ### Reporting
 | Table | Purpose |
@@ -246,46 +247,7 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ### 🧘 Stretching & Mobility
 
-**11. Full Stretching & Mobility Section** — 📋 Fully Specced / ⏳ Pending Build
-A complete system parallel to Workouts but lighter in logging. No timer, no HR tracking, no sets/reps — just a library, smart recommendations, and simple checkmark logging.
-
-**Key physiological distinction (must be respected throughout):** Dynamic stretches (pre-workout — leg swings, arm circles, hip rotations) warm up joints without reducing force output. Static stretches (30–60 second holds) temporarily reduce muscle force by up to 8% — these go AFTER workouts or in standalone sessions, never before lifting.
-
-**Stretch Library:**
-- Categorized by muscle group: Chest, Back, Hips, Hamstrings, Shoulders, Quads, Calves, Neck, Core, Full Body
-- Each entry: name, how to do it, what NOT to do (common mistakes), muscles targeted, stretch type (dynamic/static/both), recommended duration, contraindications (e.g. "avoid if you have herniated disc")
-- Separate from Exercise Library but same visual style
-
-**Daily Recommendation Generator:**
-- Pulls today's workout from workout_plans → generates 5–8 dynamic warmup stretches for muscles being trained + 6–10 static cooldown stretches for muscles just worked
-- Rest days: full-body mobility flow
-- No workout planned: recovery-focused based on yesterday's session
-- Sore spots from check-in: add targeted recovery stretches for those areas
-- Chronic pain flags (from biggest_obstacles or new `chronic_issues` field in goals_profiles): always included in every session until user marks resolved
-- User can add or remove stretches from the generated list before marking done
-
-**Simple Logging:**
-- Checkmarks: pre-workout stretches ✓, post-workout stretches ✓, standalone session ✓
-- Time of day: morning / pre-workout / post-workout / evening / before bed
-- New `stretch_logs` table: user_id, date, stretch_ids TEXT[], session_type, notes, created_at; RLS user-scoped
-- No "start stretching" session required — just check off what you did
-
-**Recovery Score Impact:**
-- Post-workout static stretching: +5 pts
-- Full standalone mobility session on a rest day: +8 pts
-- Pre-workout dynamic warmup: +3 pts
-
-**Soreness Tracking in Daily Check-In:**
-- New chip selector in daily check-in: sore spots (Neck / Shoulders / Chest / Upper Back / Lower Back / Arms / Core / Hips / Quads / Hamstrings / Calves)
-- Acute soreness (marked today after yesterday's workout) → stretch generator adds targeted recovery stretches for those areas
-- Follow-up the next day: "Yesterday you marked your [arms] as sore. How are they feeling? Better / Same / Worse" → generator escalates recovery focus if worse
-- Chronic pain (marked in biggest_obstacles, e.g. "lower back and hip pain") persists in profile — generator always includes those areas; Smart Check-In asks "Is your lower back still bothering you?" every ~2 weeks (not more often — not nagging)
-
-**DB tables needed:**
-- `stretch_logs`: user_id, date, stretch_ids TEXT[], session_type TEXT, notes TEXT, created_at; RLS user-scoped
-- `stretches`: id, name, muscle_group, stretch_type (dynamic/static/both), how_to TEXT, common_mistakes TEXT, contraindications TEXT, duration_seconds INT, gif_url; shared table, no RLS needed
-- Add `sore_spots TEXT[]` column to `daily_checkins`
-- Reset row in Settings for stretch log history
+**11. Full Stretching & Mobility Section** — ✅ Built (Phase 54)
 
 ---
 
@@ -341,6 +303,16 @@ A complete system parallel to Workouts but lighter in logging. No timer, no HR t
 ---
 
 ## Phase Log
+
+### Phase 54 — Stretching & Mobility Section — Complete
+- **`src/data/stretches.js`** — 38 stretches across 10 muscle groups; exports `STRETCHES`, `STRETCH_MUSCLE_GROUPS`, `BODY_PART_TO_STRETCH_GROUPS`, `STRETCH_BY_ID`, `STRETCH_BY_GROUP`, `getRecommendedStretches(bodyParts, soreSpots)`; each stretch has id, name, muscle_group, stretch_type (dynamic/static/both), how_to, common_mistakes, contraindications, duration_seconds; `getRecommendedStretches` builds targeted groups from today's workout body parts + sore spots, returns `{ dynamic, static, isRestDay, targetGroups }`
+- **`src/app/api/workouts/stretch-log/route.js`** — GET (date param, returns today's logs); POST (stretch_ids, session_type, duration_seconds) → inserts to `stretch_logs`; RLS-enforced via user_id
+- **`src/app/life-hub/workouts/stretching/page.js`** — Daily recommendation page; sore spots chip selector (9 options, red when active); session type toggle (Pre-Workout/Post-Workout/Standalone); physiological callout explains dynamic-before/static-after rule; stretch cards with type badge, muscle group chip, duration, expandable how-to + mistake + contraindication panels; Select All per section; sticky log button counts checked stretches; logged-today banner; duration tracked from first checkmark
+- **`src/app/life-hub/workouts/stretching/library/page.js`** — Full library; type filter (All / Dynamic / Static) with explainer callouts; muscle group nav chips; expandable rows with full details
+- **`src/components/LifeHubSidebar.js`** — Added "Stretching & Mobility" and "Stretch Library" under Workouts dropdown; workoutsOpen auto-triggers on stretching routes
+- **DB**: `stretch_logs` table (user_id, date, stretch_ids TEXT[], session_type CHECK, duration_seconds, logged_at; RLS enabled); `sore_spots TEXT[]` column added to `daily_checkins`
+- **`src/app/api/reset/route.js`** — Added `stretch_logs` scope
+- **`src/app/settings/page.js`** — Added "Stretch Log History" reset row
 
 ### Phase 51 — Pre/Post Workout Meal Advisor + gain_weight Goal + Supplement Adherence — Complete
 - **Pre/Post Workout Meal Advisor**: two dismissible banners on Food Log tab — post-workout (blue, shows minutes since completion, protein target + 30-50g carbs, "Log Snack" CTA, visible for 2 hrs after workout finish); pre-workout (blue, shows planned workout label, timing tip, visible all day until workout logged); `workout_logs` query updated to include `created_at`; `workoutFinishedAt` state added

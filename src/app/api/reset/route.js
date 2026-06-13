@@ -100,6 +100,11 @@ export async function POST(req) {
     return NextResponse.json({ ok: true })
   }
 
+  if (scope === 'stretch_logs') {
+    await supabase.from('stretch_logs').delete().eq('user_id', userId)
+    return NextResponse.json({ ok: true })
+  }
+
   if (scope === 'progress_photos') {
     const { data: photos } = await supabase.from('progress_photos').select('storage_path').eq('user_id', userId)
     if (photos?.length) {

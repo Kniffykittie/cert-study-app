@@ -788,6 +788,7 @@ export default function SettingsPage() {
                     { scope: 'supplement_logs', label: 'Supplement Log History', desc: 'Clear all "taken today" history — keeps your stack intact' },
                     { scope: 'food_log', label: 'Food Log History', desc: 'Delete all logged food entries' },
                     { scope: 'my_foods', label: 'My Foods Library', desc: 'Delete all saved custom foods' },
+                    { scope: 'stretch_logs', label: 'Stretch Log History', desc: 'Delete all stretch session logs' },
                     { scope: 'progress_photos', label: 'Progress Photos', desc: 'Delete all progress photos permanently' },
                   ].map(item => (
                     <div key={item.scope} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>

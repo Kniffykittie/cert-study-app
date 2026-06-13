@@ -89,7 +89,7 @@ export default function LifeHubSidebar() {
 
   useEffect(() => {
     if (pathname.startsWith('/life-hub/health')) setHealthOpen(true)
-    if (pathname.startsWith('/life-hub/workouts')) setWorkoutsOpen(true)
+    if (pathname.startsWith('/life-hub/workouts') || pathname.startsWith('/life-hub/workouts/stretching')) setWorkoutsOpen(true)
     if (pathname.startsWith('/life-hub/goals')) setGoalsOpen(true)
     if (pathname.startsWith('/life-hub/nutrition') || pathname.startsWith('/life-hub/goals/supplements') || pathname.startsWith('/life-hub/health/water')) setNutritionOpen(true)
   }, [pathname])
@@ -224,6 +224,8 @@ export default function LifeHubSidebar() {
             {navLink('My Plan', '/life-hub/workouts', SECTION_COLORS.workouts)}
             {navLink('Workout History', '/life-hub/workouts/history', SECTION_COLORS.workouts)}
             {navLink('Exercise Library', '/life-hub/workouts/exercises', SECTION_COLORS.workouts)}
+            {navLink('Stretching & Mobility', '/life-hub/workouts/stretching', SECTION_COLORS.workouts)}
+            {navLink('Stretch Library', '/life-hub/workouts/stretching/library', SECTION_COLORS.workouts)}
           </div>
         )}
 
