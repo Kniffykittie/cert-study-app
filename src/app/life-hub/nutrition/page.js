@@ -475,6 +475,7 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
   const BLANK_MANUAL = { name: '', brand: '', serving_size_label: '1 serving', calories: '', protein_g: '', carbs_g: '', fat_g: '', fiber_g: '', sugar_g: '', sodium_mg: '', saturated_fat_g: '', trans_fat_g: '', cholesterol_mg: '', potassium_mg: '', calcium_mg: '', iron_mg: '', magnesium_mg: '', zinc_mg: '', vitamin_a_mcg: '', vitamin_c_mg: '', vitamin_d_mcg: '', vitamin_b12_mcg: '', vitamin_b6_mg: '', folate_mcg: '' }
   const [manual, setManual] = useState(BLANK_MANUAL)
   const [manualSaveToLib, setManualSaveToLib] = useState(true)
+  const [manualIsIngredient, setManualIsIngredient] = useState(false)
   const [savingManual, setSavingManual] = useState(false)
   const [manualServings, setManualServings] = useState('1')
   const [aiFilling, setAiFilling] = useState(false)
@@ -492,6 +493,8 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
 
   const mealInfo = MEAL_SLOTS.find(m => m.key === slot)
   const filtered = filter ? myFoods.filter(f => f.name.toLowerCase().includes(filter.toLowerCase())) : myFoods
+  const filteredFoods = filtered.filter(f => !f.is_ingredient)
+  const filteredIngredients = filtered.filter(f => f.is_ingredient)
 
   useEffect(() => { if (tab === 'search') searchInputRef.current?.focus() }, [tab])
 
@@ -593,7 +596,7 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
     setSavingManual(true)
     let savedFood = null
     if (manualSaveToLib) {
-      const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...manual, source: 'manual' }) })
+      const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...manual, source: 'manual', is_ingredient: manualIsIngredient }) })
       const data = await res.json()
       if (data.food) { savedFood = data.food; onSaveFood(data.food) }
     }
@@ -663,7 +666,12 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingBottom: '8px' }}>
-                  {filtered.map(food => {
+                  {filteredIngredients.length > 0 && (
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '6px 2px 4px' }}>
+                      🥚 Ingredients
+                    </div>
+                  )}
+                  {filteredIngredients.map(food => {
                     const isExpanded = expandedId === food.id
                     const sv = parseFloat(logServings) || 1
                     const calPreview = food.calories != null ? Math.round(food.calories * (isExpanded ? sv : 1)) : null
@@ -698,6 +706,55 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
                                 style={{ width: '60px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
                             </div>
                             {calPreview != null && <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '700' }}>= {calPreview} kcal</span>}
+                            <button onClick={() => confirmLogFav(food)}
+                              style={{ marginLeft: 'auto', backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '7px', padding: '7px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                              ✓ Add to {mealInfo?.label}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {filteredFoods.length > 0 && (
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '6px 2px 4px', marginTop: filteredIngredients.length > 0 ? 8 : 0 }}>
+                      🍽️ Foods & Meals
+                    </div>
+                  )}
+                  {filteredFoods.map(food => {
+                    const isExpanded2 = expandedId === food.id
+                    const sv2 = parseFloat(logServings) || 1
+                    const calPreview2 = food.calories != null ? Math.round(food.calories * (isExpanded2 ? sv2 : 1)) : null
+                    return (
+                      <div key={food.id} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', border: isExpanded2 ? '1px solid var(--accent-blue)' : '1px solid transparent', overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                              {food.serving_size_label || '1 serving'}
+                              {food.calories != null ? ` · ${Math.round(food.calories)} kcal` : ''}
+                              {food.protein_g ? ` · ${Math.round(food.protein_g)}g P` : ''}
+                              {food.carbs_g ? ` · ${Math.round(food.carbs_g)}g C` : ''}
+                              {food.fat_g ? ` · ${Math.round(food.fat_g)}g F` : ''}
+                            </div>
+                            {(() => { const w = getDietaryWarnings(food, dietaryPrefs); return w.length > 0 ? (
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
+                                {w.map((ww, i) => <span key={i} style={{ fontSize: '10px', color: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '4px', padding: '1px 5px' }}>{ww}</span>)}
+                              </div>
+                            ) : null })()}
+                          </div>
+                          <button onClick={() => handleExpandLog(food.id)}
+                            style={{ backgroundColor: isExpanded2 ? 'transparent' : 'rgba(0,128,255,0.12)', color: isExpanded2 ? 'var(--text-secondary)' : 'var(--accent-blue)', border: isExpanded2 ? '1px solid var(--border)' : 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', flexShrink: 0 }}>
+                            {isExpanded2 ? 'Cancel' : 'Log'}
+                          </button>
+                        </div>
+                        {isExpanded2 && (
+                          <div style={{ padding: '8px 12px 12px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Servings:</span>
+                              <input type="number" min="0.25" step="0.25" value={logServings} onChange={e => setLogServings(e.target.value)}
+                                style={{ width: '60px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
+                            </div>
+                            {calPreview2 != null && <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '700' }}>= {calPreview2} kcal</span>}
                             <button onClick={() => confirmLogFav(food)}
                               style={{ marginLeft: 'auto', backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '7px', padding: '7px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
                               ✓ Add to {mealInfo?.label}
@@ -786,9 +843,17 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
                 )
               })}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '14px 0 4px' }}>
-              <input type="checkbox" id="mansavelib" checked={manualSaveToLib} onChange={e => setManualSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '14px', height: '14px' }} />
-              <label htmlFor="mansavelib" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>⭐ Save to My Favorites for quick logging next time</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '14px 0 4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input type="checkbox" id="mansavelib" checked={manualSaveToLib} onChange={e => { setManualSaveToLib(e.target.checked); if (!e.target.checked) setManualIsIngredient(false) }} style={{ accentColor: 'var(--accent-purple)', width: '14px', height: '14px' }} />
+                <label htmlFor="mansavelib" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>⭐ Save to My Favorites for quick logging next time</label>
+              </div>
+              {manualSaveToLib && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '20px' }}>
+                  <input type="checkbox" id="manisIngredient" checked={manualIsIngredient} onChange={e => setManualIsIngredient(e.target.checked)} style={{ accentColor: 'var(--accent-blue)', width: '14px', height: '14px' }} />
+                  <label htmlFor="manisIngredient" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>🥚 This is an ingredient <span style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>(appears in Meal Builder)</span></label>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1444,7 +1509,7 @@ function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, o
   )
 }
 
-function MealBuilderModal({ onClose, onSave }) {
+function MealBuilderModal({ onClose, onSave, savedIngredients = [] }) {
   const [mealName, setMealName] = useState('')
   const [servingsInMeal, setServingsInMeal] = useState('4')
   const [ingredients, setIngredients] = useState([])
@@ -1593,9 +1658,28 @@ function MealBuilderModal({ onClose, onSave }) {
             </div>
           </div>
 
+          {/* Saved ingredients quick-picks */}
+          {savedIngredients.length > 0 && (
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>🥚 My Saved Ingredients</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {savedIngredients.map(ing => {
+                  const alreadyAdded = ingredients.some(i => i.food?.id === ing.id)
+                  return (
+                    <button key={ing.id} onClick={() => !alreadyAdded && addIngredient(ing)} disabled={alreadyAdded}
+                      style={{ padding: '5px 12px', background: alreadyAdded ? 'rgba(46,204,113,0.1)' : 'var(--background)', border: `1px solid ${alreadyAdded ? 'rgba(46,204,113,0.4)' : 'var(--border)'}`, borderRadius: '20px', color: alreadyAdded ? 'var(--success)' : 'var(--text-primary)', fontSize: '12px', cursor: alreadyAdded ? 'default' : 'pointer', fontWeight: '500' }}>
+                      {alreadyAdded ? '✓ ' : '+ '}{ing.name}
+                      {ing.calories != null ? <span style={{ color: 'var(--text-secondary)', fontSize: '11px', marginLeft: '4px' }}>· {Math.round(ing.calories)} cal</span> : null}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Ingredient search */}
           <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Add Ingredient</label>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Search or Add Ingredient</label>
             <input value={query} onChange={e => handleQueryChange(e.target.value)} placeholder="Search (e.g. white onion) or type a name and add custom"
               style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '13px' }} />
             {query.trim() && (
@@ -2107,7 +2191,7 @@ export default function NutritionPage() {
           })} libraryOnly workoutCtx={workoutCtx} dietaryPrefs={goals?.dietary_preferences || []} />
       )}
       {mealBuilderModal && (
-        <MealBuilderModal onClose={() => setMealBuilderModal(false)} onSave={food => {
+        <MealBuilderModal onClose={() => setMealBuilderModal(false)} savedIngredients={myFoods.filter(f => f.is_ingredient)} onSave={food => {
           setMyFoods(prev => [...prev, food])
         }} />
       )}

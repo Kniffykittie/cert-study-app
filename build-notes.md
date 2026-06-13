@@ -641,6 +641,13 @@ A complete system parallel to Workouts but lighter in logging. No timer, no HR t
 - **Same-day completion gate** — "✓ Done Today" on plan card
 - **Stale pause cleanup** — auto-cleared if paused workout is from previous day
 
+### Ingredients vs Foods distinction + Meal Builder integration
+- Added `is_ingredient BOOLEAN DEFAULT false` column to `my_foods` table
+- **My Favorites tab** in AddFoodModal now shows two sections: "🥚 Ingredients" (items tagged as ingredients) and "🍽️ Foods & Meals" (everything else); sections only appear when they have items
+- **Enter Manually tab** → when "Save to My Favorites" is checked, a sub-option "🥚 This is an ingredient" appears; saved with `is_ingredient: true` so it shows up in the right section
+- **Meal Builder** now shows a "🥚 My Saved Ingredients" quick-pick chip row above the search box; chips are grayed out and show ✓ once added; nutrition pulls from the saved ingredient data
+- `my-foods` POST route now passes through `is_ingredient` field
+
 ### Fix: AI Fill on Add to My Drinks modal (hydration page)
 - Added "🤖 AI Fill" button next to the Name field in the Add to My Drinks modal
 - Type a drink name → click AI Fill → Haiku returns calories, caffeine, water content, and macros; pre-fills all fields; user reviews before saving

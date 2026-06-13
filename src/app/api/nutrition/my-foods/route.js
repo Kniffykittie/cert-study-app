@@ -46,6 +46,7 @@ export async function POST(req) {
     serving_size_label: body.serving_size_label?.trim() || '1 serving',
     servings_per_container: body.servings_per_container != null ? Number(body.servings_per_container) : null,
     is_drink: body.is_drink === true,
+    is_ingredient: body.is_ingredient === true,
     ...nutritionValues,
   }).select().single()
 
