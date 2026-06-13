@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import { STRETCHES, BODY_PART_TO_STRETCH_GROUPS, getRecommendedStretches } from '@/data/stretches'
 
 const COLOR = '#3b82f6'
@@ -65,26 +66,29 @@ export default function StretchingPage() {
   useEffect(() => {
     async function load() {
       const today = new Date().toISOString().slice(0, 10)
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setLoadingWorkout(false); return }
 
-      // Get today's stretch log
-      const logRes = await fetch(`/api/workouts/stretch-log?date=${today}`).then(r => r.json()).catch(() => ({}))
-      if (logRes.logs?.length) setLoggedToday(logRes.logs[0])
+      const [
+        { data: stretchLogs },
+        { data: todayWorkoutLogs },
+        { data: todayCheckin },
+      ] = await Promise.all([
+        supabase.from('stretch_logs').select('*').eq('user_id', user.id).eq('date', today).order('logged_at', { ascending: false }),
+        supabase.from('workout_logs').select('id, day_label, duration_seconds, created_at').eq('user_id', user.id).gte('created_at', `${today}T00:00:00`).order('created_at', { ascending: false }).limit(1),
+        supabase.from('daily_checkins').select('sore_spots').eq('user_id', user.id).eq('date', today).maybeSingle(),
+      ])
 
-      // Get today's workout log to determine body parts worked
-      try {
-        const wRes = await fetch('/api/workouts/log?limit=1').then(r => r.json()).catch(() => ({}))
-        const todayLog = (wRes.logs || []).find(l => l.created_at?.slice(0, 10) === today)
-        if (todayLog) {
-          setTodayWorkout(todayLog)
-          setSessionType(todayLog ? 'post_workout' : 'standalone')
-        }
-      } catch {}
+      if (stretchLogs?.length) setLoggedToday(stretchLogs[0])
 
-      // Get sore spots from today's check-in
-      try {
-        const ciRes = await fetch(`/api/life-hub/daily-checkin?date=${today}`).then(r => r.json()).catch(() => ({}))
-        if (ciRes.checkin?.sore_spots?.length) setSoreSpots(ciRes.checkin.sore_spots)
-      } catch {}
+      const todayLog = todayWorkoutLogs?.[0] || null
+      if (todayLog) {
+        setTodayWorkout(todayLog)
+        setSessionType('post_workout')
+      }
+
+      if (todayCheckin?.sore_spots?.length) setSoreSpots(todayCheckin.sore_spots)
 
       setLoadingWorkout(false)
     }

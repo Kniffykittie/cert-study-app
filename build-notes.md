@@ -227,13 +227,10 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 **3. Dietary Preferences Wired Downstream** — ✅ Built (Phase 50)
 
-**4. Orphaned Inputs — Wire Up Remaining** — 💬 Discussed / 📋 Partially Specced
-| Input | Current use | Planned use |
-|---|---|---|
-| Biggest obstacles | AI overview only | Workout plan prompt (injury-aware adjustments); nutrition coaching (budget → cheap high-protein suggestions) |
-| Primary motivations | AI overview only | Coaching tone on "What Happens Now"; Daily Brief framing |
-| Why goals (free text) | AI overview only | Daily Brief personalization |
-| Sleep hours | Recovery Score + AI overview | Note when chronically poor (impairs muscle protein synthesis — relevant to protein target) |
+**4. Orphaned Inputs — Wire Up Remaining** — ✅ Built (Phase 55)
+- `biggest_obstacles` → workout plan AI prompt (injury-aware adjustments)
+- `primary_motivations` + `why_goals` → Daily Brief personalization (tone shaping)
+- `sleep_hours` → Daily Brief sleep target vs actual gap when relevant
 
 ---
 
@@ -303,6 +300,21 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 ---
 
 ## Phase Log
+
+### Phase 55 — Orphaned Inputs + Recovery Score Stretching + Daily Brief Sore Spots — Complete
+- **Orphaned Inputs wired downstream (item #4):**
+  - `biggest_obstacles` + `biggest_obstacles_other` now injected into `generate-plan/route.js` AI prompt — phrased as "factor into exercise selection and recovery planning (chronic pain affects exercise choice; time constraints affect session length)"; `goals_profiles` select expanded to include both fields
+  - `primary_motivations`, `why_goals`, `sleep_hours` (from goals_profiles) wired into `daily-brief/route.js` — builds `personalContext` block with motivations (tone-shaping instruction to Claude), known obstacles (acknowledge if relevant to today's data), why text (reference only if genuinely connects), sleep target vs actual gap; system prompt updated with instructions to let motivations shape HOW things are said without reciting them verbatim
+- **Recovery Score — Stretching component:**
+  - Life Hub home (`page.js`) now fetches `stretch_logs` for yesterday; computes `stretchPts` (standalone=8, post_workout=5, pre_workout=3); adds to `maxAvailable` and `rawTotal`; `stretchPts` and `stretchSessionType` passed in score object; new "🧘 Stretching" component card in detail expand with session-type-specific explanation and tip
+  - "How it's calculated" text updated to include Stretching when logged; simplified format
+- **Daily Brief — sore spots + stretch context:**
+  - `daily-brief/route.js` now fetches today's check-in (`sore_spots`) and yesterday's `stretch_logs` in the parallel Promise.all
+  - New "MOBILITY & RECOVERY" section in Claude's data summary: reports sore spots and stretch session (type + count) or "none logged"
+  - System prompt updated: instruct Claude to acknowledge sore spots and connect to stretch recommendation; only mention if in the data
+- **Stretching page — workout fetch fix:**
+  - Replaced broken `fetch('/api/workouts/log?limit=1')` with Supabase client direct queries; now fetches `workout_logs`, `stretch_logs`, and `daily_checkins.sore_spots` in parallel via `Promise.all`; auto-sets `post_workout` session type when a workout was logged today
+- **Future Features:** item #4 (Orphaned Inputs) moved to Phase Log; Future Features list now complete
 
 ### Phase 54 — Stretching & Mobility Section — Complete
 - **`src/data/stretches.js`** — 38 stretches across 10 muscle groups; exports `STRETCHES`, `STRETCH_MUSCLE_GROUPS`, `BODY_PART_TO_STRETCH_GROUPS`, `STRETCH_BY_ID`, `STRETCH_BY_GROUP`, `getRecommendedStretches(bodyParts, soreSpots)`; each stretch has id, name, muscle_group, stretch_type (dynamic/static/both), how_to, common_mistakes, contraindications, duration_seconds; `getRecommendedStretches` builds targeted groups from today's workout body parts + sore spots, returns `{ dynamic, static, isRestDay, targetGroups }`

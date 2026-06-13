@@ -53,6 +53,8 @@ export async function POST(req) {
     { data: stepsRows },
     { data: drinkEntries },
     { data: hrYesterday },
+    { data: todayCheckin },
+    { data: yesterdayStretchLogs },
   ] = await Promise.all([
     supabase.from('goals_profiles').select('*').eq('user_id', user.id).single(),
     supabase.from('body_measurements').select('date, weight_lbs').eq('user_id', user.id).order('date', { ascending: false }).limit(5),
@@ -70,6 +72,8 @@ export async function POST(req) {
       .eq('user_id', user.id)
       .eq('date', yesterday)
       .maybeSingle(),
+    supabase.from('daily_checkins').select('sore_spots').eq('user_id', user.id).eq('date', today).maybeSingle(),
+    supabase.from('stretch_logs').select('session_type, stretch_ids').eq('user_id', user.id).eq('date', yesterday),
   ])
 
   // No goals → generic nudge
@@ -211,9 +215,39 @@ export async function POST(req) {
     totalCaffeineYest > 0 ? `  Caffeine yesterday: ${totalCaffeineYest}mg${totalCaffeineYest >= 400 ? ' — HIGH' : ''}` : '',
     (supplements || []).length ? `  Supplements: ${supplements.map(s => s.name).join(', ')}` : '',
     suppInteractionWarnings.length ? `  ⚠ Supplement interactions detected: ${suppInteractionWarnings.join('; ')}` : '',
+    '',
+    `MOBILITY & RECOVERY:`,
+    (() => {
+      const soreSpots = todayCheckin?.sore_spots?.filter(Boolean) ?? []
+      const yesterdayStretch = yesterdayStretchLogs ?? []
+      const parts = []
+      if (soreSpots.length) parts.push(`  Sore spots reported today: ${soreSpots.join(', ')}`)
+      if (yesterdayStretch.length) {
+        const type = yesterdayStretch[yesterdayStretch.length - 1].session_type
+        const count = yesterdayStretch.reduce((s, l) => s + (l.stretch_ids?.length || 0), 0)
+        parts.push(`  Stretch session yesterday: ${type.replace('_', ' ')} (${count} stretches logged)`)
+      } else {
+        parts.push('  No stretch session logged yesterday')
+      }
+      return parts.join('\n')
+    })(),
   ].filter(l => l !== null && l !== undefined)
 
-  const dataSummary = lines.join('\n')
+  // Goals context for personalization tone
+  const motivations = [...(goals.primary_motivations ?? []), ...(goals.primary_motivations_other ? [goals.primary_motivations_other] : [])]
+  const obstacles = [...(goals.biggest_obstacles ?? []), ...(goals.biggest_obstacles_other ? [goals.biggest_obstacles_other] : [])]
+  const whyText = goals.why_goals?.trim() || null
+  const goalsTargetSleep = goals.sleep_hours ? Number(goals.sleep_hours) : null
+  const sleepGap = sleepHours && goalsTargetSleep ? Math.round((sleepHours - goalsTargetSleep) * 10) / 10 : null
+
+  const personalContext = [
+    motivations.length ? `USER MOTIVATIONS (use to frame tone — don't recite verbatim): ${motivations.join(', ')}` : null,
+    obstacles.length ? `KNOWN OBSTACLES: <user_input>${obstacles.join(', ')}</user_input> — acknowledge relevant ones if they're showing up in the data (e.g. time constraint + short workout = still a win)` : null,
+    whyText ? `WHY THEY WANT THIS: <user_input>${whyText}</user_input> — reference only if it genuinely connects to what happened today` : null,
+    goalsTargetSleep ? `Sleep target: ${goalsTargetSleep}h/night${sleepGap !== null ? ` | Last night: ${sleepHours}h (${sleepGap >= 0 ? '+' : ''}${sleepGap}h vs target)` : ''}` : null,
+  ].filter(Boolean).join('\n')
+
+  const dataSummary = [lines.join('\n'), personalContext].filter(Boolean).join('\n\n')
 
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',
@@ -228,7 +262,12 @@ export async function POST(req) {
 - End with exactly one specific, actionable thing for today.
 - If data is sparse, note what tracking would unlock (make it feel like opportunity, not a scolding).
 - If they're on a streak or doing something well, say so — but be specific about what.
-- When citing resting HR or HRV: briefly explain what the number signals (e.g. elevated resting HR can mean incomplete recovery or stress; low HRV means the nervous system is still taxed; high HRV means you're well-recovered). Only reference these if the data was provided.`,
+- When citing resting HR or HRV: briefly explain what the number signals (e.g. elevated resting HR can mean incomplete recovery or stress; low HRV means the nervous system is still taxed; high HRV means you're well-recovered). Only reference these if the data was provided.
+- If sore spots are reported, acknowledge them briefly and connect to the stretch recommendation (e.g. "your [area] is sore — a post-workout stretch targeting it today would help recovery").
+- Only mention sore spots or stretching if they're in the data; don't force it into every brief.
+- USER MOTIVATIONS AND WHY: use these to shape your tone, not your content. If someone is motivated by "looking good at the beach", frame wins in terms of body comp, not abstract health. If their why is "keeping up with my kids", frame energy and stamina. Don't recite their motivations back at them verbatim — let it inform HOW you say things.
+- KNOWN OBSTACLES: if an obstacle like "busy schedule" or "chronic pain" is relevant to today's data (e.g. they still fit in a workout despite being busy), acknowledge it as a specific win. Don't mention obstacles that aren't relevant to today.
+- Sleep target: if provided and they fell short, mention the gap (e.g. "you slept 5.5h vs your 7h target") — only if sleep is a notable factor today.`,
     messages: [{ role: 'user', content: `Write my daily brief. Today is ${today}.\n\n${dataSummary}` }],
   })
 

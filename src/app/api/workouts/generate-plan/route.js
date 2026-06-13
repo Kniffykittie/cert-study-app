@@ -77,7 +77,7 @@ export async function POST(req) {
   const { goals, experience, days_per_week, workout_days, pushup_count, pullup_count, squat_count,
     has_pullup_bar, has_ab_roller, dumbbell_pairs, dumbbell_note, limitations, cardio_options } = body
 
-  const { data: goalsProfile } = await supabase.from('goals_profiles').select('goals,height_inches,weight_lbs,age,sex,body_composition,activity_level,daily_steps,target_weight_lbs,timeline').eq('user_id', user.id).single()
+  const { data: goalsProfile } = await supabase.from('goals_profiles').select('goals,height_inches,weight_lbs,age,sex,body_composition,activity_level,daily_steps,target_weight_lbs,timeline,biggest_obstacles,biggest_obstacles_other').eq('user_id', user.id).single()
 
   const goalsArray = Array.isArray(goals) ? goals : (goals || '').split(',')
   const wantsWeightLoss = goalsArray.includes('weight_loss')
@@ -146,6 +146,10 @@ BODY & LIFESTYLE CONTEXT (from user's goals profile):
 - Body composition: ${goalsProfile.body_composition ? (BODY_COMP_CONTEXT[goalsProfile.body_composition] || goalsProfile.body_composition) : 'not provided'}
 - Activity level outside gym: ${ACTIVITY_MAP[goalsProfile.activity_level] ?? goalsProfile.activity_level ?? 'not provided'}${goalsProfile.daily_steps ? ` (~${goalsProfile.daily_steps.toLocaleString()} steps/day — already has strong cardio base from daily movement)` : ''}
 - Timeline: ${goalsProfile.timeline ?? 'not specified'}
+${(() => {
+  const obs = [...(goalsProfile.biggest_obstacles ?? []), ...(goalsProfile.biggest_obstacles_other ? [goalsProfile.biggest_obstacles_other] : [])]
+  return obs.length ? `- Biggest obstacles the client has flagged: ${obs.join(', ')} — factor these into exercise selection and recovery planning (e.g. chronic pain/injuries affect exercise choice; time constraints affect session length)` : ''
+})()}
 Use this context to fine-tune volume, intensity, and cardio recommendations.` : ''
 
   const safeLimitations = limitations ? `<user_input>${limitations}</user_input>` : 'none'

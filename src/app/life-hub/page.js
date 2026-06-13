@@ -142,6 +142,7 @@ export default function LifeHubPage() {
         { data: yesterdayHrData },
         { data: recentHrData },
         { data: healthTokenData },
+        { data: yesterdayStretchLogs },
       ] = await Promise.all([
         supabase.from('daily_checkins').select('*').eq('user_id', user.id).gte('date', twentyEightAgo).order('date', { ascending: false }),
         supabase.from('water_logs').select('amount_oz').eq('user_id', user.id).gte('created_at', `${today}T00:00:00`),
@@ -162,6 +163,7 @@ export default function LifeHubPage() {
         supabase.from('health_heart_rate_daily').select('hrv_rmssd, resting_bpm').eq('user_id', user.id).eq('date', yesterday).maybeSingle(),
         supabase.from('health_heart_rate_daily').select('date, resting_bpm').eq('user_id', user.id).gte('date', (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().split('T')[0] })()).order('date'),
         supabase.from('google_health_tokens').select('id').eq('user_id', user.id).maybeSingle(),
+        supabase.from('stretch_logs').select('session_type, stretch_ids').eq('user_id', user.id).eq('date', yesterday),
       ])
 
       setCheckins(checkinData ?? [])
@@ -211,12 +213,15 @@ export default function LifeHubPage() {
       const workoutPts = yesterdayWorkoutMin === 0 ? 10 : yesterdayWorkoutMin < 45 ? 8 : yesterdayWorkoutMin <= 75 ? 5 : 3
       const yesterdayHrv = yesterdayHrData?.hrv_rmssd ?? null
       const hrvPts = yesterdayHrv == null ? null : yesterdayHrv >= 60 ? 10 : yesterdayHrv >= 40 ? 8 : yesterdayHrv >= 20 ? 5 : 2
-      const maxAvailable = 90 + (hrvPts != null ? 10 : 0)
+      const yesterdayStretch = (yesterdayStretchLogs ?? [])
+      const stretchSessionType = yesterdayStretch.length > 0 ? yesterdayStretch[yesterdayStretch.length - 1].session_type : null
+      const stretchPts = stretchSessionType === 'standalone' ? 8 : stretchSessionType === 'post_workout' ? 5 : stretchSessionType === 'pre_workout' ? 3 : null
+      const maxAvailable = 90 + (hrvPts != null ? 10 : 0) + (stretchPts != null ? 8 : 0)
       const hasEnoughData = sleepPts != null || yesterdayWaterOz > 0 || yesterdayProtein > 0
       if (hasEnoughData) {
-        const rawTotal = (sleepPts ?? 12) + hydrationPts + proteinPts + energyPts + workoutPts + (hrvPts ?? 0)
+        const rawTotal = (sleepPts ?? 12) + hydrationPts + proteinPts + energyPts + workoutPts + (hrvPts ?? 0) + (stretchPts ?? 0)
         const total = Math.round(Math.min(rawTotal, maxAvailable) / maxAvailable * 100)
-        setRecoveryScore({ total, components: { sleepPts: sleepPts ?? null, hydrationPts: Math.round(hydrationPts), proteinPts, energyPts, workoutPts, hrvPts }, sleepHours, sleepSource, yesterdayWaterOz: Math.round(yesterdayWaterOz), waterGoal, yesterdayHrv, hasHrv: hrvPts != null })
+        setRecoveryScore({ total, components: { sleepPts: sleepPts ?? null, hydrationPts: Math.round(hydrationPts), proteinPts, energyPts, workoutPts, hrvPts, stretchPts }, sleepHours, sleepSource, yesterdayWaterOz: Math.round(yesterdayWaterOz), waterGoal, yesterdayHrv, hasHrv: hrvPts != null, hasStretch: stretchPts != null, stretchSessionType })
       }
 
       // Section card data
@@ -558,6 +563,15 @@ export default function LifeHubPage() {
                   : `Your HRV was ${recoveryScore.yesterdayHrv}ms — low. High stress, poor sleep, or overtraining can suppress HRV. 2/10 pts.`,
             tip: rc.hrvPts != null && rc.hrvPts < 8 ? 'Low HRV often improves with better sleep and reduced training intensity.' : null,
           }] : []),
+          ...(recoveryScore.hasStretch ? [{
+            icon: '🧘', label: 'Stretching', pts: rc.stretchPts, max: 8,
+            detail: recoveryScore.stretchSessionType === 'standalone'
+              ? 'You logged a standalone mobility session yesterday — that earns the full 8 pts. Dedicated flexibility work speeds connective tissue recovery.'
+              : recoveryScore.stretchSessionType === 'post_workout'
+                ? 'You logged a post-workout stretch yesterday — 5/8 pts. Static holds after training reduce soreness and improve long-term flexibility.'
+                : 'You logged a pre-workout dynamic warm-up yesterday — 3/8 pts. Keeps joints prepared and prevents injury.',
+            tip: rc.stretchPts < 8 ? 'A standalone mobility session on rest days earns the full 8 pts and compounds flexibility gains over time.' : null,
+          }] : []),
         ]
 
         return (
@@ -632,7 +646,7 @@ export default function LifeHubPage() {
                 </div>
                 <div style={{ marginTop: '18px', padding: '12px 14px', backgroundColor: `${scoreColor}10`, border: `1px solid ${scoreColor}30`, borderRadius: '8px' }}>
                   <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.6' }}>
-                    <strong style={{ color: 'var(--text-primary)' }}>How it's calculated:</strong> Sleep (25 pts) + Hydration (20 pts) + Protein (20 pts) + Energy Check-In (15 pts) + Workout Load (10 pts){recoveryScore.hasHrv ? ' + HRV (10 pts) = 100 pts with smartwatch data' : ' = 90 pts without smartwatch · score normalized to 100'}. Score reflects how prepared your body is for today based on what you logged yesterday.
+                    <strong style={{ color: 'var(--text-primary)' }}>How it's calculated:</strong> Sleep (25) + Hydration (20) + Protein (20) + Energy (15) + Workout Load (10){recoveryScore.hasHrv ? ' + HRV (10)' : ''}{recoveryScore.hasStretch ? ' + Stretching (8)' : ''} = score normalized to 100. Reflects how prepared your body is for today based on what you logged yesterday.
                   </p>
                 </div>
               </div>
