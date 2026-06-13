@@ -73,6 +73,14 @@ Always provide a brief summary covering:
 2. **What was changed** (files/logic updated)
 3. **What to test** to confirm it works correctly
 
+### Feature Tracking — Enforced Every Session
+- **Any feature discussed but not built in the same session must be added to `build-notes.md` Future Features before the conversation ends.** Even a one-liner placeholder is enough. No exceptions.
+- **At the start of any planning session** ("what should we build?", "what's left?", "let's make a plan") — read the Future Features section of `build-notes.md` before discussing new ideas. Do not re-spec things already captured.
+- **When a feature is built**, move its entry from Future Features to the Phase Log in the same commit. Never leave it in both places.
+- **When a DB table is created or column added**, update the Database Tables section in `build-notes.md` in the same commit.
+- **When a security item is built**, mark it ✅ in the Security Status table in `build-notes.md` in the same commit.
+- **QA items** in the Untested section are removed once the user confirms tested and passing.
+
 ---
 
 ## Directory Structure
