@@ -124,6 +124,7 @@ src/
         progress-photos/route.js       GET list with signed URLs (1hr); POST upload with magic byte validation + Supabase Storage; DELETE removes from Storage + DB; uses getUser() + is_disabled check
       supplements/
         generate-profile/route.js      POST — AI supplement info card (Sonnet); cached in supplement_profiles by normalized name (shared across users); uses getUser() + is_disabled check; supplement name wrapped in user_input tags
+        ai-fill/route.js               POST { name } — Haiku estimates dose, timing, and nutrients for a supplement name; used by "🤖 AI Fill" button in the add form on supplements page; no cache; uses getUser() + is_disabled check; name wrapped in user_input tags
       nutrition/
         search/route.js                GET ?q= or ?barcode= — checks food_cache + my_foods first; falls back to Open Food Facts API; caches OFF results permanently (ODbL allows); uses getUser()
         ai-food-fill/route.js          POST { name } — Haiku estimates nutrition per typical serving; returns fill JSONB (name, serving_size_label, macros + subset of micros + servings_per_container); no cache (user reviews before saving); uses getUser() + is_disabled check

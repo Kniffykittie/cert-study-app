@@ -302,14 +302,16 @@ function EditModal({ supplement, onSave, onClose }) {
   )
 }
 
-function SupplementForm({ form, setForm, updateNutrient, addNutrient, removeNutrient }) {
+function SupplementForm({ form, setForm, updateNutrient, addNutrient, removeNutrient, hideName }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div>
-        <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600, display: 'block', marginBottom: 6 }}>Supplement Name *</label>
-        <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Magnesium Glycinate"
-          style={{ width: '100%', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary)', fontSize: 14, boxSizing: 'border-box' }} />
-      </div>
+      {!hideName && (
+        <div>
+          <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600, display: 'block', marginBottom: 6 }}>Supplement Name *</label>
+          <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Magnesium Glycinate"
+            style={{ width: '100%', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary)', fontSize: 14, boxSizing: 'border-box' }} />
+        </div>
+      )}
       <div>
         <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600, display: 'block', marginBottom: 6 }}>Dose *</label>
         <input value={form.dose} onChange={e => setForm(p => ({ ...p, dose: e.target.value }))} placeholder="e.g. 400mg, 1 capsule, 5g"
@@ -356,6 +358,8 @@ export default function SupplementsPage() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [aiFilling, setAiFilling] = useState(false)
+  const [aiFilled, setAiFilled] = useState(false)
   const [infoModal, setInfoModal] = useState(null)
   const [editModal, setEditModal] = useState(null)
   const [showWhy, setShowWhy] = useState(false)
@@ -370,6 +374,31 @@ export default function SupplementsPage() {
   }
   function addNutrientRow() { setForm(prev => ({ ...prev, nutrients: [...prev.nutrients, { nutrient: '', amount: '', unit: 'mg' }] })) }
   function removeNutrientRow(i) { setForm(prev => ({ ...prev, nutrients: prev.nutrients.filter((_, idx) => idx !== i) })) }
+
+  async function handleAiFill() {
+    if (!form.name.trim() || aiFilling) return
+    setAiFilling(true)
+    try {
+      const res = await fetch('/api/supplements/ai-fill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: form.name.trim() }),
+      })
+      const json = await res.json()
+      if (json.fill) {
+        const { dose, timing, nutrients } = json.fill
+        const nutrientsList = nutrients && Object.keys(nutrients).length
+          ? Object.entries(nutrients).map(([nutrient, val]) => {
+              const parts = String(val).split(' ')
+              return { nutrient, amount: parts[0] || '', unit: parts[1] || 'mg' }
+            })
+          : [{ nutrient: '', amount: '', unit: 'mg' }]
+        setForm(prev => ({ ...prev, dose: dose || prev.dose, timing: timing || prev.timing, nutrients: nutrientsList }))
+        setAiFilled(true)
+      }
+    } catch {}
+    setAiFilling(false)
+  }
 
   useEffect(() => { loadStack() }, [])
 
@@ -501,7 +530,7 @@ export default function SupplementsPage() {
             </div>
           )}
         </div>
-        <button onClick={() => { setShowAddForm(true); setForm(EMPTY_FORM) }}
+        <button onClick={() => { setShowAddForm(true); setForm(EMPTY_FORM); setAiFilled(false) }}
           style={{ padding: '9px 16px', background: 'var(--accent-blue)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, marginTop: 4 }}>
           + Add
         </button>
@@ -514,7 +543,21 @@ export default function SupplementsPage() {
             <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 15, fontWeight: 700 }}>New Supplement</h3>
             <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 18, cursor: 'pointer' }}>✕</button>
           </div>
-          <SupplementForm form={form} setForm={setForm} updateNutrient={updateNutrient} addNutrient={addNutrientRow} removeNutrient={removeNutrientRow} />
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600, display: 'block', marginBottom: 6 }}>Supplement Name *</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input value={form.name} onChange={e => { setForm(p => ({ ...p, name: e.target.value })); setAiFilled(false) }} placeholder="e.g. Magnesium Glycinate"
+                style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary)', fontSize: 14, boxSizing: 'border-box' }} />
+              <button onClick={handleAiFill} disabled={!form.name.trim() || aiFilling}
+                style={{ padding: '9px 14px', background: aiFilled ? 'rgba(46,204,113,0.15)' : 'rgba(96,165,250,0.1)', border: `1px solid ${aiFilled ? 'rgba(46,204,113,0.5)' : 'var(--accent-blue)'}`, borderRadius: 8, color: aiFilled ? 'var(--success)' : 'var(--accent-blue)', fontSize: 13, fontWeight: 600, cursor: form.name.trim() && !aiFilling ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', opacity: !form.name.trim() || aiFilling ? 0.5 : 1 }}>
+                {aiFilling ? '⏳ Filling...' : aiFilled ? '✓ AI Filled' : '🤖 AI Fill'}
+              </button>
+            </div>
+            {aiFilled && (
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--success)' }}>AI estimated dose, timing, and nutrients — review and adjust before saving.</div>
+            )}
+          </div>
+          <SupplementForm form={form} setForm={setForm} updateNutrient={updateNutrient} addNutrient={addNutrientRow} removeNutrient={removeNutrientRow} hideName />
           <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
             <button onClick={() => setShowAddForm(false)} style={{ flex: 1, padding: '11px', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
             <button onClick={handleAdd} disabled={saving || !form.name.trim() || !form.dose.trim()}

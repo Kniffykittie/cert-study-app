@@ -641,6 +641,13 @@ A complete system parallel to Workouts but lighter in logging. No timer, no HR t
 - **Same-day completion gate** — "✓ Done Today" on plan card
 - **Stale pause cleanup** — auto-cleared if paused workout is from previous day
 
+### Phase 52 - Complete
+- **AI Supplement Fill** — "🤖 AI Fill" button in the add supplement form
+- Type a supplement name → click 🤖 AI Fill → Haiku returns dose, timing, and nutrients; pre-fills form fields; user reviews and adjusts before saving
+- New API route: `POST /api/supplements/ai-fill` — Haiku, getUser() + is_disabled check, name wrapped in `<user_input>` tags, returns `{ fill: { dose, timing, nutrients } }`; returns `{ error }` for unknown supplements
+- `SupplementForm` component updated to accept `hideName` prop (add form renders its own name input + AI fill button row above the form)
+- AI filled indicator (green "✓ AI Filled" button + hint text) cleared when name changes
+
 ### Phase 51 - Complete
 - **Workout Logging system** — active workout page, workout history, progressive overload detection
 - `/life-hub/workouts/log/page.js` — live timer, exercise cards, set rows, add set/drop set, prev session hints, completion screen
