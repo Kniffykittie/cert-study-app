@@ -51,13 +51,19 @@ export default function HeartRatePage() {
 
   useEffect(() => {
     async function load() {
-      const statusRes = await fetch('/api/health/status')
-      const status = await statusRes.json()
-      if (!status.connected) { setConnected(false); setLoading(false); return }
-      setConnected(true)
-      const res = await fetch('/api/health/heart-rate')
-      const json = await res.json()
-      if (!json.error) setData(json)
+      try {
+        const statusRes = await fetch('/api/health/status')
+        const status = await statusRes.json()
+        if (!status.connected) { setConnected(false); setLoading(false); return }
+        setConnected(true)
+        const res = await fetch('/api/health/heart-rate')
+        if (res.ok) {
+          const json = await res.json()
+          if (!json.error) setData(json)
+        }
+      } catch (e) {
+        console.error('HR page load error:', e)
+      }
       setLoading(false)
     }
     load()
