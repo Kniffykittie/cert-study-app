@@ -1016,7 +1016,7 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button type="button" onClick={() => {
                       sessionStorage.setItem('manual_prefill', JSON.stringify(aiPreview))
-                      router.push(`/life-hub/nutrition/log-manual?slot=${slot}`)
+                      window.location.href = `/life-hub/nutrition/log-manual?slot=${slot}`
                     }}
                       style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px', fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                       ✏️ Edit Details

@@ -300,6 +300,10 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ## Phase Log
 
+### Phase 56b — Edit Details hard navigation fix — Complete
+- `router.push()` is a React client-side navigation — the current page's JS keeps running until the new page mounts, which on mobile is enough to crash the tab
+- Changed "Edit Details" button to `window.location.href = ...` — this is a hard browser navigation that immediately halts all JS on the current page, freeing its entire RAM budget before the log-manual page loads
+
 ### Phase 56 — Barcode Scanner + AI Food Estimate Crash Fix — Complete
 - **Barcode scanner added** to Nutrition food search (📷 button next to search input in AddFoodModal) and Drinks & Hydration drink search
 - Native `BarcodeDetector` API only — no WASM polyfill (WASM caused OOM crashes on mobile); shows clear error on unsupported browsers
