@@ -77,6 +77,7 @@ function LogManualInner() {
       if (saveToLib) {
         const libEntry = { ...form, is_ingredient: false, is_snack: false, is_drink: false }
         for (const k of numKeys) libEntry[k] = form[k] !== '' ? parseFloat(form[k]) : null
+        if (servingsPerContainer !== '' && servingsPerContainer != null) libEntry.servings_per_container = parseFloat(servingsPerContainer) || null
         await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(libEntry) })
       }
 
@@ -143,15 +144,19 @@ function LogManualInner() {
               <label style={{ color: 'var(--text-secondary)', fontSize: '13px', flexShrink: 0 }}>Servings:</label>
               <input type="number" min="0.25" step="0.25" value={servings} onChange={e => setServings(e.target.value)}
                 style={{ width: '80px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '14px', textAlign: 'center' }} />
-              {servingsPerContainer && (
-                <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
-                  ({servingsPerContainer} per container —{' '}
-                  <button type="button" onClick={() => setServings(String(servingsPerContainer))}
-                    style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', padding: 0, fontWeight: '600' }}>
-                    log whole container
-                  </button>)
-                </span>
+              {servingsPerContainer != null && servingsPerContainer !== '' && (
+                <button type="button" onClick={() => setServings(String(servingsPerContainer))}
+                  style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', padding: 0, fontWeight: '600' }}>
+                  × {servingsPerContainer} (whole container)
+                </button>
               )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ color: 'var(--text-secondary)', fontSize: '13px', flexShrink: 0 }}>Servings/container:</label>
+              <input type="number" min="1" step="0.5" placeholder="e.g. 2.5"
+                value={servingsPerContainer ?? ''}
+                onChange={e => setServingsPerContainer(e.target.value)}
+                style={{ width: '80px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '14px', textAlign: 'center' }} />
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
               <input type="checkbox" checked={saveToLib} onChange={e => setSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '15px', height: '15px' }} />

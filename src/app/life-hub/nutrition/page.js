@@ -284,7 +284,7 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
               {results.length > 0 && (
                 <div style={{ marginBottom: '12px' }}>
                   {query && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Results</div>}
-                  {results.map((f, i) => (
+                  {results.slice(0, 8).map((f, i) => (
                     <FoodRow key={f.id || i} food={f} selected={selected?.id === f.id && selected?._source !== 'my_foods'} onSelect={setSelected}
                       onSave={handleQuickSave} savingId={savingFood} dietaryWarnings={getDietaryWarnings(f, dietaryPrefs)} />
                   ))}
@@ -1828,7 +1828,7 @@ function MealBuilderModal({ onClose, onSave, savedIngredients = [] }) {
             {searching && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>Searching...</div>}
             {results.length > 0 && (
               <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
-                {results.map((food, i) => (
+                {results.slice(0, 8).map((food, i) => (
                   <button key={i} onClick={() => addIngredient(food)}
                     style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', background: 'var(--background)', border: 'none', borderBottom: i < results.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>

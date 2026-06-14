@@ -300,6 +300,10 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ## Phase Log
 
+### Phase 56e — Servings/container editable + search results capped — Complete
+- `log-manual/page.js`: servings_per_container is now an editable input field (pre-filled by AI, editable before saving); saved to My Favorites library when checked; "× 2.5 (whole container)" quick-fill button shown when value is set
+- `nutrition/page.js`: capped all `results.map()` calls to `results.slice(0, 8)` in SearchModal and MealBuilder search — prevents unbounded DOM lists from crashing mobile
+
 ### Phase 56d — Standalone add-food page replaces inline AddFoodModal — Complete
 - AddFoodModal was crashing the mobile tab when opened from any "Add [slot]" button — same OOM root cause as Edit Details
 - New `/life-hub/nutrition/add-food?slot=breakfast` page handles the entire add-food flow off the heavy nutrition page
