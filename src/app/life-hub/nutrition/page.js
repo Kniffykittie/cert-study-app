@@ -2,6 +2,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import BarcodeScannerModal from '@/components/BarcodeScannerModal'
 import { calcTDEE as calcTDEEShared, calcMacros as calcMacrosShared, calcGoalAdjustment, calcMicroTargets } from '@/lib/tdee'
 import { NUTRIENTS, matchSuppToNutrient, parseSuppAmount } from '@/data/nutrients'
 
@@ -458,6 +460,7 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
 }
 
 function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal, workoutCtx, dietaryPrefs }) {
+  const router = useRouter()
   const [tab, setTab] = useState('favorites')
   const [filter, setFilter] = useState('')
   const [expandedId, setExpandedId] = useState(null)
@@ -955,7 +958,49 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
                     <span>🤖</span>
                     <span>{aiFilling ? 'Estimating nutrition...' : `Ask AI to estimate "${query}"`}</span>
                   </button>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '11px', margin: '8px 0 0', opacity: 0.7 }}>AI will pre-fill the manual entry form — review and adjust before logging.</p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '11px', margin: '8px 0 0', opacity: 0.7 }}>AI will estimate the nutrition — review before logging.</p>
+                </div>
+              )}
+              {aiPreview && (
+                <div style={{ marginTop: '8px', backgroundColor: 'rgba(241,196,15,0.06)', border: '1px solid rgba(241,196,15,0.3)', borderRadius: '10px', padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                    <div>
+                      <p style={{ color: 'var(--warning)', fontSize: '11px', fontWeight: '700', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>🤖 AI Estimate — Review Before Logging</p>
+                      <p style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', margin: 0 }}>{aiPreview.name}</p>
+                      {aiPreview.serving_size_label && <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '2px 0 0' }}>Per {aiPreview.serving_size_label}</p>}
+                    </div>
+                    <button type="button" onClick={() => setAiPreview(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', padding: '0 0 0 8px', flexShrink: 0 }}>✕</button>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                    {[['Cal', aiPreview.calories], ['Protein', aiPreview.protein_g ? aiPreview.protein_g + 'g' : null], ['Carbs', aiPreview.carbs_g ? aiPreview.carbs_g + 'g' : null], ['Fat', aiPreview.fat_g ? aiPreview.fat_g + 'g' : null]].filter(([, v]) => v).map(([label, val]) => (
+                      <div key={label} style={{ backgroundColor: 'var(--background)', borderRadius: '6px', padding: '5px 10px', textAlign: 'center' }}>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>{label}</div>
+                        <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{val}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="button" onClick={() => {
+                      sessionStorage.setItem('manual_prefill', JSON.stringify(aiPreview))
+                      router.push(`/life-hub/nutrition/log-manual?slot=${slot}`)
+                    }}
+                      style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px', fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                      ✏️ Edit Details
+                    </button>
+                    <button type="button" onClick={async () => {
+                      setSavingManual(true)
+                      const sv = parseFloat(manualServings) || 1
+                      const entry = { meal_slot: slot, name: aiPreview.name, brand: aiPreview.brand || null, serving_size_label: aiPreview.serving_size_label || '1 serving', servings: sv, source: 'manual' }
+                      const numKeys = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg','saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg']
+                      for (const k of numKeys) entry[k] = aiPreview[k] != null && aiPreview[k] !== '' ? parseFloat(aiPreview[k]) * sv : null
+                      if (manualSaveToLib) await onSaveFood({ ...aiPreview, is_ingredient: false, is_snack: false })
+                      await onAdd(entry)
+                      setSavingManual(false)
+                      onClose()
+                    }} style={{ flex: 2, backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '7px', padding: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                      + Log to {mealInfo?.label}
+                    </button>
+                  </div>
                 </div>
               )}
               {!searching && query && results.length > 0 && results.length < 2 && (

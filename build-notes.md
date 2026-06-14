@@ -301,6 +301,19 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ## Phase Log
 
+### Phase 56 — Barcode Scanner + AI Food Estimate Crash Fix — Complete
+- **Barcode scanner added** to Nutrition food search (📷 button next to search input in AddFoodModal) and Drinks & Hydration drink search
+- Native `BarcodeDetector` API only — no WASM polyfill (WASM caused OOM crashes on mobile); shows clear error on unsupported browsers
+- Camera resolution reduced to 640×480 to minimize frame buffer memory; requires same barcode 3 consecutive frames before firing
+- `onResultRef` pattern in `BarcodeScannerModal` — stores `onResult` in ref so `useEffect` dependency array is `[]`, preventing runaway camera restarts on every parent re-render
+- **Crash fix:** "Ask AI to estimate" → "Edit Details" path was crashing mobile tabs (Android OOM killer)
+  - Root cause: `setTab('manual')` on the heavy nutrition page rendered 17+ new inputs simultaneously, pushing RAM over mobile browser limit
+  - Fix: AI result shows a lightweight preview card (name + cal/protein/carbs/fat chips + "Log It" + "Edit Details")
+  - "Edit Details" stores prefill in `sessionStorage` and navigates to new standalone `/life-hub/nutrition/log-manual` page
+  - Log-manual page is completely separate from the heavy nutrition page — completely unmounts it, giving the form all available RAM
+  - On successful log, navigates back to `/life-hub/nutrition`
+- New file: `src/app/life-hub/nutrition/log-manual/page.js` — lightweight standalone manual entry page; reads `manual_prefill` from sessionStorage on mount; shows name/brand/serving + 4 core macros by default; "▼ Show fiber, sodium & micronutrients" toggle for 10 additional fields; wrapped in `<Suspense>` (required by Next.js for `useSearchParams`)
+
 ### Vercel Fix — SITE_URL self-reference bug in health callback — Complete
 - `replace_all` accidentally replaced `process.env.NEXT_PUBLIC_SITE_URL` inside the SITE_URL constant definition itself, creating `const SITE_URL = SITE_URL || ...` — fixed to use `process.env.NEXT_PUBLIC_SITE_URL`
 
