@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -1473,17 +1473,21 @@ function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, o
 
   const today = new Date().toISOString().split('T')[0]
 
-  // Group into sections
-  const pinned = myFoods.filter(f => f.is_pinned)
-  const unpinned = myFoods.filter(f => !f.is_pinned)
-  const loggedToday = unpinned.filter(f => f.last_logged_at && new Date(f.last_logged_at).toISOString().split('T')[0] === today)
-  const loggedThisWeek = unpinned.filter(f => {
-    if (!f.last_logged_at) return false
-    const days = Math.floor((Date.now() - new Date(f.last_logged_at)) / 86400000)
-    return days > 0 && days < 7
-  })
-  const loggedOlder = unpinned.filter(f => f.last_logged_at && Math.floor((Date.now() - new Date(f.last_logged_at)) / 86400000) >= 7)
-  const neverLogged = unpinned.filter(f => !f.last_logged_at)
+  // Single-pass grouping — replaces 5 separate .filter() scans
+  const { pinned, loggedToday, loggedThisWeek, loggedOlder, neverLogged } = useMemo(() => {
+    const now = Date.now()
+    const p = [], lt = [], lw = [], lo = [], nl = []
+    for (const f of myFoods) {
+      if (f.is_pinned) { p.push(f); continue }
+      if (!f.last_logged_at) { nl.push(f); continue }
+      const days = Math.floor((now - new Date(f.last_logged_at)) / 86400000)
+      const dateStr = new Date(f.last_logged_at).toISOString().split('T')[0]
+      if (dateStr === today) lt.push(f)
+      else if (days < 7) lw.push(f)
+      else lo.push(f)
+    }
+    return { pinned: p, loggedToday: lt, loggedThisWeek: lw, loggedOlder: lo, neverLogged: nl }
+  }, [myFoods, today])
 
   const sections = [
     { key: 'pinned', label: '📌 Pinned', items: pinned },

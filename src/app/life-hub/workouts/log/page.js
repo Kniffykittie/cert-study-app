@@ -350,7 +350,7 @@ function LogWorkoutPageInner() {
     // Prefetch exercise details from Supabase for "?" and dropset notes
     const names = (todayPlan.exercises || []).map(ex => ex.exercise_name).filter(Boolean)
     if (names.length) {
-      const { data: exRows } = await supabase.from('exercises').select('*').in('name', names)
+      const { data: exRows } = await supabase.from('exercises').select('id, name, body_part, equipment, target, secondary_muscles, instructions, gif_url').in('name', names)
       const map = {}
       for (const ex of exRows ?? []) map[ex.name.toLowerCase()] = ex
       setExDetailMap(map)

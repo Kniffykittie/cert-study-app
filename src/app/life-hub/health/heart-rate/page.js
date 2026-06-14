@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback, useRef, Component } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo, Component } from 'react'
 import Link from 'next/link'
 
 class ErrorBoundary extends Component {
@@ -85,64 +85,83 @@ function HeartRatePageInner() {
 
   // ALL computation and hooks must be before any conditional returns (Rules of Hooks)
   const fiveMin = data?.fiveMin ?? []
-  const intraday = data?.intraday ?? []
+  // If 5-min data exists, discard intraday from memory — no need to hold both
+  const intraday = fiveMin.length > 0 ? [] : (data?.intraday ?? [])
   const daily = data?.daily ?? []
   const workoutWindow = data?.workoutWindow ?? null
 
   const useFiveMin = fiveMin.length > 0
   const hasData = useFiveMin ? fiveMin.length > 0 : intraday.length > 0
 
-  const chartPoints = useFiveMin
-    ? fiveMin.slice().sort((a, b) => a.minute_bucket - b.minute_bucket)
-    : intraday.slice().sort((a, b) => a.hour - b.hour).map(r => ({ ...r, minute_bucket: r.hour * 60 }))
+  const chartPoints = useMemo(() =>
+    useFiveMin
+      ? fiveMin.slice().sort((a, b) => a.minute_bucket - b.minute_bucket)
+      : intraday.slice().sort((a, b) => a.hour - b.hour).map(r => ({ ...r, minute_bucket: r.hour * 60 })),
+  [fiveMin, intraday, useFiveMin])
 
-  const allBpm = chartPoints.map(p => p.avg_bpm).filter(Boolean)
-  const allMin = useFiveMin ? chartPoints.map(p => p.min_bpm).filter(Boolean) : allBpm
-  const allMax = useFiveMin ? chartPoints.map(p => p.max_bpm).filter(Boolean) : allBpm
-  const dataMin = allMin.length ? allMin.reduce((a, b) => Math.min(a, b), Infinity) : 40
-  const dataMax = allMax.length ? allMax.reduce((a, b) => Math.max(a, b), -Infinity) : 120
-  const yMin = Math.max(0, dataMin - 15)
-  const yMax = Math.max(dataMax + 15, yMin + 30)
+  const { yMin, yMax } = useMemo(() => {
+    const allBpm = chartPoints.map(p => p.avg_bpm).filter(Boolean)
+    const allMin = useFiveMin ? chartPoints.map(p => p.min_bpm).filter(Boolean) : allBpm
+    const allMax = useFiveMin ? chartPoints.map(p => p.max_bpm).filter(Boolean) : allBpm
+    const dataMin = allMin.length ? allMin.reduce((a, b) => Math.min(a, b), Infinity) : 40
+    const dataMax = allMax.length ? allMax.reduce((a, b) => Math.max(a, b), -Infinity) : 120
+    return { yMin: Math.max(0, dataMin - 15), yMax: Math.max(dataMax + 15, Math.max(0, dataMin - 15) + 30) }
+  }, [chartPoints, useFiveMin])
 
   const plotW = SVG_W - PAD_LEFT - PAD_RIGHT
   const plotH = SVG_H - PAD_TOP - PAD_BOTTOM
 
-  const xOf = (minute) => PAD_LEFT + (minute / 1439) * plotW
-  const yOf = (bpm) => PAD_TOP + plotH - ((bpm - yMin) / (yMax - yMin)) * plotH
+  const xOf = useCallback((minute) => PAD_LEFT + (minute / 1439) * plotW, [plotW])
+  const yOf = useCallback((bpm) => PAD_TOP + plotH - ((bpm - yMin) / (yMax - yMin)) * plotH, [plotH, yMin, yMax])
 
-  const yStep = Math.max(10, Math.ceil((yMax - yMin) / 4 / 10) * 10)
-  const yTicks = []
-  for (let v = Math.ceil(yMin / 10) * 10; v <= yMax && yTicks.length < 20; v += yStep) yTicks.push(v)
+  const { yTicks, avgPath, bandPath, wStartX, wEndX } = useMemo(() => {
+    const yStep = Math.max(10, Math.ceil((yMax - yMin) / 4 / 10) * 10)
+    const ticks = []
+    for (let v = Math.ceil(yMin / 10) * 10; v <= yMax && ticks.length < 20; v += yStep) ticks.push(v)
 
-  const avgPath = chartPoints
-    .filter(p => p.avg_bpm)
-    .map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(p.minute_bucket).toFixed(1)},${yOf(p.avg_bpm).toFixed(1)}`)
-    .join(' ')
+    const aPath = chartPoints
+      .filter(p => p.avg_bpm)
+      .map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(p.minute_bucket).toFixed(1)},${yOf(p.avg_bpm).toFixed(1)}`)
+      .join(' ')
 
-  const bandPts = useFiveMin ? chartPoints.filter(p => p.min_bpm && p.max_bpm) : []
-  const bandPath = bandPts.length > 1
-    ? bandPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(p.minute_bucket).toFixed(1)},${yOf(p.max_bpm).toFixed(1)}`).join(' ')
-      + ' ' + bandPts.slice().reverse().map(p => `L${xOf(p.minute_bucket).toFixed(1)},${yOf(p.min_bpm).toFixed(1)}`).join(' ') + ' Z'
-    : null
+    const bandPts = useFiveMin ? chartPoints.filter(p => p.min_bpm && p.max_bpm) : []
+    const bPath = bandPts.length > 1
+      ? bandPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(p.minute_bucket).toFixed(1)},${yOf(p.max_bpm).toFixed(1)}`).join(' ')
+        + ' ' + bandPts.slice().reverse().map(p => `L${xOf(p.minute_bucket).toFixed(1)},${yOf(p.min_bpm).toFixed(1)}`).join(' ') + ' Z'
+      : null
 
-  const hourLabels = [0, 3, 6, 9, 12, 15, 18, 21]
-  const wStartX = workoutWindow ? xOf(workoutWindow.startMinute) : null
-  const wEndX = workoutWindow ? xOf(Math.min(workoutWindow.endMinute + 5, 1439)) : null
+    return {
+      yTicks: ticks,
+      avgPath: aPath,
+      bandPath: bPath,
+      wStartX: workoutWindow ? xOf(workoutWindow.startMinute) : null,
+      wEndX: workoutWindow ? xOf(Math.min(workoutWindow.endMinute + 5, 1439)) : null,
+    }
+  }, [chartPoints, yMin, yMax, useFiveMin, workoutWindow, xOf, yOf])
+
+  // Pre-sorted index for binary search during mouse hover
+  const sortedPoints = useMemo(() => chartPoints.filter(p => p.avg_bpm), [chartPoints])
+  const lastMoveTime = useRef(0)
 
   const handleSvgMouseMove = useCallback((e) => {
-    if (!svgRef.current || !chartPoints.length) return
+    const now = Date.now()
+    if (now - lastMoveTime.current < 50) return  // throttle to 20fps
+    lastMoveTime.current = now
+    if (!svgRef.current || !sortedPoints.length) return
     const rect = svgRef.current.getBoundingClientRect()
     const relX = e.clientX - rect.left
     const svgX = (relX / rect.width) * SVG_W
     const minute = Math.round(((svgX - PAD_LEFT) / plotW) * 1439)
     if (minute < 0 || minute > 1439) { setTooltip(null); return }
-    // Find closest point
-    let closest = null
-    let bestDist = Infinity
-    for (const p of chartPoints) {
-      if (!p.avg_bpm) continue
-      const d = Math.abs(p.minute_bucket - minute)
-      if (d < bestDist) { bestDist = d; closest = p }
+    // Binary search for closest point
+    let lo = 0, hi = sortedPoints.length - 1, closest = null, bestDist = Infinity
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1
+      const d = Math.abs(sortedPoints[mid].minute_bucket - minute)
+      if (d < bestDist) { bestDist = d; closest = sortedPoints[mid] }
+      if (sortedPoints[mid].minute_bucket < minute) lo = mid + 1
+      else if (sortedPoints[mid].minute_bucket > minute) hi = mid - 1
+      else break
     }
     if (!closest || bestDist > (useFiveMin ? 15 : 90)) { setTooltip(null); return }
     const cx = xOf(closest.minute_bucket)
@@ -153,7 +172,7 @@ function HeartRatePageInner() {
       closest.minute_bucket >= workoutWindow.startMinute &&
       closest.minute_bucket <= workoutWindow.endMinute + 5
     setTooltip({ point: closest, screenX, screenY, isWorkout })
-  }, [chartPoints, workoutWindow, useFiveMin])
+  }, [sortedPoints, workoutWindow, useFiveMin, plotW, xOf, yOf])
 
   // 7-day resting HR trend
   const restingTrend = daily.filter(r => r.resting_bpm).slice(-7)

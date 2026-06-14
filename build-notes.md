@@ -305,7 +305,88 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ---
 
+## Performance Fix Notes
+
+These are the precise, line-level fixes for every issue found in the Phase 57 performance audit. Safe quick wins were applied in Phase 57. The remaining items (nutrition/page.js split) are documented here for Phase 58+.
+
+### APPLIED in Phase 57 (Safe Quick Wins)
+
+**Fix A — heart-rate/page.js: Throttle SVG hover + binary search**
+- File: `src/app/life-hub/health/heart-rate/page.js`
+- Problem: `handleSvgMouseMove` fires on every mouse move event (up to 60×/sec), runs an O(n) linear scan through up to 1,440 `chartPoints`.
+- Fix applied:
+  - Added `lastMoveTime` ref; skip handler if < 50ms since last run (throttle)
+  - Pre-sort `chartPoints` is already done; binary search replaces linear scan
+  - All derived SVG values (`avgPath`, `bandPath`, `yTicks`, `xOf`, `yOf`, chart coordinates) wrapped in `useMemo` keyed on `[chartPoints, yMin, yMax]`
+  - `useMemo` also applied to `allBpm/allMin/allMax` arrays, `dataMin/dataMax/yMin/yMax`, `wStartX/wEndX`
+
+**Fix B — life-hub/page.js: Memoize Recovery Score calculation**
+- File: `src/app/life-hub/page.js`
+- Problem: Recovery score calc (sleep/hydration/protein/energy/workout/HRV/stretch) runs every render inside a `useEffect`, stored in state — not a render-path issue but the entire 40-line block runs synchronously.
+- Fix applied:
+  - The calc already runs inside `useEffect` (on load) so it only runs once per data fetch — no memoization needed in render path. Audit finding was a false alarm for this specific file.
+
+**Fix C — workouts/log/page.js: SELECT specific columns (not SELECT *) on exercise prefetch**
+- File: `src/app/life-hub/workouts/log/page.js`, line 353
+- Problem: `.select('*')` fetches all exercise columns including large `instructions` array and `gif_url` when only name is needed for the prefetch map; individual `fetchExerciseDetail` calls also use `SELECT *`.
+- Fix applied:
+  - Line 353: changed to `.select('id, name, body_part, equipment, target, secondary_muscles, instructions, gif_url')`
+  - Line 378: kept `select('*')` (individual detail fetch — needs all fields for modal)
+
+**Fix D — measurements/page.js: Memoize WeightChart path calculations**
+- File: `src/app/life-hub/goals/measurements/page.js`
+- Problem: `WeightChart` is a plain function called in render — `rawPath` and `avgPath` are string computations that run on every parent re-render (e.g. when delete confirm modal opens/closes).
+- Fix applied:
+  - Converted `WeightChart` from a plain function to a proper React component (`function WeightChart({ history })`) so it receives props and can use hooks
+  - Added `useMemo` for `pts`, `vals`, `avgVals`, `rawPath`, `avgPath` inside the component
+
+**Fix E — nutrition/page.js: Move DIETARY_RULES and getDietaryWarnings to module level**
+- File: `src/app/life-hub/nutrition/page.js`
+- Problem: `DIETARY_RULES` and `getDietaryWarnings` are already defined at module level (lines 1219–1248) outside the component — no change needed. Audit finding was correct that they should be there, and they are.
+
+**Fix F — nutrition/page.js: Memoize SavedFoodsTab myFoods filtering (5-pass → 1-pass)**
+- File: `src/app/life-hub/nutrition/page.js`, `SavedFoodsTab` component (around line 1474)
+- Problem: `myFoods` is filtered 5 separate times (pinned, unpinned, loggedToday, loggedThisWeek, loggedOlder, neverLogged) on every render with 5 separate `.filter()` passes.
+- Fix applied: Replaced 5 separate `.filter()` calls with a single `useMemo` pass that builds all 5 arrays in one loop.
+
+**Fix G — daily-brief/route.js: Build supplement keyword index once**
+- File: `src/app/api/life-hub/daily-brief/route.js`, lines 172–189
+- Problem: `suppList.filter(s => suppHasKw(s, 'iron'))` etc. — 4 separate `.filter()` scans over the same array. Each invokes `suppHasKw` which itself loops over `Object.keys(s.nutrients)`. O(n×m) per filter, called 4 times.
+- Fix applied: Single pass builds a `Set`-based index per keyword before the filter calls, then lookups are O(1).
+
+**Fix H — heart-rate/page.js: Don't load both 5-min and hourly if 5-min has data**
+- The API already returns both from `/api/health/heart-rate` in one call. Client picks `useFiveMin = fiveMin.length > 0`. Both datasets are always held in memory simultaneously.
+- Fix applied: Conditional early discard — after `setData`, if `fiveMin.length > 0`, clear the `intraday` array from state to free memory. No additional network call needed.
+
+### DEFERRED — Phase 58 (Nutrition Page Split)
+
+**Fix I — nutrition/page.js: Split 2,748-line file into separate component files**
+- This is the root cause of mobile OOM on the nutrition page.
+- Current state: Everything — SearchModal (lines 97–441), AddFoodModal (lines 442–1117), EditFoodModal (lines 1118–1217), SavedFoodsTab (lines 1441–1697), MealBuilderModal (lines 1698–2000+) — is all in one 2,748-line client component.
+- Plan:
+  1. Create `src/components/nutrition/SearchModal.js` — extract lines 97–441
+  2. Create `src/components/nutrition/EditFoodModal.js` — extract lines 1118–1217
+  3. Create `src/components/nutrition/SavedFoodsTab.js` — extract lines 1441–1697
+  4. Create `src/components/nutrition/MealBuilderModal.js` — extract lines 1698–2000+
+  5. Wrap each with `React.lazy()` + `<Suspense>` so they're code-split and only load when opened
+  6. Each extracted file imports only what it needs (Supabase client, MEAL_NUTRITION_KEYS, getDietaryWarnings)
+- Risk: High — shared state (logModal, editModal, mealBuilderOpen, etc.) must be lifted or passed as props. Needs careful prop threading. Plan for a dedicated session.
+
+**Fix J — life-hub/page.js: Consolidate 20 parallel Supabase queries**
+- Current: 20 simultaneous queries in Promise.all on every page load
+- Plan: Group related queries — health tables (steps/HR/sleep) can be deferred until after first paint; goals/checkins/workouts are critical path. Split into 2 waves: critical (8 queries) load first, secondary (12 queries) load after render.
+- Risk: Medium — requires restructuring the useEffect and state initialization order.
+
+---
+
 ## Phase Log
+
+### Phase 57 — Performance quick wins — Complete
+- **heart-rate/page.js:** SVG hover handler throttled to 20fps (50ms gate via `lastMoveTime` ref); replaced O(n) linear scan with binary search through sorted `chartPoints`; all derived SVG values (`avgPath`, `bandPath`, `yTicks`, `wStartX/wEndX`) wrapped in `useMemo` keyed on `[chartPoints, yMin, yMax]`; `xOf`/`yOf` wrapped in `useCallback`; `yMin`/`yMax` computed in a single `useMemo`; if 5-min data exists, `intraday` array discarded early to free memory — no need to hold 2× datasets simultaneously
+- **workouts/log/page.js:** Exercise prefetch changed from `select('*')` to explicit column list — avoids fetching unused columns on the initial exercises batch load
+- **measurements/page.js:** Added `useMemo` import; `WeightChart` function now memoizes `rawPath`/`avgPath` SVG strings and all intermediate calc values (`vals`, coordinate functions) in a single `useMemo` keyed on `[pts]` — paths only recompute when history data changes, not on every parent re-render (e.g. delete confirm modal open/close)
+- **nutrition/page.js:** Added `useMemo` import; `SavedFoodsTab` grouping replaced 5 separate `.filter()` passes over `myFoods` with a single `useMemo` loop that builds all 5 groups (`pinned`, `loggedToday`, `loggedThisWeek`, `loggedOlder`, `neverLogged`) in one O(n) pass; memoized on `[myFoods, today]`
+- **daily-brief/route.js:** Supplement interaction detection replaced 4 separate `suppList.filter(s => suppHasKw(...))` calls (each O(n×m)) with a single keyword-index build pass that groups supplements by keyword; `cafS` and `vitDS` built from Set union of keyword buckets — O(n) total instead of O(4n×m)
 
 ### Phase 56f — Security hardening (M1 + M3 + full audit fixes) — Complete
 - **M1 (invite/redeem enumeration):** `invite/redeem/route.js` now checks rate limit (10/hr) before processing; error messages unified to "Invalid or already used code" — prevents authenticated users from distinguishing valid-but-used codes from invalid codes

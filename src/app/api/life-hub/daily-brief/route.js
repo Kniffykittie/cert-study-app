@@ -169,15 +169,19 @@ export async function POST(req) {
   // Supplement interaction flags (rule-based — key warnings for Claude to reference)
   const suppInteractionWarnings = []
   const suppList = supplements || []
-  function suppHasKw(s, ...kws) {
+  // Build keyword index in a single pass — avoids 4 separate O(n×m) filter+scan combos
+  const suppByKw = { iron: [], calcium: [], 'vitamin d': [], 'vit d': [], caffeine: [], 'pre-workout': [] }
+  for (const s of suppList) {
     const name = s.name.toLowerCase()
     const nKeys = Object.keys(s.nutrients || {}).map(k => k.toLowerCase())
-    return kws.some(kw => name.includes(kw) || nKeys.some(n => n.includes(kw)))
+    for (const kw of Object.keys(suppByKw)) {
+      if (name.includes(kw) || nKeys.some(n => n.includes(kw))) suppByKw[kw].push(s)
+    }
   }
-  const ironS = suppList.filter(s => suppHasKw(s, 'iron'))
-  const calcS = suppList.filter(s => suppHasKw(s, 'calcium'))
-  const vitDS = suppList.filter(s => suppHasKw(s, 'vitamin d', 'vit d'))
-  const cafS = suppList.filter(s => s.name.toLowerCase().includes('pre-workout') || s.name.toLowerCase().includes('caffeine') || Object.keys(s.nutrients||{}).some(k=>k.toLowerCase().includes('caffeine')))
+  const ironS = suppByKw['iron']
+  const calcS = suppByKw['calcium']
+  const vitDS = [...new Set([...suppByKw['vitamin d'], ...suppByKw['vit d']])]
+  const cafS = [...new Set([...suppByKw['caffeine'], ...suppByKw['pre-workout']])]
   if (ironS.length && calcS.length && ironS.some(i => calcS.some(c => c.timing === i.timing))) {
     suppInteractionWarnings.push(`Iron + Calcium timing clash (same slot) — absorption conflict`)
   }

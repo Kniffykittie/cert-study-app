@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { estimateBodyFatPct } from '@/lib/tdee'
 
@@ -342,18 +342,25 @@ export default function MeasurementsPage() {
   }
 
   function WeightChart() {
-    const pts = history.filter(r => r.weight_lbs).slice(0, 60).reverse()
+    const pts = useMemo(() => history.filter(r => r.weight_lbs).slice(0, 60).reverse(), [history])
     if (pts.length < 2) return null
-    const vals = pts.map(r => parseFloat(r.weight_lbs))
-    const avgVals = rollingAvg(vals)
-    const allVals = [...vals, ...avgVals]
-    const min = Math.min(...allVals) - 1.5
-    const max = Math.max(...allVals) + 1.5
-    const W = 560, H = 130, PAD = 10
-    const x = i => PAD + (i / (pts.length - 1)) * (W - PAD * 2)
-    const y = v => H - PAD - ((v - min) / (max - min)) * (H - PAD * 2)
-    const rawPath = pts.map((_, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(vals[i]).toFixed(1)}`).join(' ')
-    const avgPath = pts.map((_, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(avgVals[i]).toFixed(1)}`).join(' ')
+    const CW = 560, CH = 130, CPAD = 10
+    const { vals, rawPath, avgPath, cx, cy } = useMemo(() => {
+      const v = pts.map(r => parseFloat(r.weight_lbs))
+      const av = rollingAvg(v)
+      const all = [...v, ...av]
+      const mn = Math.min(...all) - 1.5
+      const mx = Math.max(...all) + 1.5
+      const xFn = i => CPAD + (i / (pts.length - 1)) * (CW - CPAD * 2)
+      const yFn = val => CH - CPAD - ((val - mn) / (mx - mn)) * (CH - CPAD * 2)
+      return {
+        vals: v,
+        rawPath: pts.map((_, i) => `${i === 0 ? 'M' : 'L'}${xFn(i).toFixed(1)},${yFn(v[i]).toFixed(1)}`).join(' '),
+        avgPath: pts.map((_, i) => `${i === 0 ? 'M' : 'L'}${xFn(i).toFixed(1)},${yFn(av[i]).toFixed(1)}`).join(' '),
+        cx: xFn,
+        cy: yFn,
+      }
+    }, [pts])
     const jump = recentBigJump()
 
     return (
@@ -370,10 +377,10 @@ export default function MeasurementsPage() {
           </div>
         </div>
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px', overflowX: 'auto' }}>
-          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: '280px', display: 'block' }}>
+          <svg viewBox={`0 0 ${CW} ${CH}`} style={{ width: '100%', minWidth: '280px', display: 'block' }}>
             <path d={rawPath} fill="none" stroke="rgba(167,139,250,0.3)" strokeWidth="1.5" strokeLinejoin="round" />
             {pts.map((_, i) => (
-              <circle key={i} cx={x(i)} cy={y(vals[i])} r="2.5" fill="rgba(167,139,250,0.4)" />
+              <circle key={i} cx={cx(i)} cy={cy(vals[i])} r="2.5" fill="rgba(167,139,250,0.4)" />
             ))}
             <path d={avgPath} fill="none" stroke="var(--accent-purple)" strokeWidth="2.5" strokeLinejoin="round" />
           </svg>
