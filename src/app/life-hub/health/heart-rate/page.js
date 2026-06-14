@@ -1,6 +1,19 @@
 'use client'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, Component } from 'react'
 import Link from 'next/link'
+
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(e) { return { error: e } }
+  render() {
+    if (this.state.error) return (
+      <div style={{ padding: '32px', color: 'var(--error)', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'pre-wrap', backgroundColor: 'var(--surface)', borderRadius: '10px', margin: '24px' }}>
+        <strong>Render error (please screenshot this):</strong>{'\n'}{this.state.error?.message}{'\n'}{this.state.error?.stack}
+      </div>
+    )
+    return this.props.children
+  }
+}
 
 function bpmColor(bpm) {
   if (!bpm) return 'var(--border)'
@@ -42,7 +55,8 @@ const PAD_RIGHT = 12
 const PAD_TOP = 12
 const PAD_BOTTOM = 24
 
-export default function HeartRatePage() {
+export default function HeartRatePage() { return <ErrorBoundary><HeartRatePageInner /></ErrorBoundary> }
+function HeartRatePageInner() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [tooltip, setTooltip] = useState(null)
@@ -51,84 +65,70 @@ export default function HeartRatePage() {
 
   useEffect(() => {
     async function load() {
-      const statusRes = await fetch('/api/health/status')
-      const status = await statusRes.json()
-      if (!status.connected) { setConnected(false); setLoading(false); return }
-      setConnected(true)
-      const res = await fetch('/api/health/heart-rate')
-      const json = await res.json()
-      if (!json.error) setData(json)
+      try {
+        const statusRes = await fetch('/api/health/status')
+        const status = await statusRes.json()
+        if (!status.connected) { setConnected(false); setLoading(false); return }
+        setConnected(true)
+        const res = await fetch('/api/health/heart-rate')
+        if (res.ok) {
+          const json = await res.json()
+          if (!json.error) setData(json)
+        }
+      } catch (e) {
+        console.error('HR page load error:', e)
+      }
       setLoading(false)
     }
     load()
   }, [])
 
-  if (loading) return <div style={{ color: 'var(--text-secondary)', padding: '32px', textAlign: 'center' }}>Loading...</div>
-
-  if (!connected) return (
-    <div style={{ textAlign: 'center', paddingTop: '48px' }}>
-      <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>Google Health not connected.</p>
-      <Link href="/settings" style={{ color: 'var(--accent-blue)' }}>Connect in Settings</Link>
-    </div>
-  )
-
+  // ALL computation and hooks must be before any conditional returns (Rules of Hooks)
   const fiveMin = data?.fiveMin ?? []
   const intraday = data?.intraday ?? []
   const daily = data?.daily ?? []
-  const workoutWindow = data?.workoutWindow
+  const workoutWindow = data?.workoutWindow ?? null
 
-  // Use 5-min data for line chart; fall back to hourly if empty
   const useFiveMin = fiveMin.length > 0
   const hasData = useFiveMin ? fiveMin.length > 0 : intraday.length > 0
 
-  // Build chart points
   const chartPoints = useFiveMin
-    ? fiveMin.sort((a, b) => a.minute_bucket - b.minute_bucket)
-    : intraday.sort((a, b) => a.hour - b.hour).map(r => ({ ...r, minute_bucket: r.hour * 60 }))
+    ? fiveMin.slice().sort((a, b) => a.minute_bucket - b.minute_bucket)
+    : intraday.slice().sort((a, b) => a.hour - b.hour).map(r => ({ ...r, minute_bucket: r.hour * 60 }))
 
   const allBpm = chartPoints.map(p => p.avg_bpm).filter(Boolean)
   const allMin = useFiveMin ? chartPoints.map(p => p.min_bpm).filter(Boolean) : allBpm
   const allMax = useFiveMin ? chartPoints.map(p => p.max_bpm).filter(Boolean) : allBpm
-  const dataMin = allMin.length ? Math.min(...allMin) : 40
-  const dataMax = allMax.length ? Math.max(...allMax) : 120
+  const dataMin = allMin.length ? allMin.reduce((a, b) => Math.min(a, b), Infinity) : 40
+  const dataMax = allMax.length ? allMax.reduce((a, b) => Math.max(a, b), -Infinity) : 120
   const yMin = Math.max(0, dataMin - 15)
-  const yMax = dataMax + 15
+  const yMax = Math.max(dataMax + 15, yMin + 30)
 
   const plotW = SVG_W - PAD_LEFT - PAD_RIGHT
   const plotH = SVG_H - PAD_TOP - PAD_BOTTOM
 
-  // x: minute 0–1439 (full day)
   const xOf = (minute) => PAD_LEFT + (minute / 1439) * plotW
   const yOf = (bpm) => PAD_TOP + plotH - ((bpm - yMin) / (yMax - yMin)) * plotH
 
-  // Y-axis grid lines
-  const yStep = Math.ceil((yMax - yMin) / 4 / 10) * 10
+  const yStep = Math.max(10, Math.ceil((yMax - yMin) / 4 / 10) * 10)
   const yTicks = []
-  for (let v = Math.ceil(yMin / 10) * 10; v <= yMax; v += yStep) yTicks.push(v)
+  for (let v = Math.ceil(yMin / 10) * 10; v <= yMax && yTicks.length < 20; v += yStep) yTicks.push(v)
 
-  // Build path strings
   const avgPath = chartPoints
     .filter(p => p.avg_bpm)
     .map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(p.minute_bucket).toFixed(1)},${yOf(p.avg_bpm).toFixed(1)}`)
     .join(' ')
 
-  const bandPath = useFiveMin && chartPoints.filter(p => p.min_bpm && p.max_bpm).length > 1
-    ? (() => {
-        const pts = chartPoints.filter(p => p.min_bpm && p.max_bpm)
-        const top = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(p.minute_bucket).toFixed(1)},${yOf(p.max_bpm).toFixed(1)}`).join(' ')
-        const bot = pts.slice().reverse().map((p, i) => `${i === 0 ? 'L' : 'L'}${xOf(p.minute_bucket).toFixed(1)},${yOf(p.min_bpm).toFixed(1)}`).join(' ')
-        return top + ' ' + bot + ' Z'
-      })()
+  const bandPts = useFiveMin ? chartPoints.filter(p => p.min_bpm && p.max_bpm) : []
+  const bandPath = bandPts.length > 1
+    ? bandPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(p.minute_bucket).toFixed(1)},${yOf(p.max_bpm).toFixed(1)}`).join(' ')
+      + ' ' + bandPts.slice().reverse().map(p => `L${xOf(p.minute_bucket).toFixed(1)},${yOf(p.min_bpm).toFixed(1)}`).join(' ') + ' Z'
     : null
 
-  // Hour labels at x positions
   const hourLabels = [0, 3, 6, 9, 12, 15, 18, 21]
-
-  // Workout band x positions
   const wStartX = workoutWindow ? xOf(workoutWindow.startMinute) : null
   const wEndX = workoutWindow ? xOf(Math.min(workoutWindow.endMinute + 5, 1439)) : null
 
-  // Handle SVG hover for tooltip
   const handleSvgMouseMove = useCallback((e) => {
     if (!svgRef.current || !chartPoints.length) return
     const rect = svgRef.current.getBoundingClientRect()
@@ -158,8 +158,17 @@ export default function HeartRatePage() {
   // 7-day resting HR trend
   const restingTrend = daily.filter(r => r.resting_bpm).slice(-7)
   const hasResting = restingTrend.length >= 2
-  const trendMax = hasResting ? Math.max(...restingTrend.map(r => r.resting_bpm)) + 8 : 80
-  const trendMin = hasResting ? Math.max(0, Math.min(...restingTrend.map(r => r.resting_bpm)) - 8) : 40
+  const trendMax = hasResting ? restingTrend.reduce((a, r) => Math.max(a, r.resting_bpm), -Infinity) + 8 : 80
+  const trendMin = hasResting ? Math.max(0, restingTrend.reduce((a, r) => Math.min(a, r.resting_bpm), Infinity) - 8) : 40
+
+  // Early returns AFTER all hooks
+  if (loading) return <div style={{ color: 'var(--text-secondary)', padding: '32px', textAlign: 'center' }}>Loading...</div>
+  if (!connected) return (
+    <div style={{ textAlign: 'center', paddingTop: '48px' }}>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>Google Health not connected.</p>
+      <Link href="/settings" style={{ color: 'var(--accent-blue)' }}>Connect in Settings</Link>
+    </div>
+  )
 
   return (
     <div>

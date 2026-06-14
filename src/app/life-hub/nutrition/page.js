@@ -155,13 +155,16 @@ function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, w
   async function handleAiFill() {
     if (aiFilling) return
     setAiFilling(true)
-    const res = await fetch('/api/nutrition/ai-food-fill', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: query }),
-    })
-    const data = await res.json()
+    let data
+    try {
+      const res = await fetch('/api/nutrition/ai-food-fill', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: query }),
+      })
+      data = await res.json()
+    } catch { setAiFilling(false); return }
     setAiFilling(false)
-    if (!data.fill) return
+    if (!data?.fill) return
     const fill = data.fill
     const estimated = new Set()
     const numFields = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg','saturated_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','vitamin_c_mg','vitamin_d_mcg']
@@ -474,6 +477,7 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
   const [saveToLib, setSaveToLib] = useState(true)
   const [savingSearch, setSavingSearch] = useState(false)
   const [savingFood, setSavingFood] = useState(null)
+  const [aiPreview, setAiPreview] = useState(null)
   // manual tab
   const BLANK_MANUAL = { name: '', brand: '', serving_size_label: '1 serving', calories: '', protein_g: '', carbs_g: '', fat_g: '', fiber_g: '', sugar_g: '', sodium_mg: '', saturated_fat_g: '', trans_fat_g: '', cholesterol_mg: '', potassium_mg: '', calcium_mg: '', iron_mg: '', magnesium_mg: '', zinc_mg: '', vitamin_a_mcg: '', vitamin_c_mg: '', vitamin_d_mcg: '', vitamin_b12_mcg: '', vitamin_b6_mg: '', folate_mcg: '' }
   const [manual, setManual] = useState(BLANK_MANUAL)
@@ -485,8 +489,10 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
   const [aiFilling, setAiFilling] = useState(false)
   const [aiEstimatedFields, setAiEstimatedFields] = useState(new Set())
   const [microFilling, setMicroFilling] = useState(false)
+  const [showOptionalFields, setShowOptionalFields] = useState(false)
   const [searchGramInput, setSearchGramInput] = useState('')
 
+  const [showScanner, setShowScanner] = useState(false)
   const debounceRef = useRef(null)
   const searchInputRef = useRef(null)
 
@@ -519,13 +525,16 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
   async function handleAiFill() {
     if (aiFilling) return
     setAiFilling(true)
-    const res = await fetch('/api/nutrition/ai-food-fill', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: query }),
-    })
-    const data = await res.json()
+    let data
+    try {
+      const res = await fetch('/api/nutrition/ai-food-fill', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: query }),
+      })
+      data = await res.json()
+    } catch { setAiFilling(false); return }
     setAiFilling(false)
-    if (!data.fill) return
+    if (!data?.fill) return
     const fill = data.fill
     const estimated = new Set()
     const filled = { ...BLANK_MANUAL }
@@ -537,7 +546,7 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
     }
     setManual(filled)
     setAiEstimatedFields(estimated)
-    setTab('manual')
+    setAiPreview(filled)
   }
 
   async function handleMicroFill(food) {
@@ -861,7 +870,7 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
                 </div>
               ))}
               <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Macros</div>
-              {[{ key: 'calories', label: 'Calories' }, { key: 'protein_g', label: 'Protein (g)' }, { key: 'carbs_g', label: 'Carbs (g)' }, { key: 'fat_g', label: 'Fat (g)' }, { key: 'fiber_g', label: dvMode && DV.fiber_g ? `Fiber (% DV, ${DV.fiber_g}g)` : 'Fiber (g)' }, { key: 'sugar_g', label: 'Sugar (g)' }, { key: 'sodium_mg', label: dvMode && DV.sodium_mg ? `Sodium (% DV, ${DV.sodium_mg}mg)` : 'Sodium (mg)' }, { key: 'potassium_mg', label: dvMode && DV.potassium_mg ? `Potassium (% DV, ${DV.potassium_mg}mg)` : 'Potassium (mg)' }].map(({ key, label }) => {
+              {[{ key: 'calories', label: 'Calories' }, { key: 'protein_g', label: 'Protein (g)' }, { key: 'carbs_g', label: 'Carbs (g)' }, { key: 'fat_g', label: 'Fat (g)' }].map(({ key, label }) => {
                 const hasDV = dvMode && DV[key] != null
                 const displayVal = hasDV && manual[key] !== '' ? String(Math.round((parseFloat(manual[key]) / DV[key]) * 100)) : manual[key]
                 return (
@@ -878,24 +887,29 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
                   </div>
                 )
               })}
-              <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Optional</div>
-              {[{ key: 'saturated_fat_g', label: dvMode && DV.saturated_fat_g ? `Sat. Fat (% DV, ${DV.saturated_fat_g}g)` : 'Saturated Fat (g)' }, { key: 'cholesterol_mg', label: dvMode && DV.cholesterol_mg ? `Cholesterol (% DV, ${DV.cholesterol_mg}mg)` : 'Cholesterol (mg)' }, { key: 'calcium_mg', label: dvMode && DV.calcium_mg ? `Calcium (% DV, ${DV.calcium_mg}mg)` : 'Calcium (mg)' }, { key: 'iron_mg', label: dvMode && DV.iron_mg ? `Iron (% DV, ${DV.iron_mg}mg)` : 'Iron (mg)' }, { key: 'vitamin_c_mg', label: dvMode && DV.vitamin_c_mg ? `Vitamin C (% DV, ${DV.vitamin_c_mg}mg)` : 'Vitamin C (mg)' }, { key: 'vitamin_d_mcg', label: dvMode && DV.vitamin_d_mcg ? `Vitamin D (% DV, ${DV.vitamin_d_mcg}mcg)` : 'Vitamin D (mcg)' }].map(({ key, label }) => {
-                const hasDV = dvMode && DV[key] != null
-                const displayVal = hasDV && manual[key] !== '' ? String(Math.round((parseFloat(manual[key]) / DV[key]) * 100)) : manual[key]
-                return (
-                  <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
-                    <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                    <input type="number" min="0" step={hasDV ? '1' : '0.1'} value={hasDV ? displayVal : manual[key]} placeholder="0"
-                      onChange={e => {
-                        const raw = e.target.value
-                        const stored = hasDV && raw !== '' ? String(Math.round((parseFloat(raw) / 100) * DV[key] * 10) / 10) : raw
-                        setManual(m => ({ ...m, [key]: stored }))
-                        setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n })
-                      }}
-                      style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
-                  </div>
-                )
-              })}
+              <button type="button" onClick={() => setShowOptionalFields(v => !v)}
+                style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', padding: '4px 0', textAlign: 'left', fontWeight: '500' }}>
+                {showOptionalFields ? '▲ Hide fiber, sodium & micronutrients' : '▼ Show fiber, sodium & micronutrients'}
+              </button>
+              {showOptionalFields && <>
+                {[{ key: 'fiber_g', label: dvMode && DV.fiber_g ? `Fiber (% DV, ${DV.fiber_g}g)` : 'Fiber (g)' }, { key: 'sugar_g', label: 'Sugar (g)' }, { key: 'sodium_mg', label: dvMode && DV.sodium_mg ? `Sodium (% DV, ${DV.sodium_mg}mg)` : 'Sodium (mg)' }, { key: 'potassium_mg', label: dvMode && DV.potassium_mg ? `Potassium (% DV, ${DV.potassium_mg}mg)` : 'Potassium (mg)' }, { key: 'saturated_fat_g', label: dvMode && DV.saturated_fat_g ? `Sat. Fat (% DV, ${DV.saturated_fat_g}g)` : 'Saturated Fat (g)' }, { key: 'cholesterol_mg', label: dvMode && DV.cholesterol_mg ? `Cholesterol (% DV, ${DV.cholesterol_mg}mg)` : 'Cholesterol (mg)' }, { key: 'calcium_mg', label: dvMode && DV.calcium_mg ? `Calcium (% DV, ${DV.calcium_mg}mg)` : 'Calcium (mg)' }, { key: 'iron_mg', label: dvMode && DV.iron_mg ? `Iron (% DV, ${DV.iron_mg}mg)` : 'Iron (mg)' }, { key: 'vitamin_c_mg', label: dvMode && DV.vitamin_c_mg ? `Vitamin C (% DV, ${DV.vitamin_c_mg}mg)` : 'Vitamin C (mg)' }, { key: 'vitamin_d_mcg', label: dvMode && DV.vitamin_d_mcg ? `Vitamin D (% DV, ${DV.vitamin_d_mcg}mcg)` : 'Vitamin D (mcg)' }].map(({ key, label }) => {
+                  const hasDV = dvMode && DV[key] != null
+                  const displayVal = hasDV && manual[key] !== '' ? String(Math.round((parseFloat(manual[key]) / DV[key]) * 100)) : manual[key]
+                  return (
+                    <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
+                      <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
+                      <input type="number" min="0" step={hasDV ? '1' : '0.1'} value={hasDV ? displayVal : manual[key]} placeholder="0"
+                        onChange={e => {
+                          const raw = e.target.value
+                          const stored = hasDV && raw !== '' ? String(Math.round((parseFloat(raw) / 100) * DV[key] * 10) / 10) : raw
+                          setManual(m => ({ ...m, [key]: stored }))
+                          setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n })
+                        }}
+                        style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
+                    </div>
+                  )
+                })}
+              </>}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '14px 0 4px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -934,11 +948,31 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
         {/* ── Search Database tab ── */}
         {tab === 'search' && (
           <>
-            <div style={{ padding: '0 20px 10px', flexShrink: 0 }}>
+            <div style={{ padding: '0 20px 10px', flexShrink: 0, display: 'flex', gap: '8px' }}>
               <input ref={searchInputRef} value={query} onChange={e => handleQueryChange(e.target.value)}
                 placeholder="Search food name or brand..."
-                style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 14px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                style={{ flex: 1, boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 14px', color: 'var(--text-primary)', fontSize: '13px' }} />
+              <button onClick={() => setShowScanner(true)}
+                title="Scan barcode"
+                style={{ flexShrink: 0, padding: '9px 12px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}>
+                📷
+              </button>
             </div>
+            {showScanner && (
+              <BarcodeScannerModal
+                onResult={barcode => {
+                  setShowScanner(false)
+                  setQuery(barcode)
+                  setSelected(null)
+                  setSearching(true)
+                  fetch(`/api/nutrition/search?barcode=${encodeURIComponent(barcode)}`)
+                    .then(r => r.json())
+                    .then(d => { setResults(d.results || []); setSearching(false) })
+                    .catch(() => setSearching(false))
+                }}
+                onClose={() => setShowScanner(false)}
+              />
+            )}
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
               {searching && <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Searching...</p>}
@@ -950,10 +984,10 @@ function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood, onCreateMeal,
                   ))}
                 </div>
               )}
-              {!searching && query && results.length === 0 && (
+              {!searching && query && results.length === 0 && !aiPreview && (
                 <div style={{ marginTop: '8px', backgroundColor: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: '10px', padding: '14px 16px' }}>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 10px' }}>No results found in the database.</p>
-                  <button onClick={handleAiFill} disabled={aiFilling}
+                  <button onClick={handleAiFill} disabled={aiFilling} type="button"
                     style={{ backgroundColor: 'rgba(167,139,250,0.15)', color: 'var(--accent-purple)', border: '1px solid rgba(167,139,250,0.35)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: '600', cursor: aiFilling ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: aiFilling ? 0.7 : 1 }}>
                     <span>🤖</span>
                     <span>{aiFilling ? 'Estimating nutrition...' : `Ask AI to estimate "${query}"`}</span>

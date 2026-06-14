@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import BarcodeScannerModal from '@/components/BarcodeScannerModal'
 
 const DEFAULT_GOAL = 64
 
@@ -102,6 +103,7 @@ export default function DrinksHydrationPage() {
   const [drinkSearch, setDrinkSearch] = useState('')
   const [drinkResults, setDrinkResults] = useState([])
   const [searching, setSearching] = useState(false)
+  const [showDrinkScanner, setShowDrinkScanner] = useState(false)
   const [savedDrinks, setSavedDrinks] = useState([])
   const [logModal, setLogModal] = useState(null)
   const [servingsInput, setServingsInput] = useState('1')
@@ -929,18 +931,39 @@ export default function DrinksHydrationPage() {
         )}
 
         {/* Search */}
-        <div style={{ position: 'relative' }}>
-          <input
-            type="text"
-            value={drinkSearch}
-            onChange={e => handleDrinkSearchChange(e.target.value)}
-            placeholder="Search drinks — coffee, soda, juice, protein shake..."
-            style={{ width: '100%', boxSizing: 'border-box', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', color: 'var(--text-primary)', fontSize: 13 }}
-          />
-          {searching && (
-            <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--text-secondary)' }}>Searching...</div>
-          )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <input
+              type="text"
+              value={drinkSearch}
+              onChange={e => handleDrinkSearchChange(e.target.value)}
+              placeholder="Search drinks — coffee, soda, juice, protein shake..."
+              style={{ width: '100%', boxSizing: 'border-box', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', color: 'var(--text-primary)', fontSize: 13 }}
+            />
+            {searching && (
+              <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--text-secondary)' }}>Searching...</div>
+            )}
+          </div>
+          <button onClick={() => setShowDrinkScanner(true)}
+            title="Scan barcode"
+            style={{ flexShrink: 0, padding: '10px 12px', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>
+            📷
+          </button>
         </div>
+        {showDrinkScanner && (
+          <BarcodeScannerModal
+            onResult={barcode => {
+              setShowDrinkScanner(false)
+              setDrinkSearch(barcode)
+              setSearching(true)
+              fetch(`/api/nutrition/search?barcode=${encodeURIComponent(barcode)}`)
+                .then(r => r.json())
+                .then(d => { setDrinkResults(d.results || []); setSearching(false) })
+                .catch(() => setSearching(false))
+            }}
+            onClose={() => setShowDrinkScanner(false)}
+          />
+        )}
 
         {drinkResults.length > 0 && (
           <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 240, overflowY: 'auto' }}>

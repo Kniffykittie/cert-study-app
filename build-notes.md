@@ -294,8 +294,7 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 **Features that must be built AFTER Vercel deploy:**
 - Vercel Cron Job (health auto-sync) — Vercel-only, configured in `vercel.json`
-- PWA conversion — service workers require HTTPS
-- Barcode scanner — camera API requires HTTPS in most browsers
+- PWA conversion — service workers require HTTPS ✅ Built
 
 ---
 
@@ -307,12 +306,55 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 - Camera resolution reduced to 640×480 to minimize frame buffer memory; requires same barcode 3 consecutive frames before firing
 - `onResultRef` pattern in `BarcodeScannerModal` — stores `onResult` in ref so `useEffect` dependency array is `[]`, preventing runaway camera restarts on every parent re-render
 - **Crash fix:** "Ask AI to estimate" → "Edit Details" path was crashing mobile tabs (Android OOM killer)
-  - Root cause: `setTab('manual')` on the heavy nutrition page rendered 17+ new inputs simultaneously, pushing RAM over mobile browser limit
+  - Root cause: rendering additional inputs on the heavy nutrition page pushed RAM over mobile browser limit
   - Fix: AI result shows a lightweight preview card (name + cal/protein/carbs/fat chips + "Log It" + "Edit Details")
   - "Edit Details" stores prefill in `sessionStorage` and navigates to new standalone `/life-hub/nutrition/log-manual` page
-  - Log-manual page is completely separate from the heavy nutrition page — completely unmounts it, giving the form all available RAM
-  - On successful log, navigates back to `/life-hub/nutrition`
-- New file: `src/app/life-hub/nutrition/log-manual/page.js` — lightweight standalone manual entry page; reads `manual_prefill` from sessionStorage on mount; shows name/brand/serving + 4 core macros by default; "▼ Show fiber, sodium & micronutrients" toggle for 10 additional fields; wrapped in `<Suspense>` (required by Next.js for `useSearchParams`)
+  - Log-manual page is completely separate — completely unmounts the heavy nutrition page, giving the form all available RAM
+- New file: `src/app/life-hub/nutrition/log-manual/page.js` — lightweight standalone manual entry; reads `manual_prefill` from sessionStorage; shows name/brand/serving + 4 core macros; "▼ Show fiber, sodium & micronutrients" toggle; wrapped in `<Suspense>`
+
+### Mobile — Life Hub status pills responsive wrap — Complete
+- Replaced `repeat(4, 1fr)` with `repeat(auto-fit, minmax(140px, 1fr))` on the Zone 1 status bar grid
+- On mobile (~390px): 2×2 grid; on desktop: all 4 pills in one row
+
+### Mobile — LifeHubSidebar JS-based mobile detection — Complete
+- Replaced CSS `@media` class injection with `isMobile` state using `window.innerWidth <= 768` in a useEffect + resize listener
+- CSS-in-JSX `<style>` tags in Next.js App Router client components are unreliable for media queries; JS-driven conditional rendering is guaranteed to work
+- On mobile: renders hamburger button + backdrop + slide-in overlay; on desktop: renders sidebar in flow as before
+
+### Mobile — SW cache v2 bump — Complete
+- Bumped `CACHE` from `csa-shell-v1` to `csa-shell-v2` in `public/sw.js` to force full cache eviction on next SW update
+- Fixes stale LifeHubSidebar JS bundle being served from old cache on PWA
+
+### Mobile — viewport meta tag fix — Complete
+- Added `<meta name="viewport" content="width=device-width, initial-scale=1">` to root layout
+- Without this, mobile browsers render at ~980px desktop width so `@media (max-width: 768px)` never fires — sidebar drawer never activates on phones
+
+### Mobile — Life Hub sidebar drawer — Complete
+- LifeHubSidebar hidden on mobile (≤768px); hamburger button (☰) fixed top-left opens it as slide-in overlay
+- Backdrop tap and route change both close the drawer
+- life-hub/layout.js adds `padding-top: 64px` on mobile so content clears the hamburger
+- Matches the existing StudyHubSidebar mobile pattern (same CSS class naming convention, different prefix `lh-`)
+
+### PWA — Progressive Web App (installable) — Complete
+- `public/manifest.json` — app name "Cert Study App", short_name "CSA", display standalone, theme #a78bfa, 192+512 icons
+- `public/sw.js` — cache-shell service worker; caches `/` and `/offline`; cache-first for static assets; network-first for navigation; skips all `/api/`, Supabase, non-GET requests
+- `src/app/offline/page.js` — offline fallback page ("You're offline" + Try Again)
+- `src/components/ServiceWorkerRegistrar.js` — client component that registers `/sw.js` on mount, renders null
+- `src/app/layout.js` — added manifest link, theme-color meta, Apple PWA meta tags, apple-touch-icon, mounts ServiceWorkerRegistrar
+- `public/icons/icon-192.png` + `icon-512.png` — generated via sharp (dark bg + purple CSA text)
+- Install on iPhone: Safari → Share → Add to Home Screen; Android: browser menu → Install App
+
+### Vercel Fix — Heart Rate page crash (Rules of Hooks) — Complete
+- Root cause: `useCallback` was declared after `if (loading) return` and `if (!connected) return` — violating Rules of Hooks (hooks must be called unconditionally). React error #310 in production.
+- Fix: moved ALL computation (fiveMin, chartPoints, avgPath, bandPath, yTicks, etc.) and `useCallback` to BEFORE the conditional returns; early returns now placed after all hooks
+- Also replaced `Math.min/max(...spread)` with `.reduce()` throughout, and added `Math.max(yMax, yMin+30)` guard so yMax is always > yMin
+- ErrorBoundary class component left in place (catches any future render errors gracefully)
+
+### Vercel Fix — Heart Rate page crash — Complete
+- Heart rate page was crashing the browser tab when navigating to it
+- Fix 1: wrapped entire `load()` in try/catch so fetch errors don't propagate uncaught
+- Fix 2: guarded `yStep` with `Math.max(10, ...)` to prevent a zero-step value; added `yTicks.length < 20` cap on the tick loop as a hard safety net
+- Fix 3: replaced `Math.min(...spread)` / `Math.max(...spread)` with `.reduce()` to avoid potential stack overflow on large arrays
 
 ### Vercel Fix — SITE_URL self-reference bug in health callback — Complete
 - `replace_all` accidentally replaced `process.env.NEXT_PUBLIC_SITE_URL` inside the SITE_URL constant definition itself, creating `const SITE_URL = SITE_URL || ...` — fixed to use `process.env.NEXT_PUBLIC_SITE_URL`
