@@ -31,6 +31,7 @@ function LogManualInner() {
 
   const [form, setForm] = useState(BLANK)
   const [servings, setServings] = useState('1')
+  const [servingsPerContainer, setServingsPerContainer] = useState(null)
   const [saveToLib, setSaveToLib] = useState(true)
   const [showExtra, setShowExtra] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -53,6 +54,7 @@ function LogManualInner() {
         }
         setForm(filled)
         setAiEstimated(estimated)
+        if (prefill.servings_per_container != null) setServingsPerContainer(parseFloat(prefill.servings_per_container))
       }
     } catch {}
   }, [])
@@ -137,10 +139,19 @@ function LogManualInner() {
           ))}
 
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: '14px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <label style={{ color: 'var(--text-secondary)', fontSize: '13px', flexShrink: 0 }}>Servings:</label>
               <input type="number" min="0.25" step="0.25" value={servings} onChange={e => setServings(e.target.value)}
                 style={{ width: '80px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '14px', textAlign: 'center' }} />
+              {servingsPerContainer && (
+                <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+                  ({servingsPerContainer} per container —{' '}
+                  <button type="button" onClick={() => setServings(String(servingsPerContainer))}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', padding: 0, fontWeight: '600' }}>
+                    log whole container
+                  </button>)
+                </span>
+              )}
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
               <input type="checkbox" checked={saveToLib} onChange={e => setSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '15px', height: '15px' }} />

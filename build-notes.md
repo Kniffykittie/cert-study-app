@@ -300,6 +300,11 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ## Phase Log
 
+### Phase 56c — Servings per container on log-manual page — Complete
+- AI fill response includes `servings_per_container` (e.g. 2.5 for a can of soup) — now stored and displayed on the log-manual page
+- Shows "(2.5 per container — log whole container)" hint next to the Servings input
+- "log whole container" button pre-fills the servings field with the container count so macros are correctly multiplied
+
 ### Phase 56b — Edit Details hard navigation fix — Complete
 - `router.push()` is a React client-side navigation — the current page's JS keeps running until the new page mounts, which on mobile is enough to crash the tab
 - Changed "Edit Details" button to `window.location.href = ...` — this is a hard browser navigation that immediately halts all JS on the current page, freeing its entire RAM budget before the log-manual page loads
