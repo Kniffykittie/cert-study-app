@@ -5,6 +5,19 @@ const LIMITS = {
   'lab-summary': 1,
   'goals/generate-overview': 5,
   'workouts/generate-plan': 3,
+  'workouts/exercise-chat': 20,
+  'supplements/ai-fill': 10,
+  'supplements/generate-profile': 10,
+  'nutrition/ai-food-fill': 20,
+  'nutrition/ai-food-intel': 20,
+  'nutrition/ai-drink-fill': 10,
+  'nutrition/ai-micro-fill': 15,
+  'nutrition/meal-plan/analyze': 5,
+  'life-hub/daily-brief': 2,
+  'life-hub/monthly-wrap': 2,
+  'nutrition/encyclopedia': 5,
+  'invite/redeem': 10,
+  '2fa/use-recovery': 5,
 }
 
 function minutesUntilNextHour() {
@@ -24,8 +37,9 @@ export async function checkRateLimit(supabase, userId, route) {
     p_route: route,
   })
 
-  if (error) return { allowed: true } // fail open — don't block on DB error
+  if (error) return { allowed: false, error: 'Rate limit check failed' }
 
   const allowed = data <= limit
   return { allowed, count: data, limit, waitMinutes: allowed ? 0 : minutesUntilNextHour() }
 }
+

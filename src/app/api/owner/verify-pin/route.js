@@ -4,10 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 
 const OWNER_EMAIL = 'sethproper40@yahoo.com'
 const MAX_ATTEMPTS = 3
-const LOCKOUT_MS = 60 * 60 * 1000
-
-// Module-level state — resets on server restart; fine for single-owner personal app
-const state = { count: 0, lockedUntil: null }
+const LOCKOUT_MINUTES = 60
+const ROUTE_KEY = 'owner/verify-pin'
 
 export async function POST(req) {
   const supabase = await createClient()
@@ -16,13 +14,21 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  if (state.lockedUntil) {
-    if (Date.now() < state.lockedUntil) {
-      const secondsLeft = Math.ceil((state.lockedUntil - Date.now()) / 1000)
-      return NextResponse.json({ error: 'Too many attempts', lockedSeconds: secondsLeft }, { status: 429 })
-    }
-    state.count = 0
-    state.lockedUntil = null
+  // DB-persisted attempt counter — survives server restarts and serverless cold starts
+  const { data: attempts } = await supabase
+    .from('api_rate_limits')
+    .select('count, window_start')
+    .eq('user_id', user.id)
+    .eq('route', ROUTE_KEY)
+    .single()
+
+  const windowStart = attempts?.window_start ? new Date(attempts.window_start) : null
+  const windowAge = windowStart ? Date.now() - windowStart.getTime() : Infinity
+  const currentCount = windowAge < LOCKOUT_MINUTES * 60 * 1000 ? (attempts?.count ?? 0) : 0
+
+  if (currentCount >= MAX_ATTEMPTS && windowAge < LOCKOUT_MINUTES * 60 * 1000) {
+    const secondsLeft = Math.ceil((LOCKOUT_MINUTES * 60 * 1000 - windowAge) / 1000)
+    return NextResponse.json({ error: 'Too many attempts. Locked for 1 hour.', lockedSeconds: secondsLeft }, { status: 429 })
   }
 
   const { pin } = await req.json()
@@ -31,16 +37,23 @@ export async function POST(req) {
 
   const submitted = createHash('sha256').update(String(pin)).digest('hex')
   const match = submitted === hash
+
   if (!match) {
-    state.count++
-    if (state.count >= MAX_ATTEMPTS) {
-      state.lockedUntil = Date.now() + LOCKOUT_MS
-      return NextResponse.json({ error: 'Too many attempts. Locked for 1 hour.', lockedSeconds: LOCKOUT_MS / 1000 }, { status: 429 })
+    const newCount = currentCount + 1
+    const now = new Date().toISOString()
+    await supabase.from('api_rate_limits').upsert(
+      { user_id: user.id, route: ROUTE_KEY, count: newCount, window_start: windowAge >= LOCKOUT_MINUTES * 60 * 1000 ? now : (attempts?.window_start ?? now) },
+      { onConflict: 'user_id,route' }
+    )
+    if (newCount >= MAX_ATTEMPTS) {
+      return NextResponse.json({ error: 'Too many attempts. Locked for 1 hour.', lockedSeconds: LOCKOUT_MINUTES * 60 }, { status: 429 })
     }
-    return NextResponse.json({ error: 'Incorrect PIN', attemptsLeft: MAX_ATTEMPTS - state.count }, { status: 401 })
+    return NextResponse.json({ error: 'Incorrect PIN', attemptsLeft: MAX_ATTEMPTS - newCount }, { status: 401 })
   }
 
-  state.count = 0
-  state.lockedUntil = null
+  await supabase.from('api_rate_limits').upsert(
+    { user_id: user.id, route: ROUTE_KEY, count: 0, window_start: new Date().toISOString() },
+    { onConflict: 'user_id,route' }
+  )
   return NextResponse.json({ ok: true })
 }

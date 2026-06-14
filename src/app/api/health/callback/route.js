@@ -1,14 +1,24 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url)
   const code = searchParams.get('code')
+  const state = searchParams.get('state')
   const error = searchParams.get('error')
 
+  const cookieStore = await cookies()
+  const expectedState = cookieStore.get('oauth_state')?.value
+  cookieStore.delete('oauth_state')
+
   if (error || !code) {
+    return NextResponse.redirect(`${SITE_URL}/settings?health=error`)
+  }
+
+  if (!state || !expectedState || state !== expectedState) {
     return NextResponse.redirect(`${SITE_URL}/settings?health=error`)
   }
 

@@ -169,6 +169,13 @@ All items are ✅ built. This section is reference only — not a to-do list.
 | 14 | 2FA — TOTP via authenticator app | ✅ Built | Supabase MFA; QR enrollment; recovery codes in `recovery_codes`; TOTP login gate |
 | 15 | Owner admin panel | ✅ Built | User list, disable/enable, force logout, send reset, reset 2FA, clear PIN — all in Settings |
 | 16 | Invite-only signup | ✅ Built | `invite_codes` table; `/join` page; `validate` + `redeem` routes; IP brute force protection |
+| 17 | OAuth CSRF protection | ✅ Built | State param stored in httpOnly cookie (10min); validated in `/api/health/callback` before code exchange |
+| 18 | Barcode SSRF prevention | ✅ Built | `/^\d{8,14}$/` validation on barcode before use; `encodeURIComponent` in OFF URL; 400 on bad format |
+| 19 | Chat history injection prevention | ✅ Built | Role whitelist `['user','assistant']`; last 20 messages only; 2000 char/msg limit |
+| 20 | Invite code enumeration prevention | ✅ Built | `invite/redeem` rate-limited (10/hr); unified error "Invalid or already used code" |
+| 21 | Recovery code brute force prevention | ✅ Built | `2fa/use-recovery` rate-limited (5/hr via `api_rate_limits`) |
+| 22 | Rate limit fail-closed | ✅ Built | `checkRateLimit` returns `{ allowed: false }` on DB error — was fail-open |
+| 23 | Owner PIN serverless lockout | ✅ Built | Lockout persisted in `api_rate_limits` DB — survives cold starts |
 
 ---
 
@@ -299,6 +306,17 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 ---
 
 ## Phase Log
+
+### Phase 56f — Security hardening (M1 + M3 + full audit fixes) — Complete
+- **M1 (invite/redeem enumeration):** `invite/redeem/route.js` now checks rate limit (10/hr) before processing; error messages unified to "Invalid or already used code" — prevents authenticated users from distinguishing valid-but-used codes from invalid codes
+- **M3 (recovery code brute force):** `2fa/use-recovery/route.js` now checks rate limit (5/hr) — blocks brute-force enumeration of bcrypt-hashed recovery codes
+- **rateLimit.js:** Added `invite/redeem` (10/hr) and `2fa/use-recovery` (5/hr) to LIMITS; fixed fail-open bug to fail-closed on DB error
+- **C1 (OAuth CSRF):** `health/connect` generates UUID state stored in httpOnly cookie (10min); `health/callback` validates state before code exchange — prevents CSRF token injection
+- **H1 (barcode SSRF):** `nutrition/search/route.js` validates barcode against `/^\d{8,14}$/` before use; `encodeURIComponent` in OFF URL; returns 400 on bad format; `BarcodeScannerModal` also validates before calling `onResult`
+- **H2 (prompt injection in chat routes):** `chat/route.js` filters roles to `['user','assistant']`, limits history to last 20 msgs × 2000 chars; `test-chat/route.js` added is_disabled check, sanitizes inputs, wraps in `<question_context>` + `<user_input>` tags
+- **H3 (unprotected AI routes):** All AI routes now gated by `checkRateLimit` — 11 previously unprotected routes added including `workouts/exercise-chat`, `supplements/ai-fill`, `nutrition/ai-drink-fill`, `nutrition/ai-micro-fill`, `life-hub/daily-brief`, and 6 more
+- **M4 (owner PIN in-memory lockout):** `owner/verify-pin/route.js` — lockout state moved from module-level variables to `api_rate_limits` DB table; survives serverless cold starts and redeploys
+- **C3 (flag-question auth gap):** `flag-question/route.js` — auth guard moved to top of handler; whitelist validation on `feedback_type`, `cert`, `difficulty`; `feedback_text` truncated to 1000 chars
 
 ### Phase 56e — Servings/container editable + search results capped — Complete
 - `log-manual/page.js`: servings_per_container is now an editable input field (pre-filled by AI, editable before saving); saved to My Favorites library when checked; "× 2.5 (whole container)" quick-fill button shown when value is set

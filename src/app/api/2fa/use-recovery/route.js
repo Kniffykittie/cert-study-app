@@ -2,11 +2,15 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 export async function POST(req) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { allowed } = await checkRateLimit(supabase, user.id, '2fa/use-recovery')
+  if (!allowed) return NextResponse.json({ error: 'Too many attempts. Try again later.' }, { status: 429 })
 
   const { code } = await req.json()
   if (!code?.trim()) return NextResponse.json({ error: 'No code provided' }, { status: 400 })

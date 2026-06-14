@@ -48,6 +48,11 @@ export default function BarcodeScannerModal({ onResult, onClose }) {
                 seenCount = 1
               }
               if (seenCount >= 3) {
+                if (!/^\d{8,14}$/.test(val)) {
+                  lastSeen = null; seenCount = 0
+                  if (active) raf = requestAnimationFrame(tick)
+                  return
+                }
                 active = false
                 stream.getTracks().forEach(t => t.stop())
                 if (videoRef.current) videoRef.current.srcObject = null

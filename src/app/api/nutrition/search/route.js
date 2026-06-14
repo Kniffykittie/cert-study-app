@@ -58,8 +58,10 @@ export async function GET(req) {
 
   const { searchParams } = new URL(req.url)
   const query = searchParams.get('q')?.trim()
-  const barcode = searchParams.get('barcode')?.trim()
+  const rawBarcode = searchParams.get('barcode')?.trim()
+  const barcode = rawBarcode && /^\d{8,14}$/.test(rawBarcode) ? rawBarcode : null
 
+  if (rawBarcode && !barcode) return NextResponse.json({ error: 'Invalid barcode format' }, { status: 400 })
   if (!query && !barcode) return NextResponse.json({ results: [] })
 
   // 1. Check Supabase cache first
@@ -79,7 +81,7 @@ export async function GET(req) {
 
   // 3. Open Food Facts
   const offUrl = barcode
-    ? `https://world.openfoodfacts.org/api/v2/product/${barcode}.json`
+    ? `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json`
     : `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=15&fields=product_name,brands,serving_size,nutriments,code`
 
   const offRes = await fetch(offUrl, { headers: { 'User-Agent': 'CertStudyApp/1.0 (sethproper40@yahoo.com)' } })

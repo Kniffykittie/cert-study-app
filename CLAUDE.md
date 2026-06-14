@@ -98,7 +98,7 @@ src/
       wrong-answers/route.js           GET wrong answers by cert (deduped by question text)
       lab-doc-feedback/route.js        AI feedback on step documentation; uses getUser() + is_disabled check; prompt injection protected
       owner/
-        verify-pin/route.js            POST — verifies owner PIN against OWNER_PIN_HASH env var; 3-attempt lockout for 1 hour; owner email check; module-level brute-force state
+        verify-pin/route.js            POST — verifies owner PIN against OWNER_PIN_HASH env var; 3-attempt lockout for 1 hour; owner email check; DB-persisted lockout in api_rate_limits (survives cold starts)
         generate-invite/route.js       POST — owner only; generates random XXXX-XXXX invite code; inserts to invite_codes table
         admin/
           users/route.js               GET — owner only; lists all auth users + profile data (display_name, is_disabled, has_pin) via admin client
@@ -109,7 +109,7 @@ src/
           reset-2fa/route.js           POST — owner only; deletes all TOTP factors for a user via admin client + clears their recovery codes
       invite/
         validate/route.js              GET ?code= — public; checks if code exists and unused; IP-based brute force protection (5 failed attempts/hr blocks IP); records attempts in join_attempts table
-        redeem/route.js                POST — authenticated; marks invite code used_by + used_at
+        redeem/route.js                POST — authenticated; rate-limited (10/hr); unified error message to prevent code enumeration; marks invite code used_by + used_at
       lab-summary/route.js             AI lab completion summary (3 sections); uses getUser() + is_disabled check; prompt injection protected
       delete-account/route.js          POST — full cascade delete across all tables + supabase admin auth user removal; uses getUser()
       2fa/

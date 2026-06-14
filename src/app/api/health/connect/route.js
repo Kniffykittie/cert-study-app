@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
 
@@ -15,6 +16,9 @@ export async function GET() {
   if (!user) return new Response('Unauthorized', { status: 401 })
 
   const state = crypto.randomUUID()
+  const cookieStore = await cookies()
+  cookieStore.set('oauth_state', state, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 600, path: '/' })
+
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_HEALTH_CLIENT_ID,
     redirect_uri: `${SITE_URL}/api/health/callback`,
