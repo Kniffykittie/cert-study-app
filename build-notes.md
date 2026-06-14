@@ -300,6 +300,15 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ## Phase Log
 
+### Phase 56d — Standalone add-food page replaces inline AddFoodModal — Complete
+- AddFoodModal was crashing the mobile tab when opened from any "Add [slot]" button — same OOM root cause as Edit Details
+- New `/life-hub/nutrition/add-food?slot=breakfast` page handles the entire add-food flow off the heavy nutrition page
+- Page has two tabs: ⭐ Favorites (filtered list with servings + whole-container button) and 🔍 Search (OFFs search + barcode scanner + AI estimate)
+- "✏️ Enter food manually" button on both tabs navigates to existing log-manual page
+- AI estimate flow on search tab: preview card with "Log It" + "Edit Details" (navigates to log-manual)
+- All "Add [slot]", "Log Lunch", "Log Snack", and empty-slot dashed buttons now use `window.location.href` to navigate to add-food page
+- Servings per container shown on both Favorites and Search result panels with "whole container" quick-fill button
+
 ### Phase 56c — Servings per container on log-manual page — Complete
 - AI fill response includes `servings_per_container` (e.g. 2.5 for a can of soup) — now stored and displayed on the log-manual page
 - Shows "(2.5 per container — log whole container)" hint next to the Servings input

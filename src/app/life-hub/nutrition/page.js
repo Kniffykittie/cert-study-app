@@ -2558,7 +2558,7 @@ export default function NutritionPage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                    <button onClick={() => setLogModal('lunch')} style={{ backgroundColor: '#f97316', border: 'none', color: '#fff', borderRadius: '7px', padding: '6px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Log Lunch</button>
+                    <button onClick={() => { window.location.href = '/life-hub/nutrition/add-food?slot=lunch' }} style={{ backgroundColor: '#f97316', border: 'none', color: '#fff', borderRadius: '7px', padding: '6px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Log Lunch</button>
                     <button onClick={() => setDismissedBanners(s => new Set([...s, 'lunch']))} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
                   </div>
                 </div>
@@ -2612,7 +2612,7 @@ export default function NutritionPage() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                      <button onClick={() => setLogModal('snack')} style={{ backgroundColor: '#3b82f6', border: 'none', color: '#fff', borderRadius: '7px', padding: '6px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Log Snack</button>
+                      <button onClick={() => { window.location.href = '/life-hub/nutrition/add-food?slot=snack' }} style={{ backgroundColor: '#3b82f6', border: 'none', color: '#fff', borderRadius: '7px', padding: '6px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Log Snack</button>
                       <button onClick={() => setDismissedBanners(s => new Set([...s, 'post_workout']))} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
                     </div>
                   </div>
@@ -2651,7 +2651,7 @@ export default function NutritionPage() {
                       <span style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>{slot.label}</span>
                       {slotCals > 0 && <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{Math.round(slotCals)} kcal</span>}
                     </div>
-                    <button onClick={() => setLogModal(slot.key)}
+                    <button onClick={() => { window.location.href = `/life-hub/nutrition/add-food?slot=${slot.key}` }}
                       style={{ backgroundColor: 'rgba(0,128,255,0.12)', color: 'var(--accent-blue)', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
                       + Add
                     </button>
@@ -2680,7 +2680,7 @@ export default function NutritionPage() {
                     </div>
                   )}
                   {slotEntries.length === 0 && (
-                    <button onClick={() => setLogModal(slot.key)}
+                    <button onClick={() => { window.location.href = `/life-hub/nutrition/add-food?slot=${slot.key}` }}
                       style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: '7px', padding: '8px 12px', cursor: 'pointer', textAlign: 'left', width: '100%', marginTop: '6px', color: 'var(--text-secondary)', fontSize: '12px' }}>
                       + Log {slot.label.toLowerCase()}…
                     </button>
