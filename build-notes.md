@@ -381,6 +381,19 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Phase 58 — nutrition/page.js component split (mobile OOM fix) — Complete
+- **Problem:** 2,748-line single `'use client'` file caused Android to kill the tab (OOM) — full component tree parsed and registered on initial load
+- **Solution:** Extracted 6 components into separate files + shared utility module
+- `src/lib/nutritionUtils.js` — shared constants (`MEAL_SLOTS`, `DV`, `MICRO_GROUPS`, `MEAL_NUTRITION_KEYS`, etc.) and pure functions (`foodCompleteness`, `getDietaryWarnings`, `DIETARY_RULES`)
+- `src/components/nutrition/FoodIntelCard.js` — AI food intelligence card
+- `src/components/nutrition/EditFoodModal.js` — edit saved food modal (all 27 fields + AI micro-fill)
+- `src/components/nutrition/SavedFoodsTab.js` — My Favorites tab with grouping, pinning, direct log
+- `src/components/nutrition/NutrientBars.js` — micronutrient stacked bars (food + supplement)
+- `src/components/nutrition/MealBuilderModal.js` — meal recipe builder
+- `src/components/nutrition/SearchModal.js` — OFFs search + manual entry + AI fill
+- `src/components/nutrition/AddFoodModal.js` — 3-tab add-food modal (Favorites / Manual / Search)
+- `nutrition/page.js` reduced from 2,748 → ~700 lines; clean Vercel build confirmed
+
 ### Phase 57 — Performance quick wins — Complete
 - **heart-rate/page.js:** SVG hover handler throttled to 20fps (50ms gate via `lastMoveTime` ref); replaced O(n) linear scan with binary search through sorted `chartPoints`; all derived SVG values (`avgPath`, `bandPath`, `yTicks`, `wStartX/wEndX`) wrapped in `useMemo` keyed on `[chartPoints, yMin, yMax]`; `xOf`/`yOf` wrapped in `useCallback`; `yMin`/`yMax` computed in a single `useMemo`; if 5-min data exists, `intraday` array discarded early to free memory — no need to hold 2× datasets simultaneously
 - **workouts/log/page.js:** Exercise prefetch changed from `select('*')` to explicit column list — avoids fetching unused columns on the initial exercises batch load

@@ -178,7 +178,7 @@ src/
       nutrition/
         add-food/page.js               Standalone add-food page — Favorites tab (filtered list, servings, whole-container) + Search tab (OFFs + barcode + AI estimate); navigates here from all "Add [slot]" buttons; logs food then returns to nutrition
         log-manual/page.js             Standalone lightweight manual food entry — reads AI prefill from sessionStorage; core macros + optional micronutrients; avoids loading heavy nutrition page DOM; wrapped in Suspense
-        page.js                        Nutrition dashboard — TDEE + macro targets from goals_profiles, calorie ring, food log by meal slot (breakfast/lunch/dinner/snack/other), food search via Open Food Facts + My Foods library, manual entry with save-to-library, Supplements tab; TDEE calibration card (pending suggestion from tdee_suggestions); gates on goals profile; SavedFoodsTab has ✏️ edit button per food (EditFoodModal with all 27 fields + AI micro-fill) and completeness chips (✓/⚠/✗) per food
+        page.js                        Nutrition dashboard (~700 lines; Phase 58 split from 2,748 lines) — TDEE + macro targets, calorie ring, food log by meal slot, Supplements tab, TDEE calibration card, micronutrient panel; imports 6 extracted components from src/components/nutrition/ and shared utils from src/lib/nutritionUtils.js
         meal-plan/page.js              Weekly Meal Plan — Mon–Sun grid, meal slot rows, food search, AI insight analysis (typed callouts citing specific days and foods)
     join/
       page.js                          Invite-only signup — requires valid invite code + email + password; validates code, creates Supabase auth user, redeems code
@@ -216,6 +216,14 @@ src/
       security-plus-labs.js            Security+ lab set — 4 labs, 20 steps — all steps have document arrays
     stretches.js                       38 stretches across 10 muscle groups; exports STRETCHES, STRETCH_MUSCLE_GROUPS, BODY_PART_TO_STRETCH_GROUPS, STRETCH_BY_ID, STRETCH_BY_GROUP, getRecommendedStretches(bodyParts, soreSpots); each stretch: id, name, muscle_group, stretch_type (dynamic/static/both), how_to, common_mistakes, contraindications, duration_seconds
   components/
+    nutrition/
+      FoodIntelCard.js               AI food intel card (glycemic load, satiety, processing level, timing, fun fact); cached in ai_food_intel_cache
+      EditFoodModal.js               Edit saved food — all 27 fields + AI micro-fill; imports TRACKED_MICRO_KEYS from nutritionUtils
+      SavedFoodsTab.js               My Favorites tab — pinned/today/week/older/never groups, direct log flow, pin/edit/delete
+      NutrientBars.js                Micronutrient stacked bars (food + supplement segments, color-coded by % DV)
+      MealBuilderModal.js            Meal recipe builder — ingredient search, custom ingredients, save as recipe
+      SearchModal.js                 OFFs search + manual entry + AI fill + AI micro-fill; dietary warning chips
+      AddFoodModal.js                3-tab add-food modal (⭐ Favorites | ✏️ Manual | 🔍 Search); favorites grouped by ingredient/snack/food
     StudyHubSidebar.js                 Nav sidebar with test-in-progress guard
     LifeHubSidebar.js                  Life Hub nav — section color system (overview=purple, health=green, nutrition=orange, workouts=blue, goals=teal); Overview section (Dashboard + Monthly Wrap), Goals dropdown (Overview + Measurements + Setup), Health dropdown (Overview + Step Tracker + Heart Rate + Sleep Tracker), Nutrition dropdown (Food Log + Meal Plan + Encyclopedia + Hydration + Supplements), Workouts dropdown (My Plan + History + Exercise Library + Stretching & Mobility + Stretch Library); Hydration and Supplements live under Nutrition group; auto-opens on active routes; SECTION_COLORS constant defines all section accent colors
     BookmarkModal.js                   Bookmark reason + notes modal
