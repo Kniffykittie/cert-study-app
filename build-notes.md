@@ -302,7 +302,7 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ### Barcode Scanner + AI Fill Preview — Food Log + Drink Log — Complete
 - `BarcodeScannerModal`: uses native BarcodeDetector API only (no WASM polyfill); `barcode-detector` npm package fully uninstalled; 640×480 video resolution; srcObject nulled on stop; 3 consecutive detections required; onResultRef prevents effect restarts
-- 📷 button added next to search input in AddFoodModal "Search Database" tab (`nutrition/page.js`) — scans barcode and fires `/api/nutrition/search?barcode=` directly
+- Manual entry form in AddFoodModal collapsed to 7 fields by default (name/brand/serving/cal/protein/carbs/fat); fiber, sodium, and micronutrients hidden behind "Show more" toggle — prevents OOM crash on mobile when switching to manual tab
 - 📷 button added next to drink search in Drinks & Hydration page (`health/water/page.js`) — same barcode → search flow
 - Supplements page skipped (supplements don't have barcodes)
 
