@@ -70,6 +70,7 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
   const [manualSaveToLib, setManualSaveToLib] = useState(true)
   const [manualIsIngredient, setManualIsIngredient] = useState(false)
   const [manualIsSnack, setManualIsSnack] = useState(false)
+  const [manualIsDrink, setManualIsDrink] = useState(false)
   const [savingManual, setSavingManual] = useState(false)
   const [manualServings, setManualServings] = useState('1')
   const [aiFilling, setAiFilling] = useState(false)
@@ -89,9 +90,22 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
 
   const mealInfo = MEAL_SLOTS.find(m => m.key === slot)
   const filtered = filter ? myFoods.filter(f => f.name.toLowerCase().includes(filter.toLowerCase())) : myFoods
-  const filteredIngredients = filtered.filter(f => f.is_ingredient)
-  const filteredSnacks = filtered.filter(f => f.is_snack && !f.is_ingredient)
-  const filteredFoods = filtered.filter(f => !f.is_ingredient && !f.is_snack)
+  const favDrinks = filtered.filter(f => f.is_drink)
+  const favIngredients = filtered.filter(f => f.is_ingredient && !f.is_drink)
+  const favSnacks = filtered.filter(f => f.is_snack && !f.is_ingredient && !f.is_drink)
+  const favFoods = filtered.filter(f => !f.is_ingredient && !f.is_snack && !f.is_drink)
+
+  const smartDefault = slot === 'drink' ? 'drinks' : slot === 'snack' ? 'snacks' : 'all'
+  const [favTab, setFavTab] = useState(() => {
+    try { return localStorage.getItem('favTab') || smartDefault } catch { return smartDefault }
+  })
+
+  function setFavTabPersist(t) {
+    setFavTab(t)
+    try { localStorage.setItem('favTab', t) } catch {}
+  }
+
+  const favTabItems = favTab === 'drinks' ? favDrinks : favTab === 'ingredients' ? favIngredients : favTab === 'snacks' ? favSnacks : favTab === 'foods' ? favFoods : filtered
 
   useEffect(() => { if (tab === 'search') searchInputRef.current?.focus() }, [tab])
 
@@ -196,7 +210,7 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
     setSavingManual(true)
     let savedFood = null
     if (manualSaveToLib) {
-      const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...manual, source: 'manual', is_ingredient: manualIsIngredient, is_snack: manualIsSnack }) })
+      const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...manual, source: 'manual', is_ingredient: manualIsIngredient, is_snack: manualIsSnack, is_drink: manualIsDrink }) })
       const data = await res.json()
       if (data.food) { savedFood = data.food; onSaveFood(data.food) }
     }
@@ -298,27 +312,57 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
 
         {tab === 'favorites' && (
           <>
-            <div style={{ padding: '0 20px 10px', flexShrink: 0 }}>
+            <div style={{ padding: '0 20px 8px', flexShrink: 0 }}>
               <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter your favorites..."
                 style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 14px', color: 'var(--text-primary)', fontSize: '13px' }} />
             </div>
+            <div style={{ padding: '0 20px 8px', flexShrink: 0, display: 'flex', gap: '5px', overflowX: 'auto' }}>
+              {[
+                { key: 'all', label: '🌟 All', count: filtered.length },
+                { key: 'foods', label: '🍽️ Foods & Meals', count: favFoods.length },
+                { key: 'drinks', label: '🥤 Drinks', count: favDrinks.length },
+                { key: 'snacks', label: '🍿 Snacks', count: favSnacks.length },
+                { key: 'ingredients', label: '🥚 Ingredients', count: favIngredients.length },
+              ].map(({ key, label, count }) => (
+                <button key={key} onClick={() => setFavTabPersist(key)}
+                  style={{ padding: '5px 10px', borderRadius: '20px', border: favTab === key ? 'none' : '1px solid var(--border)', backgroundColor: favTab === key ? 'var(--accent-blue)' : 'var(--background)', color: favTab === key ? '#fff' : count === 0 ? 'var(--border)' : 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {label} {count > 0 ? `(${count})` : ''}
+                </button>
+              ))}
+            </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
-              {filtered.length === 0 ? (
+              {myFoods.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '28px 0' }}>
                   <div style={{ fontSize: '30px', marginBottom: '8px' }}>⭐</div>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '12px' }}>
-                    {filter ? `No favorites match "${filter}"` : 'No saved favorites yet.'}
-                  </p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '12px' }}>No saved favorites yet.</p>
                   <button onClick={() => { setFilter(''); setTab('search') }}
                     style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
                     🔍 Find a food to add
                   </button>
                 </div>
+              ) : favTabItems.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 8px' }}>
+                    {filter ? `No ${favTab === 'all' ? 'favorites' : favTab} match "${filter}"` : `No ${favTab === 'all' ? 'favorites' : favTab} saved yet.`}
+                  </p>
+                  {!filter && (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0, opacity: 0.7 }}>
+                      {favTab === 'drinks' ? 'Log drinks from the Hydration page, or search and save here.' : favTab === 'ingredients' ? 'Save foods with the "Ingredient" tag when adding manually.' : 'Search for a food and save it to your favorites.'}
+                    </p>
+                  )}
+                </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingBottom: '8px' }}>
-                  <FavSection items={filteredIngredients} label="🥚 Ingredients" />
-                  <FavSection items={filteredSnacks} label="🍿 Snacks" />
-                  <FavSection items={filteredFoods} label="🍽️ Foods & Meals" />
+                  {favTab === 'all' ? (
+                    <>
+                      <FavSection items={favFoods} label="🍽️ Foods & Meals" />
+                      <FavSection items={favDrinks} label="🥤 Drinks" />
+                      <FavSection items={favSnacks} label="🍿 Snacks" />
+                      <FavSection items={favIngredients} label="🥚 Ingredients" />
+                    </>
+                  ) : (
+                    <FavSection items={favTabItems} label="" />
+                  )}
                 </div>
               )}
             </div>
@@ -416,18 +460,22 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '14px 0 4px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <input type="checkbox" id="mansavelib" checked={manualSaveToLib} onChange={e => { setManualSaveToLib(e.target.checked); if (!e.target.checked) { setManualIsIngredient(false); setManualIsSnack(false) } }} style={{ accentColor: 'var(--accent-purple)', width: '14px', height: '14px' }} />
+                <input type="checkbox" id="mansavelib" checked={manualSaveToLib} onChange={e => { setManualSaveToLib(e.target.checked); if (!e.target.checked) { setManualIsIngredient(false); setManualIsSnack(false); setManualIsDrink(false) } }} style={{ accentColor: 'var(--accent-purple)', width: '14px', height: '14px' }} />
                 <label htmlFor="mansavelib" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>⭐ Save to My Favorites for quick logging next time</label>
               </div>
               {manualSaveToLib && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <input type="checkbox" id="manisIngredient" checked={manualIsIngredient} onChange={e => { setManualIsIngredient(e.target.checked); if (e.target.checked) setManualIsSnack(false) }} style={{ accentColor: 'var(--accent-blue)', width: '14px', height: '14px' }} />
+                    <input type="checkbox" id="manisIngredient" checked={manualIsIngredient} onChange={e => { setManualIsIngredient(e.target.checked); if (e.target.checked) { setManualIsSnack(false); setManualIsDrink(false) } }} style={{ accentColor: 'var(--accent-blue)', width: '14px', height: '14px' }} />
                     <label htmlFor="manisIngredient" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>🥚 This is an ingredient <span style={{ opacity: 0.7 }}>(appears in Meal Builder)</span></label>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <input type="checkbox" id="manisSnack" checked={manualIsSnack} onChange={e => { setManualIsSnack(e.target.checked); if (e.target.checked) setManualIsIngredient(false) }} style={{ accentColor: 'var(--warning)', width: '14px', height: '14px' }} />
+                    <input type="checkbox" id="manisSnack" checked={manualIsSnack} onChange={e => { setManualIsSnack(e.target.checked); if (e.target.checked) { setManualIsIngredient(false); setManualIsDrink(false) } }} style={{ accentColor: 'var(--warning)', width: '14px', height: '14px' }} />
                     <label htmlFor="manisSnack" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>🍿 This is a snack</label>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <input type="checkbox" id="manisDrink" checked={manualIsDrink} onChange={e => { setManualIsDrink(e.target.checked); if (e.target.checked) { setManualIsIngredient(false); setManualIsSnack(false) } }} style={{ accentColor: 'var(--accent-blue)', width: '14px', height: '14px' }} />
+                    <label htmlFor="manisDrink" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>🥤 This is a drink <span style={{ opacity: 0.7 }}>(appears in Drinks tab)</span></label>
                   </div>
                 </div>
               )}

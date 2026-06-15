@@ -381,6 +381,17 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Phase 59 — My Favorites sub-tabs in AddFoodModal — Complete
+- **Problem:** All saved foods (drinks, ingredients, snacks, meals) mixed in one scroll — hard to find what you want
+- **Solution:** Sub-tab pills inside the Favorites tab: 🌟 All | 🍽️ Foods & Meals | 🥤 Drinks | 🍿 Snacks | 🥚 Ingredients
+- Count badges on each tab — `Drinks (3)` shows what's there at a glance
+- Smart default: slot=drink auto-opens on Drinks; slot=snack auto-opens on Snacks; otherwise All
+- Last-used sub-tab persisted in `localStorage` so reopening remembers your position
+- Empty state per tab with context-aware hint (e.g. "Log drinks from Hydration page, or search and save here")
+- Drinks properly excluded from all other tabs (`is_drink` flag checked)
+- Manual entry now has 🥤 Drink checkbox (mutually exclusive with Ingredient/Snack); saves `is_drink: true` to my-foods
+- Filter input still works within whatever sub-tab is active
+
 ### Phase 58 — nutrition/page.js component split (mobile OOM fix) — Complete
 - **Problem:** 2,748-line single `'use client'` file caused Android to kill the tab (OOM) — full component tree parsed and registered on initial load
 - **Solution:** Extracted 6 components into separate files + shared utility module
