@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import BarcodeScannerModal from '@/components/BarcodeScannerModal'
 import { MEAL_SLOTS, MEAL_NUTRITION_KEYS, DV, getDietaryWarnings, categorizeFoods, buildFoodLogEntry, FOOD_CATEGORIES, categoryToFlags } from '@/lib/nutritionUtils'
 import FoodIntelCard from '@/components/nutrition/FoodIntelCard'
+import LogConfirmModal from '@/components/nutrition/LogConfirmModal'
 
 const MICRO_KEYS = ['sodium_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','omega3_g','vitamin_k_mcg','choline_mg']
 
@@ -55,8 +56,8 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
   const router = useRouter()
   const [tab, setTab] = useState('favorites')
   const [filter, setFilter] = useState('')
-  const [expandedId, setExpandedId] = useState(null)
-  const [logServings, setLogServings] = useState('1')
+  const [confirmFavFood, setConfirmFavFood] = useState(null)
+  const [confirmLogging, setConfirmLogging] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
@@ -167,15 +168,11 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
     setTab('manual')
   }
 
-  function handleExpandLog(foodId) {
-    if (expandedId === foodId) { setExpandedId(null) } else { setExpandedId(foodId); setLogServings('1') }
-  }
-
-  async function confirmLogFav(food) {
-    const sv = parseFloat(logServings) || 1
-    const entry = { meal_slot: slot, servings: sv, source: 'my_foods', my_food_id: food.id }
-    for (const k of ['name', 'brand', 'serving_size_label', ...MEAL_NUTRITION_KEYS]) entry[k] = food[k] ?? null
+  async function handleConfirmFavLog(entry) {
+    setConfirmLogging(true)
     await onAdd(entry)
+    setConfirmLogging(false)
+    setConfirmFavFood(null)
     onClose()
   }
 
@@ -240,50 +237,31 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
     return (
       <>
         <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '6px 2px 4px' }}>{label}</div>
-        {items.map(food => {
-          const isExp = expandedId === food.id
-          const sv = parseFloat(logServings) || 1
-          const calPreview = food.calories != null ? Math.round(food.calories * (isExp ? sv : 1)) : null
-          return (
-            <div key={food.id} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', border: isExp ? '1px solid var(--accent-blue)' : '1px solid transparent', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-                    {food.serving_size_label || '1 serving'}
-                    {food.calories != null ? ` · ${Math.round(food.calories)} kcal` : ''}
-                    {food.protein_g ? ` · ${Math.round(food.protein_g)}g P` : ''}
-                    {food.carbs_g ? ` · ${Math.round(food.carbs_g)}g C` : ''}
-                    {food.fat_g ? ` · ${Math.round(food.fat_g)}g F` : ''}
-                  </div>
-                  {(() => { const w = getDietaryWarnings(food, dietaryPrefs); return w.length > 0 ? (
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
-                      {w.map((ww, i) => <span key={i} style={{ fontSize: '10px', color: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '4px', padding: '1px 5px' }}>{ww}</span>)}
-                    </div>
-                  ) : null })()}
+        {items.map(food => (
+          <div key={food.id} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', border: '1px solid transparent', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                  {food.serving_size_label || '1 serving'}
+                  {food.calories != null ? ` · ${Math.round(food.calories)} kcal` : ''}
+                  {food.protein_g ? ` · ${Math.round(food.protein_g)}g P` : ''}
+                  {food.carbs_g ? ` · ${Math.round(food.carbs_g)}g C` : ''}
+                  {food.fat_g ? ` · ${Math.round(food.fat_g)}g F` : ''}
                 </div>
-                <button onClick={() => handleExpandLog(food.id)}
-                  style={{ backgroundColor: isExp ? 'transparent' : 'rgba(0,128,255,0.12)', color: isExp ? 'var(--text-secondary)' : 'var(--accent-blue)', border: isExp ? '1px solid var(--border)' : 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', flexShrink: 0 }}>
-                  {isExp ? 'Cancel' : 'Log'}
-                </button>
+                {(() => { const w = getDietaryWarnings(food, dietaryPrefs); return w.length > 0 ? (
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
+                    {w.map((ww, i) => <span key={i} style={{ fontSize: '10px', color: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '4px', padding: '1px 5px' }}>{ww}</span>)}
+                  </div>
+                ) : null })()}
               </div>
-              {isExp && (
-                <div style={{ padding: '8px 12px 12px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Servings:</span>
-                    <input type="number" min="0.25" step="0.25" value={logServings} onChange={e => setLogServings(e.target.value)}
-                      style={{ width: '60px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
-                  </div>
-                  {calPreview != null && <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '700' }}>= {calPreview} kcal</span>}
-                  <button onClick={() => confirmLogFav(food)}
-                    style={{ marginLeft: 'auto', backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '7px', padding: '7px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-                    ✓ Add to {mealInfo?.label}
-                  </button>
-                </div>
-              )}
+              <button onClick={() => setConfirmFavFood(food)}
+                style={{ backgroundColor: 'rgba(0,128,255,0.12)', color: 'var(--accent-blue)', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', flexShrink: 0 }}>
+                Log
+              </button>
             </div>
-          )
-        })}
+          </div>
+        ))}
       </>
     )
   }
@@ -652,6 +630,15 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
         )}
 
       </div>
+      {confirmFavFood && (
+        <LogConfirmModal
+          food={confirmFavFood}
+          defaultSlot={slot}
+          onLog={handleConfirmFavLog}
+          onCancel={() => setConfirmFavFood(null)}
+          logging={confirmLogging}
+        />
+      )}
     </div>
   )
 }

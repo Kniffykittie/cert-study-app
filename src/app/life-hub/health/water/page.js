@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import BarcodeScannerModal from '@/components/BarcodeScannerModal'
 import { DV, MEAL_NUTRITION_KEYS } from '@/lib/nutritionUtils'
 import EditFoodModal from '@/components/nutrition/EditFoodModal'
+import LogConfirmModal from '@/components/nutrition/LogConfirmModal'
 
 const DEFAULT_GOAL = 64
 
@@ -125,6 +126,7 @@ export default function DrinksHydrationPage() {
 
   const [logDrinkTime, setLogDrinkTime] = useState('')
   const [editLogTime, setEditLogTime] = useState('')
+  const [drinkConfirmFood, setDrinkConfirmFood] = useState(null)
 
   // Edit logged drink entry
   const [editLogModal, setEditLogModal] = useState(null) // { entry (from drinkEntries), perServing: {cal,caf,waterOz} }
@@ -918,7 +920,7 @@ export default function DrinksHydrationPage() {
             ) : (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {savedDrinks.map(d => (
-                  <button key={d.id} onClick={() => quickLogSavedDrink(d)} disabled={loggingDrink}
+                  <button key={d.id} onClick={() => setDrinkConfirmFood(d)} disabled={loggingDrink}
                     style={{ padding: '6px 12px', background: 'var(--background)', border: '1px solid var(--accent-purple)', borderRadius: 20, color: 'var(--accent-purple)', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}>
                     {d.name}
                   </button>
@@ -1467,6 +1469,28 @@ export default function DrinksHydrationPage() {
             </div>
           </div>
         </div>
+      )}
+      {drinkConfirmFood && (
+        <LogConfirmModal
+          food={drinkConfirmFood}
+          defaultSlot="drink"
+          onLog={async entry => {
+            setLoggingDrink(true)
+            const res = await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...entry, date: today }) })
+            const data = await res.json()
+            if (data.entry) {
+              setDrinkEntries(prev => [...prev, data.entry].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)))
+              if (drinkConfirmFood.water_g) {
+                const ozAdded = drinkConfirmFood.water_g * entry.servings * 0.0338
+                setWeek(prev => prev.map(d => d.date === today ? { ...d, oz: d.oz + ozAdded } : d))
+              }
+            }
+            setLoggingDrink(false)
+            setDrinkConfirmFood(null)
+          }}
+          onCancel={() => setDrinkConfirmFood(null)}
+          logging={loggingDrink}
+        />
       )}
     </div>
   )

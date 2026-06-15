@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import BarcodeScannerModal from '@/components/BarcodeScannerModal'
 import { MEAL_SLOTS, categorizeFoods, buildFoodLogEntry, FOOD_CATEGORIES, categoryToFlags } from '@/lib/nutritionUtils'
+import LogConfirmModal from '@/components/nutrition/LogConfirmModal'
 
 const SLOT_LABELS = Object.fromEntries(MEAL_SLOTS.map(s => [s.key, `${s.emoji} ${s.label}`]))
 
@@ -26,10 +27,8 @@ function AddFoodPageInner() {
   const [tab, setTab] = useState('favorites')
   const [myFoods, setMyFoods] = useState([])
   const [filter, setFilter] = useState('')
-  const [logServings, setLogServings] = useState('1')
-  const [expandedId, setExpandedId] = useState(null)
-  const [logging, setLogging] = useState(null)
-  const [logTime, setLogTime] = useState(nowTimeString)
+  const [logging, setLogging] = useState(false)
+  const [confirmFood, setConfirmFood] = useState(null)
   const smartFavDefault = slot === 'drink' ? 'drinks' : slot === 'snack' ? 'snacks' : 'all'
   const [favTab, setFavTab] = useState(() => { try { return localStorage.getItem('favTab') || smartFavDefault } catch { return smartFavDefault } })
 
@@ -54,12 +53,14 @@ function AddFoodPageInner() {
     }).catch(() => {})
   }, [])
 
-  async function logEntry(food, sv) {
-    setLogging(food.id || food.name)
-    const entry = buildFoodLogEntry(food, slot, sv, food.source || 'my_foods')
-    if (logTime) entry.logged_time = timeToISO(logTime)
+  async function logEntry(entry) {
+    setLogging(true)
     await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry) })
     window.location.href = '/life-hub/nutrition'
+  }
+
+  async function handleFavLog(entry) {
+    await logEntry(entry)
   }
 
   async function saveAndLog(food, sv) {
@@ -67,7 +68,8 @@ function AddFoodPageInner() {
     if (saveSearchToLib) {
       await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...food, ...categoryToFlags(searchCategory) }) }).catch(() => {})
     }
-    await logEntry(food, sv)
+    const entry = buildFoodLogEntry(food, slot, sv, food.source || 'my_foods')
+    await logEntry(entry)
   }
 
   function handleSearch(q) {
@@ -168,54 +170,22 @@ function AddFoodPageInner() {
               </div>
             )}
 
-            {filtered.map(food => {
-              const isExpanded = expandedId === food.id
-              const sv = parseFloat(logServings) || 1
-              const calPreview = food.calories != null ? Math.round(food.calories * (isExpanded ? sv : 1)) : null
-              return (
-                <div key={food.id} onClick={() => { if (!isExpanded) setLogTime(nowTimeString()); setExpandedId(isExpanded ? null : food.id) }}
-                  style={{ backgroundColor: 'var(--surface)', borderRadius: '10px', border: `1px solid ${isExpanded ? 'var(--accent-blue)' : 'var(--border)'}`, overflow: 'hidden', cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>
-                        {food.serving_size_label || '1 serving'}
-                        {food.calories != null ? ` · ${Math.round(food.calories)} kcal` : ''}
-                        {food.protein_g ? ` · ${Math.round(food.protein_g)}g P` : ''}
-                      </div>
+            {filtered.map(food => (
+              <div key={food.id} onClick={() => setConfirmFood(food)}
+                style={{ backgroundColor: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)', overflow: 'hidden', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>
+                      {food.serving_size_label || '1 serving'}
+                      {food.calories != null ? ` · ${Math.round(food.calories)} kcal` : ''}
+                      {food.protein_g ? ` · ${Math.round(food.protein_g)}g P` : ''}
                     </div>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '18px', marginLeft: '8px' }}>{isExpanded ? '▲' : '▼'}</span>
                   </div>
-                  {isExpanded && (
-                    <div onClick={e => e.stopPropagation()} style={{ padding: '0 14px 14px', borderTop: '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '12px 0', flexWrap: 'wrap' }}>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Servings:</span>
-                        <input type="number" min="0.25" step="0.25" value={logServings} onChange={e => setLogServings(e.target.value)}
-                          onClick={e => e.stopPropagation()}
-                          style={{ width: '70px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '14px', textAlign: 'center' }} />
-                        {food.servings_per_container > 1 && (
-                          <button type="button" onClick={e => { e.stopPropagation(); setLogServings(String(food.servings_per_container)) }}
-                            style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', padding: 0, fontWeight: '600' }}>
-                            × {food.servings_per_container} (whole container)
-                          </button>
-                        )}
-                        {calPreview != null && <span style={{ color: 'var(--accent-blue)', fontWeight: '700', fontSize: '13px' }}>= {calPreview} kcal</span>}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0', flexWrap: 'wrap' }}>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Time:</span>
-                        <input type="time" value={logTime} onChange={e => setLogTime(e.target.value)}
-                          onClick={e => e.stopPropagation()}
-                          style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '14px' }} />
-                      </div>
-                      <button onClick={() => logEntry(food, sv)} disabled={logging === food.id}
-                        style={{ width: '100%', backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', opacity: logging === food.id ? 0.6 : 1 }}>
-                        {logging === food.id ? 'Logging...' : `+ Log to ${slotLabel}`}
-                      </button>
-                    </div>
-                  )}
+                  <span style={{ color: 'var(--accent-blue)', fontSize: '12px', fontWeight: '600', marginLeft: '8px' }}>Log →</span>
                 </div>
-              )
-            })}
+              </div>
+            ))}
 
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '14px', textAlign: 'center' }}>
               <button onClick={() => window.location.href = `/life-hub/nutrition/log-manual?slot=${slot}`}
@@ -274,7 +244,7 @@ function AddFoodPageInner() {
                     style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: '7px', padding: '9px', fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                     ✏️ Edit Details
                   </button>
-                  <button onClick={() => logEntry({ ...aiPreview, source: 'manual' }, 1)}
+                  <button onClick={() => setConfirmFood({ ...aiPreview, source: 'manual' })}
                     style={{ flex: 2, backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '7px', padding: '9px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
                     + Log to {slotLabel}
                   </button>
@@ -359,6 +329,15 @@ function AddFoodPageInner() {
       </div>
 
       {showScanner && <BarcodeScannerModal onResult={handleBarcode} onClose={() => setShowScanner(false)} />}
+      {confirmFood && (
+        <LogConfirmModal
+          food={confirmFood}
+          defaultSlot={slot}
+          onLog={handleFavLog}
+          onCancel={() => setConfirmFood(null)}
+          logging={logging}
+        />
+      )}
     </div>
   )
 }

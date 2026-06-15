@@ -381,6 +381,13 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Phase 66 — Universal LogConfirmModal — Complete
+- New component: src/components/nutrition/LogConfirmModal.js — bottom-sheet modal with food name/brand, macro grid (live-updating with servings), non-null micros as chips with DV%, servings input, time picker, meal slot selector chips, Log/Cancel buttons
+- SavedFoodsTab.js: replaced inline expand-to-log with LogConfirmModal (Log button opens modal); removed inline servings/time/slot UI from each row; removed FoodIntelCard import
+- add-food/page.js: favorites tab now taps to open LogConfirmModal instead of expanding inline; AI preview "Log" also opens modal
+- water/page.js: saved drink chips now open LogConfirmModal (slot='drink') instead of auto-logging; water tracking updated after modal confirm
+- AddFoodModal.js: favorites tab Log button opens LogConfirmModal instead of inline expand; modal closes after confirm
+
 ### Phase 65 — Category picker + drinks sub-tab fix — Complete
 - nutrition/page.js: removed `!f.is_drink` filter — all myFoods now passed to SavedFoodsTab; categorizeFoods() handles sub-tab sorting
 - nutritionUtils.js: added FOOD_CATEGORIES, foodToCategory(), categoryToFlags() exports

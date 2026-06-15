@@ -1,40 +1,20 @@
 'use client'
 import { useState, useMemo } from 'react'
-import { MEAL_SLOTS, MEAL_NUTRITION_KEYS, foodCompleteness, categorizeFoods } from '@/lib/nutritionUtils'
-import FoodIntelCard from '@/components/nutrition/FoodIntelCard'
+import { MEAL_NUTRITION_KEYS, foodCompleteness, categorizeFoods } from '@/lib/nutritionUtils'
+import LogConfirmModal from '@/components/nutrition/LogConfirmModal'
 
-function nowTimeString() {
-  const d = new Date()
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-function timeToISO(timeStr, dateStr) {
-  const [h, m] = timeStr.split(':').map(Number)
-  if (dateStr) {
-    const [Y, M, D] = dateStr.split('-').map(Number)
-    return new Date(Y, M - 1, D, h, m, 0).toISOString()
-  }
-  const d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString()
-}
-
-export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, onEdit, todayEntries, workoutCtx }) {
-  const [expandedId, setExpandedId] = useState(null)
-  const [logServings, setLogServings] = useState('1')
-  const [logTime, setLogTime] = useState(nowTimeString)
+export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, onEdit, todayEntries, workoutCtx, defaultSlot }) {
+  const [confirmFood, setConfirmFood] = useState(null)
+  const [logging, setLogging] = useState(false)
   const [favTab, setFavTab] = useState(() => { try { return localStorage.getItem('favTab') || 'all' } catch { return 'all' } })
 
   function setFavTabPersist(t) { setFavTab(t); try { localStorage.setItem('favTab', t) } catch {} }
 
-  function handleLogClick(foodId) {
-    if (expandedId === foodId) { setExpandedId(null) } else { setExpandedId(foodId); setLogServings('1'); setLogTime(nowTimeString()) }
-  }
-
-  async function confirmDirectLog(food, slotKey) {
-    const sv = parseFloat(logServings) || 1
-    const entry = { meal_slot: slotKey, servings: sv, source: 'my_foods', my_food_id: food.id, logged_time: logTime ? timeToISO(logTime) : undefined }
-    for (const k of ['name', 'brand', 'serving_size_label', ...MEAL_NUTRITION_KEYS]) entry[k] = food[k] ?? null
+  async function handleConfirmLog(entry) {
+    setLogging(true)
     await onDirectLog(entry)
-    setExpandedId(null)
+    setLogging(false)
+    setConfirmFood(null)
   }
 
   async function quickRepeat(food) {
@@ -88,9 +68,6 @@ export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLi
   ].filter(s => s.items.length > 0)
 
   function FoodRow({ f }) {
-    const isExpanded = expandedId === f.id
-    const sv = parseFloat(logServings) || 1
-    const calPreview = f.calories != null ? Math.round(f.calories * sv) : null
     const todayCount = (todayEntries || []).filter(e => e.my_food_id === f.id).length
     const freqLabel = getFrequencyLabel(f)
     const completeness = foodCompleteness(f)
@@ -101,7 +78,7 @@ export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLi
       : { color: 'var(--error)', bg: 'rgba(231,76,60,0.1)', label: '✗' }
 
     return (
-      <div key={f.id} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', border: isExpanded ? '1px solid var(--accent-blue)' : f.is_pinned ? '1px solid rgba(241,196,15,0.25)' : '1px solid transparent', overflow: 'hidden' }}>
+      <div key={f.id} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', border: f.is_pinned ? '1px solid rgba(241,196,15,0.25)' : '1px solid transparent', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px' }}>
           <button onClick={() => onPin(f.id, !f.is_pinned)} title={f.is_pinned ? 'Unpin' : 'Pin to top'}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', padding: '0 2px', opacity: f.is_pinned ? 1 : 0.25, flexShrink: 0, lineHeight: 1 }}
@@ -134,6 +111,9 @@ export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLi
               {f.carbs_g ? ` · ${Math.round(f.carbs_g)}g C` : ''}
               {f.fat_g ? ` · ${Math.round(f.fat_g)}g F` : ''}
             </div>
+            {freqLabel && (
+              <div style={{ fontSize: '10px', color: 'var(--accent-blue)', marginTop: '2px' }}>📊 {freqLabel}</div>
+            )}
           </div>
           <div style={{ display: 'flex', gap: '5px', flexShrink: 0, alignItems: 'center' }}>
             {todayCount > 0 && (
@@ -144,45 +124,14 @@ export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLi
             )}
             <button onClick={() => onEdit(f)} title="Edit nutrition info"
               style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>✏️</button>
-            <button onClick={() => handleLogClick(f.id)}
-              style={{ backgroundColor: isExpanded ? 'transparent' : 'rgba(0,128,255,0.12)', color: isExpanded ? 'var(--text-secondary)' : 'var(--accent-blue)', border: isExpanded ? '1px solid var(--border)' : 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
-              {isExpanded ? 'Cancel' : 'Log'}
+            <button onClick={() => setConfirmFood(f)}
+              style={{ backgroundColor: 'rgba(0,128,255,0.12)', color: 'var(--accent-blue)', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+              Log
             </button>
             <button onClick={() => onDelete(f.id)}
               style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', padding: '0 2px' }}>×</button>
           </div>
         </div>
-        {isExpanded && (
-          <div style={{ padding: '0 12px 12px', borderTop: '1px solid var(--border)' }}>
-            {freqLabel && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', backgroundColor: 'rgba(0,128,255,0.08)', borderRadius: '6px', padding: '4px 10px', marginTop: '10px', marginBottom: '4px' }}>
-                <span style={{ fontSize: '11px' }}>📊</span>
-                <span style={{ fontSize: '11px', color: 'var(--accent-blue)', fontWeight: '600' }}>You log this {freqLabel}</span>
-              </div>
-            )}
-            <FoodIntelCard foodName={f.name} brand={f.brand} calories={f.calories} protein_g={f.protein_g} carbs_g={f.carbs_g} fat_g={f.fat_g} fiber_g={f.fiber_g} sugar_g={f.sugar_g} workoutCtx={workoutCtx} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0 10px', flexWrap: 'wrap' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Servings:</span>
-              <input type="number" min="0.25" step="0.25" value={logServings} onChange={e => setLogServings(e.target.value)}
-                style={{ width: '60px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
-              {calPreview != null && <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '700' }}>= {calPreview} kcal</span>}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Time:</span>
-              <input type="time" value={logTime} onChange={e => setLogTime(e.target.value)}
-                style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '13px' }} />
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Log to which meal?</div>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {MEAL_SLOTS.map(slot => (
-                <button key={slot.key} onClick={() => confirmDirectLog(f, slot.key)}
-                  style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer', fontWeight: '500' }}>
-                  {slot.emoji} {slot.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     )
   }
@@ -251,6 +200,15 @@ export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLi
             </div>
           ))}
         </div>
+      )}
+      {confirmFood && (
+        <LogConfirmModal
+          food={confirmFood}
+          defaultSlot={defaultSlot || 'breakfast'}
+          onLog={handleConfirmLog}
+          onCancel={() => setConfirmFood(null)}
+          logging={logging}
+        />
       )}
     </div>
   )
