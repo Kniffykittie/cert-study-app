@@ -65,7 +65,6 @@ export default function EditFoodModal({ food, onClose, onSave }) {
   const [aiFilledFields, setAiFilledFields] = useState(new Set())
   const [showPicker, setShowPicker] = useState(false)
   const [dvMode, setDvMode] = useState(false)
-  const [dvMode, setDvMode] = useState(false)
 
   // Active nutrients = any micro key with a non-empty value, plus newly added ones
   const [activeNutrients, setActiveNutrients] = useState(() => {
