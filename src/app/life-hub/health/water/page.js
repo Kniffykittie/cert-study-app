@@ -1434,11 +1434,7 @@ export default function DrinksHydrationPage() {
             </div>
             {(() => {
               const microMeta = [
-                { key: 'sugar_g', label: 'Sugar', unit: 'g' },
-                { key: 'sodium_mg', label: 'Sodium', unit: 'mg' },
-                { key: 'potassium_mg', label: 'Potassium', unit: 'mg' },
-                { key: 'vitamin_c_mg', label: 'Vitamin C', unit: 'mg' },
-                { key: 'caffeine_mg', label: 'Caffeine', unit: 'mg' },
+                ...DRINK_EXTRA_NUTRIENTS.map(n => ({ key: n.key, label: n.label, unit: n.unit })),
                 { key: 'water_g', label: 'Water', unit: 'g' },
               ]
               const rows = microMeta.filter(m => viewEntry[m.key] != null && viewEntry[m.key] !== 0)

@@ -141,6 +141,7 @@ function HeartRatePageInner() {
 
   // Pre-sorted index for binary search during mouse hover
   const sortedPoints = useMemo(() => chartPoints.filter(p => p.avg_bpm), [chartPoints])
+  const hourLabels = [0, 3, 6, 9, 12, 15, 18, 21]
   const lastMoveTime = useRef(0)
 
   const handleSvgMouseMove = useCallback((e) => {
