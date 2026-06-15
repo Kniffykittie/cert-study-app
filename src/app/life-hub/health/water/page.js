@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import BarcodeScannerModal from '@/components/BarcodeScannerModal'
+import { DV } from '@/lib/nutritionUtils'
 
 const DEFAULT_GOAL = 64
 
@@ -176,6 +177,7 @@ export default function DrinksHydrationPage() {
   const [editSavedModal, setEditSavedModal] = useState(null)
   const [savedEditForm, setSavedEditForm] = useState({ name: '', serving_size_label: '', calories: '', protein_g: '', carbs_g: '', fat_g: '', sugar_g: '', sodium_mg: '', potassium_mg: '', vitamin_c_mg: '', caffeine_mg: '', water_oz: '' })
   const [savingSaved, setSavingSaved] = useState(false)
+  const [dvMode, setDvMode] = useState(false)
 
   const searchTimeout = useRef(null)
   const today = new Date().toLocaleDateString('en-CA')
@@ -1188,14 +1190,30 @@ export default function DrinksHydrationPage() {
                 </div>
               ))}
               {/* Active nutrient rows */}
+              {activeDrinkNutrients.size > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => setDvMode(m => !m)}
+                    style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: `1px solid ${dvMode ? 'var(--accent-blue)' : 'var(--border)'}`, background: 'var(--surface)', color: dvMode ? 'var(--accent-blue)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>
+                    {dvMode ? 'mg' : '% DV'}
+                  </button>
+                </div>
+              )}
               {[...activeDrinkNutrients].map(key => {
                 const meta = DRINK_EXTRA_NUTRIENTS.find(n => n.key === key)
                 if (!meta) return null
+                const hasDV = dvMode && DV[key] != null
+                const rawVal = addDrinkForm[key]
+                const displayVal = hasDV && rawVal !== '' ? String(+(parseFloat(rawVal) / DV[key] * 100).toFixed(1)) : rawVal
+                const displayLabel = hasDV ? `${meta.label} (% DV, ${DV[key]}${meta.unit})` : `${meta.label} (${meta.unit})`
                 return (
                   <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <label style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1 }}>{meta.label} ({meta.unit})</label>
-                    <input type="number" value={addDrinkForm[key]} min="0"
-                      onChange={e => setAddDrinkForm(p => ({ ...p, [key]: e.target.value }))}
+                    <label style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1 }}>{displayLabel}</label>
+                    <input type="number" value={displayVal} min="0"
+                      onChange={e => {
+                        const raw = e.target.value
+                        const stored = hasDV && raw !== '' ? String(Math.round(parseFloat(raw) * DV[key] / 100 * 10) / 10) : raw
+                        setAddDrinkForm(p => ({ ...p, [key]: stored }))
+                      }}
                       placeholder="0"
                       style={{ width: 80, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13, textAlign: 'right' }} />
                     <button onClick={() => { setActiveDrinkNutrients(s => { const n = new Set(s); n.delete(key); return n }); setAddDrinkForm(p => ({ ...p, [key]: '' })) }}
@@ -1410,23 +1428,39 @@ export default function DrinksHydrationPage() {
 
             {showLogNutrition && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, padding: '10px 12px', background: 'var(--background)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => setDvMode(m => !m)}
+                    style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: `1px solid ${dvMode ? 'var(--accent-blue)' : 'var(--border)'}`, background: 'var(--surface)', color: dvMode ? 'var(--accent-blue)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>
+                    {dvMode ? 'mg' : '% DV'}
+                  </button>
+                </div>
                 {[
-                  { label: 'Sodium (mg)', key: 'sodium_mg' },
-                  { label: 'Sugar (g)', key: 'sugar_g' },
-                  { label: 'Protein (g)', key: 'protein_g' },
-                  { label: 'Carbs (g)', key: 'carbs_g' },
-                  { label: 'Fat (g)', key: 'fat_g' },
-                  { label: 'Potassium (mg)', key: 'potassium_mg' },
-                  { label: 'Vitamin C (mg)', key: 'vitamin_c_mg' },
-                ].map(f => (
-                  <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <label style={{ fontSize: 12, color: 'var(--text-secondary)', width: 150, flexShrink: 0 }}>{f.label}</label>
-                    <input type="number" value={logNutrition[f.key]} min="0"
-                      onChange={e => setLogNutrition(p => ({ ...p, [f.key]: e.target.value }))}
-                      placeholder="0"
-                      style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
-                  </div>
-                ))}
+                  { label: 'Sodium', key: 'sodium_mg', unit: 'mg' },
+                  { label: 'Sugar', key: 'sugar_g', unit: 'g' },
+                  { label: 'Protein', key: 'protein_g', unit: 'g' },
+                  { label: 'Carbs', key: 'carbs_g', unit: 'g' },
+                  { label: 'Fat', key: 'fat_g', unit: 'g' },
+                  { label: 'Potassium', key: 'potassium_mg', unit: 'mg' },
+                  { label: 'Vitamin C', key: 'vitamin_c_mg', unit: 'mg' },
+                ].map(f => {
+                  const hasDV = dvMode && DV[f.key] != null
+                  const rawVal = logNutrition[f.key]
+                  const displayVal = hasDV && rawVal !== '' ? String(+(parseFloat(rawVal) / DV[f.key] * 100).toFixed(1)) : rawVal
+                  const displayLabel = hasDV ? `${f.label} (% DV, ${DV[f.key]}${f.unit})` : `${f.label} (${f.unit})`
+                  return (
+                    <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <label style={{ fontSize: 12, color: 'var(--text-secondary)', width: 150, flexShrink: 0 }}>{displayLabel}</label>
+                      <input type="number" value={displayVal} min="0"
+                        onChange={e => {
+                          const raw = e.target.value
+                          const stored = hasDV && raw !== '' ? String(Math.round(parseFloat(raw) * DV[f.key] / 100 * 10) / 10) : raw
+                          setLogNutrition(p => ({ ...p, [f.key]: stored }))
+                        }}
+                        placeholder="0"
+                        style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
+                    </div>
+                  )
+                })}
               </div>
             )}
 

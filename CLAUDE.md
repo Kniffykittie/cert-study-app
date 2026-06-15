@@ -77,6 +77,7 @@ These pairs can't easily share code but must be kept in sync manually. Any chang
 | Drink log time picker | `src/app/life-hub/health/water/page.js` (logModal + editLogModal) | Any future drink-logging surface | Both the add modal and the edit modal must include a time input; PATCH must send `date` + `logged_time` |
 | Drink nutrient picker | `src/app/life-hub/health/water/page.js` (`DRINK_EXTRA_NUTRIENTS`) | `src/components/nutrition/EditFoodModal.js` (NUTRIENT_GROUPS) | When a new nutrient is added to `MEAL_NUTRITION_KEYS`, add it to both pickers |
 | OFF nutrient extraction | `src/app/api/nutrition/search/route.js` | `src/app/api/nutrition/ai-micro-fill/route.js` (prompt fields) | When a new nutrient column is added, update both the OFFs extraction AND the AI prompt |
+| DV%/mg toggle | `src/components/nutrition/EditFoodModal.js` | `src/components/nutrition/AddFoodModal.js`, `src/app/life-hub/health/water/page.js`, `src/app/life-hub/nutrition/log-manual/page.js` | All 4 files must show the same toggle, same conversion formula, same "no DV" fallback behavior |
 
 ### Time Logging Pattern — `logged_time`
 Any log entry surface (food or drink) that lets the user set a custom time must:

@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { DV } from '@/lib/nutritionUtils'
 
 const ALL_NUM_KEYS = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg','saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','caffeine_mg','water_g','omega3_g','vitamin_k_mcg','choline_mg','phosphorus_mg','chloride_mg','manganese_mg','selenium_mcg','chromium_mcg','copper_mg','iodine_mcg','biotin_mcg','pantothenic_acid_mg','niacin_mg','thiamine_mg','riboflavin_mg']
 
@@ -63,6 +64,8 @@ export default function EditFoodModal({ food, onClose, onSave }) {
   const [microFilling, setMicroFilling] = useState(false)
   const [aiFilledFields, setAiFilledFields] = useState(new Set())
   const [showPicker, setShowPicker] = useState(false)
+  const [dvMode, setDvMode] = useState(false)
+  const [dvMode, setDvMode] = useState(false)
 
   // Active nutrients = any micro key with a non-empty value, plus newly added ones
   const [activeNutrients, setActiveNutrients] = useState(() => {
@@ -124,18 +127,29 @@ export default function EditFoodModal({ food, onClose, onSave }) {
     if (data.food) onSave(data.food)
   }
 
-  const fieldRow = (key, label, unit) => (
-    <div key={key} style={{ display: 'grid', gridTemplateColumns: '1fr auto 28px', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-      <label style={{ color: aiFilledFields.has(key) ? 'var(--warning)' : 'var(--text-secondary)', fontSize: '12px' }}>
-        {label}{unit ? ` (${unit})` : ''}{aiFilledFields.has(key) ? ' 🤖' : ''}
-      </label>
-      <input type="number" value={form[key]} placeholder="0" min="0" step="any"
-        onChange={e => { set(key, e.target.value); setAiFilledFields(s => { const n = new Set(s); n.delete(key); return n }) }}
-        style={{ width: '90px', backgroundColor: aiFilledFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiFilledFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: aiFilledFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px', textAlign: 'right' }} />
-      <button onClick={() => removeNutrient(key)} title="Remove"
-        style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '15px', cursor: 'pointer', padding: 0, lineHeight: 1, opacity: 0.5 }}>×</button>
-    </div>
-  )
+  const fieldRow = (key, label, unit) => {
+    const hasDV = dvMode && DV[key] != null
+    const rawVal = form[key]
+    const displayVal = hasDV && rawVal !== '' && rawVal != null ? String(+(parseFloat(rawVal) / DV[key] * 100).toFixed(1)) : rawVal
+    const displayLabel = hasDV ? `${label} (% DV, ${DV[key]}${unit})` : `${label}${unit ? ` (${unit})` : ''}`
+    return (
+      <div key={key} style={{ display: 'grid', gridTemplateColumns: '1fr auto 28px', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+        <label style={{ color: aiFilledFields.has(key) ? 'var(--warning)' : 'var(--text-secondary)', fontSize: '12px' }}>
+          {displayLabel}{aiFilledFields.has(key) ? ' 🤖' : ''}
+        </label>
+        <input type="number" value={displayVal} placeholder="0" min="0" step={hasDV ? '1' : 'any'}
+          onChange={e => {
+            const raw = e.target.value
+            const actual = hasDV && raw !== '' ? String(Math.round(parseFloat(raw) * DV[key] / 100 * 10) / 10) : raw
+            set(key, actual)
+            setAiFilledFields(s => { const n = new Set(s); n.delete(key); return n })
+          }}
+          style={{ width: '90px', backgroundColor: aiFilledFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiFilledFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: aiFilledFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px', textAlign: 'right' }} />
+        <button onClick={() => removeNutrient(key)} title="Remove"
+          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '15px', cursor: 'pointer', padding: 0, lineHeight: 1, opacity: 0.5 }}>×</button>
+      </div>
+    )
+  }
 
   const inactiveMicros = Object.keys(ALL_MICRO_META).filter(k => !activeNutrients.has(k))
 
@@ -176,7 +190,13 @@ export default function EditFoodModal({ food, onClose, onSave }) {
           {/* Active micronutrients */}
           {activeNutrients.size > 0 && (
             <>
-              <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Micronutrients</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Micronutrients</div>
+                <button type="button" onClick={() => setDvMode(m => !m)}
+                  style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: `1px solid ${dvMode ? 'var(--accent-blue)' : 'var(--border)'}`, background: 'var(--surface)', color: dvMode ? 'var(--accent-blue)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>
+                  {dvMode ? 'mg' : '% DV'}
+                </button>
+              </div>
               {[...activeNutrients].map(key => {
                 const meta = ALL_MICRO_META[key]
                 if (!meta) return null

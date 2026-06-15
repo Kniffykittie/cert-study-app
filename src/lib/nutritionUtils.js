@@ -18,6 +18,8 @@ export const DV = {
   // B-vitamins
   biotin_mcg: 30, pantothenic_acid_mg: 5, niacin_mg: 16,
   thiamine_mg: 1.2, riboflavin_mg: 1.3,
+  // Additional vitamins
+  vitamin_k_mcg: 120, choline_mg: 550,
 }
 
 export const MICRO_GROUPS = [
