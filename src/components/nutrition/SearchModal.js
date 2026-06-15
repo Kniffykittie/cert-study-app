@@ -198,7 +198,7 @@ export default function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood,
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
-              {filteredMyFoods.length > 0 && (
+              {filteredMyFoods.length > 0 && !libraryOnly && (
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ fontSize: '11px', color: 'var(--accent-purple)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px', fontWeight: '600' }}>⭐ Saved Foods</div>
                   {filteredMyFoods.map(f => (
