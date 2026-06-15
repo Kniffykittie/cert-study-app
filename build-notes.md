@@ -381,6 +381,12 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Phase 64 — Log entry detail modal + DV% conversion hints — Complete
+- Tap any food log entry on nutrition page → read-only modal with all macros + non-null micros, serving info, time logged
+- Tap any drink entry on hydration page → same read-only modal
+- All nutrient input fields now show live conversion hint (e.g. "200mg = 22% DV" or "20% DV = 180mg") below each field
+- Applies to EditFoodModal, log-manual/page.js, water/page.js nutrient inputs
+
 ### Phase 63 — DV% ↔ mg toggle for all nutrient entry points — Complete
 - Added DV% ↔ mg toggle to EditFoodModal.js, water/page.js (log + edit modals), and log-manual/page.js
 - nutritionUtils.js DV constant extended: added vitamin_k_mcg: 120 and choline_mg: 550

@@ -89,6 +89,44 @@ export default function NutritionPage() {
   const [todayWaterOz, setTodayWaterOz] = useState(null)
   const [dismissedBanners, setDismissedBanners] = useState(new Set())
   const [workoutFinishedAt, setWorkoutFinishedAt] = useState(null)
+  const [viewEntry, setViewEntry] = useState(null)
+
+  const MICRO_LABEL_MAP = {
+    fiber_g: { label: 'Fiber', unit: 'g' },
+    sugar_g: { label: 'Sugar', unit: 'g' },
+    sodium_mg: { label: 'Sodium', unit: 'mg' },
+    saturated_fat_g: { label: 'Saturated Fat', unit: 'g' },
+    trans_fat_g: { label: 'Trans Fat', unit: 'g' },
+    cholesterol_mg: { label: 'Cholesterol', unit: 'mg' },
+    potassium_mg: { label: 'Potassium', unit: 'mg' },
+    calcium_mg: { label: 'Calcium', unit: 'mg' },
+    iron_mg: { label: 'Iron', unit: 'mg' },
+    magnesium_mg: { label: 'Magnesium', unit: 'mg' },
+    zinc_mg: { label: 'Zinc', unit: 'mg' },
+    vitamin_a_mcg: { label: 'Vitamin A', unit: 'mcg' },
+    vitamin_c_mg: { label: 'Vitamin C', unit: 'mg' },
+    vitamin_d_mcg: { label: 'Vitamin D', unit: 'mcg' },
+    vitamin_b12_mcg: { label: 'Vitamin B12', unit: 'mcg' },
+    vitamin_b6_mg: { label: 'Vitamin B6', unit: 'mg' },
+    folate_mcg: { label: 'Folate', unit: 'mcg' },
+    caffeine_mg: { label: 'Caffeine', unit: 'mg' },
+    water_g: { label: 'Water', unit: 'g' },
+    omega3_g: { label: 'Omega-3', unit: 'g' },
+    vitamin_k_mcg: { label: 'Vitamin K', unit: 'mcg' },
+    choline_mg: { label: 'Choline', unit: 'mg' },
+    phosphorus_mg: { label: 'Phosphorus', unit: 'mg' },
+    chloride_mg: { label: 'Chloride', unit: 'mg' },
+    manganese_mg: { label: 'Manganese', unit: 'mg' },
+    selenium_mcg: { label: 'Selenium', unit: 'mcg' },
+    chromium_mcg: { label: 'Chromium', unit: 'mcg' },
+    copper_mg: { label: 'Copper', unit: 'mg' },
+    iodine_mcg: { label: 'Iodine', unit: 'mcg' },
+    biotin_mcg: { label: 'Biotin', unit: 'mcg' },
+    pantothenic_acid_mg: { label: 'Pantothenic Acid', unit: 'mg' },
+    niacin_mg: { label: 'Niacin', unit: 'mg' },
+    thiamine_mg: { label: 'Thiamine', unit: 'mg' },
+    riboflavin_mg: { label: 'Riboflavin', unit: 'mg' },
+  }
 
   const today = new Date().toISOString().split('T')[0]
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
@@ -272,6 +310,55 @@ export default function NutritionPage() {
 
   return (
     <div>
+      {viewEntry && (
+        <div onClick={() => setViewEntry(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, maxWidth: 400, width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{viewEntry.name}</div>
+              {viewEntry.brand && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{viewEntry.brand}</div>}
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                {viewEntry.servings !== 1 ? `${viewEntry.servings}× ` : ''}{viewEntry.serving_size_label || '1 serving'}
+                {' · '}{MEAL_SLOTS.find(s => s.key === viewEntry.meal_slot)?.label || viewEntry.meal_slot}
+              </div>
+              {viewEntry.created_at && (
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
+                  {new Date(viewEntry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+              {[
+                { label: 'Calories', value: viewEntry.calories, unit: 'kcal', color: 'var(--accent-blue)' },
+                { label: 'Protein', value: viewEntry.protein_g, unit: 'g', color: 'var(--success)' },
+                { label: 'Carbs', value: viewEntry.carbs_g, unit: 'g', color: 'var(--warning)' },
+                { label: 'Fat', value: viewEntry.fat_g, unit: 'g', color: 'var(--accent-purple)' },
+              ].map(m => (
+                <div key={m.label} style={{ background: 'var(--background)', borderRadius: 8, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{m.label}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: m.color }}>{m.value != null ? Math.round(m.value * 10) / 10 : '—'}<span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-secondary)', marginLeft: 2 }}>{m.unit}</span></div>
+                </div>
+              ))}
+            </div>
+            {Object.entries(MICRO_LABEL_MAP).some(([k]) => viewEntry[k] != null && viewEntry[k] !== 0) && (
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Micronutrients</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {Object.entries(MICRO_LABEL_MAP).filter(([k]) => viewEntry[k] != null && viewEntry[k] !== 0).map(([k, meta]) => (
+                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>{meta.label}</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{Math.round(viewEntry[k] * 10) / 10} {meta.unit}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button onClick={() => setViewEntry(null)}
+              style={{ width: '100%', padding: '10px', background: 'none', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer' }}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
       {logModal && (
         <AddFoodModal slot={logModal} onClose={() => setLogModal(null)} onAdd={handleAddEntry}
           myFoods={mealFoods} onSaveFood={handleSaveToMyFoods} onCreateMeal={() => setMealBuilderModal(true)} workoutCtx={workoutCtx} dietaryPrefs={goals?.dietary_preferences || []} />
@@ -617,7 +704,7 @@ export default function NutritionPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {slotEntries.map(e => (
                         <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--background)', borderRadius: '8px', padding: '8px 12px' }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => setViewEntry(e)}>
                             <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.name}</div>
                             <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
                               {e.servings !== 1 ? `${e.servings}× ` : ''}{e.serving_size_label || '1 serving'}
@@ -699,6 +786,57 @@ export default function NutritionPage() {
         <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '16px', textAlign: 'center' }}>
           Calorie target from Mifflin-St Jeor formula · <Link href="/life-hub/goals/setup" style={{ color: 'var(--accent-purple)' }}>Update goals</Link>
         </p>
+      )}
+
+      {viewEntry && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={() => setViewEntry(null)}>
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px', maxWidth: '400px', width: '100%', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>{viewEntry.name}</div>
+              {viewEntry.brand && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>{viewEntry.brand}</div>}
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                {viewEntry.servings !== 1 ? `${viewEntry.servings}× ` : ''}{viewEntry.serving_size_label || '1 serving'}
+                {MEAL_SLOTS.find(s => s.key === viewEntry.meal_slot) ? ` · ${MEAL_SLOTS.find(s => s.key === viewEntry.meal_slot).label}` : ''}
+                {viewEntry.created_at ? ` · ${new Date(viewEntry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+              {[
+                { label: 'Calories', value: viewEntry.calories, unit: 'kcal', color: 'var(--accent-blue)' },
+                { label: 'Protein', value: viewEntry.protein_g, unit: 'g', color: 'var(--success)' },
+                { label: 'Carbs', value: viewEntry.carbs_g, unit: 'g', color: 'var(--warning)' },
+                { label: 'Fat', value: viewEntry.fat_g, unit: 'g', color: '#f97316' },
+              ].map(m => (
+                <div key={m.label} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 12px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>{m.label}</div>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: m.color }}>{m.value != null ? Math.round(m.value * 10) / 10 : '—'}<span style={{ fontSize: '11px', fontWeight: '400', color: 'var(--text-secondary)', marginLeft: '3px' }}>{m.unit}</span></div>
+                </div>
+              ))}
+            </div>
+            {(() => {
+              const microKeys = Object.keys(MICRO_LABEL_MAP)
+              const rows = microKeys.filter(k => viewEntry[k] != null && viewEntry[k] !== 0)
+              if (rows.length === 0) return null
+              return (
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {rows.map(k => {
+                    const { label, unit } = MICRO_LABEL_MAP[k]
+                    return (
+                      <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>{Math.round(viewEntry[k] * 10) / 10} {unit}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+            <button onClick={() => setViewEntry(null)}
+              style={{ width: '100%', marginTop: '16px', padding: '10px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer' }}>
+              Close
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )

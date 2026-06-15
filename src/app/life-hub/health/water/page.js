@@ -185,6 +185,7 @@ export default function DrinksHydrationPage() {
   const [aiFillDrinkDone, setAiFillDrinkDone] = useState(false)
   const [editSavedModal, setEditSavedModal] = useState(null)
   const [savedEditForm, setSavedEditForm] = useState({ name: '', serving_size_label: '', calories: '', protein_g: '', carbs_g: '', fat_g: '', sugar_g: '', sodium_mg: '', potassium_mg: '', vitamin_c_mg: '', caffeine_mg: '', water_oz: '' })
+  const [viewEntry, setViewEntry] = useState(null)
   const [savingSaved, setSavingSaved] = useState(false)
   const [dvMode, setDvMode] = useState(false)
 
@@ -1041,7 +1042,15 @@ export default function DrinksHydrationPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {allEntries.map((entry, i) => (
               <div key={entry.type + entry.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: i < allEntries.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{ flex: 1, minWidth: 0, cursor: entry.type === 'drink' ? 'pointer' : 'default' }}
+                  onClick={() => {
+                    if (entry.type === 'drink') {
+                      const raw = drinkEntries.find(e => e.id === entry.id)
+                      if (raw) setViewEntry(raw)
+                    }
+                  }}
+                >
                   <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: entry.type === 'water' ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {entry.label}
                   </div>
@@ -1213,19 +1222,25 @@ export default function DrinksHydrationPage() {
                 const rawVal = addDrinkForm[key]
                 const displayVal = hasDV && rawVal !== '' ? String(+(parseFloat(rawVal) / DV[key] * 100).toFixed(1)) : rawVal
                 const displayLabel = hasDV ? `${meta.label} (% DV, ${DV[key]}${meta.unit})` : `${meta.label} (${meta.unit})`
+                const hint = rawVal !== ''
+                  ? (!dvMode && DV[key] != null ? `= ${Math.round(parseFloat(rawVal) / DV[key] * 100)}% DV` : dvMode && DV[key] != null ? `= ${Math.round(parseFloat(rawVal) * DV[key] / 100 * 10) / 10}${meta.unit}` : null)
+                  : null
                 return (
-                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <label style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1 }}>{displayLabel}</label>
-                    <input type="number" value={displayVal} min="0"
-                      onChange={e => {
-                        const raw = e.target.value
-                        const stored = hasDV && raw !== '' ? String(Math.round(parseFloat(raw) * DV[key] / 100 * 10) / 10) : raw
-                        setAddDrinkForm(p => ({ ...p, [key]: stored }))
-                      }}
-                      placeholder="0"
-                      style={{ width: 80, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13, textAlign: 'right' }} />
-                    <button onClick={() => { setActiveDrinkNutrients(s => { const n = new Set(s); n.delete(key); return n }); setAddDrinkForm(p => ({ ...p, [key]: '' })) }}
-                      style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 16, cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>×</button>
+                  <div key={key}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1 }}>{displayLabel}</label>
+                      <input type="number" value={displayVal} min="0"
+                        onChange={e => {
+                          const raw = e.target.value
+                          const stored = hasDV && raw !== '' ? String(Math.round(parseFloat(raw) * DV[key] / 100 * 10) / 10) : raw
+                          setAddDrinkForm(p => ({ ...p, [key]: stored }))
+                        }}
+                        placeholder="0"
+                        style={{ width: 80, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13, textAlign: 'right' }} />
+                      <button onClick={() => { setActiveDrinkNutrients(s => { const n = new Set(s); n.delete(key); return n }); setAddDrinkForm(p => ({ ...p, [key]: '' })) }}
+                        style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 16, cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>×</button>
+                    </div>
+                    {hint && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', textAlign: 'right', paddingRight: 28 }}>{hint}</div>}
                   </div>
                 )
               })}
@@ -1391,6 +1406,62 @@ export default function DrinksHydrationPage() {
         </div>
       )}
 
+      {/* View drink entry detail modal */}
+      {viewEntry && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setViewEntry(null)}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, maxWidth: 380, width: '100%', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{viewEntry.name}</div>
+              {viewEntry.brand && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{viewEntry.brand}</div>}
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                {viewEntry.servings !== 1 ? `${viewEntry.servings}× ` : ''}{viewEntry.serving_size_label || '1 serving'}
+                {' · '}
+                {new Date(viewEntry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+              {[
+                { label: 'Calories', value: viewEntry.calories, unit: 'kcal', color: 'var(--accent-blue)' },
+                { label: 'Protein', value: viewEntry.protein_g, unit: 'g', color: 'var(--success)' },
+                { label: 'Carbs', value: viewEntry.carbs_g, unit: 'g', color: 'var(--warning)' },
+                { label: 'Fat', value: viewEntry.fat_g, unit: 'g', color: '#f97316' },
+              ].map(m => (
+                <div key={m.label} style={{ background: 'var(--background)', borderRadius: 8, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 2 }}>{m.label}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: m.color }}>{m.value != null ? Math.round(m.value * 10) / 10 : '—'}<span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-secondary)', marginLeft: 3 }}>{m.unit}</span></div>
+                </div>
+              ))}
+            </div>
+            {(() => {
+              const microMeta = [
+                { key: 'sugar_g', label: 'Sugar', unit: 'g' },
+                { key: 'sodium_mg', label: 'Sodium', unit: 'mg' },
+                { key: 'potassium_mg', label: 'Potassium', unit: 'mg' },
+                { key: 'vitamin_c_mg', label: 'Vitamin C', unit: 'mg' },
+                { key: 'caffeine_mg', label: 'Caffeine', unit: 'mg' },
+                { key: 'water_g', label: 'Water', unit: 'g' },
+              ]
+              const rows = microMeta.filter(m => viewEntry[m.key] != null && viewEntry[m.key] !== 0)
+              if (rows.length === 0) return null
+              return (
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {rows.map(m => (
+                    <div key={m.key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>{m.label}</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{Math.round(viewEntry[m.key] * 10) / 10} {m.unit}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+            <button onClick={() => setViewEntry(null)}
+              style={{ width: '100%', marginTop: 16, padding: '10px', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-secondary)', fontSize: 14, cursor: 'pointer' }}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Log drink modal */}
       {logModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -1455,17 +1526,23 @@ export default function DrinksHydrationPage() {
                   const rawVal = logNutrition[f.key]
                   const displayVal = hasDV && rawVal !== '' ? String(+(parseFloat(rawVal) / DV[f.key] * 100).toFixed(1)) : rawVal
                   const displayLabel = hasDV ? `${f.label} (% DV, ${DV[f.key]}${f.unit})` : `${f.label} (${f.unit})`
+                  const hint = rawVal !== ''
+                    ? (!dvMode && DV[f.key] != null ? `= ${Math.round(parseFloat(rawVal) / DV[f.key] * 100)}% DV` : dvMode && DV[f.key] != null ? `= ${Math.round(parseFloat(rawVal) * DV[f.key] / 100 * 10) / 10}${f.unit}` : null)
+                    : null
                   return (
-                    <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <label style={{ fontSize: 12, color: 'var(--text-secondary)', width: 150, flexShrink: 0 }}>{displayLabel}</label>
-                      <input type="number" value={displayVal} min="0"
-                        onChange={e => {
-                          const raw = e.target.value
-                          const stored = hasDV && raw !== '' ? String(Math.round(parseFloat(raw) * DV[f.key] / 100 * 10) / 10) : raw
-                          setLogNutrition(p => ({ ...p, [f.key]: stored }))
-                        }}
-                        placeholder="0"
-                        style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
+                    <div key={f.key}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <label style={{ fontSize: 12, color: 'var(--text-secondary)', width: 150, flexShrink: 0 }}>{displayLabel}</label>
+                        <input type="number" value={displayVal} min="0"
+                          onChange={e => {
+                            const raw = e.target.value
+                            const stored = hasDV && raw !== '' ? String(Math.round(parseFloat(raw) * DV[f.key] / 100 * 10) / 10) : raw
+                            setLogNutrition(p => ({ ...p, [f.key]: stored }))
+                          }}
+                          placeholder="0"
+                          style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
+                      </div>
+                      {hint && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', paddingLeft: 160 }}>{hint}</div>}
                     </div>
                   )
                 })}
