@@ -381,6 +381,16 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Phase 62 — SavedFoodsTab sub-tabs + time picker for food and drink logging — Complete
+- **Problem 1:** "My Favorites" tab on main nutrition page (SavedFoodsTab.js) had no sub-tabs — only add-food/page.js had them after Phase 61
+- **Problem 2:** No way to log the time a food or drink was consumed — entries always defaulted to the current timestamp
+- **Problem 3:** No way to edit the time on an existing log entry after the fact
+- **SavedFoodsTab.js:** Added 5 sub-tab pills (🌟 All | 🍽️ Foods & Meals | 🥤 Drinks | 🍿 Snacks | 🥚 Ingredients) using `categorizeFoods()`; active tab persisted to `localStorage` key `favTab`; added `logTime` state with `nowTimeString()` default; time input shown in expanded log panel; `logged_time` passed to POST body
+- **add-food/page.js:** Added `logTime` state and `nowTimeString()` helper; time input added to expanded favorites card panel; `logTime` resets to current time when a card expands; `logged_time` sent in logEntry
+- **water/page.js:** Added `logDrinkTime` state to drink log modal with time input; added `editLogTime` state to edit log modal with time input; both send `logged_time` (and `date`) in their respective API calls
+- **api/nutrition/log/route.js:** POST now extracts `logged_time` and sets `created_at = ${date}T${logged_time}:00` on insert; PATCH now extracts `date` and `logged_time` and sets `created_at` on update — enables retroactive time correction
+- **CLAUDE.md:** Documented "Time Logging Pattern — `logged_time`" in Parallel Implementations section with 5-step requirement; all 3 entry points listed in sync table
+
 ### Phase 61b — Centralize shared nutrition logic, eliminate duplicate constants — Complete
 - **Problem:** Nutrient key lists, MEAL_SLOTS, dietary rules, food categorization logic, and log-entry assembly were independently copy-pasted across 8+ files — high drift risk when adding nutrients
 - **nutritionUtils.js:** Added `categorizeFoods(foods)` (splits by is_drink/is_ingredient/is_snack) and `buildFoodLogEntry(food, slot, sv, source)` (assembles food_log_entries object with all MEAL_NUTRITION_KEYS multiplied by servings) — now exported as shared utilities

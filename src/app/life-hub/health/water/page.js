@@ -116,6 +116,9 @@ export default function DrinksHydrationPage() {
     caffeine_mg: '', water_oz: '',
   })
 
+  const [logDrinkTime, setLogDrinkTime] = useState('')
+  const [editLogTime, setEditLogTime] = useState('')
+
   // Edit logged drink entry
   const [editLogModal, setEditLogModal] = useState(null) // { entry (from drinkEntries), perServing: {cal,caf,waterOz} }
   const [editServings, setEditServings] = useState('1')
@@ -432,6 +435,8 @@ export default function DrinksHydrationPage() {
     setEditCalPer(entry.calories ? String(Math.round((entry.calories / sv) * 10) / 10) : '')
     setEditCafPer(entry.caffeine_mg ? String(Math.round((entry.caffeine_mg / sv) * 10) / 10) : '')
     setEditWaterOzPer(entry.water_g ? String(Math.round((entry.water_g / sv) * 0.0338 * 10) / 10) : '')
+    const d = new Date(entry.created_at)
+    setEditLogTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`)
   }
 
   async function saveEditLogEntry() {
@@ -441,6 +446,7 @@ export default function DrinksHydrationPage() {
     const calPer = parseFloat(editCalPer) || 0
     const cafPer = parseFloat(editCafPer) || 0
     const waterOzPer = parseFloat(editWaterOzPer) || 0
+    const entryDate = editLogModal.date || today
     const body = {
       id: editLogModal.id,
       name: editName.trim() || editLogModal.name,
@@ -448,6 +454,8 @@ export default function DrinksHydrationPage() {
       calories: calPer * sv || null,
       caffeine_mg: cafPer * sv || null,
       water_g: waterOzPer > 0 ? (waterOzPer * 29.5735) * sv : null,
+      date: entryDate,
+      logged_time: editLogTime || undefined,
     }
     const res = await fetch('/api/nutrition/log', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const data = await res.json()
@@ -577,6 +585,7 @@ export default function DrinksHydrationPage() {
     setServingsInput('1')
     setSaveDrink(false)
     setShowLogNutrition(false)
+    setLogDrinkTime(nowTimeString())
     setLogNutrition({
       calories: item.calories != null ? String(Math.round(item.calories * 10) / 10) : '',
       protein_g: item.protein_g != null ? String(item.protein_g) : '',
@@ -647,6 +656,7 @@ export default function DrinksHydrationPage() {
       source: logModal.source || 'off',
       food_cache_id: logModal.barcode ? logModal.id : null,
       my_food_id: logModal._source === 'my_foods' ? logModal.id : null,
+      logged_time: logDrinkTime || undefined,
     }
     const res = await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const data = await res.json()
@@ -1280,6 +1290,11 @@ export default function DrinksHydrationPage() {
                     style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
                 </div>
               ))}
+              <div key="time" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', width: 140, flexShrink: 0 }}>Time logged</label>
+                <input type="time" value={editLogTime} onChange={e => setEditLogTime(e.target.value)}
+                  style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
               <button onClick={saveEditLogEntry} disabled={savingEdit}
@@ -1362,6 +1377,12 @@ export default function DrinksHydrationPage() {
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Servings</label>
               <input type="number" value={servingsInput} onChange={e => setServingsInput(e.target.value)} min="0.1" step="0.5"
                 style={{ width: 80, background: 'var(--background)', border: '1px solid var(--accent-blue)', borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)', fontSize: 14, fontWeight: 600 }} />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', marginBottom: 14 }}>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)', width: 60, flexShrink: 0 }}>Time:</span>
+              <input type="time" value={logDrinkTime} onChange={e => setLogDrinkTime(e.target.value)}
+                style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
             </div>
 
             {/* Nutrition fields — primary */}

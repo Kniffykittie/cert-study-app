@@ -47,8 +47,9 @@ export async function POST(req) {
   }
 
   const { date, meal_slot, name, brand, serving_size_label, servings, calories, protein_g, carbs_g, fat_g,
-    fiber_g, sugar_g, sodium_mg, source, food_cache_id, my_food_id, ...rest } = body
+    fiber_g, sugar_g, sodium_mg, source, food_cache_id, my_food_id, logged_time, ...rest } = body
   const sv = servings || 1
+  const entryDate = date || new Date().toISOString().split('T')[0]
 
   // Multiply all nutrients by servings
   function mult(val) { return val != null ? val * sv : null }
@@ -58,9 +59,9 @@ export async function POST(req) {
     microValues[field] = rest[field] != null ? rest[field] * sv : null
   }
 
-  const { data, error } = await supabase.from('food_log_entries').insert({
+  const insertRow = {
     user_id: user.id,
-    date: date || new Date().toISOString().split('T')[0],
+    date: entryDate,
     meal_slot: meal_slot || 'other',
     name, brand, serving_size_label,
     servings: sv,
@@ -75,7 +76,10 @@ export async function POST(req) {
     food_cache_id: food_cache_id || null,
     my_food_id: my_food_id || null,
     ...microValues,
-  }).select().single()
+  }
+  if (logged_time) insertRow.created_at = `${entryDate}T${logged_time}:00`
+
+  const { data, error } = await supabase.from('food_log_entries').insert(insertRow).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -92,12 +96,16 @@ export async function PATCH(req) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { id, ...fields } = body
+  const { id, date: entryDate, logged_time, ...fields } = body
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
   const allowed = ['name', 'servings', 'calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g', 'sodium_mg', 'caffeine_mg', 'water_g', ...MICRO_FIELDS]
   const updates = {}
   for (const k of allowed) { if (fields[k] !== undefined) updates[k] = fields[k] }
+  if (logged_time) {
+    const d = entryDate || new Date().toISOString().split('T')[0]
+    updates.created_at = `${d}T${logged_time}:00`
+  }
 
   const { data, error } = await supabase.from('food_log_entries').update(updates).eq('id', id).eq('user_id', user.id).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

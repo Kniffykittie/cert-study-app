@@ -63,7 +63,7 @@ Workouts    #3b82f6   (blue)
 | `MEAL_SLOTS` | All nutrition pages — import and derive labels/keys from the object array |
 | `MEAL_NUTRITION_KEYS` | API routes `log/route.js` and `my-foods/route.js` — derive MICRO_FIELDS from it |
 | `getDietaryWarnings` | `AddFoodModal`, `SearchModal`, `meal-plan/page.js` — never re-implement dietary rules |
-| `categorizeFoods(foods)` | `add-food/page.js`, `AddFoodModal.js` — always use this for is_drink/is_ingredient/is_snack splits |
+| `categorizeFoods(foods)` | `add-food/page.js`, `AddFoodModal.js`, `SavedFoodsTab.js` — always use this for is_drink/is_ingredient/is_snack splits |
 | `buildFoodLogEntry(food, slot, sv, source)` | `add-food/page.js` (and any future log-entry point) — never build the entry object manually |
 
 ### What Still Requires Manual Sync (no shared import)
@@ -72,8 +72,19 @@ These pairs can't easily share code but must be kept in sync manually. Any chang
 | What | File A | File B | What must match |
 |------|--------|--------|-----------------|
 | Favorites sub-tabs UI | `src/components/nutrition/AddFoodModal.js` | `src/app/life-hub/nutrition/add-food/page.js` | Tab keys, labels, count badges, smart default per slot, `localStorage` key `favTab` — both use `categorizeFoods()` now, but UI layout must match |
+| Favorites sub-tabs UI | `src/components/nutrition/SavedFoodsTab.js` | `src/app/life-hub/nutrition/add-food/page.js` | Same 5 sub-tabs (All/Foods & Meals/Drinks/Snacks/Ingredients), same `localStorage` key `favTab`, same `categorizeFoods()` call |
+| Time picker on log | `src/components/nutrition/SavedFoodsTab.js` (log expand panel) | `src/app/life-hub/nutrition/add-food/page.js` (expanded card) | Both must show time input, default to now, pass `logged_time` to the log API |
+| Drink log time picker | `src/app/life-hub/health/water/page.js` (logModal + editLogModal) | Any future drink-logging surface | Both the add modal and the edit modal must include a time input; PATCH must send `date` + `logged_time` |
 | Drink nutrient picker | `src/app/life-hub/health/water/page.js` (`DRINK_EXTRA_NUTRIENTS`) | `src/components/nutrition/EditFoodModal.js` (NUTRIENT_GROUPS) | When a new nutrient is added to `MEAL_NUTRITION_KEYS`, add it to both pickers |
 | OFF nutrient extraction | `src/app/api/nutrition/search/route.js` | `src/app/api/nutrition/ai-micro-fill/route.js` (prompt fields) | When a new nutrient column is added, update both the OFFs extraction AND the AI prompt |
+
+### Time Logging Pattern — `logged_time`
+Any log entry surface (food or drink) that lets the user set a custom time must:
+1. Show a `<input type="time">` defaulting to `nowTimeString()` (HH:MM format)
+2. Pass `logged_time: "HH:MM"` in the POST body to `/api/nutrition/log`
+3. For edits (PATCH), send both `date` (the entry's date) and `logged_time` — the route constructs `created_at` from these
+4. The API route constructs `created_at = ${date}T${logged_time}:00` and inserts/updates it
+5. **All three entry points must do this the same way:** `SavedFoodsTab`, `add-food/page.js`, `water/page.js` (search modal + saved drink chip flow)
 
 ### New Nutrient Checklist
 When adding a new nutrient to `MEAL_NUTRITION_KEYS`, touch ALL of these in the same commit:

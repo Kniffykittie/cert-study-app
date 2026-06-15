@@ -1,19 +1,28 @@
 'use client'
 import { useState, useMemo } from 'react'
-import { MEAL_SLOTS, MEAL_NUTRITION_KEYS, foodCompleteness } from '@/lib/nutritionUtils'
+import { MEAL_SLOTS, MEAL_NUTRITION_KEYS, foodCompleteness, categorizeFoods } from '@/lib/nutritionUtils'
 import FoodIntelCard from '@/components/nutrition/FoodIntelCard'
+
+function nowTimeString() {
+  const d = new Date()
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
 
 export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, onEdit, todayEntries, workoutCtx }) {
   const [expandedId, setExpandedId] = useState(null)
   const [logServings, setLogServings] = useState('1')
+  const [logTime, setLogTime] = useState(nowTimeString)
+  const [favTab, setFavTab] = useState(() => { try { return localStorage.getItem('favTab') || 'all' } catch { return 'all' } })
+
+  function setFavTabPersist(t) { setFavTab(t); try { localStorage.setItem('favTab', t) } catch {} }
 
   function handleLogClick(foodId) {
-    if (expandedId === foodId) { setExpandedId(null) } else { setExpandedId(foodId); setLogServings('1') }
+    if (expandedId === foodId) { setExpandedId(null) } else { setExpandedId(foodId); setLogServings('1'); setLogTime(nowTimeString()) }
   }
 
   async function confirmDirectLog(food, slotKey) {
     const sv = parseFloat(logServings) || 1
-    const entry = { meal_slot: slotKey, servings: sv, source: 'my_foods', my_food_id: food.id }
+    const entry = { meal_slot: slotKey, servings: sv, source: 'my_foods', my_food_id: food.id, logged_time: logTime }
     for (const k of ['name', 'brand', 'serving_size_label', ...MEAL_NUTRITION_KEYS]) entry[k] = food[k] ?? null
     await onDirectLog(entry)
     setExpandedId(null)
@@ -43,10 +52,13 @@ export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLi
 
   const today = new Date().toISOString().split('T')[0]
 
+  const { drinks, ingredients, snacks, meals } = categorizeFoods(myFoods)
+  const activeList = favTab === 'drinks' ? drinks : favTab === 'ingredients' ? ingredients : favTab === 'snacks' ? snacks : favTab === 'foods' ? meals : myFoods
+
   const { pinned, loggedToday, loggedThisWeek, loggedOlder, neverLogged } = useMemo(() => {
     const now = Date.now()
     const p = [], lt = [], lw = [], lo = [], nl = []
-    for (const f of myFoods) {
+    for (const f of activeList) {
       if (f.is_pinned) { p.push(f); continue }
       if (!f.last_logged_at) { nl.push(f); continue }
       const days = Math.floor((now - new Date(f.last_logged_at)) / 86400000)
@@ -56,7 +68,7 @@ export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLi
       else lo.push(f)
     }
     return { pinned: p, loggedToday: lt, loggedThisWeek: lw, loggedOlder: lo, neverLogged: nl }
-  }, [myFoods, today])
+  }, [activeList, today])
 
   const sections = [
     { key: 'pinned', label: '📌 Pinned', items: pinned },
@@ -146,6 +158,11 @@ export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLi
                 style={{ width: '60px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
               {calPreview != null && <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '700' }}>= {calPreview} kcal</span>}
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Time:</span>
+              <input type="time" value={logTime} onChange={e => setLogTime(e.target.value)}
+                style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '13px' }} />
+            </div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Log to which meal?</div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {MEAL_SLOTS.map(slot => (
@@ -167,6 +184,23 @@ export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLi
 
   return (
     <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+        {[
+          { key: 'all', label: '🌟 All', count: myFoods.length },
+          { key: 'foods', label: '🍽️ Foods & Meals', count: meals.length },
+          { key: 'drinks', label: '🥤 Drinks', count: drinks.length },
+          { key: 'snacks', label: '🍿 Snacks', count: snacks.length },
+          { key: 'ingredients', label: '🥚 Ingredients', count: ingredients.length },
+        ].map(({ key, label, count }) => (
+          <button key={key} onClick={() => setFavTabPersist(key)}
+            style={{ padding: '5px 10px', borderRadius: '20px', border: `1px solid ${favTab === key ? 'var(--accent-blue)' : 'var(--border)'}`,
+              backgroundColor: favTab === key ? 'rgba(59,130,246,0.12)' : 'var(--surface)',
+              color: favTab === key ? 'var(--accent-blue)' : 'var(--text-secondary)',
+              fontSize: '12px', fontWeight: favTab === key ? '700' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            {label} {count > 0 && <span style={{ opacity: 0.7 }}>({count})</span>}
+          </button>
+        ))}
+      </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
         <div>
           <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', margin: '0 0 4px' }}>My Favorites</h2>
