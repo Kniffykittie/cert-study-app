@@ -381,6 +381,14 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Phase 65 — Category picker + drinks sub-tab fix — Complete
+- nutrition/page.js: removed `!f.is_drink` filter — all myFoods now passed to SavedFoodsTab; categorizeFoods() handles sub-tab sorting
+- nutritionUtils.js: added FOOD_CATEGORIES, foodToCategory(), categoryToFlags() exports
+- EditFoodModal.js: category picker (4 chips: Food/Meal | Drink | Snack | Ingredient) at top of form; category saved on edit
+- AddFoodModal.js: replaced is_drink/is_snack/is_ingredient checkboxes with unified category picker
+- add-food/page.js: category picker shown when saving search result to favorites
+- SearchModal.js: category picker shown when saving to favorites
+
 ### Phase 64 — Log entry detail modal + DV% conversion hints — Complete
 - Tap any food log entry on nutrition page → read-only modal with all macros + non-null micros, serving info, time logged
 - Tap any drink entry on hydration page → same read-only modal

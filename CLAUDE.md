@@ -65,6 +65,7 @@ Workouts    #3b82f6   (blue)
 | `getDietaryWarnings` | `AddFoodModal`, `SearchModal`, `meal-plan/page.js` — never re-implement dietary rules |
 | `categorizeFoods(foods)` | `add-food/page.js`, `AddFoodModal.js`, `SavedFoodsTab.js` — always use this for is_drink/is_ingredient/is_snack splits |
 | `buildFoodLogEntry(food, slot, sv, source)` | `add-food/page.js` (and any future log-entry point) — never build the entry object manually |
+| `FOOD_CATEGORIES`, `foodToCategory()`, `categoryToFlags()` | EditFoodModal, AddFoodModal, add-food/page.js, SearchModal — always import, never redefine locally |
 
 ### What Still Requires Manual Sync (no shared import)
 These pairs can't easily share code but must be kept in sync manually. Any change to one must be applied to the other in the **same commit**.

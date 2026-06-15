@@ -137,6 +137,28 @@ export function categorizeFoods(foods) {
   }
 }
 
+export const FOOD_CATEGORIES = [
+  { key: 'food', label: '🍽️ Food / Meal' },
+  { key: 'drink', label: '🥤 Drink' },
+  { key: 'snack', label: '🍿 Snack' },
+  { key: 'ingredient', label: '🥚 Ingredient' },
+]
+
+export function foodToCategory(food) {
+  if (food?.is_drink) return 'drink'
+  if (food?.is_ingredient) return 'ingredient'
+  if (food?.is_snack) return 'snack'
+  return 'food'
+}
+
+export function categoryToFlags(cat) {
+  return {
+    is_drink: cat === 'drink',
+    is_snack: cat === 'snack',
+    is_ingredient: cat === 'ingredient',
+  }
+}
+
 export function buildFoodLogEntry(food, slot, servings, source) {
   const sv = servings || 1
   const entry = {
