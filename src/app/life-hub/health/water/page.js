@@ -11,6 +11,15 @@ function nowTimeString() {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+function timeToISO(timeStr, dateStr) {
+  const [h, m] = timeStr.split(':').map(Number)
+  if (dateStr) {
+    const [Y, M, D] = dateStr.split('-').map(Number)
+    return new Date(Y, M - 1, D, h, m, 0).toISOString()
+  }
+  const d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString()
+}
+
 function formatOz(n) {
   const v = parseFloat(n) || 0
   return v % 1 === 0 ? String(v) : v.toFixed(1)
@@ -456,8 +465,7 @@ export default function DrinksHydrationPage() {
       calories: calPer * sv || null,
       caffeine_mg: cafPer * sv || null,
       water_g: waterOzPer > 0 ? (waterOzPer * 29.5735) * sv : null,
-      date: entryDate,
-      logged_time: editLogTime || undefined,
+      logged_time: editLogTime ? timeToISO(editLogTime, entryDate) : undefined,
     }
     const res = await fetch('/api/nutrition/log', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const data = await res.json()
@@ -658,7 +666,7 @@ export default function DrinksHydrationPage() {
       source: logModal.source || 'off',
       food_cache_id: logModal.barcode ? logModal.id : null,
       my_food_id: logModal._source === 'my_foods' ? logModal.id : null,
-      logged_time: logDrinkTime || undefined,
+      logged_time: logDrinkTime ? timeToISO(logDrinkTime) : undefined,
     }
     const res = await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const data = await res.json()

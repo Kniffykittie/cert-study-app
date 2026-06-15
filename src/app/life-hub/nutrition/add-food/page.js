@@ -12,6 +12,11 @@ function nowTimeString() {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+function timeToISO(timeStr) {
+  const [h, m] = timeStr.split(':').map(Number)
+  const d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString()
+}
+
 function AddFoodPageInner() {
   const router = useRouter()
   const params = useSearchParams()
@@ -50,7 +55,7 @@ function AddFoodPageInner() {
   async function logEntry(food, sv) {
     setLogging(food.id || food.name)
     const entry = buildFoodLogEntry(food, slot, sv, food.source || 'my_foods')
-    if (logTime) entry.logged_time = logTime
+    if (logTime) entry.logged_time = timeToISO(logTime)
     await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry) })
     window.location.href = '/life-hub/nutrition'
   }

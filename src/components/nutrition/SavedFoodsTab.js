@@ -8,6 +8,15 @@ function nowTimeString() {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+function timeToISO(timeStr, dateStr) {
+  const [h, m] = timeStr.split(':').map(Number)
+  if (dateStr) {
+    const [Y, M, D] = dateStr.split('-').map(Number)
+    return new Date(Y, M - 1, D, h, m, 0).toISOString()
+  }
+  const d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString()
+}
+
 export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, onEdit, todayEntries, workoutCtx }) {
   const [expandedId, setExpandedId] = useState(null)
   const [logServings, setLogServings] = useState('1')
@@ -22,7 +31,7 @@ export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLi
 
   async function confirmDirectLog(food, slotKey) {
     const sv = parseFloat(logServings) || 1
-    const entry = { meal_slot: slotKey, servings: sv, source: 'my_foods', my_food_id: food.id, logged_time: logTime }
+    const entry = { meal_slot: slotKey, servings: sv, source: 'my_foods', my_food_id: food.id, logged_time: logTime ? timeToISO(logTime) : undefined }
     for (const k of ['name', 'brand', 'serving_size_label', ...MEAL_NUTRITION_KEYS]) entry[k] = food[k] ?? null
     await onDirectLog(entry)
     setExpandedId(null)

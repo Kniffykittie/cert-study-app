@@ -77,7 +77,7 @@ export async function POST(req) {
     my_food_id: my_food_id || null,
     ...microValues,
   }
-  if (logged_time) insertRow.created_at = `${entryDate}T${logged_time}:00`
+  if (logged_time) insertRow.created_at = logged_time.includes('T') ? logged_time : `${entryDate}T${logged_time}:00`
 
   const { data, error } = await supabase.from('food_log_entries').insert(insertRow).select().single()
 
@@ -104,7 +104,7 @@ export async function PATCH(req) {
   for (const k of allowed) { if (fields[k] !== undefined) updates[k] = fields[k] }
   if (logged_time) {
     const d = entryDate || new Date().toISOString().split('T')[0]
-    updates.created_at = `${d}T${logged_time}:00`
+    updates.created_at = logged_time.includes('T') ? logged_time : `${d}T${logged_time}:00`
   }
 
   const { data, error } = await supabase.from('food_log_entries').update(updates).eq('id', id).eq('user_id', user.id).select().single()
