@@ -48,6 +48,22 @@ function extractNutrients(n, useSuffix) {
     choline_mg:      get('choline') != null ? get('choline') * 1000 : null,
     // added sugars: g/100g — no conversion
     added_sugar_g:   get('added-sugars') != null ? get('added-sugars') : null,
+    // extended minerals: g/100g → mg (×1,000)
+    phosphorus_mg:   get('phosphorus') != null ? get('phosphorus') * 1000 : null,
+    chloride_mg:     get('chloride') != null ? get('chloride') * 1000 : null,
+    manganese_mg:    get('manganese') != null ? get('manganese') * 1000 : null,
+    copper_mg:       get('copper') != null ? get('copper') * 1000 : null,
+    // trace minerals: g/100g → mcg (×1,000,000)
+    selenium_mcg:    get('selenium') != null ? get('selenium') * 1000000 : null,
+    chromium_mcg:    get('chromium') != null ? get('chromium') * 1000000 : null,
+    iodine_mcg:      get('iodine') != null ? get('iodine') * 1000000 : null,
+    // B-vitamins: g/100g → mg (×1,000)
+    thiamine_mg:     (get('vitamin-b1') ?? get('thiamin')) != null ? (get('vitamin-b1') ?? get('thiamin')) * 1000 : null,
+    riboflavin_mg:   get('vitamin-b2') != null ? get('vitamin-b2') * 1000 : null,
+    niacin_mg:       get('niacin') != null ? get('niacin') * 1000 : null,
+    pantothenic_acid_mg: get('pantothenic-acid') != null ? get('pantothenic-acid') * 1000 : null,
+    // biotin: g/100g → mcg (×1,000,000)
+    biotin_mcg:      get('biotin') != null ? get('biotin') * 1000000 : null,
   }
 }
 

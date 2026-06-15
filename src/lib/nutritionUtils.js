@@ -12,6 +12,12 @@ export const DV = {
   potassium_mg: 4700, calcium_mg: 1300, iron_mg: 18, magnesium_mg: 420,
   zinc_mg: 11, vitamin_a_mcg: 900, vitamin_c_mg: 90, vitamin_d_mcg: 20,
   vitamin_b12_mcg: 2.4, vitamin_b6_mg: 1.7, folate_mcg: 400,
+  // Extended minerals
+  phosphorus_mg: 1250, chloride_mg: 2300, manganese_mg: 2.3,
+  selenium_mcg: 55, chromium_mcg: 35, copper_mg: 0.9, iodine_mcg: 150,
+  // B-vitamins
+  biotin_mcg: 30, pantothenic_acid_mg: 5, niacin_mg: 16,
+  thiamine_mg: 1.2, riboflavin_mg: 1.3,
 }
 
 export const MICRO_GROUPS = [
@@ -27,11 +33,18 @@ export const MICRO_GROUPS = [
     label: 'Minerals',
     items: [
       { key: 'sodium_mg', label: 'Sodium', unit: 'mg', warn: true },
+      { key: 'chloride_mg', label: 'Chloride', unit: 'mg', warn: true },
       { key: 'potassium_mg', label: 'Potassium', unit: 'mg' },
       { key: 'calcium_mg', label: 'Calcium', unit: 'mg' },
+      { key: 'phosphorus_mg', label: 'Phosphorus', unit: 'mg' },
       { key: 'iron_mg', label: 'Iron', unit: 'mg' },
       { key: 'magnesium_mg', label: 'Magnesium', unit: 'mg' },
       { key: 'zinc_mg', label: 'Zinc', unit: 'mg' },
+      { key: 'copper_mg', label: 'Copper', unit: 'mg' },
+      { key: 'manganese_mg', label: 'Manganese', unit: 'mg' },
+      { key: 'selenium_mcg', label: 'Selenium', unit: 'mcg' },
+      { key: 'chromium_mcg', label: 'Chromium', unit: 'mcg' },
+      { key: 'iodine_mcg', label: 'Iodine', unit: 'mcg' },
     ],
   },
   {
@@ -40,9 +53,15 @@ export const MICRO_GROUPS = [
       { key: 'vitamin_a_mcg', label: 'Vitamin A', unit: 'mcg' },
       { key: 'vitamin_c_mg', label: 'Vitamin C', unit: 'mg' },
       { key: 'vitamin_d_mcg', label: 'Vitamin D', unit: 'mcg' },
-      { key: 'vitamin_b12_mcg', label: 'Vitamin B12', unit: 'mcg' },
+      { key: 'thiamine_mg', label: 'Thiamine (B1)', unit: 'mg' },
+      { key: 'riboflavin_mg', label: 'Riboflavin (B2)', unit: 'mg' },
+      { key: 'niacin_mg', label: 'Niacin (B3)', unit: 'mg' },
+      { key: 'pantothenic_acid_mg', label: 'Pantothenic Acid (B5)', unit: 'mg' },
       { key: 'vitamin_b6_mg', label: 'Vitamin B6', unit: 'mg' },
+      { key: 'biotin_mcg', label: 'Biotin (B7)', unit: 'mcg' },
       { key: 'folate_mcg', label: 'Folate', unit: 'mcg' },
+      { key: 'vitamin_b12_mcg', label: 'Vitamin B12', unit: 'mcg' },
+      { key: 'vitamin_k_mcg', label: 'Vitamin K', unit: 'mcg' },
     ],
   },
 ]
@@ -53,10 +72,21 @@ export const MEAL_NUTRITION_KEYS = [
   'iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg',
   'vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg',
   'caffeine_mg','water_g','omega3_g','vitamin_k_mcg','choline_mg',
+  'phosphorus_mg','chloride_mg','manganese_mg','selenium_mcg','chromium_mcg',
+  'copper_mg','iodine_mcg','biotin_mcg','pantothenic_acid_mg','niacin_mg',
+  'thiamine_mg','riboflavin_mg',
 ]
 
 export const CORE_MACRO_KEYS = ['calories','protein_g','carbs_g','fat_g']
-export const TRACKED_MICRO_KEYS = ['fiber_g','sugar_g','sodium_mg','saturated_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','omega3_g','vitamin_k_mcg','choline_mg']
+export const TRACKED_MICRO_KEYS = [
+  'fiber_g','sugar_g','sodium_mg','saturated_fat_g','cholesterol_mg',
+  'potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg',
+  'vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg',
+  'omega3_g','vitamin_k_mcg','choline_mg',
+  'phosphorus_mg','chloride_mg','manganese_mg','selenium_mcg','chromium_mcg',
+  'copper_mg','iodine_mcg','biotin_mcg','pantothenic_acid_mg','niacin_mg',
+  'thiamine_mg','riboflavin_mg',
+]
 
 export function foodCompleteness(food) {
   const missingMacro = CORE_MACRO_KEYS.some(k => food[k] == null)

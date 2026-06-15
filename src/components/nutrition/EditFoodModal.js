@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { TRACKED_MICRO_KEYS } from '@/lib/nutritionUtils'
 
 export default function EditFoodModal({ food, onClose, onSave }) {
-  const ALL_NUM_KEYS = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg','saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','caffeine_mg','water_g','omega3_g','vitamin_k_mcg','choline_mg']
+  const ALL_NUM_KEYS = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg','saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','caffeine_mg','water_g','omega3_g','vitamin_k_mcg','choline_mg','phosphorus_mg','chloride_mg','manganese_mg','selenium_mcg','chromium_mcg','copper_mg','iodine_mcg','biotin_mcg','pantothenic_acid_mg','niacin_mg','thiamine_mg','riboflavin_mg']
   const toForm = f => {
     const obj = { name: f.name || '', brand: f.brand || '', serving_size_label: f.serving_size_label || '1 serving', servings_per_container: f.servings_per_container != null ? String(f.servings_per_container) : '' }
     for (const k of ALL_NUM_KEYS) obj[k] = f[k] != null ? String(f[k]) : ''
@@ -94,21 +94,33 @@ export default function EditFoodModal({ food, onClose, onSave }) {
 
             <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Minerals</div>
             {fieldRow('sodium_mg', 'Sodium (mg)')}
+            {fieldRow('chloride_mg', 'Chloride (mg)')}
             {fieldRow('potassium_mg', 'Potassium (mg)')}
             {fieldRow('calcium_mg', 'Calcium (mg)')}
+            {fieldRow('phosphorus_mg', 'Phosphorus (mg)')}
             {fieldRow('iron_mg', 'Iron (mg)')}
             {fieldRow('magnesium_mg', 'Magnesium (mg)')}
             {fieldRow('zinc_mg', 'Zinc (mg)')}
+            {fieldRow('copper_mg', 'Copper (mg)')}
+            {fieldRow('manganese_mg', 'Manganese (mg)')}
+            {fieldRow('selenium_mcg', 'Selenium (mcg)')}
+            {fieldRow('chromium_mcg', 'Chromium (mcg)')}
+            {fieldRow('iodine_mcg', 'Iodine (mcg)')}
 
             <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Vitamins</div>
             {fieldRow('vitamin_a_mcg', 'Vitamin A (mcg)')}
             {fieldRow('vitamin_c_mg', 'Vitamin C (mg)')}
             {fieldRow('vitamin_d_mcg', 'Vitamin D (mcg)')}
-            {fieldRow('vitamin_b12_mcg', 'Vitamin B12 (mcg)')}
+            {fieldRow('thiamine_mg', 'Thiamine / B1 (mg)')}
+            {fieldRow('riboflavin_mg', 'Riboflavin / B2 (mg)')}
+            {fieldRow('niacin_mg', 'Niacin / B3 (mg)')}
+            {fieldRow('pantothenic_acid_mg', 'Pantothenic Acid / B5 (mg)')}
             {fieldRow('vitamin_b6_mg', 'Vitamin B6 (mg)')}
+            {fieldRow('biotin_mcg', 'Biotin / B7 (mcg)')}
             {fieldRow('folate_mcg', 'Folate (mcg)')}
-            {fieldRow('omega3_g', 'Omega-3 (g)')}
+            {fieldRow('vitamin_b12_mcg', 'Vitamin B12 (mcg)')}
             {fieldRow('vitamin_k_mcg', 'Vitamin K (mcg)')}
+            {fieldRow('omega3_g', 'Omega-3 (g)')}
             {fieldRow('choline_mg', 'Choline (mg)')}
 
             <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Other</div>

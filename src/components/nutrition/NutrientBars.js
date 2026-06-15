@@ -2,27 +2,39 @@
 import { DV } from '@/lib/nutritionUtils'
 
 const NUTRIENT_BAR_GROUPS = [
-  { label: 'Minerals', keys: ['calcium_mg','iron_mg','magnesium_mg','potassium_mg','zinc_mg','sodium_mg'] },
-  { label: 'Vitamins', keys: ['vitamin_d_mcg','vitamin_c_mg','vitamin_a_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg'] },
-  { label: 'Other', keys: ['fiber_g','omega3_g','vitamin_k_mcg','choline_mg'] },
+  { label: 'Minerals', keys: ['calcium_mg','phosphorus_mg','iron_mg','magnesium_mg','potassium_mg','zinc_mg','copper_mg','manganese_mg','sodium_mg','chloride_mg','selenium_mcg','chromium_mcg','iodine_mcg'] },
+  { label: 'Vitamins', keys: ['vitamin_d_mcg','vitamin_c_mg','vitamin_a_mcg','thiamine_mg','riboflavin_mg','niacin_mg','pantothenic_acid_mg','vitamin_b6_mg','biotin_mcg','folate_mcg','vitamin_b12_mcg','vitamin_k_mcg'] },
+  { label: 'Other', keys: ['fiber_g','omega3_g','choline_mg'] },
 ]
 
 const NUTRIENT_META = {
   calcium_mg: { label: 'Calcium', unit: 'mg' },
+  phosphorus_mg: { label: 'Phosphorus', unit: 'mg' },
   iron_mg: { label: 'Iron', unit: 'mg' },
   magnesium_mg: { label: 'Magnesium', unit: 'mg' },
   potassium_mg: { label: 'Potassium', unit: 'mg' },
   zinc_mg: { label: 'Zinc', unit: 'mg' },
+  copper_mg: { label: 'Copper', unit: 'mg' },
+  manganese_mg: { label: 'Manganese', unit: 'mg' },
   sodium_mg: { label: 'Sodium', unit: 'mg', warnHigh: true },
+  chloride_mg: { label: 'Chloride', unit: 'mg', warnHigh: true },
+  selenium_mcg: { label: 'Selenium', unit: 'mcg' },
+  chromium_mcg: { label: 'Chromium', unit: 'mcg' },
+  iodine_mcg: { label: 'Iodine', unit: 'mcg' },
   vitamin_d_mcg: { label: 'Vitamin D', unit: 'mcg' },
   vitamin_c_mg: { label: 'Vitamin C', unit: 'mg' },
   vitamin_a_mcg: { label: 'Vitamin A', unit: 'mcg' },
-  vitamin_b12_mcg: { label: 'Vitamin B12', unit: 'mcg' },
+  thiamine_mg: { label: 'Thiamine (B1)', unit: 'mg' },
+  riboflavin_mg: { label: 'Riboflavin (B2)', unit: 'mg' },
+  niacin_mg: { label: 'Niacin (B3)', unit: 'mg' },
+  pantothenic_acid_mg: { label: 'Pantothenic Acid (B5)', unit: 'mg' },
   vitamin_b6_mg: { label: 'Vitamin B6', unit: 'mg' },
+  biotin_mcg: { label: 'Biotin (B7)', unit: 'mcg' },
   folate_mcg: { label: 'Folate', unit: 'mcg' },
+  vitamin_b12_mcg: { label: 'Vitamin B12', unit: 'mcg' },
+  vitamin_k_mcg: { label: 'Vitamin K', unit: 'mcg' },
   fiber_g: { label: 'Fiber', unit: 'g' },
   omega3_g: { label: 'Omega-3', unit: 'g' },
-  vitamin_k_mcg: { label: 'Vitamin K', unit: 'mcg' },
   choline_mg: { label: 'Choline', unit: 'mg' },
 }
 

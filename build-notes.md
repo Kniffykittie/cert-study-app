@@ -119,8 +119,8 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 ### Nutrition
 | Table | Purpose |
 |-------|---------|
-| `food_cache` | Shared OFFs results — barcode (unique), full macro + micro fields (27 total), servings_per_container, source; cached permanently (ODbL license); no RLS |
-| `my_foods` | User food library — name, brand, serving_size_label, servings_per_container, all 27 nutrition fields, last_logged_at, log_count, is_pinned, is_drink; RLS user-scoped |
+| `food_cache` | Shared OFFs results — barcode (unique), full macro + micro fields (39 total after Phase 60), servings_per_container, source; cached permanently (ODbL license); no RLS |
+| `my_foods` | User food library — name, brand, serving_size_label, servings_per_container, all 39 nutrition fields, last_logged_at, log_count, is_pinned, is_drink; RLS user-scoped |
 | `ai_food_intel_cache` | AI food intelligence — food_key (normalized name, unique), intel JSONB (GI, satiety, density, processing, timing, pairings, fun fact); shared across users; cached forever |
 | `food_log_entries` | Food log — user/date/meal_slot, name, brand, servings, all nutrition fields (multiplied by servings), source, food_cache_id, my_food_id; RLS user-scoped |
 | `meal_plans` | Weekly meal plan headers — week_start DATE (Monday); UNIQUE on user_id+week_start; RLS user-scoped |
@@ -380,6 +380,17 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase 60 — Extended nutrient tracking (electrolytes + full B-vitamin panel) — Complete
+- **Problem:** Couldn't log phosphorus, chloride, manganese, selenium, chromium, copper, iodine, biotin (B7), pantothenic acid (B5), niacin (B3), thiamine (B1), or riboflavin (B2) — critical for tracking electrolyte packets like Ultima Replenisher
+- **DB migration:** 12 new NUMERIC columns added to `food_cache`, `my_foods`, `food_log_entries`, `meal_plan_entries`
+- **nutritionUtils.js:** Extended `DV`, `MICRO_GROUPS` (Minerals now has 13 entries, Vitamins now has 12), `MEAL_NUTRITION_KEYS`, `TRACKED_MICRO_KEYS`
+- **NutrientBars.js:** Updated `NUTRIENT_BAR_GROUPS` and `NUTRIENT_META` to render all new nutrients in the micronutrient panel
+- **nutrients.js:** 12 new nutrient entries with full metadata (slug, key, rdv, goalTags, symptomTags, synergies, competitors, suppMatch, oneLiner) — now appears in Encyclopedia
+- **search/route.js:** Extracts all 12 new fields from Open Food Facts (correct g→mg or g→mcg conversions per nutrient)
+- **ai-micro-fill/route.js:** Updated prompt to request all 12 new fields; max_tokens bumped to 600
+- **EditFoodModal.js:** All 12 new fields added to form with correct labels and units
+- **encyclopedia/page.js:** 13 new color entries for new nutrient slugs
 
 ### Phase 59 — My Favorites sub-tabs in AddFoodModal — Complete
 - **Problem:** All saved foods (drinks, ingredients, snacks, meals) mixed in one scroll — hard to find what you want

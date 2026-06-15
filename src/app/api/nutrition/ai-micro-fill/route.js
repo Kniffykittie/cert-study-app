@@ -49,12 +49,24 @@ Return ONLY valid JSON. Use null for any value you are not reasonably confident 
   "folate_mcg": number or null,
   "omega3_g": number or null,
   "vitamin_k_mcg": number or null,
-  "choline_mg": number or null
+  "choline_mg": number or null,
+  "phosphorus_mg": number or null,
+  "chloride_mg": number or null,
+  "manganese_mg": number or null,
+  "selenium_mcg": number or null,
+  "chromium_mcg": number or null,
+  "copper_mg": number or null,
+  "iodine_mcg": number or null,
+  "biotin_mcg": number or null,
+  "pantothenic_acid_mg": number or null,
+  "niacin_mg": number or null,
+  "thiamine_mg": number or null,
+  "riboflavin_mg": number or null
 }`
 
   const message = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 400,
+    max_tokens: 600,
     messages: [{ role: 'user', content: prompt }],
   })
 

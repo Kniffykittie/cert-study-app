@@ -20,6 +20,18 @@ const NUTRIENT_COLORS = {
   'omega-3':    '#22d3ee', // cyan
   'vitamin-k':  '#86efac', // light green
   'choline':    '#f472b6', // pink
+  'phosphorus': '#818cf8', // indigo
+  'chloride':   '#94a3b8', // slate (like sodium)
+  'manganese':  '#d97706', // amber-brown
+  'selenium':   '#10b981', // emerald
+  'chromium':   '#6366f1', // violet
+  'copper':     '#b45309', // amber-dark
+  'iodine':     '#7c3aed', // purple
+  'thiamine':   '#f59e0b', // amber
+  'riboflavin': '#fb923c', // orange
+  'niacin':     '#ef4444', // red
+  'pantothenic-acid': '#ec4899', // pink-red
+  'biotin':     '#d946ef', // fuchsia
 }
 
 const STATUS_COLORS = {
