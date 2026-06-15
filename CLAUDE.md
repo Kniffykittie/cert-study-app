@@ -5,6 +5,8 @@ A personal certification study app for CCNA, Network+, and Security+ exam prep. 
 
 **Active branch:** `claude/adoring-shannon-sTxW8`
 
+**Deploy rule:** After every push to the feature branch, also merge to `main` so Vercel deploys immediately. Single user, no PR review needed.
+
 ---
 
 ## Tech Stack
@@ -103,9 +105,10 @@ When adding a new nutrient to `MEAL_NUTRITION_KEYS`, touch ALL of these in the s
 
 ## Session Rules
 
-### Pull Command (always give this after every push — as a code block so it's copyable)
+### Deploy Rule — After Every Push
+After pushing to `claude/adoring-shannon-sTxW8`, always merge to `main` so Vercel deploys:
 ```
-git pull origin claude/adoring-shannon-sTxW8
+git push origin HEAD:main
 ```
 
 ### MD Notes — Enforced by Pre-Push Hook
@@ -633,7 +636,7 @@ src/
 ## Common Commands
 ```bash
 # Pull latest changes
-git pull origin claude/adoring-shannon-sTxW8
+git push origin HEAD:main
 
 # Start dev server
 npm run dev
