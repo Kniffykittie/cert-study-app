@@ -381,6 +381,13 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Phase 67 — All Logging Flows Through LogConfirmModal — Complete
+- `LogConfirmModal`: Added `mode="drink"` with editable caffeine (mg) and water (oz) inputs; added `initialServings`/`initialSlot` props for pre-fill; added `extra` prop for parent-injected content (e.g. save checkbox); drink mode uses purple Log button
+- `SavedFoodsTab`: Repeat button (↺) now opens LogConfirmModal pre-filled with last servings + slot instead of auto-logging
+- `AddFoodModal`: Search tab "Log" button, AI preview "Log" button, and manual tab "Log" button all open LogConfirmModal before logging; save-to-lib and my_food_id logic handled in callbacks
+- `add-food/page.js`: Search "Log" button opens LogConfirmModal; callback handles save-to-lib then logs
+- `water/page.js`: Search result drinks now open LogConfirmModal in `mode="drink"` with save-to-favorites checkbox via `extra` prop; saved drink chips already used LogConfirmModal, now also use `mode="drink"` for editable caffeine/water
+
 ### Phase 66 — Universal LogConfirmModal — Complete
 - New component: src/components/nutrition/LogConfirmModal.js — bottom-sheet modal with food name/brand, macro grid (live-updating with servings), non-null micros as chips with DV%, servings input, time picker, meal slot selector chips, Log/Cancel buttons
 - SavedFoodsTab.js: replaced inline expand-to-log with LogConfirmModal (Log button opens modal); removed inline servings/time/slot UI from each row; removed FoodIntelCard import

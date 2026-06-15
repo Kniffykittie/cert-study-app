@@ -58,6 +58,10 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
   const [filter, setFilter] = useState('')
   const [confirmFavFood, setConfirmFavFood] = useState(null)
   const [confirmLogging, setConfirmLogging] = useState(false)
+  const [confirmOtherFood, setConfirmOtherFood] = useState(null)
+  const [confirmOtherInitServings, setConfirmOtherInitServings] = useState('1')
+  const [confirmOtherType, setConfirmOtherType] = useState(null)
+  const [savingConfirmOther, setSavingConfirmOther] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
@@ -176,46 +180,42 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
     onClose()
   }
 
-  async function handleSearchLog() {
-    if (!selected) return
-    setSavingSearch(true)
-    if (saveToLib) {
-      const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(selected) })
-      const data = await res.json()
-      if (data.food) onSaveFood(data.food)
+  function buildManualFoodForConfirm() {
+    const obj = { name: manual.name, brand: manual.brand || null, serving_size_label: manual.serving_size_label || '1 serving', source: 'manual' }
+    for (const k of MEAL_NUTRITION_KEYS) {
+      obj[k] = manual[k] !== '' && manual[k] !== undefined ? Number(manual[k]) || null : null
     }
-    const sv = parseFloat(searchServings) || 1
-    const entry = { meal_slot: slot, servings: sv, source: selected._source || selected.source || 'off' }
-    for (const k of MEAL_NUTRITION_KEYS) { entry[k] = selected[k] ?? null }
-    entry.name = selected.name
-    entry.brand = selected.brand ?? null
-    entry.serving_size_label = selected.serving_size_label || '1 serving'
-    entry.food_cache_id = selected._source === 'my_foods' ? null : (selected.id || null)
-    entry.my_food_id = selected._source === 'my_foods' ? selected.id : null
-    await onAdd(entry)
-    setSavingSearch(false)
-    onClose()
+    return obj
   }
 
-  async function handleManualLog() {
-    if (!manual.name.trim()) return
-    setSavingManual(true)
-    let savedFood = null
-    if (manualSaveToLib) {
-      const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...manual, source: 'manual', ...categoryToFlags(manualCategory) }) })
-      const data = await res.json()
-      if (data.food) { savedFood = data.food; onSaveFood(data.food) }
+  async function handleConfirmOtherLog(entry) {
+    setSavingConfirmOther(true)
+    if (confirmOtherType === 'search') {
+      if (saveToLib) {
+        const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(selected) })
+        const data = await res.json()
+        if (data.food) onSaveFood(data.food)
+      }
+      const enriched = {
+        ...entry,
+        food_cache_id: selected._source === 'my_foods' ? null : (selected.id || null),
+        my_food_id: selected._source === 'my_foods' ? selected.id : null,
+      }
+      await onAdd(enriched)
+    } else if (confirmOtherType === 'manual') {
+      let savedFoodId = null
+      if (manualSaveToLib) {
+        const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...manual, source: 'manual', ...categoryToFlags(manualCategory) }) })
+        const data = await res.json()
+        if (data.food) { savedFoodId = data.food.id; onSaveFood(data.food) }
+      }
+      await onAdd({ ...entry, source: 'manual', my_food_id: savedFoodId || null })
+    } else if (confirmOtherType === 'ai') {
+      if (manualSaveToLib) await onSaveFood({ ...aiPreview, is_ingredient: false, is_snack: false })
+      await onAdd(entry)
     }
-    const sv = parseFloat(manualServings) || 1
-    const entry = { meal_slot: slot, servings: sv, source: 'manual', my_food_id: savedFood?.id || null }
-    for (const k of MEAL_NUTRITION_KEYS) {
-      entry[k] = manual[k] !== '' ? Number(manual[k]) || null : null
-    }
-    entry.name = manual.name
-    entry.brand = manual.brand || null
-    entry.serving_size_label = manual.serving_size_label || '1 serving'
-    await onAdd(entry)
-    setSavingManual(false)
+    setSavingConfirmOther(false)
+    setConfirmOtherFood(null)
     onClose()
   }
 
@@ -459,9 +459,9 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
               <input type="number" min="0.25" step="0.25" value={manualServings} onChange={e => setManualServings(e.target.value)}
                 style={{ width: '56px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }} />
             </div>
-            <button onClick={handleManualLog} disabled={!manual.name.trim() || savingManual}
-              style={{ flex: 1, backgroundColor: manual.name.trim() ? 'var(--accent-blue)' : 'var(--border)', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: '600', cursor: manual.name.trim() ? 'pointer' : 'default', opacity: savingManual ? 0.6 : 1 }}>
-              {savingManual ? '...' : `+ Log to ${mealInfo?.label}`}
+            <button onClick={() => { if (!manual.name.trim()) return; setConfirmOtherType('manual'); setConfirmOtherInitServings(manualServings); setConfirmOtherFood(buildManualFoodForConfirm()) }} disabled={!manual.name.trim() || savingConfirmOther}
+              style={{ flex: 1, backgroundColor: manual.name.trim() ? 'var(--accent-blue)' : 'var(--border)', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: '600', cursor: manual.name.trim() ? 'pointer' : 'default', opacity: savingConfirmOther ? 0.6 : 1 }}>
+              {savingConfirmOther ? '...' : `+ Log to ${mealInfo?.label}`}
             </button>
           </div>
         )}
@@ -540,16 +540,15 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
                       style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px', fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                       ✏️ Edit Details
                     </button>
-                    <button type="button" onClick={async () => {
-                      setSavingManual(true)
-                      const sv = parseFloat(manualServings) || 1
-                      const entry = { meal_slot: slot, name: aiPreview.name, brand: aiPreview.brand || null, serving_size_label: aiPreview.serving_size_label || '1 serving', servings: sv, source: 'manual' }
-                      const numKeys = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg','saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg']
-                      for (const k of numKeys) entry[k] = aiPreview[k] != null && aiPreview[k] !== '' ? parseFloat(aiPreview[k]) * sv : null
-                      if (manualSaveToLib) await onSaveFood({ ...aiPreview, is_ingredient: false, is_snack: false })
-                      await onAdd(entry)
-                      setSavingManual(false)
-                      onClose()
+                    <button type="button" onClick={() => {
+                      const food = { ...aiPreview, source: 'manual' }
+                      for (const k of MEAL_NUTRITION_KEYS) {
+                        if (food[k] != null && food[k] !== '') food[k] = parseFloat(food[k]) || null
+                        else food[k] = null
+                      }
+                      setConfirmOtherType('ai')
+                      setConfirmOtherInitServings('1')
+                      setConfirmOtherFood(food)
                     }} style={{ flex: 2, backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '7px', padding: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
                       + Log to {mealInfo?.label}
                     </button>
@@ -601,9 +600,9 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
                       </button>
                     )}
                   </div>
-                  <button onClick={handleSearchLog} disabled={savingSearch}
+                  <button onClick={() => { setConfirmOtherType('search'); setConfirmOtherInitServings(searchServings); setConfirmOtherFood(selected) }} disabled={savingSearch}
                     style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: savingSearch ? 0.6 : 1, flexShrink: 0 }}>
-                    {savingSearch ? '...' : '+ Log'}
+                    + Log
                   </button>
                 </div>
                 {(() => {
@@ -637,6 +636,16 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
           onLog={handleConfirmFavLog}
           onCancel={() => setConfirmFavFood(null)}
           logging={confirmLogging}
+        />
+      )}
+      {confirmOtherFood && (
+        <LogConfirmModal
+          food={confirmOtherFood}
+          defaultSlot={slot}
+          initialServings={confirmOtherInitServings}
+          onLog={handleConfirmOtherLog}
+          onCancel={() => { setConfirmOtherFood(null); setConfirmOtherType(null) }}
+          logging={savingConfirmOther}
         />
       )}
     </div>

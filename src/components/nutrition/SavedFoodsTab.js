@@ -5,6 +5,8 @@ import LogConfirmModal from '@/components/nutrition/LogConfirmModal'
 
 export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLibrary, onPin, onEdit, todayEntries, workoutCtx, defaultSlot }) {
   const [confirmFood, setConfirmFood] = useState(null)
+  const [confirmInitServings, setConfirmInitServings] = useState(null)
+  const [confirmInitSlot, setConfirmInitSlot] = useState(null)
   const [logging, setLogging] = useState(false)
   const [favTab, setFavTab] = useState(() => { try { return localStorage.getItem('favTab') || 'all' } catch { return 'all' } })
 
@@ -17,13 +19,13 @@ export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLi
     setConfirmFood(null)
   }
 
-  async function quickRepeat(food) {
+  function quickRepeat(food) {
     const prev = (todayEntries || []).filter(e => e.my_food_id === food.id)
     const lastServings = prev.length ? prev[prev.length - 1].servings : 1
-    const slot = prev.length ? prev[prev.length - 1].meal_slot : 'snack'
-    const entry = { meal_slot: slot, servings: lastServings, source: 'my_foods', my_food_id: food.id }
-    for (const k of ['name', 'brand', 'serving_size_label', ...MEAL_NUTRITION_KEYS]) entry[k] = food[k] ?? null
-    await onDirectLog(entry)
+    const lastSlot = prev.length ? prev[prev.length - 1].meal_slot : 'snack'
+    setConfirmInitServings(String(lastServings))
+    setConfirmInitSlot(lastSlot)
+    setConfirmFood(food)
   }
 
   function getFrequencyLabel(food) {
@@ -124,7 +126,7 @@ export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLi
             )}
             <button onClick={() => onEdit(f)} title="Edit nutrition info"
               style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>✏️</button>
-            <button onClick={() => setConfirmFood(f)}
+            <button onClick={() => { setConfirmInitServings(null); setConfirmInitSlot(null); setConfirmFood(f) }}
               style={{ backgroundColor: 'rgba(0,128,255,0.12)', color: 'var(--accent-blue)', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
               Log
             </button>
@@ -205,8 +207,10 @@ export default function SavedFoodsTab({ myFoods, onDirectLog, onDelete, onOpenLi
         <LogConfirmModal
           food={confirmFood}
           defaultSlot={defaultSlot || 'breakfast'}
+          initialServings={confirmInitServings}
+          initialSlot={confirmInitSlot}
           onLog={handleConfirmLog}
-          onCancel={() => setConfirmFood(null)}
+          onCancel={() => { setConfirmFood(null); setConfirmInitServings(null); setConfirmInitSlot(null) }}
           logging={logging}
         />
       )}

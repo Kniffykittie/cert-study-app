@@ -49,10 +49,15 @@ const MICRO_DISPLAY = [
   { key: 'chromium_mcg', label: 'Chromium', unit: 'mcg' },
 ]
 
-export default function LogConfirmModal({ food, defaultSlot, onLog, onCancel, logging }) {
-  const [servings, setServings] = useState('1')
+const DRINK_EDITABLE_KEYS = new Set(['caffeine_mg', 'water_g'])
+
+export default function LogConfirmModal({ food, defaultSlot, onLog, onCancel, logging, mode, initialServings, initialSlot, extra }) {
+  const isDrink = mode === 'drink'
+  const [servings, setServings] = useState(initialServings || '1')
   const [logTime, setLogTime] = useState(nowTimeString)
-  const [slot, setSlot] = useState(defaultSlot || 'breakfast')
+  const [slot, setSlot] = useState(initialSlot || defaultSlot || (isDrink ? 'drink' : 'breakfast'))
+  const [caffeineInput, setCaffeineInput] = useState(food?.caffeine_mg != null ? String(food.caffeine_mg) : '')
+  const [waterOzInput, setWaterOzInput] = useState(food?.water_g != null ? String(Math.round(food.water_g * 0.0338 * 10) / 10) : '')
 
   const sv = parseFloat(servings) || 1
   const calPreview = food?.calories != null ? Math.round(food.calories * sv) : null
@@ -60,7 +65,10 @@ export default function LogConfirmModal({ food, defaultSlot, onLog, onCancel, lo
   const carbPreview = food?.carbs_g != null ? Math.round(food.carbs_g * sv * 10) / 10 : null
   const fatPreview = food?.fat_g != null ? Math.round(food.fat_g * sv * 10) / 10 : null
 
-  const nonNullMicros = MICRO_DISPLAY.filter(m => food?.[m.key] != null && food[m.key] !== 0)
+  const nonNullMicros = MICRO_DISPLAY.filter(m => {
+    if (isDrink && DRINK_EDITABLE_KEYS.has(m.key)) return false
+    return food?.[m.key] != null && food[m.key] !== 0
+  })
 
   function handleLog() {
     const entry = {
@@ -75,7 +83,14 @@ export default function LogConfirmModal({ food, defaultSlot, onLog, onCancel, lo
     if (food.id && food.source !== 'off' && food.source !== 'manual_search') {
       entry.my_food_id = food.id
     }
-    for (const k of MEAL_NUTRITION_KEYS) entry[k] = food[k] != null ? food[k] * sv : null
+    for (const k of MEAL_NUTRITION_KEYS) {
+      if (isDrink && (k === 'caffeine_mg' || k === 'water_g')) continue
+      entry[k] = food[k] != null ? food[k] * sv : null
+    }
+    if (isDrink) {
+      entry.caffeine_mg = caffeineInput !== '' ? Number(caffeineInput) * sv : null
+      entry.water_g = waterOzInput !== '' ? Number(waterOzInput) * 29.5735 * sv : null
+    }
     onLog(entry)
   }
 
@@ -124,6 +139,13 @@ export default function LogConfirmModal({ food, defaultSlot, onLog, onCancel, lo
           </div>
         )}
 
+        {/* Extra content (e.g. save-to-favorites checkbox from parent) */}
+        {extra && (
+          <div style={{ margin: '12px 20px 0' }}>
+            {extra}
+          </div>
+        )}
+
         <div style={{ padding: '16px 20px 0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {/* Servings */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -138,6 +160,28 @@ export default function LogConfirmModal({ food, defaultSlot, onLog, onCancel, lo
             )}
             {calPreview != null && <span style={{ color: 'var(--accent-blue)', fontWeight: '700', fontSize: '14px', marginLeft: 'auto' }}>{calPreview} kcal</span>}
           </div>
+
+          {/* Drink-specific editable fields */}
+          {isDrink && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '13px', whiteSpace: 'nowrap', width: '130px' }}>☕ Caffeine (mg):</span>
+                <input type="number" min="0" step="1" value={caffeineInput} onChange={e => setCaffeineInput(e.target.value)} placeholder="0"
+                  style={{ width: '80px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 8px', color: 'var(--text-primary)', fontSize: '14px', textAlign: 'center' }} />
+                {caffeineInput !== '' && sv !== 1 && (
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>= {Math.round(Number(caffeineInput) * sv)}mg total</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '13px', whiteSpace: 'nowrap', width: '130px' }}>💧 Water (oz):</span>
+                <input type="number" min="0" step="0.5" value={waterOzInput} onChange={e => setWaterOzInput(e.target.value)} placeholder="0"
+                  style={{ width: '80px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 8px', color: 'var(--text-primary)', fontSize: '14px', textAlign: 'center' }} />
+                {waterOzInput !== '' && sv !== 1 && (
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>= {Math.round(Number(waterOzInput) * sv * 10) / 10}oz total</span>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Time */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -169,8 +213,8 @@ export default function LogConfirmModal({ food, defaultSlot, onLog, onCancel, lo
               Cancel
             </button>
             <button onClick={handleLog} disabled={!!logging}
-              style={{ flex: 2, backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: '700', cursor: logging ? 'default' : 'pointer', opacity: logging ? 0.6 : 1 }}>
-              {logging ? 'Logging...' : '✓ Log Item'}
+              style={{ flex: 2, backgroundColor: isDrink ? 'var(--accent-purple)' : 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: '700', cursor: logging ? 'default' : 'pointer', opacity: logging ? 0.6 : 1 }}>
+              {logging ? 'Logging...' : isDrink ? '💧 Log Drink' : '✓ Log Item'}
             </button>
           </div>
         </div>

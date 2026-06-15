@@ -29,6 +29,8 @@ function AddFoodPageInner() {
   const [filter, setFilter] = useState('')
   const [logging, setLogging] = useState(false)
   const [confirmFood, setConfirmFood] = useState(null)
+  const [confirmSearchFood, setConfirmSearchFood] = useState(null)
+  const [savingConfirmSearch, setSavingConfirmSearch] = useState(false)
   const smartFavDefault = slot === 'drink' ? 'drinks' : slot === 'snack' ? 'snacks' : 'all'
   const [favTab, setFavTab] = useState(() => { try { return localStorage.getItem('favTab') || smartFavDefault } catch { return smartFavDefault } })
 
@@ -38,7 +40,6 @@ function AddFoodPageInner() {
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState(null)
   const [searchServings, setSearchServings] = useState('1')
-  const [savingSearch, setSavingSearch] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [aiFilling, setAiFilling] = useState(false)
   const [aiPreview, setAiPreview] = useState(null)
@@ -63,13 +64,17 @@ function AddFoodPageInner() {
     await logEntry(entry)
   }
 
-  async function saveAndLog(food, sv) {
-    setSavingSearch(true)
-    if (saveSearchToLib) {
-      await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...food, ...categoryToFlags(searchCategory) }) }).catch(() => {})
+  async function handleSearchConfirmLog(entry) {
+    setSavingConfirmSearch(true)
+    if (saveSearchToLib && selected) {
+      await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...selected, ...categoryToFlags(searchCategory) }) }).catch(() => {})
     }
-    const entry = buildFoodLogEntry(food, slot, sv, food.source || 'my_foods')
-    await logEntry(entry)
+    const enriched = {
+      ...entry,
+      food_cache_id: selected?._source === 'my_foods' ? null : (selected?.id || null),
+      my_food_id: selected?._source === 'my_foods' ? selected.id : null,
+    }
+    await logEntry(enriched)
   }
 
   function handleSearch(q) {
@@ -310,9 +315,9 @@ function AddFoodPageInner() {
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={() => saveAndLog(selected, parseFloat(searchServings) || 1)} disabled={!!savingSearch}
-                    style={{ flex: 1, backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '11px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', opacity: savingSearch ? 0.6 : 1 }}>
-                    {savingSearch ? 'Logging...' : `+ Log to ${slotLabel}`}
+                  <button onClick={() => setConfirmSearchFood(selected)} disabled={!!savingConfirmSearch}
+                    style={{ flex: 1, backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '11px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', opacity: savingConfirmSearch ? 0.6 : 1 }}>
+                    {savingConfirmSearch ? 'Logging...' : `+ Log to ${slotLabel}`}
                   </button>
                 </div>
               </div>
@@ -336,6 +341,16 @@ function AddFoodPageInner() {
           onLog={handleFavLog}
           onCancel={() => setConfirmFood(null)}
           logging={logging}
+        />
+      )}
+      {confirmSearchFood && (
+        <LogConfirmModal
+          food={confirmSearchFood}
+          defaultSlot={slot}
+          initialServings={searchServings}
+          onLog={handleSearchConfirmLog}
+          onCancel={() => setConfirmSearchFood(null)}
+          logging={savingConfirmSearch}
         />
       )}
     </div>

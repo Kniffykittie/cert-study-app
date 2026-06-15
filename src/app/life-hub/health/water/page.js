@@ -117,16 +117,11 @@ export default function DrinksHydrationPage() {
   const [searching, setSearching] = useState(false)
   const [showDrinkScanner, setShowDrinkScanner] = useState(false)
   const [savedDrinks, setSavedDrinks] = useState([])
-  const [logModal, setLogModal] = useState(null)
-  const [servingsInput, setServingsInput] = useState('1')
-  const [saveDrink, setSaveDrink] = useState(false)
   const [loggingDrink, setLoggingDrink] = useState(false)
-  const [showLogNutrition, setShowLogNutrition] = useState(false)
-  const [logNutrition, setLogNutrition] = useState({})
-
-  const [logDrinkTime, setLogDrinkTime] = useState('')
   const [editLogTime, setEditLogTime] = useState('')
   const [drinkConfirmFood, setDrinkConfirmFood] = useState(null)
+  const [drinkSearchLogFood, setDrinkSearchLogFood] = useState(null)
+  const [saveDrinkToFavs, setSaveDrinkToFavs] = useState(false)
 
   // Edit logged drink entry
   const [editLogModal, setEditLogModal] = useState(null) // { entry (from drinkEntries), perServing: {cal,caf,waterOz} }
@@ -175,9 +170,6 @@ export default function DrinksHydrationPage() {
     { key: 'omega3_g', label: 'Omega-3', unit: 'g', group: 'Other', color: '#34d399' },
   ]
   const DRINK_EXTRA_KEYS = DRINK_EXTRA_NUTRIENTS.map(n => n.key)
-  const EMPTY_LOG_NUTRITION = Object.fromEntries(
-    [...DRINK_EXTRA_KEYS, 'caffeine_mg', 'water_oz', 'calories'].map(k => [k, ''])
-  )
   const EMPTY_DRINK_FORM = { name: '', serving_size_label: '', calories: '', caffeine_mg: '', water_oz: '', ...Object.fromEntries(DRINK_EXTRA_KEYS.map(k => [k, ''])) }
   const [addDrinkForm, setAddDrinkForm] = useState(EMPTY_DRINK_FORM)
   const [activeDrinkNutrients, setActiveDrinkNutrients] = useState(new Set())
@@ -552,85 +544,49 @@ export default function DrinksHydrationPage() {
     if (res.ok) setSavedDrinks(prev => prev.filter(d => d.id !== id))
   }
 
-  function openLogModal(item) {
-    setLogModal(item)
-    setServingsInput('1')
-    setSaveDrink(false)
-    setShowLogNutrition(false)
-    setLogDrinkTime(nowTimeString())
-    const initialNutrition = { ...EMPTY_LOG_NUTRITION }
-    for (const key of [...DRINK_EXTRA_KEYS, 'caffeine_mg', 'calories']) {
-      if (item[key] != null) initialNutrition[key] = String(item[key])
-    }
-    initialNutrition.water_oz = item.water_g != null ? String(Math.round(item.water_g * 0.0338 * 10) / 10) : ''
-    setLogNutrition(initialNutrition)
-  }
-
-  async function confirmLogDrink() {
-    if (!logModal) return
-    const sv = parseFloat(servingsInput) || 1
+  async function handleDrinkSearchLog(entry) {
     setLoggingDrink(true)
-    const n = logNutrition
-
-    const waterGrams = n.water_oz !== '' ? Number(n.water_oz) * 29.5735 : null
-
-    if (saveDrink) {
+    const food = drinkSearchLogFood
+    if (saveDrinkToFavs && food) {
+      const sv = entry.servings
       const saveBody = {
-        name: logModal.name,
-        brand: logModal.brand || null,
-        serving_size_label: logModal.serving_size_label || '1 serving',
+        name: food.name,
+        brand: food.brand || null,
+        serving_size_label: food.serving_size_label || '1 serving',
         is_drink: true,
-        water_g: waterGrams,
+        calories: entry.calories != null ? entry.calories / sv : null,
+        caffeine_mg: entry.caffeine_mg != null ? entry.caffeine_mg / sv : null,
+        water_g: entry.water_g != null ? entry.water_g / sv : null,
       }
-      if (n.calories !== '' && n.calories != null) saveBody.calories = Number(n.calories)
       for (const k of MEAL_NUTRITION_KEYS) {
-        if (k !== 'water_g' && n[k] !== '' && n[k] != null) saveBody[k] = Number(n[k])
+        if (k === 'calories' || k === 'caffeine_mg' || k === 'water_g') continue
+        if (food[k] != null) saveBody[k] = food[k]
       }
-      await fetch('/api/nutrition/my-foods', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(saveBody),
-      })
-      const { data: sd } = await (async () => {
-        const supabase = createClient()
-        return supabase.from('my_foods').select('*').eq('user_id', (await supabase.auth.getUser()).data.user.id).eq('is_drink', true).order('name', { ascending: true })
-      })()
+      await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(saveBody) })
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: sd } = await supabase.from('my_foods').select('*').eq('user_id', user.id).eq('is_drink', true).order('name', { ascending: true })
       setSavedDrinks(sd || [])
     }
-
     const body = {
+      ...entry,
       date: today,
-      meal_slot: 'drink',
-      name: logModal.name,
-      brand: logModal.brand || null,
-      serving_size_label: logModal.serving_size_label || '1 serving',
-      servings: sv,
-      source: logModal.source || 'off',
-      food_cache_id: logModal.barcode ? logModal.id : null,
-      my_food_id: logModal._source === 'my_foods' ? logModal.id : null,
-      logged_time: logDrinkTime ? timeToISO(logDrinkTime) : undefined,
+      source: food?.source || 'off',
+      food_cache_id: food?._source !== 'my_foods' ? (food?.id || null) : null,
+      my_food_id: food?._source === 'my_foods' ? food.id : null,
     }
-    for (const k of MEAL_NUTRITION_KEYS) {
-      if (k === 'water_g') {
-        body.water_g = waterGrams
-      } else if (n[k] !== '' && n[k] != null) {
-        body[k] = Number(n[k])
-      }
-    }
-    if (n.calories !== '' && n.calories != null) body.calories = Number(n.calories)
     const res = await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const data = await res.json()
     if (data.entry) {
       setDrinkEntries(prev => [...prev, data.entry].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)))
-      if (waterGrams) {
-        const ozAdded = (waterGrams * sv) * 0.0338
-        setWeek(prev => prev.map(d => d.date === today ? { ...d, oz: d.oz + ozAdded } : d))
+      if (entry.water_g) {
+        setWeek(prev => prev.map(d => d.date === today ? { ...d, oz: d.oz + entry.water_g * 0.0338 } : d))
       }
     }
-    setLogModal(null)
+    setLoggingDrink(false)
+    setDrinkSearchLogFood(null)
     setDrinkSearch('')
     setDrinkResults([])
-    setLoggingDrink(false)
   }
 
   // Computed totals
@@ -968,7 +924,7 @@ export default function DrinksHydrationPage() {
         {drinkResults.length > 0 && (
           <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 240, overflowY: 'auto' }}>
             {drinkResults.map((item, i) => (
-              <button key={i} onClick={() => openLogModal(item)}
+              <button key={i} onClick={() => { setDrinkSearchLogFood(item); setSaveDrinkToFavs(false) }}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                 <div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{item.name}</div>
@@ -1364,125 +1320,36 @@ export default function DrinksHydrationPage() {
         </div>
       )}
 
-      {/* Log drink modal */}
-      {logModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, maxWidth: 400, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>{logModal.name}</div>
-            {logModal.brand && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>{logModal.brand}</div>}
-            {logModal.serving_size_label && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>Per {logModal.serving_size_label}</div>}
-
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Servings</label>
-              <input type="number" value={servingsInput} onChange={e => setServingsInput(e.target.value)} min="0.1" step="0.5"
-                style={{ width: 80, background: 'var(--background)', border: '1px solid var(--accent-blue)', borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)', fontSize: 14, fontWeight: 600 }} />
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', marginBottom: 14 }}>
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)', width: 60, flexShrink: 0 }}>Time:</span>
-              <input type="time" value={logDrinkTime} onChange={e => setLogDrinkTime(e.target.value)}
-                style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
-            </div>
-
-            {/* Nutrition fields — primary */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-              {[
-                { label: 'Calories', key: 'calories', placeholder: '0' },
-                { label: 'Water content (oz)', key: 'water_oz', placeholder: '0' },
-                { label: 'Caffeine (mg)', key: 'caffeine_mg', placeholder: '0' },
-              ].map(f => (
-                <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', width: 150, flexShrink: 0 }}>{f.label}</label>
-                  <input type="number" value={logNutrition[f.key]} min="0"
-                    onChange={e => setLogNutrition(p => ({ ...p, [f.key]: e.target.value }))}
-                    placeholder={f.placeholder}
-                    style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
-                </div>
-              ))}
-            </div>
-
-            {/* Expandable more nutrients */}
-            <button onClick={() => setShowLogNutrition(v => !v)}
-              style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', fontSize: 12, cursor: 'pointer', padding: 0, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
-              {showLogNutrition ? '▲ Hide' : '▼ Add more nutrients'} (sodium, sugar, protein…)
-            </button>
-
-            {showLogNutrition && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, padding: '10px 12px', background: 'var(--background)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={() => setDvMode(m => !m)}
-                    style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: `1px solid ${dvMode ? 'var(--accent-blue)' : 'var(--border)'}`, background: 'var(--surface)', color: dvMode ? 'var(--accent-blue)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>
-                    {dvMode ? 'mg' : '% DV'}
-                  </button>
-                </div>
-                {[
-                  { label: 'Sodium', key: 'sodium_mg', unit: 'mg' },
-                  { label: 'Sugar', key: 'sugar_g', unit: 'g' },
-                  { label: 'Protein', key: 'protein_g', unit: 'g' },
-                  { label: 'Carbs', key: 'carbs_g', unit: 'g' },
-                  { label: 'Fat', key: 'fat_g', unit: 'g' },
-                  { label: 'Potassium', key: 'potassium_mg', unit: 'mg' },
-                  { label: 'Vitamin C', key: 'vitamin_c_mg', unit: 'mg' },
-                ].map(f => {
-                  const hasDV = dvMode && DV[f.key] != null
-                  const rawVal = logNutrition[f.key]
-                  const displayVal = hasDV && rawVal !== '' ? String(+(parseFloat(rawVal) / DV[f.key] * 100).toFixed(1)) : rawVal
-                  const displayLabel = hasDV ? `${f.label} (% DV, ${DV[f.key]}${f.unit})` : `${f.label} (${f.unit})`
-                  const hint = rawVal !== ''
-                    ? (!dvMode && DV[f.key] != null ? `= ${Math.round(parseFloat(rawVal) / DV[f.key] * 100)}% DV` : dvMode && DV[f.key] != null ? `= ${Math.round(parseFloat(rawVal) * DV[f.key] / 100 * 10) / 10}${f.unit}` : null)
-                    : null
-                  return (
-                    <div key={f.key}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <label style={{ fontSize: 12, color: 'var(--text-secondary)', width: 150, flexShrink: 0 }}>{displayLabel}</label>
-                        <input type="number" value={displayVal} min="0"
-                          onChange={e => {
-                            const raw = e.target.value
-                            const stored = hasDV && raw !== '' ? String(Math.round(parseFloat(raw) * DV[f.key] / 100 * 10) / 10) : raw
-                            setLogNutrition(p => ({ ...p, [f.key]: stored }))
-                          }}
-                          placeholder="0"
-                          style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
-                      </div>
-                      {hint && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', paddingLeft: 160 }}>{hint}</div>}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer', marginBottom: 16 }}>
-              <input type="checkbox" checked={saveDrink} onChange={e => setSaveDrink(e.target.checked)}
-                style={{ width: 16, height: 16, cursor: 'pointer' }} />
+      {drinkSearchLogFood && (
+        <LogConfirmModal
+          food={drinkSearchLogFood}
+          defaultSlot="drink"
+          mode="drink"
+          onLog={handleDrinkSearchLog}
+          onCancel={() => { setDrinkSearchLogFood(null); setSaveDrinkToFavs(false) }}
+          logging={loggingDrink}
+          extra={
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={saveDrinkToFavs} onChange={e => setSaveDrinkToFavs(e.target.checked)}
+                style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--accent-purple)' }} />
               Save to My Drinks for quick log later
             </label>
-
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={confirmLogDrink} disabled={loggingDrink}
-                style={{ flex: 1, padding: '10px', background: 'var(--accent-blue)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-                {loggingDrink ? 'Logging...' : 'Log Drink'}
-              </button>
-              <button onClick={() => setLogModal(null)}
-                style={{ padding: '10px 16px', background: 'none', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-secondary)', fontSize: 14, cursor: 'pointer' }}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+          }
+        />
       )}
       {drinkConfirmFood && (
         <LogConfirmModal
           food={drinkConfirmFood}
           defaultSlot="drink"
+          mode="drink"
           onLog={async entry => {
             setLoggingDrink(true)
             const res = await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...entry, date: today }) })
             const data = await res.json()
             if (data.entry) {
               setDrinkEntries(prev => [...prev, data.entry].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)))
-              if (drinkConfirmFood.water_g) {
-                const ozAdded = drinkConfirmFood.water_g * entry.servings * 0.0338
-                setWeek(prev => prev.map(d => d.date === today ? { ...d, oz: d.oz + ozAdded } : d))
+              if (entry.water_g) {
+                setWeek(prev => prev.map(d => d.date === today ? { ...d, oz: d.oz + entry.water_g * 0.0338 } : d))
               }
             }
             setLoggingDrink(false)
