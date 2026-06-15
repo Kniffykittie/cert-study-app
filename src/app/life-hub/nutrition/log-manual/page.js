@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { DV } from '@/lib/nutritionUtils'
 
 const FIELDS = [
   { key: 'calories', label: 'Calories' },
@@ -34,6 +35,7 @@ function LogManualInner() {
   const [servingsPerContainer, setServingsPerContainer] = useState(null)
   const [saveToLib, setSaveToLib] = useState(true)
   const [showExtra, setShowExtra] = useState(false)
+  const [dvMode, setDvMode] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [aiEstimated, setAiEstimated] = useState(new Set())
@@ -127,17 +129,39 @@ function LogManualInner() {
             </div>
           ))}
 
-          <button type="button" onClick={() => setShowExtra(v => !v)}
-            style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', fontSize: '13px', cursor: 'pointer', padding: '2px 0', textAlign: 'left', fontWeight: '500' }}>
-            {showExtra ? '▲ Hide fiber, sodium & micronutrients' : '▼ Show fiber, sodium & micronutrients'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <button type="button" onClick={() => setShowExtra(v => !v)}
+              style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', fontSize: '13px', cursor: 'pointer', padding: '2px 0', textAlign: 'left', fontWeight: '500' }}>
+              {showExtra ? '▲ Hide fiber, sodium & micronutrients' : '▼ Show fiber, sodium & micronutrients'}
+            </button>
+            {showExtra && (
+              <button type="button" onClick={() => setDvMode(m => !m)}
+                style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: `1px solid ${dvMode ? 'var(--accent-blue)' : 'var(--border)'}`, background: 'var(--surface)', color: dvMode ? 'var(--accent-blue)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>
+                {dvMode ? 'mg' : '% DV'}
+              </button>
+            )}
+          </div>
 
-          {showExtra && EXTRA_FIELDS.map(({ key, label }) => (
-            <div key={key}>
-              <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px' }}>{label}</label>
-              <input type="number" min="0" step="0.1" placeholder="0" value={form[key]} onChange={e => set(key, e.target.value)} style={inputStyle(key)} />
-            </div>
-          ))}
+          {showExtra && EXTRA_FIELDS.map(({ key, label }) => {
+            const unit = label.match(/\(([^)]+)\)/)?.[1]
+            const hasDV = dvMode && DV[key] != null
+            const rawVal = form[key]
+            const displayVal = hasDV && rawVal !== '' ? String(+(parseFloat(rawVal) / DV[key] * 100).toFixed(1)) : rawVal
+            const displayLabel = hasDV ? label.replace(/\([^)]+\)/, `(% DV, ${DV[key]}${unit})`) : label
+            return (
+              <div key={key}>
+                <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px' }}>{displayLabel}</label>
+                <input type="number" min="0" step={hasDV ? '1' : '0.1'} placeholder="0"
+                  value={displayVal}
+                  onChange={e => {
+                    const raw = e.target.value
+                    const stored = hasDV && raw !== '' ? String(Math.round(parseFloat(raw) * DV[key] / 100 * 10) / 10) : raw
+                    set(key, stored)
+                  }}
+                  style={inputStyle(key)} />
+              </div>
+            )
+          })}
 
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: '14px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>

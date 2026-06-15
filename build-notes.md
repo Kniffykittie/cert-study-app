@@ -381,6 +381,14 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Phase 63 — DV% ↔ mg toggle for all nutrient entry points — Complete
+- Added DV% ↔ mg toggle to EditFoodModal.js, water/page.js (log + edit modals), and log-manual/page.js
+- nutritionUtils.js DV constant extended: added vitamin_k_mcg: 120 and choline_mg: 550
+- Toggle shows "% DV" button (switches to mg mode) and "mg" button (switches to DV mode)
+- Nutrients without a standard DV (omega3_g, trans_fat_g, water_g, caffeine_mg) always show in their native unit
+- DV% pattern: display = actual / DV[key] * 100; on change: actual = input * DV[key] / 100
+- AddFoodModal.js already had this toggle — all other entry points now match
+
 ### Phase 62 — SavedFoodsTab sub-tabs + time picker for food and drink logging — Complete
 - **Problem 1:** "My Favorites" tab on main nutrition page (SavedFoodsTab.js) had no sub-tabs — only add-food/page.js had them after Phase 61
 - **Problem 2:** No way to log the time a food or drink was consumed — entries always defaulted to the current timestamp
