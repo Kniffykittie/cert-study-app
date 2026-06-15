@@ -131,21 +131,28 @@ export default function EditFoodModal({ food, onClose, onSave }) {
     const rawVal = form[key]
     const displayVal = hasDV && rawVal !== '' && rawVal != null ? String(+(parseFloat(rawVal) / DV[key] * 100).toFixed(1)) : rawVal
     const displayLabel = hasDV ? `${label} (% DV, ${DV[key]}${unit})` : `${label}${unit ? ` (${unit})` : ''}`
+    const hasValue = rawVal !== '' && rawVal != null
+    const hint = hasValue
+      ? (!dvMode && DV[key] != null ? `= ${Math.round(parseFloat(rawVal) / DV[key] * 100)}% DV` : dvMode && DV[key] != null ? `= ${Math.round(parseFloat(rawVal) * DV[key] / 100 * 10) / 10}${unit}` : null)
+      : null
     return (
-      <div key={key} style={{ display: 'grid', gridTemplateColumns: '1fr auto 28px', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-        <label style={{ color: aiFilledFields.has(key) ? 'var(--warning)' : 'var(--text-secondary)', fontSize: '12px' }}>
+      <div key={key} style={{ display: 'grid', gridTemplateColumns: '1fr auto 28px', alignItems: 'start', gap: '8px', marginBottom: '6px' }}>
+        <label style={{ color: aiFilledFields.has(key) ? 'var(--warning)' : 'var(--text-secondary)', fontSize: '12px', paddingTop: '7px' }}>
           {displayLabel}{aiFilledFields.has(key) ? ' 🤖' : ''}
         </label>
-        <input type="number" value={displayVal} placeholder="0" min="0" step={hasDV ? '1' : 'any'}
-          onChange={e => {
-            const raw = e.target.value
-            const actual = hasDV && raw !== '' ? String(Math.round(parseFloat(raw) * DV[key] / 100 * 10) / 10) : raw
-            set(key, actual)
-            setAiFilledFields(s => { const n = new Set(s); n.delete(key); return n })
-          }}
-          style={{ width: '90px', backgroundColor: aiFilledFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiFilledFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: aiFilledFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px', textAlign: 'right' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+          <input type="number" value={displayVal} placeholder="0" min="0" step={hasDV ? '1' : 'any'}
+            onChange={e => {
+              const raw = e.target.value
+              const actual = hasDV && raw !== '' ? String(Math.round(parseFloat(raw) * DV[key] / 100 * 10) / 10) : raw
+              set(key, actual)
+              setAiFilledFields(s => { const n = new Set(s); n.delete(key); return n })
+            }}
+            style={{ width: '90px', backgroundColor: aiFilledFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiFilledFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: aiFilledFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px', textAlign: 'right' }} />
+          {hint && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{hint}</div>}
+        </div>
         <button onClick={() => removeNutrient(key)} title="Remove"
-          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '15px', cursor: 'pointer', padding: 0, lineHeight: 1, opacity: 0.5 }}>×</button>
+          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '15px', cursor: 'pointer', padding: 0, lineHeight: 1, opacity: 0.5, paddingTop: '5px' }}>×</button>
       </div>
     )
   }

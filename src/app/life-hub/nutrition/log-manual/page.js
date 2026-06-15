@@ -148,6 +148,9 @@ function LogManualInner() {
             const rawVal = form[key]
             const displayVal = hasDV && rawVal !== '' ? String(+(parseFloat(rawVal) / DV[key] * 100).toFixed(1)) : rawVal
             const displayLabel = hasDV ? label.replace(/\([^)]+\)/, `(% DV, ${DV[key]}${unit})`) : label
+            const hint = rawVal !== ''
+              ? (!dvMode && DV[key] != null ? `= ${Math.round(parseFloat(rawVal) / DV[key] * 100)}% DV` : dvMode && DV[key] != null ? `= ${Math.round(parseFloat(rawVal) * DV[key] / 100 * 10) / 10}${unit}` : null)
+              : null
             return (
               <div key={key}>
                 <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px' }}>{displayLabel}</label>
@@ -159,6 +162,7 @@ function LogManualInner() {
                     set(key, stored)
                   }}
                   style={inputStyle(key)} />
+                {hint && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{hint}</div>}
               </div>
             )
           })}
