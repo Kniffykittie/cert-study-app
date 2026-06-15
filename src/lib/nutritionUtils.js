@@ -125,3 +125,27 @@ export function getDietaryWarnings(food, prefs) {
   if (!prefs || prefs.length === 0) return []
   return prefs.flatMap(p => { const fn = DIETARY_RULES[p]; const w = fn?.(food); return w ? [w] : [] })
 }
+
+export function categorizeFoods(foods) {
+  return {
+    drinks:      foods.filter(f => f.is_drink),
+    ingredients: foods.filter(f => f.is_ingredient && !f.is_drink),
+    snacks:      foods.filter(f => f.is_snack && !f.is_ingredient && !f.is_drink),
+    meals:       foods.filter(f => !f.is_ingredient && !f.is_snack && !f.is_drink),
+  }
+}
+
+export function buildFoodLogEntry(food, slot, servings, source) {
+  const sv = servings || 1
+  const entry = {
+    meal_slot: slot,
+    name: food.name,
+    brand: food.brand || null,
+    serving_size_label: food.serving_size_label || '1 serving',
+    servings: sv,
+    source: source || food.source || 'manual',
+    date: new Date().toLocaleDateString('en-CA'),
+  }
+  for (const k of MEAL_NUTRITION_KEYS) entry[k] = food[k] != null ? food[k] * sv : null
+  return entry
+}

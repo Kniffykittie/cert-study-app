@@ -1,13 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { MEAL_NUTRITION_KEYS } from '@/lib/nutritionUtils'
 
-const ALL_NUTRITION_FIELDS = [
-  'calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg',
-  'saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg',
-  'iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg',
-  'vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg',
-  'caffeine_mg','water_g','omega3_g','vitamin_k_mcg','choline_mg','added_sugar_g',
-]
+const ALL_NUTRITION_FIELDS = MEAL_NUTRITION_KEYS
 
 export async function GET(req) {
   const supabase = await createClient()

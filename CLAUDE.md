@@ -55,16 +55,36 @@ Workouts    #3b82f6   (blue)
 
 ## Parallel Implementations — Must Stay in Sync
 
-These file pairs implement the same UI pattern in two different places. Any change to one **must** be applied to the other in the same commit. If you're only touching one, stop and check whether the other needs the same change before pushing.
+`src/lib/nutritionUtils.js` is the **single source of truth** for all nutrition constants. Import from it — never redefine locally.
+
+### What's Centralized (import, don't copy)
+| Export | Used by |
+|--------|---------|
+| `MEAL_SLOTS` | All nutrition pages — import and derive labels/keys from the object array |
+| `MEAL_NUTRITION_KEYS` | API routes `log/route.js` and `my-foods/route.js` — derive MICRO_FIELDS from it |
+| `getDietaryWarnings` | `AddFoodModal`, `SearchModal`, `meal-plan/page.js` — never re-implement dietary rules |
+| `categorizeFoods(foods)` | `add-food/page.js`, `AddFoodModal.js` — always use this for is_drink/is_ingredient/is_snack splits |
+| `buildFoodLogEntry(food, slot, sv, source)` | `add-food/page.js` (and any future log-entry point) — never build the entry object manually |
+
+### What Still Requires Manual Sync (no shared import)
+These pairs can't easily share code but must be kept in sync manually. Any change to one must be applied to the other in the **same commit**.
 
 | What | File A | File B | What must match |
 |------|--------|--------|-----------------|
-| Favorites food list + sub-tabs | `src/components/nutrition/AddFoodModal.js` (Favorites tab) | `src/app/life-hub/nutrition/add-food/page.js` (Favorites tab) | Sub-tab pills (All / Foods & Meals / Drinks / Snacks / Ingredients), count badges, smart default per slot, `localStorage` key `favTab`, `is_drink`/`is_ingredient`/`is_snack` filter logic, numKeys list |
-| Food log entry nutrient keys | `src/app/life-hub/nutrition/add-food/page.js` (`numKeys` array in `logEntry()`) | `src/app/life-hub/nutrition/page.js` (log route calls) | Must include all fields in `MEAL_NUTRITION_KEYS` from `nutritionUtils.js` — any new nutrient added there must be added to numKeys too |
-| My Foods saved drink nutrient fields | `src/app/life-hub/health/water/page.js` (`DRINK_EXTRA_NUTRIENTS` + `saveNewDrink`) | `src/components/nutrition/EditFoodModal.js` (nutrient picker) | When a new nutrient is tracked in `MEAL_NUTRITION_KEYS`, check if it should be addable on both the food edit modal and the add-drink modal |
-| Nutrition field list (source of truth) | `src/lib/nutritionUtils.js` (`MEAL_NUTRITION_KEYS`, `TRACKED_MICRO_KEYS`) | Every file that constructs a food/log object | Adding a nutrient to nutritionUtils requires updating: `search/route.js` (OFF extraction), `ai-micro-fill/route.js` (prompt), `EditFoodModal.js` (picker), `add-food/page.js` (numKeys), `water/page.js` (DRINK_EXTRA_NUTRIENTS), DB migration |
+| Favorites sub-tabs UI | `src/components/nutrition/AddFoodModal.js` | `src/app/life-hub/nutrition/add-food/page.js` | Tab keys, labels, count badges, smart default per slot, `localStorage` key `favTab` — both use `categorizeFoods()` now, but UI layout must match |
+| Drink nutrient picker | `src/app/life-hub/health/water/page.js` (`DRINK_EXTRA_NUTRIENTS`) | `src/components/nutrition/EditFoodModal.js` (NUTRIENT_GROUPS) | When a new nutrient is added to `MEAL_NUTRITION_KEYS`, add it to both pickers |
+| OFF nutrient extraction | `src/app/api/nutrition/search/route.js` | `src/app/api/nutrition/ai-micro-fill/route.js` (prompt fields) | When a new nutrient column is added, update both the OFFs extraction AND the AI prompt |
 
-**Rule:** When Phase N adds a new nutrient or UI pattern, search for all files in the table above and confirm each one is updated before closing the phase. Leave no parallel implementation behind.
+### New Nutrient Checklist
+When adding a new nutrient to `MEAL_NUTRITION_KEYS`, touch ALL of these in the same commit:
+1. `src/lib/nutritionUtils.js` — add to `MEAL_NUTRITION_KEYS`, `TRACKED_MICRO_KEYS`, `DV`, `MICRO_GROUPS`
+2. `src/app/api/nutrition/search/route.js` — add OFFs extraction with correct unit conversion
+3. `src/app/api/nutrition/ai-micro-fill/route.js` — add to prompt JSON
+4. `src/components/nutrition/EditFoodModal.js` — add chip to the correct NUTRIENT_GROUPS group
+5. `src/app/life-hub/health/water/page.js` — add to `DRINK_EXTRA_NUTRIENTS` if it's an electrolyte/vitamin
+6. `src/data/nutrients.js` — add encyclopedia entry (slug, key, rdv, tags, etc.)
+7. `src/app/life-hub/nutrition/encyclopedia/page.js` — add color entry
+8. **DB migration** — new NUMERIC column on `food_cache`, `my_foods`, `food_log_entries`, `meal_plan_entries`
 
 ---
 

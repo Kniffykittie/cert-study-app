@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import BarcodeScannerModal from '@/components/BarcodeScannerModal'
-import { MEAL_SLOTS, MEAL_NUTRITION_KEYS, DV, getDietaryWarnings } from '@/lib/nutritionUtils'
+import { MEAL_SLOTS, MEAL_NUTRITION_KEYS, DV, getDietaryWarnings, categorizeFoods, buildFoodLogEntry } from '@/lib/nutritionUtils'
 import FoodIntelCard from '@/components/nutrition/FoodIntelCard'
 
 const MICRO_KEYS = ['sodium_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','omega3_g','vitamin_k_mcg','choline_mg']
@@ -90,10 +90,7 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
 
   const mealInfo = MEAL_SLOTS.find(m => m.key === slot)
   const filtered = filter ? myFoods.filter(f => f.name.toLowerCase().includes(filter.toLowerCase())) : myFoods
-  const favDrinks = filtered.filter(f => f.is_drink)
-  const favIngredients = filtered.filter(f => f.is_ingredient && !f.is_drink)
-  const favSnacks = filtered.filter(f => f.is_snack && !f.is_ingredient && !f.is_drink)
-  const favFoods = filtered.filter(f => !f.is_ingredient && !f.is_snack && !f.is_drink)
+  const { drinks: favDrinks, ingredients: favIngredients, snacks: favSnacks, meals: favFoods } = categorizeFoods(filtered)
 
   const smartDefault = slot === 'drink' ? 'drinks' : slot === 'snack' ? 'snacks' : 'all'
   const [favTab, setFavTab] = useState(() => {

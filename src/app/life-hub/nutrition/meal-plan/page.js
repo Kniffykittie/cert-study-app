@@ -4,11 +4,12 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { calcMicroTargets } from '@/lib/tdee'
 import { matchSuppToNutrient, parseSuppAmount } from '@/data/nutrients'
+import { MEAL_SLOTS as MEAL_SLOT_DEFS, getDietaryWarnings } from '@/lib/nutritionUtils'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const DAY_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-const MEAL_SLOTS = ['breakfast', 'lunch', 'dinner', 'snack', 'other']
-const MEAL_LABELS = { breakfast: '🌅 Breakfast', lunch: '☀️ Lunch', dinner: '🌙 Dinner', snack: '🍎 Snack', other: '🍽️ Other' }
+const MEAL_SLOTS = MEAL_SLOT_DEFS.map(s => s.key)
+const MEAL_LABELS = Object.fromEntries(MEAL_SLOT_DEFS.map(s => [s.key, `${s.emoji} ${s.label}`]))
 
 const INSIGHT_COLORS = {
   warning: { bg: 'rgba(241,196,15,0.08)', border: 'rgba(241,196,15,0.3)', icon: '⚠️', label: 'var(--warning)' },
@@ -94,20 +95,7 @@ function formatWeekLabel(weekStart) {
   return `${d.toLocaleDateString('en-US', opts)} – ${end.toLocaleDateString('en-US', opts)}`
 }
 
-const MEAL_PLAN_DIETARY_RULES = {
-  vegan: (f) => { const t = `${f.name} ${f.brand||''}`.toLowerCase(); return ['chicken','beef','pork','turkey','lamb','fish','salmon','tuna','shrimp','crab','lobster','meat','steak','bacon','ham','sausage','milk','cheese','butter','cream','yogurt','whey','egg','gelatin','lard'].some(k=>t.includes(k)) ? '⚠️ May not be vegan' : null },
-  vegetarian: (f) => { const t = `${f.name} ${f.brand||''}`.toLowerCase(); return ['chicken','beef','pork','turkey','lamb','fish','salmon','tuna','shrimp','crab','lobster','meat','steak','bacon','ham','sausage','lard','gelatin','anchovy'].some(k=>t.includes(k)) ? '⚠️ Contains meat/fish' : null },
-  gluten_free: (f) => { const t = `${f.name} ${f.brand||''}`.toLowerCase(); return ['wheat','bread','pasta','flour','gluten','barley','rye','malt','couscous','seitan','cracker','pretzel','muffin','cookie','cake','biscuit','cereal','granola'].some(k=>t.includes(k)) ? '⚠️ May contain gluten' : null },
-  dairy_free: (f) => { const t = `${f.name} ${f.brand||''}`.toLowerCase(); return ['milk','cheese','butter','cream','yogurt','whey','lactose','casein','ghee','kefir','ricotta','mozzarella','cheddar','parmesan'].some(k=>t.includes(k)) ? '⚠️ Contains dairy' : null },
-  low_sodium: (f) => f.sodium_mg != null && f.sodium_mg > 600 ? `⚠️ High sodium (${Math.round(f.sodium_mg)}mg)` : null,
-  keto: (f) => f.carbs_g != null && f.carbs_g > 20 ? `⚠️ High carbs (${Math.round(f.carbs_g)}g)` : null,
-  low_carb: (f) => f.carbs_g != null && f.carbs_g > 30 ? `⚠️ High carbs (${Math.round(f.carbs_g)}g)` : null,
-}
-
-function getMealPlanWarnings(food, prefs) {
-  if (!prefs?.length) return []
-  return prefs.flatMap(p => { const fn = MEAL_PLAN_DIETARY_RULES[p]; const w = fn?.(food); return w ? [w] : [] })
-}
+const getMealPlanWarnings = getDietaryWarnings
 
 export default function MealPlanPage() {
   const [weekOffset, setWeekOffset] = useState(0)

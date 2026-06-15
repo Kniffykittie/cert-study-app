@@ -381,6 +381,16 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Phase 61b — Centralize shared nutrition logic, eliminate duplicate constants — Complete
+- **Problem:** Nutrient key lists, MEAL_SLOTS, dietary rules, food categorization logic, and log-entry assembly were independently copy-pasted across 8+ files — high drift risk when adding nutrients
+- **nutritionUtils.js:** Added `categorizeFoods(foods)` (splits by is_drink/is_ingredient/is_snack) and `buildFoodLogEntry(food, slot, sv, source)` (assembles food_log_entries object with all MEAL_NUTRITION_KEYS multiplied by servings) — now exported as shared utilities
+- **add-food/page.js:** Now imports `MEAL_SLOTS`, `categorizeFoods`, `buildFoodLogEntry` from nutritionUtils; removed 14-line local duplicate of MEAL_SLOTS; logEntry() now delegates to buildFoodLogEntry; categorization uses categorizeFoods
+- **AddFoodModal.js:** Now imports `categorizeFoods` and `buildFoodLogEntry`; categorization 4-liner replaced with 1-line destructure
+- **meal-plan/page.js:** Removed 7-rule `MEAL_PLAN_DIETARY_RULES` duplicate and local `getMealPlanWarnings`; now imports `getDietaryWarnings` and `MEAL_SLOTS` from nutritionUtils; `MEAL_LABELS` derived from imported constant
+- **api/nutrition/log/route.js:** Removed 10-key `MICRO_FIELDS` hardcode; now imports `MEAL_NUTRITION_KEYS` and derives MICRO_FIELDS dynamically — all 37 nutrient fields now covered (was missing 12 Phase 60 fields)
+- **api/nutrition/my-foods/route.js:** Removed 26-key `ALL_NUTRITION_FIELDS` hardcode; now imports `MEAL_NUTRITION_KEYS` directly
+- **CLAUDE.md:** Parallel Implementations section expanded with "What's Centralized" table, updated sync table, and complete New Nutrient Checklist (8-step)
+
 ### Phase 61 — Smart nutrient UI + Favorites sub-tabs fix + Hydration extended nutrients — Complete
 - **Problem 1:** Sub-tabs from Phase 59 not visible on "Add to [Meal]" because those buttons navigate to `add-food/page.js` (standalone page), not `AddFoodModal`
 - **Problem 2:** "Add to My Drinks" modal on Hydration page only had 10 nutrient fields — missing all 12 Phase 60 electrolytes/B-vitamins

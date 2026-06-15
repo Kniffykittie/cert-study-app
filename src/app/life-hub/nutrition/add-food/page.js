@@ -3,15 +3,9 @@ import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import BarcodeScannerModal from '@/components/BarcodeScannerModal'
+import { MEAL_SLOTS, categorizeFoods, buildFoodLogEntry } from '@/lib/nutritionUtils'
 
-const SLOT_LABELS = { breakfast: '🌅 Breakfast', lunch: '☀️ Lunch', dinner: '🌙 Dinner', snack: '🍎 Snack', other: '📦 Other' }
-const MEAL_SLOTS = [
-  { key: 'breakfast', label: 'Breakfast', emoji: '🌅' },
-  { key: 'lunch', label: 'Lunch', emoji: '☀️' },
-  { key: 'dinner', label: 'Dinner', emoji: '🌙' },
-  { key: 'snack', label: 'Snack', emoji: '🍎' },
-  { key: 'other', label: 'Other', emoji: '📦' },
-]
+const SLOT_LABELS = Object.fromEntries(MEAL_SLOTS.map(s => [s.key, `${s.emoji} ${s.label}`]))
 
 function AddFoodPageInner() {
   const router = useRouter()
@@ -49,17 +43,7 @@ function AddFoodPageInner() {
 
   async function logEntry(food, sv) {
     setLogging(food.id || food.name)
-    const numKeys = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg','saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','omega3_g','vitamin_k_mcg','choline_mg','phosphorus_mg','chloride_mg','manganese_mg','selenium_mcg','chromium_mcg','copper_mg','iodine_mcg','biotin_mcg','pantothenic_acid_mg','niacin_mg','thiamine_mg','riboflavin_mg']
-    const entry = {
-      meal_slot: slot,
-      name: food.name,
-      brand: food.brand || null,
-      serving_size_label: food.serving_size_label || '1 serving',
-      servings: sv,
-      source: food.source || 'my_foods',
-      date: new Date().toLocaleDateString('en-CA'),
-    }
-    for (const k of numKeys) entry[k] = food[k] != null ? food[k] * sv : null
+    const entry = buildFoodLogEntry(food, slot, sv, food.source || 'my_foods')
     await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry) })
     window.location.href = '/life-hub/nutrition'
   }
@@ -105,10 +89,7 @@ function AddFoodPageInner() {
   }
 
   const textFiltered = myFoods.filter(f => !filter || f.name.toLowerCase().includes(filter.toLowerCase()) || (f.brand || '').toLowerCase().includes(filter.toLowerCase()))
-  const favDrinks = textFiltered.filter(f => f.is_drink)
-  const favIngredients = textFiltered.filter(f => f.is_ingredient && !f.is_drink)
-  const favSnacks = textFiltered.filter(f => f.is_snack && !f.is_ingredient && !f.is_drink)
-  const favFoods = textFiltered.filter(f => !f.is_ingredient && !f.is_snack && !f.is_drink)
+  const { drinks: favDrinks, ingredients: favIngredients, snacks: favSnacks, meals: favFoods } = categorizeFoods(textFiltered)
   const filtered = favTab === 'drinks' ? favDrinks : favTab === 'ingredients' ? favIngredients : favTab === 'snacks' ? favSnacks : favTab === 'foods' ? favFoods : textFiltered
 
   function setFavTabPersist(t) { setFavTab(t); try { localStorage.setItem('favTab', t) } catch {} }
