@@ -2,7 +2,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import BarcodeScannerModal from '@/components/BarcodeScannerModal'
-import { DV } from '@/lib/nutritionUtils'
+import { DV, MEAL_NUTRITION_KEYS } from '@/lib/nutritionUtils'
+import EditFoodModal from '@/components/nutrition/EditFoodModal'
 
 const DEFAULT_GOAL = 64
 
@@ -120,11 +121,7 @@ export default function DrinksHydrationPage() {
   const [saveDrink, setSaveDrink] = useState(false)
   const [loggingDrink, setLoggingDrink] = useState(false)
   const [showLogNutrition, setShowLogNutrition] = useState(false)
-  const [logNutrition, setLogNutrition] = useState({
-    calories: '', protein_g: '', carbs_g: '', fat_g: '',
-    sugar_g: '', sodium_mg: '', potassium_mg: '', vitamin_c_mg: '',
-    caffeine_mg: '', water_oz: '',
-  })
+  const [logNutrition, setLogNutrition] = useState({})
 
   const [logDrinkTime, setLogDrinkTime] = useState('')
   const [editLogTime, setEditLogTime] = useState('')
@@ -176,6 +173,9 @@ export default function DrinksHydrationPage() {
     { key: 'omega3_g', label: 'Omega-3', unit: 'g', group: 'Other', color: '#34d399' },
   ]
   const DRINK_EXTRA_KEYS = DRINK_EXTRA_NUTRIENTS.map(n => n.key)
+  const EMPTY_LOG_NUTRITION = Object.fromEntries(
+    [...DRINK_EXTRA_KEYS, 'caffeine_mg', 'water_oz', 'calories'].map(k => [k, ''])
+  )
   const EMPTY_DRINK_FORM = { name: '', serving_size_label: '', calories: '', caffeine_mg: '', water_oz: '', ...Object.fromEntries(DRINK_EXTRA_KEYS.map(k => [k, ''])) }
   const [addDrinkForm, setAddDrinkForm] = useState(EMPTY_DRINK_FORM)
   const [activeDrinkNutrients, setActiveDrinkNutrients] = useState(new Set())
@@ -184,9 +184,7 @@ export default function DrinksHydrationPage() {
   const [aiFillDrink, setAiFillDrink] = useState(false)
   const [aiFillDrinkDone, setAiFillDrinkDone] = useState(false)
   const [editSavedModal, setEditSavedModal] = useState(null)
-  const [savedEditForm, setSavedEditForm] = useState({ name: '', serving_size_label: '', calories: '', protein_g: '', carbs_g: '', fat_g: '', sugar_g: '', sodium_mg: '', potassium_mg: '', vitamin_c_mg: '', caffeine_mg: '', water_oz: '' })
   const [viewEntry, setViewEntry] = useState(null)
-  const [savingSaved, setSavingSaved] = useState(false)
   const [dvMode, setDvMode] = useState(false)
 
   const searchTimeout = useRef(null)
@@ -223,7 +221,7 @@ export default function DrinksHydrationPage() {
     // Today's drink entries from food_log
     const { data: de } = await supabase
       .from('food_log_entries')
-      .select('id, name, brand, servings, serving_size_label, calories, protein_g, carbs_g, fat_g, sugar_g, sodium_mg, potassium_mg, vitamin_c_mg, caffeine_mg, water_g, created_at')
+      .select('*')
       .eq('user_id', user.id)
       .eq('date', today)
       .eq('meal_slot', 'drink')
@@ -417,15 +415,11 @@ export default function DrinksHydrationPage() {
       brand: drink.brand || null,
       serving_size_label: drink.serving_size_label || '1 serving',
       servings: 1,
-      calories: drink.calories,
-      protein_g: drink.protein_g,
-      carbs_g: drink.carbs_g,
-      fat_g: drink.fat_g,
-      sodium_mg: drink.sodium_mg,
-      caffeine_mg: drink.caffeine_mg,
-      water_g: drink.water_g,
       source: 'my_foods',
       my_food_id: drink.id,
+    }
+    for (const k of MEAL_NUTRITION_KEYS) {
+      if (drink[k] != null) body[k] = drink[k]
     }
     const res = await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const data = await res.json()
@@ -459,6 +453,7 @@ export default function DrinksHydrationPage() {
     const cafPer = parseFloat(editCafPer) || 0
     const waterOzPer = parseFloat(editWaterOzPer) || 0
     const entryDate = editLogModal.date || today
+    const origSv = editLogModal.servings || 1
     const body = {
       id: editLogModal.id,
       name: editName.trim() || editLogModal.name,
@@ -467,6 +462,13 @@ export default function DrinksHydrationPage() {
       caffeine_mg: cafPer * sv || null,
       water_g: waterOzPer > 0 ? (waterOzPer * 29.5735) * sv : null,
       logged_time: editLogTime ? timeToISO(editLogTime, entryDate) : undefined,
+    }
+    for (const k of MEAL_NUTRITION_KEYS) {
+      if (k === 'calories' || k === 'caffeine_mg' || k === 'water_g') continue
+      if (editLogModal[k] != null) {
+        const perServing = editLogModal[k] / origSv
+        body[k] = perServing * sv
+      }
     }
     const res = await fetch('/api/nutrition/log', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const data = await res.json()
@@ -541,49 +543,6 @@ export default function DrinksHydrationPage() {
 
   function openEditSavedModal(drink) {
     setEditSavedModal(drink)
-    setSavedEditForm({
-      name: drink.name || '',
-      serving_size_label: drink.serving_size_label || '1 serving',
-      calories: drink.calories != null ? String(drink.calories) : '',
-      protein_g: drink.protein_g != null ? String(drink.protein_g) : '',
-      carbs_g: drink.carbs_g != null ? String(drink.carbs_g) : '',
-      fat_g: drink.fat_g != null ? String(drink.fat_g) : '',
-      sugar_g: drink.sugar_g != null ? String(drink.sugar_g) : '',
-      sodium_mg: drink.sodium_mg != null ? String(Math.round(drink.sodium_mg)) : '',
-      potassium_mg: drink.potassium_mg != null ? String(Math.round(drink.potassium_mg)) : '',
-      vitamin_c_mg: drink.vitamin_c_mg != null ? String(drink.vitamin_c_mg) : '',
-      caffeine_mg: drink.caffeine_mg != null ? String(drink.caffeine_mg) : '',
-      water_oz: drink.water_g != null ? String(Math.round(drink.water_g * 0.0338 * 10) / 10) : '',
-    })
-  }
-
-  async function saveEditSavedDrink() {
-    if (!editSavedModal) return
-    setSavingSaved(true)
-    const f = savedEditForm
-    const body = {
-      id: editSavedModal.id,
-      name: f.name.trim() || editSavedModal.name,
-      serving_size_label: f.serving_size_label || '1 serving',
-      calories: f.calories !== '' ? Number(f.calories) : null,
-      protein_g: f.protein_g !== '' ? Number(f.protein_g) : null,
-      carbs_g: f.carbs_g !== '' ? Number(f.carbs_g) : null,
-      fat_g: f.fat_g !== '' ? Number(f.fat_g) : null,
-      sugar_g: f.sugar_g !== '' ? Number(f.sugar_g) : null,
-      sodium_mg: f.sodium_mg !== '' ? Number(f.sodium_mg) : null,
-      potassium_mg: f.potassium_mg !== '' ? Number(f.potassium_mg) : null,
-      vitamin_c_mg: f.vitamin_c_mg !== '' ? Number(f.vitamin_c_mg) : null,
-      caffeine_mg: f.caffeine_mg !== '' ? Number(f.caffeine_mg) : null,
-      water_g: f.water_oz !== '' ? Number(f.water_oz) * 29.5735 : null,
-      is_drink: true,
-    }
-    const res = await fetch('/api/nutrition/my-foods', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    const data = await res.json()
-    if (data.food) {
-      setSavedDrinks(prev => prev.map(d => d.id === editSavedModal.id ? data.food : d))
-    }
-    setSavingSaved(false)
-    setEditSavedModal(null)
   }
 
   async function deleteSavedDrink(id) {
@@ -597,18 +556,12 @@ export default function DrinksHydrationPage() {
     setSaveDrink(false)
     setShowLogNutrition(false)
     setLogDrinkTime(nowTimeString())
-    setLogNutrition({
-      calories: item.calories != null ? String(Math.round(item.calories * 10) / 10) : '',
-      protein_g: item.protein_g != null ? String(item.protein_g) : '',
-      carbs_g: item.carbs_g != null ? String(item.carbs_g) : '',
-      fat_g: item.fat_g != null ? String(item.fat_g) : '',
-      sugar_g: item.sugar_g != null ? String(item.sugar_g) : '',
-      sodium_mg: item.sodium_mg != null ? String(Math.round(item.sodium_mg)) : '',
-      potassium_mg: item.potassium_mg != null ? String(Math.round(item.potassium_mg)) : '',
-      vitamin_c_mg: item.vitamin_c_mg != null ? String(item.vitamin_c_mg) : '',
-      caffeine_mg: item.caffeine_mg != null ? String(item.caffeine_mg) : '',
-      water_oz: item.water_g != null ? String(Math.round(item.water_g * 0.0338 * 10) / 10) : '',
-    })
+    const initialNutrition = { ...EMPTY_LOG_NUTRITION }
+    for (const key of [...DRINK_EXTRA_KEYS, 'caffeine_mg', 'calories']) {
+      if (item[key] != null) initialNutrition[key] = String(item[key])
+    }
+    initialNutrition.water_oz = item.water_g != null ? String(Math.round(item.water_g * 0.0338 * 10) / 10) : ''
+    setLogNutrition(initialNutrition)
   }
 
   async function confirmLogDrink() {
@@ -620,25 +573,21 @@ export default function DrinksHydrationPage() {
     const waterGrams = n.water_oz !== '' ? Number(n.water_oz) * 29.5735 : null
 
     if (saveDrink) {
+      const saveBody = {
+        name: logModal.name,
+        brand: logModal.brand || null,
+        serving_size_label: logModal.serving_size_label || '1 serving',
+        is_drink: true,
+        water_g: waterGrams,
+      }
+      if (n.calories !== '' && n.calories != null) saveBody.calories = Number(n.calories)
+      for (const k of MEAL_NUTRITION_KEYS) {
+        if (k !== 'water_g' && n[k] !== '' && n[k] != null) saveBody[k] = Number(n[k])
+      }
       await fetch('/api/nutrition/my-foods', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: logModal.name,
-          brand: logModal.brand || null,
-          serving_size_label: logModal.serving_size_label || '1 serving',
-          is_drink: true,
-          calories: n.calories !== '' ? Number(n.calories) : null,
-          protein_g: n.protein_g !== '' ? Number(n.protein_g) : null,
-          carbs_g: n.carbs_g !== '' ? Number(n.carbs_g) : null,
-          fat_g: n.fat_g !== '' ? Number(n.fat_g) : null,
-          sugar_g: n.sugar_g !== '' ? Number(n.sugar_g) : null,
-          sodium_mg: n.sodium_mg !== '' ? Number(n.sodium_mg) : null,
-          potassium_mg: n.potassium_mg !== '' ? Number(n.potassium_mg) : null,
-          vitamin_c_mg: n.vitamin_c_mg !== '' ? Number(n.vitamin_c_mg) : null,
-          caffeine_mg: n.caffeine_mg !== '' ? Number(n.caffeine_mg) : null,
-          water_g: waterGrams,
-        })
+        body: JSON.stringify(saveBody),
       })
       const { data: sd } = await (async () => {
         const supabase = createClient()
@@ -654,21 +603,19 @@ export default function DrinksHydrationPage() {
       brand: logModal.brand || null,
       serving_size_label: logModal.serving_size_label || '1 serving',
       servings: sv,
-      calories: n.calories !== '' ? Number(n.calories) : null,
-      protein_g: n.protein_g !== '' ? Number(n.protein_g) : null,
-      carbs_g: n.carbs_g !== '' ? Number(n.carbs_g) : null,
-      fat_g: n.fat_g !== '' ? Number(n.fat_g) : null,
-      sugar_g: n.sugar_g !== '' ? Number(n.sugar_g) : null,
-      sodium_mg: n.sodium_mg !== '' ? Number(n.sodium_mg) : null,
-      potassium_mg: n.potassium_mg !== '' ? Number(n.potassium_mg) : null,
-      vitamin_c_mg: n.vitamin_c_mg !== '' ? Number(n.vitamin_c_mg) : null,
-      caffeine_mg: n.caffeine_mg !== '' ? Number(n.caffeine_mg) : null,
-      water_g: waterGrams,
       source: logModal.source || 'off',
       food_cache_id: logModal.barcode ? logModal.id : null,
       my_food_id: logModal._source === 'my_foods' ? logModal.id : null,
       logged_time: logDrinkTime ? timeToISO(logDrinkTime) : undefined,
     }
+    for (const k of MEAL_NUTRITION_KEYS) {
+      if (k === 'water_g') {
+        body.water_g = waterGrams
+      } else if (n[k] !== '' && n[k] != null) {
+        body[k] = Number(n[k])
+      }
+    }
+    if (n.calories !== '' && n.calories != null) body.calories = Number(n.calories)
     const res = await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const data = await res.json()
     if (data.entry) {
@@ -1353,57 +1300,14 @@ export default function DrinksHydrationPage() {
 
       {/* Edit saved drink modal */}
       {editSavedModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, maxWidth: 380, width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Edit Saved Drink</div>
-              <button onClick={() => setEditSavedModal(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 18, cursor: 'pointer' }}>✕</button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {[
-                { label: 'Name *', key: 'name', type: 'text' },
-                { label: 'Serving Size Label', key: 'serving_size_label', type: 'text', placeholder: 'e.g. 1 can, 12 fl oz' },
-              ].map(f => (
-                <div key={f.key}>
-                  <label style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>{f.label}</label>
-                  <input type={f.type} value={savedEditForm[f.key]} onChange={e => setSavedEditForm(p => ({ ...p, [f.key]: e.target.value }))}
-                    placeholder={f.placeholder || ''}
-                    style={{ width: '100%', boxSizing: 'border-box', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text-primary)', fontSize: 13 }} />
-                </div>
-              ))}
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>Nutrition per serving</div>
-              {[
-                { label: 'Calories', key: 'calories' },
-                { label: 'Water content (oz)', key: 'water_oz' },
-                { label: 'Caffeine (mg)', key: 'caffeine_mg' },
-                { label: 'Sodium (mg)', key: 'sodium_mg' },
-                { label: 'Sugar (g)', key: 'sugar_g' },
-                { label: 'Protein (g)', key: 'protein_g' },
-                { label: 'Carbs (g)', key: 'carbs_g' },
-                { label: 'Fat (g)', key: 'fat_g' },
-                { label: 'Potassium (mg)', key: 'potassium_mg' },
-                { label: 'Vitamin C (mg)', key: 'vitamin_c_mg' },
-              ].map(f => (
-                <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', width: 160, flexShrink: 0 }}>{f.label}</label>
-                  <input type="number" value={savedEditForm[f.key]} onChange={e => setSavedEditForm(p => ({ ...p, [f.key]: e.target.value }))}
-                    placeholder="0" min="0"
-                    style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-              <button onClick={saveEditSavedDrink} disabled={savingSaved || !savedEditForm.name.trim()}
-                style={{ flex: 1, padding: '10px', background: 'var(--accent-blue)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: savingSaved ? 0.6 : 1 }}>
-                {savingSaved ? 'Saving...' : 'Save Changes'}
-              </button>
-              <button onClick={() => setEditSavedModal(null)}
-                style={{ padding: '10px 16px', background: 'none', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-secondary)', fontSize: 14, cursor: 'pointer' }}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+        <EditFoodModal
+          food={editSavedModal}
+          onClose={() => setEditSavedModal(null)}
+          onSave={(updated) => {
+            setSavedDrinks(prev => prev.map(d => d.id === updated.id ? updated : d))
+            setEditSavedModal(null)
+          }}
+        />
       )}
 
       {/* View drink entry detail modal */}
