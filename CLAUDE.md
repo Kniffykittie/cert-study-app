@@ -176,7 +176,7 @@ src/
         stretching/page.js             Stretching & Mobility — daily recommendations based on today's workout body parts + sore spots; session type toggle (Pre/Post/Standalone); dynamic+static sections with check-off cards; sticky log button; duration tracked from first check
         stretching/library/page.js     Stretch Library — all 38 stretches; filter by type (dynamic/static) and muscle group; expandable rows with how-to, mistake warnings, contraindications
       nutrition/
-        add-food/page.js               Standalone add-food page — Favorites tab (filtered list, servings, whole-container) + Search tab (OFFs + barcode + AI estimate); navigates here from all "Add [slot]" buttons; logs food then returns to nutrition
+        add-food/page.js               Standalone add-food page — Favorites tab with sub-tab pills (🌟 All | 🍽️ Foods & Meals | 🥤 Drinks | 🍿 Snacks | 🥚 Ingredients; smart default per slot; localStorage persisted; count badges; filter works within active sub-tab) + Search tab (OFFs + barcode + AI estimate); navigates here from all "Add [slot]" buttons; logs food then returns to nutrition
         log-manual/page.js             Standalone lightweight manual food entry — reads AI prefill from sessionStorage; core macros + optional micronutrients; avoids loading heavy nutrition page DOM; wrapped in Suspense
         page.js                        Nutrition dashboard (~700 lines; Phase 58 split from 2,748 lines) — TDEE + macro targets, calorie ring, food log by meal slot, Supplements tab, TDEE calibration card, micronutrient panel; imports 6 extracted components from src/components/nutrition/ and shared utils from src/lib/nutritionUtils.js
         meal-plan/page.js              Weekly Meal Plan — Mon–Sun grid, meal slot rows, food search, AI insight analysis (typed callouts citing specific days and foods)
@@ -218,7 +218,7 @@ src/
   components/
     nutrition/
       FoodIntelCard.js               AI food intel card (glycemic load, satiety, processing level, timing, fun fact); cached in ai_food_intel_cache
-      EditFoodModal.js               Edit saved food — all 39 fields (Phase 60 extended nutrients) + AI micro-fill; imports TRACKED_MICRO_KEYS from nutritionUtils
+      EditFoodModal.js               Edit saved food — smart nutrient UI: only shows fields with values by default; "+ Add nutrients" chip picker (Minerals blue, Vitamins purple, Other green); clicking chip adds row; × removes it; AI Fill always visible; macros always shown 2-col; all 38 fields accessible; imports TRACKED_MICRO_KEYS from nutritionUtils
       SavedFoodsTab.js               My Favorites tab — pinned/today/week/older/never groups, direct log flow, pin/edit/delete
       NutrientBars.js                Micronutrient stacked bars (food + supplement segments, color-coded by % DV)
       MealBuilderModal.js            Meal recipe builder — ingredient search, custom ingredients, save as recipe

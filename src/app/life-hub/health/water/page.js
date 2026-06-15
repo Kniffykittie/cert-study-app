@@ -128,8 +128,45 @@ export default function DrinksHydrationPage() {
   // Manage saved drinks
   const [managingDrinks, setManagingDrinks] = useState(false)
   const [addDrinkModal, setAddDrinkModal] = useState(false)
-  const [addDrinkForm, setAddDrinkForm] = useState({ name: '', serving_size_label: '', calories: '', protein_g: '', carbs_g: '', fat_g: '', sugar_g: '', sodium_mg: '', potassium_mg: '', vitamin_c_mg: '', caffeine_mg: '', water_oz: '' })
-  const [addDrinkNutrition, setAddDrinkNutrition] = useState(false)
+  const DRINK_EXTRA_NUTRIENTS = [
+    { key: 'sugar_g', label: 'Sugar', unit: 'g', group: 'Macros', color: '#34d399' },
+    { key: 'protein_g', label: 'Protein', unit: 'g', group: 'Macros', color: '#34d399' },
+    { key: 'carbs_g', label: 'Carbs', unit: 'g', group: 'Macros', color: '#34d399' },
+    { key: 'fat_g', label: 'Fat', unit: 'g', group: 'Macros', color: '#34d399' },
+    { key: 'sodium_mg', label: 'Sodium', unit: 'mg', group: 'Minerals', color: '#60a5fa' },
+    { key: 'potassium_mg', label: 'Potassium', unit: 'mg', group: 'Minerals', color: '#60a5fa' },
+    { key: 'magnesium_mg', label: 'Magnesium', unit: 'mg', group: 'Minerals', color: '#60a5fa' },
+    { key: 'calcium_mg', label: 'Calcium', unit: 'mg', group: 'Minerals', color: '#60a5fa' },
+    { key: 'phosphorus_mg', label: 'Phosphorus', unit: 'mg', group: 'Minerals', color: '#60a5fa' },
+    { key: 'chloride_mg', label: 'Chloride', unit: 'mg', group: 'Minerals', color: '#60a5fa' },
+    { key: 'zinc_mg', label: 'Zinc', unit: 'mg', group: 'Minerals', color: '#60a5fa' },
+    { key: 'iron_mg', label: 'Iron', unit: 'mg', group: 'Minerals', color: '#60a5fa' },
+    { key: 'copper_mg', label: 'Copper', unit: 'mg', group: 'Minerals', color: '#60a5fa' },
+    { key: 'manganese_mg', label: 'Manganese', unit: 'mg', group: 'Minerals', color: '#60a5fa' },
+    { key: 'selenium_mcg', label: 'Selenium', unit: 'mcg', group: 'Minerals', color: '#60a5fa' },
+    { key: 'chromium_mcg', label: 'Chromium', unit: 'mcg', group: 'Minerals', color: '#60a5fa' },
+    { key: 'iodine_mcg', label: 'Iodine', unit: 'mcg', group: 'Minerals', color: '#60a5fa' },
+    { key: 'vitamin_c_mg', label: 'Vitamin C', unit: 'mg', group: 'Vitamins', color: '#a78bfa' },
+    { key: 'vitamin_b6_mg', label: 'Vitamin B6', unit: 'mg', group: 'Vitamins', color: '#a78bfa' },
+    { key: 'vitamin_b12_mcg', label: 'Vitamin B12', unit: 'mcg', group: 'Vitamins', color: '#a78bfa' },
+    { key: 'vitamin_d_mcg', label: 'Vitamin D', unit: 'mcg', group: 'Vitamins', color: '#a78bfa' },
+    { key: 'folate_mcg', label: 'Folate', unit: 'mcg', group: 'Vitamins', color: '#a78bfa' },
+    { key: 'niacin_mg', label: 'Niacin (B3)', unit: 'mg', group: 'Vitamins', color: '#a78bfa' },
+    { key: 'pantothenic_acid_mg', label: 'Pantothenic Acid (B5)', unit: 'mg', group: 'Vitamins', color: '#a78bfa' },
+    { key: 'biotin_mcg', label: 'Biotin (B7)', unit: 'mcg', group: 'Vitamins', color: '#a78bfa' },
+    { key: 'thiamine_mg', label: 'Thiamine (B1)', unit: 'mg', group: 'Vitamins', color: '#a78bfa' },
+    { key: 'riboflavin_mg', label: 'Riboflavin (B2)', unit: 'mg', group: 'Vitamins', color: '#a78bfa' },
+    { key: 'vitamin_a_mcg', label: 'Vitamin A', unit: 'mcg', group: 'Vitamins', color: '#a78bfa' },
+    { key: 'vitamin_k_mcg', label: 'Vitamin K', unit: 'mcg', group: 'Vitamins', color: '#a78bfa' },
+    { key: 'cholesterol_mg', label: 'Cholesterol', unit: 'mg', group: 'Other', color: '#34d399' },
+    { key: 'saturated_fat_g', label: 'Saturated Fat', unit: 'g', group: 'Other', color: '#34d399' },
+    { key: 'omega3_g', label: 'Omega-3', unit: 'g', group: 'Other', color: '#34d399' },
+  ]
+  const DRINK_EXTRA_KEYS = DRINK_EXTRA_NUTRIENTS.map(n => n.key)
+  const EMPTY_DRINK_FORM = { name: '', serving_size_label: '', calories: '', caffeine_mg: '', water_oz: '', ...Object.fromEntries(DRINK_EXTRA_KEYS.map(k => [k, ''])) }
+  const [addDrinkForm, setAddDrinkForm] = useState(EMPTY_DRINK_FORM)
+  const [activeDrinkNutrients, setActiveDrinkNutrients] = useState(new Set())
+  const [showDrinkPicker, setShowDrinkPicker] = useState(false)
   const [savingAddDrink, setSavingAddDrink] = useState(false)
   const [aiFillDrink, setAiFillDrink] = useState(false)
   const [aiFillDrinkDone, setAiFillDrinkDone] = useState(false)
@@ -422,8 +459,9 @@ export default function DrinksHydrationPage() {
   }
 
   function openAddDrinkModal() {
-    setAddDrinkForm({ name: '', serving_size_label: '1 serving', calories: '', protein_g: '', carbs_g: '', fat_g: '', sugar_g: '', sodium_mg: '', potassium_mg: '', vitamin_c_mg: '', caffeine_mg: '', water_oz: '' })
-    setAddDrinkNutrition(false)
+    setAddDrinkForm({ ...EMPTY_DRINK_FORM, serving_size_label: '1 serving' })
+    setActiveDrinkNutrients(new Set())
+    setShowDrinkPicker(false)
     setAiFillDrinkDone(false)
     setAddDrinkModal(true)
   }
@@ -440,21 +478,23 @@ export default function DrinksHydrationPage() {
       const json = await res.json()
       if (json.fill) {
         const f = json.fill
-        setAddDrinkForm(prev => ({
-          ...prev,
-          name: f.name || prev.name,
-          serving_size_label: f.serving_size_label || prev.serving_size_label,
-          calories: f.calories != null ? String(f.calories) : prev.calories,
-          caffeine_mg: f.caffeine_mg != null ? String(f.caffeine_mg) : prev.caffeine_mg,
-          water_oz: f.water_oz != null ? String(Math.round(f.water_oz * 10) / 10) : prev.water_oz,
-          sugar_g: f.sugar_g != null ? String(f.sugar_g) : prev.sugar_g,
-          sodium_mg: f.sodium_mg != null ? String(f.sodium_mg) : prev.sodium_mg,
-          protein_g: f.protein_g != null ? String(f.protein_g) : prev.protein_g,
-          carbs_g: f.carbs_g != null ? String(f.carbs_g) : prev.carbs_g,
-          fat_g: f.fat_g != null ? String(f.fat_g) : prev.fat_g,
-          potassium_mg: f.potassium_mg != null ? String(f.potassium_mg) : prev.potassium_mg,
-          vitamin_c_mg: f.vitamin_c_mg != null ? String(f.vitamin_c_mg) : prev.vitamin_c_mg,
-        }))
+        const updates = {
+          name: f.name || undefined,
+          serving_size_label: f.serving_size_label || undefined,
+          calories: f.calories != null ? String(f.calories) : undefined,
+          caffeine_mg: f.caffeine_mg != null ? String(f.caffeine_mg) : undefined,
+          water_oz: f.water_oz != null ? String(Math.round(f.water_oz * 10) / 10) : undefined,
+          sugar_g: f.sugar_g != null ? String(f.sugar_g) : undefined,
+          sodium_mg: f.sodium_mg != null ? String(f.sodium_mg) : undefined,
+          protein_g: f.protein_g != null ? String(f.protein_g) : undefined,
+          carbs_g: f.carbs_g != null ? String(f.carbs_g) : undefined,
+          fat_g: f.fat_g != null ? String(f.fat_g) : undefined,
+          potassium_mg: f.potassium_mg != null ? String(f.potassium_mg) : undefined,
+          vitamin_c_mg: f.vitamin_c_mg != null ? String(f.vitamin_c_mg) : undefined,
+        }
+        setAddDrinkForm(prev => { const n = { ...prev }; Object.entries(updates).forEach(([k, v]) => { if (v !== undefined) n[k] = v }); return n })
+        const newActive = new Set(DRINK_EXTRA_KEYS.filter(k => updates[k] !== undefined && updates[k] !== ''))
+        setActiveDrinkNutrients(newActive)
         setAiFillDrinkDone(true)
       }
     } catch {}
@@ -465,29 +505,19 @@ export default function DrinksHydrationPage() {
     const f = addDrinkForm
     if (!f.name.trim()) return
     setSavingAddDrink(true)
-    const body = {
-      name: f.name.trim(),
-      serving_size_label: f.serving_size_label || '1 serving',
-      is_drink: true,
+    const body = { name: f.name.trim(), serving_size_label: f.serving_size_label || '1 serving', is_drink: true,
       calories: f.calories !== '' ? Number(f.calories) : null,
-      protein_g: f.protein_g !== '' ? Number(f.protein_g) : null,
-      carbs_g: f.carbs_g !== '' ? Number(f.carbs_g) : null,
-      fat_g: f.fat_g !== '' ? Number(f.fat_g) : null,
-      sugar_g: f.sugar_g !== '' ? Number(f.sugar_g) : null,
-      sodium_mg: f.sodium_mg !== '' ? Number(f.sodium_mg) : null,
-      potassium_mg: f.potassium_mg !== '' ? Number(f.potassium_mg) : null,
-      vitamin_c_mg: f.vitamin_c_mg !== '' ? Number(f.vitamin_c_mg) : null,
       caffeine_mg: f.caffeine_mg !== '' ? Number(f.caffeine_mg) : null,
       water_g: f.water_oz !== '' ? Number(f.water_oz) * 29.5735 : null,
     }
+    for (const k of DRINK_EXTRA_KEYS) body[k] = f[k] !== '' ? Number(f[k]) : null
     const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const data = await res.json()
-    if (data.food) {
-      setSavedDrinks(prev => [...prev, data.food].sort((a, b) => a.name.localeCompare(b.name)))
-    }
+    if (data.food) setSavedDrinks(prev => [...prev, data.food].sort((a, b) => a.name.localeCompare(b.name)))
     setSavingAddDrink(false)
-    setAddDrinkForm({ name: '', serving_size_label: '1 serving', calories: '', protein_g: '', carbs_g: '', fat_g: '', sugar_g: '', sodium_mg: '', potassium_mg: '', vitamin_c_mg: '', caffeine_mg: '', water_oz: '' })
-    setAddDrinkNutrition(false)
+    setAddDrinkForm({ ...EMPTY_DRINK_FORM, serving_size_label: '1 serving' })
+    setActiveDrinkNutrients(new Set())
+    setShowDrinkPicker(false)
   }
 
   function openEditSavedModal(drink) {
@@ -1147,31 +1177,51 @@ export default function DrinksHydrationPage() {
                     style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
                 </div>
               ))}
-              <button onClick={() => setAddDrinkNutrition(v => !v)}
-                style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', fontSize: 12, cursor: 'pointer', padding: 0, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 4 }}>
-                {addDrinkNutrition ? '▲ Hide' : '▼ More nutrients'} (sodium, sugar, protein…)
-              </button>
-              {addDrinkNutrition && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px', background: 'var(--background)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                  {[
-                    { label: 'Sodium (mg)', key: 'sodium_mg' },
-                    { label: 'Sugar (g)', key: 'sugar_g' },
-                    { label: 'Protein (g)', key: 'protein_g' },
-                    { label: 'Carbs (g)', key: 'carbs_g' },
-                    { label: 'Fat (g)', key: 'fat_g' },
-                    { label: 'Potassium (mg)', key: 'potassium_mg' },
-                    { label: 'Vitamin C (mg)', key: 'vitamin_c_mg' },
-                  ].map(f => (
-                    <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <label style={{ fontSize: 12, color: 'var(--text-secondary)', width: 150, flexShrink: 0 }}>{f.label}</label>
-                      <input type="number" value={addDrinkForm[f.key]} min="0"
-                        onChange={e => setAddDrinkForm(p => ({ ...p, [f.key]: e.target.value }))}
-                        placeholder="0"
-                        style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* Active nutrient rows */}
+              {[...activeDrinkNutrients].map(key => {
+                const meta = DRINK_EXTRA_NUTRIENTS.find(n => n.key === key)
+                if (!meta) return null
+                return (
+                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <label style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1 }}>{meta.label} ({meta.unit})</label>
+                    <input type="number" value={addDrinkForm[key]} min="0"
+                      onChange={e => setAddDrinkForm(p => ({ ...p, [key]: e.target.value }))}
+                      placeholder="0"
+                      style={{ width: 80, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13, textAlign: 'right' }} />
+                    <button onClick={() => { setActiveDrinkNutrients(s => { const n = new Set(s); n.delete(key); return n }); setAddDrinkForm(p => ({ ...p, [key]: '' })) }}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 16, cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>×</button>
+                  </div>
+                )
+              })}
+
+              {/* Add nutrient chip picker */}
+              <div>
+                <button onClick={() => setShowDrinkPicker(v => !v)}
+                  style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: 8, padding: '7px 12px', color: 'var(--accent-blue)', fontSize: 12, fontWeight: 600, cursor: 'pointer', width: '100%' }}>
+                  {showDrinkPicker ? '▲ Hide nutrients' : '+ Add nutrients'}
+                </button>
+                {showDrinkPicker && (
+                  <div style={{ marginTop: 8, padding: '10px 12px', background: 'var(--background)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    {['Macros', 'Minerals', 'Vitamins', 'Other'].map(group => {
+                      const items = DRINK_EXTRA_NUTRIENTS.filter(n => n.group === group && !activeDrinkNutrients.has(n.key))
+                      if (items.length === 0) return null
+                      return (
+                        <div key={group} style={{ marginBottom: 8 }}>
+                          <div style={{ fontSize: 10, color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{group}</div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                            {items.map(n => (
+                              <button key={n.key} onClick={() => { setActiveDrinkNutrients(s => new Set([...s, n.key])); setShowDrinkPicker(false) }}
+                                style={{ padding: '4px 9px', borderRadius: 12, border: `1px solid ${n.color}`, background: `${n.color}18`, color: n.color, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                                {n.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
               <button onClick={saveNewDrink} disabled={savingAddDrink || !addDrinkForm.name.trim()}

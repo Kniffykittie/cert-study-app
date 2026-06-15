@@ -381,6 +381,14 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Phase 61 — Smart nutrient UI + Favorites sub-tabs fix + Hydration extended nutrients — Complete
+- **Problem 1:** Sub-tabs from Phase 59 not visible on "Add to [Meal]" because those buttons navigate to `add-food/page.js` (standalone page), not `AddFoodModal`
+- **Problem 2:** "Add to My Drinks" modal on Hydration page only had 10 nutrient fields — missing all 12 Phase 60 electrolytes/B-vitamins
+- **Problem 3:** EditFoodModal loaded all 38 nutrient fields as empty rows — overwhelming wall of zeros
+- **Fix 1 — add-food/page.js:** Added sub-tab pills (🌟 All | 🍽️ Foods & Meals | 🥤 Drinks | 🍿 Snacks | 🥚 Ingredients) to the Favorites section with count badges, smart defaults per slot, `localStorage` persistence; now loads ALL my_foods (not just non-drinks); numKeys extended with 12 Phase 60 nutrients
+- **Fix 2 — EditFoodModal.js (Phase 60 rewrite):** New smart UI — starts showing only fields that already have values (`activeNutrients` Set); "+ Add nutrients" dashed button opens grouped chip picker (Minerals in blue, Vitamins in purple, Other in green); clicking a chip adds that nutrient row; × removes it; AI Fill always visible and auto-adds filled fields to active set; macros always shown in 2-col grid
+- **Fix 3 — water/page.js:** "Add to My Drinks" modal now has same smart chip picker; `DRINK_EXTRA_NUTRIENTS` const (32 nutrients in 4 groups); `activeDrinkNutrients` Set + `showDrinkPicker` toggle; AI Fill auto-reveals filled fields; `saveNewDrink` writes all fields; `EMPTY_DRINK_FORM` includes all fields
+
 ### Phase 60 — Extended nutrient tracking (electrolytes + full B-vitamin panel) — Complete
 - **Problem:** Couldn't log phosphorus, chloride, manganese, selenium, chromium, copper, iodine, biotin (B7), pantothenic acid (B5), niacin (B3), thiamine (B1), or riboflavin (B2) — critical for tracking electrolyte packets like Ultima Replenisher
 - **DB migration:** 12 new NUMERIC columns added to `food_cache`, `my_foods`, `food_log_entries`, `meal_plan_entries`

@@ -25,6 +25,8 @@ function AddFoodPageInner() {
   const [logServings, setLogServings] = useState('1')
   const [expandedId, setExpandedId] = useState(null)
   const [logging, setLogging] = useState(null)
+  const smartFavDefault = slot === 'drink' ? 'drinks' : slot === 'snack' ? 'snacks' : 'all'
+  const [favTab, setFavTab] = useState(() => { try { return localStorage.getItem('favTab') || smartFavDefault } catch { return smartFavDefault } })
 
   // search
   const [query, setQuery] = useState('')
@@ -41,13 +43,13 @@ function AddFoodPageInner() {
 
   useEffect(() => {
     fetch('/api/nutrition/my-foods').then(r => r.json()).then(d => {
-      if (d.foods) setMyFoods(d.foods.filter(f => !f.is_drink))
+      if (d.foods) setMyFoods(d.foods)
     }).catch(() => {})
   }, [])
 
   async function logEntry(food, sv) {
     setLogging(food.id || food.name)
-    const numKeys = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg','saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','omega3_g','vitamin_k_mcg','choline_mg']
+    const numKeys = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg','saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','omega3_g','vitamin_k_mcg','choline_mg','phosphorus_mg','chloride_mg','manganese_mg','selenium_mcg','chromium_mcg','copper_mg','iodine_mcg','biotin_mcg','pantothenic_acid_mg','niacin_mg','thiamine_mg','riboflavin_mg']
     const entry = {
       meal_slot: slot,
       name: food.name,
@@ -102,7 +104,14 @@ function AddFoodPageInner() {
     setAiFilling(false)
   }
 
-  const filtered = myFoods.filter(f => !filter || f.name.toLowerCase().includes(filter.toLowerCase()) || (f.brand || '').toLowerCase().includes(filter.toLowerCase()))
+  const textFiltered = myFoods.filter(f => !filter || f.name.toLowerCase().includes(filter.toLowerCase()) || (f.brand || '').toLowerCase().includes(filter.toLowerCase()))
+  const favDrinks = textFiltered.filter(f => f.is_drink)
+  const favIngredients = textFiltered.filter(f => f.is_ingredient && !f.is_drink)
+  const favSnacks = textFiltered.filter(f => f.is_snack && !f.is_ingredient && !f.is_drink)
+  const favFoods = textFiltered.filter(f => !f.is_ingredient && !f.is_snack && !f.is_drink)
+  const filtered = favTab === 'drinks' ? favDrinks : favTab === 'ingredients' ? favIngredients : favTab === 'snacks' ? favSnacks : favTab === 'foods' ? favFoods : textFiltered
+
+  function setFavTabPersist(t) { setFavTab(t); try { localStorage.setItem('favTab', t) } catch {} }
 
   const tabBtn = (key, label) => (
     <button key={key} onClick={() => setTab(key)}
@@ -134,6 +143,25 @@ function AddFoodPageInner() {
         {/* ── Favorites tab ── */}
         {tab === 'favorites' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {/* Sub-tabs */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {[
+                { key: 'all', label: `🌟 All`, count: textFiltered.length },
+                { key: 'foods', label: `🍽️ Foods & Meals`, count: favFoods.length },
+                { key: 'drinks', label: `🥤 Drinks`, count: favDrinks.length },
+                { key: 'snacks', label: `🍿 Snacks`, count: favSnacks.length },
+                { key: 'ingredients', label: `🥚 Ingredients`, count: favIngredients.length },
+              ].map(({ key, label, count }) => (
+                <button key={key} onClick={() => setFavTabPersist(key)}
+                  style={{ padding: '5px 10px', borderRadius: '20px', border: `1px solid ${favTab === key ? 'var(--accent-blue)' : 'var(--border)'}`,
+                    backgroundColor: favTab === key ? 'rgba(59,130,246,0.12)' : 'var(--surface)',
+                    color: favTab === key ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                    fontSize: '12px', fontWeight: favTab === key ? '700' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  {label} {count > 0 && <span style={{ opacity: 0.7 }}>({count})</span>}
+                </button>
+              ))}
+            </div>
+
             <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter favorites..."
               style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '14px' }} />
 
