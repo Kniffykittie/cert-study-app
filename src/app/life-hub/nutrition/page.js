@@ -282,8 +282,6 @@ export default function NutritionPage() {
     </div>
   )
 
-  const mealFoods = myFoods.filter(f => !f.is_drink)
-
   const tdee = calcTDEE(goals)
   const macros = calcMacros(tdee, goals)
   const { bonus: workoutBonus, reason: bonusReason, grossBurn, duration: workoutDuration } = calcWorkoutBonus(todayWorkout, goals)
@@ -361,7 +359,7 @@ export default function NutritionPage() {
       )}
       {logModal && (
         <AddFoodModal slot={logModal} onClose={() => setLogModal(null)} onAdd={handleAddEntry}
-          myFoods={mealFoods} onSaveFood={handleSaveToMyFoods} onCreateMeal={() => setMealBuilderModal(true)} workoutCtx={workoutCtx} dietaryPrefs={goals?.dietary_preferences || []} />
+          myFoods={myFoods} onSaveFood={handleSaveToMyFoods} onCreateMeal={() => setMealBuilderModal(true)} workoutCtx={workoutCtx} dietaryPrefs={goals?.dietary_preferences || []} />
       )}
       {libraryModal && (
         <SearchModal slot={null} onClose={() => setLibraryModal(false)} onAdd={() => {}}
@@ -738,7 +736,7 @@ export default function NutritionPage() {
 
       {/* Saved Foods Tab */}
       {activeTab === 'myfoods' && (
-        <SavedFoodsTab myFoods={mealFoods} onDirectLog={handleAddEntry} onDelete={handleDeleteMyFood}
+        <SavedFoodsTab myFoods={myFoods} onDirectLog={handleAddEntry} onDelete={handleDeleteMyFood}
           onPin={handlePinMyFood} onEdit={setEditingFood} todayEntries={entries} onOpenLibrary={() => setLibraryModal(true)} workoutCtx={workoutCtx} />
       )}
 

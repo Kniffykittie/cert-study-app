@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import BarcodeScannerModal from '@/components/BarcodeScannerModal'
-import { MEAL_SLOTS, categorizeFoods, buildFoodLogEntry } from '@/lib/nutritionUtils'
+import { MEAL_SLOTS, categorizeFoods, buildFoodLogEntry, FOOD_CATEGORIES, categoryToFlags } from '@/lib/nutritionUtils'
 
 const SLOT_LABELS = Object.fromEntries(MEAL_SLOTS.map(s => [s.key, `${s.emoji} ${s.label}`]))
 
@@ -43,6 +43,8 @@ function AddFoodPageInner() {
   const [showScanner, setShowScanner] = useState(false)
   const [aiFilling, setAiFilling] = useState(false)
   const [aiPreview, setAiPreview] = useState(null)
+  const [searchCategory, setSearchCategory] = useState('food')
+  const [saveSearchToLib, setSaveSearchToLib] = useState(true)
   const debounceRef = useRef(null)
   const supabase = createClient()
 
@@ -62,7 +64,9 @@ function AddFoodPageInner() {
 
   async function saveAndLog(food, sv) {
     setSavingSearch(true)
-    await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...food, is_ingredient: false, is_snack: false, is_drink: false }) }).catch(() => {})
+    if (saveSearchToLib) {
+      await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...food, ...categoryToFlags(searchCategory) }) }).catch(() => {})
+    }
     await logEntry(food, sv)
   }
 
@@ -282,7 +286,7 @@ function AddFoodPageInner() {
             {results.length > 0 && !selected && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {results.slice(0, 8).map((r, i) => (
-                  <div key={i} onClick={() => { setSelected(r); setSearchServings('1') }}
+                  <div key={i} onClick={() => { setSelected(r); setSearchServings('1'); setSearchCategory('food') }}
                     style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
                     <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>{r.name}</div>
                     {r.brand && <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{r.brand}</div>}
@@ -318,6 +322,23 @@ function AddFoodPageInner() {
                     </button>
                   )}
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                  <input type="checkbox" id="searchsavelib" checked={saveSearchToLib} onChange={e => setSaveSearchToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '14px', height: '14px' }} />
+                  <label htmlFor="searchsavelib" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>⭐ Save to My Favorites</label>
+                </div>
+                {saveSearchToLib && (
+                  <div style={{ marginBottom: '10px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Category</div>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {FOOD_CATEGORIES.map(c => (
+                        <button key={c.key} type="button" onClick={() => setSearchCategory(c.key)}
+                          style={{ padding: '5px 10px', borderRadius: '16px', border: `1px solid ${searchCategory === c.key ? 'var(--accent-blue)' : 'var(--border)'}`, background: searchCategory === c.key ? 'rgba(0,128,255,0.12)' : 'var(--surface)', color: searchCategory === c.key ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: searchCategory === c.key ? 600 : 400 }}>
+                          {c.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button onClick={() => saveAndLog(selected, parseFloat(searchServings) || 1)} disabled={!!savingSearch}
                     style={{ flex: 1, backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '11px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', opacity: savingSearch ? 0.6 : 1 }}>

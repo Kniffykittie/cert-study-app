@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { MEAL_SLOTS, getDietaryWarnings } from '@/lib/nutritionUtils'
+import { MEAL_SLOTS, getDietaryWarnings, FOOD_CATEGORIES, categoryToFlags } from '@/lib/nutritionUtils'
 import FoodIntelCard from '@/components/nutrition/FoodIntelCard'
 
 const MICRO_KEYS = ['sodium_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg']
@@ -56,6 +56,7 @@ export default function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood,
     vitamin_d_mcg: '', vitamin_b12_mcg: '', vitamin_b6_mg: '', folate_mcg: '',
   })
   const [saveToLib, setSaveToLib] = useState(false)
+  const [searchCategory, setSearchCategory] = useState('food')
   const [saving, setSaving] = useState(false)
   const [savingFood, setSavingFood] = useState(null)
   const [aiFilling, setAiFilling] = useState(false)
@@ -70,6 +71,7 @@ export default function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood,
   function handleQueryChange(val) {
     setQuery(val)
     setSelected(null)
+    setSearchCategory('food')
     clearTimeout(debounceRef.current)
     if (!val.trim()) { setResults([]); return }
     debounceRef.current = setTimeout(async () => {
@@ -143,7 +145,7 @@ export default function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood,
   async function handleAdd() {
     setSaving(true)
     if (libraryOnly || (manualMode && saveToLib)) {
-      const payload = manualMode ? manual : selected
+      const payload = manualMode ? manual : { ...selected, ...categoryToFlags(searchCategory) }
       const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       const data = await res.json()
       if (data.food) onSaveFood(data.food)
@@ -280,6 +282,19 @@ export default function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood,
                   ) : null
                 })()}
                 <FoodIntelCard foodName={selected.name} brand={selected.brand} calories={selected.calories} protein_g={selected.protein_g} carbs_g={selected.carbs_g} fat_g={selected.fat_g} fiber_g={selected.fiber_g} sugar_g={selected.sugar_g} workoutCtx={workoutCtx} />
+                {libraryOnly && (
+                  <div style={{ marginTop: '10px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Category</div>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {FOOD_CATEGORIES.map(c => (
+                        <button key={c.key} type="button" onClick={() => setSearchCategory(c.key)}
+                          style={{ padding: '5px 10px', borderRadius: '16px', border: `1px solid ${searchCategory === c.key ? 'var(--accent-blue)' : 'var(--border)'}`, background: searchCategory === c.key ? 'rgba(0,128,255,0.12)' : 'var(--surface)', color: searchCategory === c.key ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: searchCategory === c.key ? 600 : 400 }}>
+                          {c.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -343,9 +358,11 @@ export default function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood,
                 </div>
               ))}
               {!libraryOnly && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
-                  <input type="checkbox" id="savelib" checked={saveToLib} onChange={e => setSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '16px', height: '16px' }} />
-                  <label htmlFor="savelib" style={{ color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>⭐ Save to My Foods library</label>
+                <div style={{ marginTop: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                    <input type="checkbox" id="savelib" checked={saveToLib} onChange={e => setSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '16px', height: '16px' }} />
+                    <label htmlFor="savelib" style={{ color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>⭐ Save to My Foods library</label>
+                  </div>
                 </div>
               )}
             </div>

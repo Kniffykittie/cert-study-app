@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import BarcodeScannerModal from '@/components/BarcodeScannerModal'
-import { MEAL_SLOTS, MEAL_NUTRITION_KEYS, DV, getDietaryWarnings, categorizeFoods, buildFoodLogEntry } from '@/lib/nutritionUtils'
+import { MEAL_SLOTS, MEAL_NUTRITION_KEYS, DV, getDietaryWarnings, categorizeFoods, buildFoodLogEntry, FOOD_CATEGORIES, categoryToFlags } from '@/lib/nutritionUtils'
 import FoodIntelCard from '@/components/nutrition/FoodIntelCard'
 
 const MICRO_KEYS = ['sodium_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','omega3_g','vitamin_k_mcg','choline_mg']
@@ -68,9 +68,7 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
   const [aiPreview, setAiPreview] = useState(null)
   const [manual, setManual] = useState(BLANK_MANUAL)
   const [manualSaveToLib, setManualSaveToLib] = useState(true)
-  const [manualIsIngredient, setManualIsIngredient] = useState(false)
-  const [manualIsSnack, setManualIsSnack] = useState(false)
-  const [manualIsDrink, setManualIsDrink] = useState(false)
+  const [manualCategory, setManualCategory] = useState('food')
   const [savingManual, setSavingManual] = useState(false)
   const [manualServings, setManualServings] = useState('1')
   const [aiFilling, setAiFilling] = useState(false)
@@ -207,7 +205,7 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
     setSavingManual(true)
     let savedFood = null
     if (manualSaveToLib) {
-      const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...manual, source: 'manual', is_ingredient: manualIsIngredient, is_snack: manualIsSnack, is_drink: manualIsDrink }) })
+      const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...manual, source: 'manual', ...categoryToFlags(manualCategory) }) })
       const data = await res.json()
       if (data.food) { savedFood = data.food; onSaveFood(data.food) }
     }
@@ -461,18 +459,15 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
                 <label htmlFor="mansavelib" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>⭐ Save to My Favorites for quick logging next time</label>
               </div>
               {manualSaveToLib && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <input type="checkbox" id="manisIngredient" checked={manualIsIngredient} onChange={e => { setManualIsIngredient(e.target.checked); if (e.target.checked) { setManualIsSnack(false); setManualIsDrink(false) } }} style={{ accentColor: 'var(--accent-blue)', width: '14px', height: '14px' }} />
-                    <label htmlFor="manisIngredient" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>🥚 This is an ingredient <span style={{ opacity: 0.7 }}>(appears in Meal Builder)</span></label>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <input type="checkbox" id="manisSnack" checked={manualIsSnack} onChange={e => { setManualIsSnack(e.target.checked); if (e.target.checked) { setManualIsIngredient(false); setManualIsDrink(false) } }} style={{ accentColor: 'var(--warning)', width: '14px', height: '14px' }} />
-                    <label htmlFor="manisSnack" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>🍿 This is a snack</label>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <input type="checkbox" id="manisDrink" checked={manualIsDrink} onChange={e => { setManualIsDrink(e.target.checked); if (e.target.checked) { setManualIsIngredient(false); setManualIsSnack(false) } }} style={{ accentColor: 'var(--accent-blue)', width: '14px', height: '14px' }} />
-                    <label htmlFor="manisDrink" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>🥤 This is a drink <span style={{ opacity: 0.7 }}>(appears in Drinks tab)</span></label>
+                <div style={{ paddingLeft: '20px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Category</div>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {FOOD_CATEGORIES.map(c => (
+                      <button key={c.key} type="button" onClick={() => setManualCategory(c.key)}
+                        style={{ padding: '5px 10px', borderRadius: '16px', border: `1px solid ${manualCategory === c.key ? 'var(--accent-blue)' : 'var(--border)'}`, background: manualCategory === c.key ? 'rgba(0,128,255,0.12)' : 'var(--surface)', color: manualCategory === c.key ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: manualCategory === c.key ? 600 : 400 }}>
+                        {c.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}

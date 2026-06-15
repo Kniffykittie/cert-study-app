@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { DV } from '@/lib/nutritionUtils'
+import { DV, FOOD_CATEGORIES, foodToCategory, categoryToFlags } from '@/lib/nutritionUtils'
 
 const ALL_NUM_KEYS = ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g','sodium_mg','saturated_fat_g','trans_fat_g','cholesterol_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','caffeine_mg','water_g','omega3_g','vitamin_k_mcg','choline_mg','phosphorus_mg','chloride_mg','manganese_mg','selenium_mcg','chromium_mcg','copper_mg','iodine_mcg','biotin_mcg','pantothenic_acid_mg','niacin_mg','thiamine_mg','riboflavin_mg']
 
@@ -60,6 +60,7 @@ export default function EditFoodModal({ food, onClose, onSave }) {
     return obj
   }
   const [form, setForm] = useState(() => toForm(food))
+  const [category, setCategory] = useState(() => foodToCategory(food))
   const [saving, setSaving] = useState(false)
   const [microFilling, setMicroFilling] = useState(false)
   const [aiFilledFields, setAiFilledFields] = useState(new Set())
@@ -118,7 +119,7 @@ export default function EditFoodModal({ food, onClose, onSave }) {
   async function handleSave() {
     if (!form.name.trim()) return
     setSaving(true)
-    const body = { id: food.id, name: form.name, brand: form.brand || null, serving_size_label: form.serving_size_label || '1 serving', servings_per_container: form.servings_per_container !== '' ? parseFloat(form.servings_per_container) : null }
+    const body = { id: food.id, name: form.name, brand: form.brand || null, serving_size_label: form.serving_size_label || '1 serving', servings_per_container: form.servings_per_container !== '' ? parseFloat(form.servings_per_container) : null, ...categoryToFlags(category) }
     for (const k of ALL_NUM_KEYS) body[k] = form[k] !== '' ? Number(form[k]) || null : null
     const res = await fetch('/api/nutrition/my-foods', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const data = await res.json()
@@ -178,6 +179,19 @@ export default function EditFoodModal({ food, onClose, onSave }) {
                   style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px' }} />
               </div>
             ))}
+          </div>
+
+          {/* Category picker */}
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Category</div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {FOOD_CATEGORIES.map(c => (
+                <button key={c.key} type="button" onClick={() => setCategory(c.key)}
+                  style={{ padding: '5px 10px', borderRadius: '16px', border: `1px solid ${category === c.key ? 'var(--accent-blue)' : 'var(--border)'}`, background: category === c.key ? 'rgba(0,128,255,0.12)' : 'var(--surface)', color: category === c.key ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: category === c.key ? 600 : 400 }}>
+                  {c.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Macros */}
