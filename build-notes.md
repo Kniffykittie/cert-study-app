@@ -381,6 +381,9 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Phase 67c — Audit cleanup — Complete
+- `water/page.js`: Removed dead `quickLogSavedDrink` function (direct-log bypass left over from before Phase 67; never called — all drink logging now goes through LogConfirmModal)
+
 ### Phase 67b — UX Fixes (Build a Meal button + libraryOnly saved foods) — Complete
 - `nutrition/page.js`: Added "🍳 Build a Meal" button above SavedFoodsTab on My Favorites tab; calls `setMealBuilderModal(true)` directly so user can always access MealBuilderModal without going through AddFoodModal
 - `SearchModal.js`: Hide "⭐ Saved Foods" section when `libraryOnly=true` — prevents already-saved foods from appearing when user is adding new foods to their library

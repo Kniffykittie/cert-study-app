@@ -400,33 +400,6 @@ export default function DrinksHydrationPage() {
     }, 400)
   }
 
-  async function quickLogSavedDrink(drink) {
-    setLoggingDrink(true)
-    const body = {
-      date: today,
-      meal_slot: 'drink',
-      name: drink.name,
-      brand: drink.brand || null,
-      serving_size_label: drink.serving_size_label || '1 serving',
-      servings: 1,
-      source: 'my_foods',
-      my_food_id: drink.id,
-    }
-    for (const k of MEAL_NUTRITION_KEYS) {
-      if (drink[k] != null) body[k] = drink[k]
-    }
-    const res = await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    const data = await res.json()
-    if (data.entry) {
-      setDrinkEntries(prev => [...prev, data.entry].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)))
-      if (drink.water_g) {
-        const ozAdded = drink.water_g * 0.0338
-        setWeek(prev => prev.map(d => d.date === today ? { ...d, oz: d.oz + ozAdded } : d))
-      }
-    }
-    setLoggingDrink(false)
-  }
-
   function openEditLogModal(entry) {
     const sv = entry.servings || 1
     setEditLogModal(entry)
