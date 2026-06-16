@@ -1,9 +1,68 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { MEAL_SLOTS, getDietaryWarnings, FOOD_CATEGORIES, categoryToFlags } from '@/lib/nutritionUtils'
+import { MEAL_SLOTS, getDietaryWarnings, FOOD_CATEGORIES, categoryToFlags, DV } from '@/lib/nutritionUtils'
 import FoodIntelCard from '@/components/nutrition/FoodIntelCard'
 
 const MICRO_KEYS = ['sodium_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg']
+
+const NUTRIENT_GROUPS = [
+  { label: 'Minerals', color: '#60a5fa', keys: [
+    { key: 'sodium_mg', label: 'Sodium', unit: 'mg' },
+    { key: 'chloride_mg', label: 'Chloride', unit: 'mg' },
+    { key: 'potassium_mg', label: 'Potassium', unit: 'mg' },
+    { key: 'calcium_mg', label: 'Calcium', unit: 'mg' },
+    { key: 'phosphorus_mg', label: 'Phosphorus', unit: 'mg' },
+    { key: 'iron_mg', label: 'Iron', unit: 'mg' },
+    { key: 'magnesium_mg', label: 'Magnesium', unit: 'mg' },
+    { key: 'zinc_mg', label: 'Zinc', unit: 'mg' },
+    { key: 'copper_mg', label: 'Copper', unit: 'mg' },
+    { key: 'manganese_mg', label: 'Manganese', unit: 'mg' },
+    { key: 'selenium_mcg', label: 'Selenium', unit: 'mcg' },
+    { key: 'chromium_mcg', label: 'Chromium', unit: 'mcg' },
+    { key: 'iodine_mcg', label: 'Iodine', unit: 'mcg' },
+  ]},
+  { label: 'Vitamins', color: '#a78bfa', keys: [
+    { key: 'vitamin_a_mcg', label: 'Vitamin A', unit: 'mcg' },
+    { key: 'vitamin_c_mg', label: 'Vitamin C', unit: 'mg' },
+    { key: 'vitamin_d_mcg', label: 'Vitamin D', unit: 'mcg' },
+    { key: 'thiamine_mg', label: 'B1 / Thiamine', unit: 'mg' },
+    { key: 'riboflavin_mg', label: 'B2 / Riboflavin', unit: 'mg' },
+    { key: 'niacin_mg', label: 'B3 / Niacin', unit: 'mg' },
+    { key: 'pantothenic_acid_mg', label: 'B5 / Pantothenic', unit: 'mg' },
+    { key: 'vitamin_b6_mg', label: 'B6', unit: 'mg' },
+    { key: 'biotin_mcg', label: 'B7 / Biotin', unit: 'mcg' },
+    { key: 'folate_mcg', label: 'Folate', unit: 'mcg' },
+    { key: 'vitamin_b12_mcg', label: 'B12', unit: 'mcg' },
+    { key: 'vitamin_k_mcg', label: 'Vitamin K', unit: 'mcg' },
+    { key: 'omega3_g', label: 'Omega-3', unit: 'g' },
+    { key: 'choline_mg', label: 'Choline', unit: 'mg' },
+  ]},
+  { label: 'Other', color: '#34d399', keys: [
+    { key: 'fiber_g', label: 'Fiber', unit: 'g' },
+    { key: 'sugar_g', label: 'Sugar', unit: 'g' },
+    { key: 'saturated_fat_g', label: 'Saturated Fat', unit: 'g' },
+    { key: 'trans_fat_g', label: 'Trans Fat', unit: 'g' },
+    { key: 'cholesterol_mg', label: 'Cholesterol', unit: 'mg' },
+    { key: 'caffeine_mg', label: 'Caffeine', unit: 'mg' },
+    { key: 'water_g', label: 'Water', unit: 'g' },
+  ]},
+]
+
+const ALL_MICRO_META = Object.fromEntries(
+  NUTRIENT_GROUPS.flatMap(g => g.keys.map(n => [n.key, { ...n, groupLabel: g.label, groupColor: g.color }]))
+)
+
+const EMPTY_MANUAL = {
+  name: '', brand: '', serving_size_label: '1 serving',
+  calories: '', protein_g: '', carbs_g: '', fat_g: '',
+  fiber_g: '', sugar_g: '', sodium_mg: '', saturated_fat_g: '', trans_fat_g: '', cholesterol_mg: '',
+  potassium_mg: '', calcium_mg: '', iron_mg: '', magnesium_mg: '', zinc_mg: '',
+  vitamin_a_mcg: '', vitamin_c_mg: '', vitamin_d_mcg: '', vitamin_b12_mcg: '',
+  vitamin_b6_mg: '', folate_mcg: '', caffeine_mg: '', water_g: '',
+  omega3_g: '', vitamin_k_mcg: '', choline_mg: '', phosphorus_mg: '', chloride_mg: '',
+  manganese_mg: '', selenium_mcg: '', chromium_mcg: '', copper_mg: '', iodine_mcg: '',
+  biotin_mcg: '', pantothenic_acid_mg: '', niacin_mg: '', thiamine_mg: '', riboflavin_mg: '',
+}
 
 function FoodRow({ food, selected, onSelect, isSaved, onSave, savingId, dietaryWarnings }) {
   const cal = food.calories ? Math.round(food.calories) : '?'
@@ -48,15 +107,13 @@ export default function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood,
   const [selected, setSelected] = useState(null)
   const [servings, setServings] = useState('1')
   const [manualMode, setManualMode] = useState(false)
-  const [manual, setManual] = useState({
-    name: '', brand: '', serving_size_label: '1 serving',
-    calories: '', protein_g: '', carbs_g: '', fat_g: '', fiber_g: '', sugar_g: '', sodium_mg: '',
-    saturated_fat_g: '', trans_fat_g: '', cholesterol_mg: '', potassium_mg: '', calcium_mg: '',
-    iron_mg: '', magnesium_mg: '', zinc_mg: '', vitamin_a_mcg: '', vitamin_c_mg: '',
-    vitamin_d_mcg: '', vitamin_b12_mcg: '', vitamin_b6_mg: '', folate_mcg: '',
-  })
+  const [manual, setManual] = useState(EMPTY_MANUAL)
   const [saveToLib, setSaveToLib] = useState(false)
   const [searchCategory, setSearchCategory] = useState('food')
+  const [manualCategory, setManualCategory] = useState('food')
+  const [activeNutrients, setActiveNutrients] = useState(new Set())
+  const [dvMode, setDvMode] = useState(false)
+  const [showPicker, setShowPicker] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savingFood, setSavingFood] = useState(null)
   const [aiFilling, setAiFilling] = useState(false)
@@ -107,6 +164,11 @@ export default function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood,
     }
     setManual(filled)
     setAiEstimatedFields(estimated)
+    const newActive = new Set()
+    for (const k of Object.keys(ALL_MICRO_META)) {
+      if (filled[k] && filled[k] !== '') newActive.add(k)
+    }
+    setActiveNutrients(newActive)
     setManualMode(true)
   }
 
@@ -127,7 +189,84 @@ export default function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood,
     }
     setManual(filled)
     setAiEstimatedFields(estimated)
+    const newActive = new Set(activeNutrients)
+    for (const k of MICRO_KEYS) {
+      if (filled[k] && filled[k] !== '') newActive.add(k)
+    }
+    setActiveNutrients(newActive)
     setManualMode(true)
+  }
+
+  function addManualNutrient(key) {
+    setActiveNutrients(s => new Set([...s, key]))
+    setShowPicker(false)
+  }
+
+  function removeManualNutrient(key) {
+    setActiveNutrients(s => { const n = new Set(s); n.delete(key); return n })
+    setManual(m => ({ ...m, [key]: '' }))
+    setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n })
+  }
+
+  function manualFieldRow(key) {
+    const meta = ALL_MICRO_META[key]
+    if (!meta) return null
+    const hasDV = dvMode && DV[key] != null
+    const rawVal = manual[key]
+    const displayVal = hasDV && rawVal !== '' && rawVal != null ? String(+(parseFloat(rawVal) / DV[key] * 100).toFixed(1)) : (rawVal || '')
+    const displayLabel = hasDV ? `${meta.label} (% DV, ${DV[key]}${meta.unit})` : `${meta.label}${meta.unit ? ` (${meta.unit})` : ''}`
+    const hasValue = rawVal !== '' && rawVal != null
+    const hint = hasValue
+      ? (!dvMode && DV[key] != null ? `= ${Math.round(parseFloat(rawVal) / DV[key] * 100)}% DV` : dvMode && DV[key] != null ? `= ${Math.round(parseFloat(rawVal) * DV[key] / 100 * 10) / 10}${meta.unit}` : null)
+      : null
+    const isAI = aiEstimatedFields.has(key)
+    return (
+      <div key={key} style={{ display: 'grid', gridTemplateColumns: '1fr auto 28px', alignItems: 'start', gap: '8px', marginBottom: '6px' }}>
+        <label style={{ color: isAI ? 'var(--warning)' : 'var(--text-secondary)', fontSize: '12px', paddingTop: '7px' }}>
+          {displayLabel}{isAI ? ' 🤖' : ''}
+        </label>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+          <input type="number" value={displayVal} placeholder="0" min="0" step={hasDV ? '1' : 'any'}
+            onChange={e => {
+              const raw = e.target.value
+              const actual = hasDV && raw !== '' ? String(Math.round(parseFloat(raw) * DV[key] / 100 * 10) / 10) : raw
+              setManual(m => ({ ...m, [key]: actual }))
+              setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n })
+            }}
+            style={{ width: '90px', backgroundColor: isAI ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: isAI ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: isAI ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px', textAlign: 'right' }} />
+          {hint && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{hint}</div>}
+        </div>
+        <button onClick={() => removeManualNutrient(key)} title="Remove"
+          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '15px', cursor: 'pointer', padding: 0, lineHeight: 1, opacity: 0.5, paddingTop: '5px' }}>×</button>
+      </div>
+    )
+  }
+
+  async function handleManualMicroFill() {
+    if (microFilling || !manual.name.trim()) return
+    setMicroFilling(true)
+    const res = await fetch('/api/nutrition/ai-micro-fill', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: manual.name, brand: manual.brand, calories: manual.calories, protein_g: manual.protein_g, carbs_g: manual.carbs_g, fat_g: manual.fat_g }),
+    })
+    const data = await res.json()
+    setMicroFilling(false)
+    if (!data.micros) return
+    const estimated = new Set(aiEstimatedFields)
+    const newActive = new Set(activeNutrients)
+    setManual(prev => {
+      const next = { ...prev }
+      for (const k of Object.keys(ALL_MICRO_META)) {
+        if (data.micros[k] != null && (prev[k] === '' || prev[k] == null)) {
+          next[k] = String(data.micros[k])
+          estimated.add(k)
+          newActive.add(k)
+        }
+      }
+      return next
+    })
+    setAiEstimatedFields(estimated)
+    setActiveNutrients(newActive)
   }
 
   function parseGramWeight(label) {
@@ -145,13 +284,17 @@ export default function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood,
   async function handleAdd() {
     setSaving(true)
     if (libraryOnly || (manualMode && saveToLib)) {
-      const payload = manualMode ? manual : { ...selected, ...categoryToFlags(searchCategory) }
+      const payload = manualMode ? { ...manual, ...categoryToFlags(manualCategory) } : { ...selected, ...categoryToFlags(searchCategory) }
       const res = await fetch('/api/nutrition/my-foods', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       const data = await res.json()
       if (data.food) onSaveFood(data.food)
       setSaving(false)
       if (libraryOnly && manualMode) {
-        setManual({ name: '', brand: '', serving_size_label: '1 serving', calories: '', protein_g: '', carbs_g: '', fat_g: '', fiber_g: '', sugar_g: '', sodium_mg: '', saturated_fat_g: '', trans_fat_g: '', cholesterol_mg: '', potassium_mg: '', calcium_mg: '', iron_mg: '', magnesium_mg: '', zinc_mg: '', vitamin_a_mcg: '', vitamin_c_mg: '', vitamin_d_mcg: '', vitamin_b12_mcg: '', vitamin_b6_mg: '', folate_mcg: '' })
+        setManual(EMPTY_MANUAL)
+        setActiveNutrients(new Set())
+        setDvMode(false)
+        setShowPicker(false)
+        setManualCategory('food')
         setManualMode(false)
       } else {
         onClose()
@@ -319,54 +462,95 @@ export default function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood,
             ) : (
               <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 14px' }}>Fill in what you know — everything except Name is optional.</p>
             )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {[
-                { key: 'name', label: 'Name *' }, { key: 'brand', label: 'Brand' },
-                { key: 'serving_size_label', label: 'Serving Size' },
-              ].map(({ key, label }) => (
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '12px' }}>
+              {[{ key: 'name', label: 'Name *' }, { key: 'brand', label: 'Brand' }, { key: 'serving_size_label', label: 'Serving Size' }].map(({ key, label }) => (
                 <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
                   <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                  <input type="text" value={manual[key]} placeholder={key === 'serving_size_label' ? '1 cup (240ml)' : ''} onChange={e => { setManual(m => ({ ...m, [key]: e.target.value })); setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n }) }}
-                    style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
+                  <input type="text" value={manual[key]} placeholder={key === 'serving_size_label' ? '1 cup (240ml)' : ''}
+                    onChange={e => { setManual(m => ({ ...m, [key]: e.target.value })); setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n }) }}
+                    style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
                 </div>
               ))}
-              <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Main Macros</div>
-              {['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g'].map(key => {
-                const labels = { calories: 'Calories', protein_g: 'Protein (g)', carbs_g: 'Carbs (g)', fat_g: 'Fat (g)', fiber_g: 'Fiber (g)', sugar_g: 'Sugar (g)' }
-                return (
-                  <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
-                    <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{labels[key]}</label>
-                    <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => { setManual(m => ({ ...m, [key]: e.target.value })); setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n }) }}
-                      style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
-                  </div>
-                )
-              })}
-              {[
-                { section: 'Fats & Cholesterol', fields: [{ key: 'saturated_fat_g', label: 'Saturated Fat (g)' }, { key: 'trans_fat_g', label: 'Trans Fat (g)' }, { key: 'cholesterol_mg', label: 'Cholesterol (mg)' }] },
-                { section: 'Minerals', fields: [{ key: 'sodium_mg', label: 'Sodium (mg)' }, { key: 'potassium_mg', label: 'Potassium (mg)' }, { key: 'calcium_mg', label: 'Calcium (mg)' }, { key: 'iron_mg', label: 'Iron (mg)' }, { key: 'magnesium_mg', label: 'Magnesium (mg)' }, { key: 'zinc_mg', label: 'Zinc (mg)' }] },
-                { section: 'Vitamins', fields: [{ key: 'vitamin_a_mcg', label: 'Vitamin A (mcg)' }, { key: 'vitamin_c_mg', label: 'Vitamin C (mg)' }, { key: 'vitamin_d_mcg', label: 'Vitamin D (mcg)' }, { key: 'vitamin_b12_mcg', label: 'Vitamin B12 (mcg)' }, { key: 'vitamin_b6_mg', label: 'Vitamin B6 (mg)' }, { key: 'folate_mcg', label: 'Folate (mcg)' }] },
-              ].map(({ section, fields }) => (
-                <div key={section}>
-                  <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{section}</div>
-                  {fields.map(({ key, label }) => (
-                    <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                      <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                      <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0" onChange={e => { setManual(m => ({ ...m, [key]: e.target.value })); setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n }) }}
-                        style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
-                    </div>
-                  ))}
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Category</div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {FOOD_CATEGORIES.map(c => (
+                  <button key={c.key} type="button" onClick={() => setManualCategory(c.key)}
+                    style={{ padding: '5px 10px', borderRadius: '16px', border: `1px solid ${manualCategory === c.key ? 'var(--accent-blue)' : 'var(--border)'}`, background: manualCategory === c.key ? 'rgba(0,128,255,0.12)' : 'var(--surface)', color: manualCategory === c.key ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: manualCategory === c.key ? 600 : 400 }}>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Macros</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+              {[{ key: 'calories', label: 'Calories' }, { key: 'protein_g', label: 'Protein (g)' }, { key: 'carbs_g', label: 'Carbs (g)' }, { key: 'fat_g', label: 'Fat (g)' }].map(({ key, label }) => (
+                <div key={key}>
+                  <label style={{ color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-secondary)', fontSize: '11px', display: 'block', marginBottom: '3px' }}>{label}{aiEstimatedFields.has(key) ? ' 🤖' : ''}</label>
+                  <input type="number" value={manual[key]} placeholder="0" min="0" step="any"
+                    onChange={e => { setManual(m => ({ ...m, [key]: e.target.value })); setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n }) }}
+                    style={{ width: '100%', boxSizing: 'border-box', backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
                 </div>
               ))}
-              {!libraryOnly && (
-                <div style={{ marginTop: '6px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                    <input type="checkbox" id="savelib" checked={saveToLib} onChange={e => setSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '16px', height: '16px' }} />
-                    <label htmlFor="savelib" style={{ color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>⭐ Save to My Foods library</label>
-                  </div>
+            </div>
+
+            {activeNutrients.size > 0 && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Micronutrients</div>
+                  <button type="button" onClick={() => setDvMode(m => !m)}
+                    style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: `1px solid ${dvMode ? 'var(--accent-blue)' : 'var(--border)'}`, background: 'var(--surface)', color: dvMode ? 'var(--accent-blue)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>
+                    {dvMode ? 'mg' : '% DV'}
+                  </button>
+                </div>
+                {[...activeNutrients].map(key => manualFieldRow(key))}
+              </>
+            )}
+
+            <div style={{ marginTop: '10px' }}>
+              <button onClick={() => setShowPicker(v => !v)}
+                style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', color: 'var(--accent-blue)', cursor: 'pointer', fontWeight: '600', width: '100%' }}>
+                {showPicker ? '▲ Close picker' : `+ Add ${activeNutrients.size > 0 ? 'more ' : ''}nutrients`}
+              </button>
+              {showPicker && (
+                <div style={{ marginTop: '10px', backgroundColor: 'var(--background)', borderRadius: '10px', padding: '12px', border: '1px solid var(--border)' }}>
+                  {NUTRIENT_GROUPS.map(group => {
+                    const available = group.keys.filter(n => !activeNutrients.has(n.key))
+                    if (available.length === 0) return null
+                    return (
+                      <div key={group.label} style={{ marginBottom: '10px' }}>
+                        <div style={{ fontSize: '10px', fontWeight: '700', color: group.color, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>{group.label}</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                          {available.map(n => (
+                            <button key={n.key} onClick={() => addManualNutrient(n.key)}
+                              style={{ padding: '4px 10px', borderRadius: '20px', border: `1px solid ${group.color}40`, backgroundColor: `${group.color}10`, color: group.color, fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>
+                              + {n.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
+
+            {!libraryOnly && (
+              <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input type="checkbox" id="savelib" checked={saveToLib} onChange={e => setSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '16px', height: '16px' }} />
+                <label htmlFor="savelib" style={{ color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>⭐ Save to My Foods library</label>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '10px', marginTop: '18px' }}>
+              <button onClick={handleManualMicroFill} disabled={microFilling || !manual.name.trim()}
+                style={{ backgroundColor: 'rgba(167,139,250,0.12)', color: 'var(--accent-purple)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', fontWeight: '600', cursor: (microFilling || !manual.name.trim()) ? 'default' : 'pointer', opacity: (microFilling || !manual.name.trim()) ? 0.5 : 1, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                {microFilling ? '🤖 Filling...' : '🤖 AI Fill'}
+              </button>
               <button onClick={() => setManualMode(false)}
                 style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>← Back</button>
               <button onClick={handleAdd} disabled={!manual.name.trim() || saving}

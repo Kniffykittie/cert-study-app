@@ -273,7 +273,7 @@ src/
       SavedFoodsTab.js               My Favorites tab — pinned/today/week/older/never groups, direct log flow, pin/edit/delete
       NutrientBars.js                Micronutrient stacked bars (food + supplement segments, color-coded by % DV)
       MealBuilderModal.js            Meal recipe builder — ingredient search, custom ingredients, save as recipe
-      SearchModal.js                 OFFs search + manual entry + AI fill + AI micro-fill; dietary warning chips
+      SearchModal.js                 OFFs search + manual entry + AI fill + AI micro-fill; dietary warning chips; manual form uses chip picker UI matching EditFoodModal (NUTRIENT_GROUPS, ALL_MICRO_META, dvMode toggle, per-field remove, manualCategory picker)
       AddFoodModal.js                3-tab add-food modal (⭐ Favorites | ✏️ Manual | 🔍 Search); Favorites has sub-tabs (All | Foods & Meals | Drinks | Snacks | Ingredients) with counts; smart default tab based on meal slot; last sub-tab persisted to localStorage; manual entry has Drink checkbox
     StudyHubSidebar.js                 Nav sidebar with test-in-progress guard
     LifeHubSidebar.js                  Life Hub nav — section color system (overview=purple, health=green, nutrition=orange, workouts=blue, goals=teal); Overview section (Dashboard + Monthly Wrap), Goals dropdown (Overview + Measurements + Setup), Health dropdown (Overview + Step Tracker + Heart Rate + Sleep Tracker), Nutrition dropdown (Food Log + Meal Plan + Encyclopedia + Hydration + Supplements), Workouts dropdown (My Plan + History + Exercise Library + Stretching & Mobility + Stretch Library); Hydration and Supplements live under Nutrition group; auto-opens on active routes; SECTION_COLORS constant defines all section accent colors
