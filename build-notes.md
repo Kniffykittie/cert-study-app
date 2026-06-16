@@ -766,6 +766,9 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 - Weight-to-servings input (type total grams → servings auto-calculates)
 - My Favorites sorted: pinned → recent → log count → name; section dividers; 📌 pin; ↺ quick-repeat; frequency insight
 
+### Phase 48c - Complete
+- **AddFoodModal manual tab upgraded to chip-picker UI matching EditFoodModal**: replaced collapsed "▼ Show fiber, sodium & micronutrients" section with full chip picker (Minerals/Vitamins/Other groups); 2-column macro grid; DV%/mg toggle appears inline only when micros are active; category selector always visible (moved above macros); AI Fill now activates nutrient chips for any estimated micro fields; `NUTRIENT_GROUPS` + `ALL_MICRO_META` constants added at module level
+
 ### Phase 48b - Complete
 - **AddFoodModal rewritten with 3 equal tabs**: "⭐ My Favorites" | "✏️ Enter Manually" | "🔍 Search Database" — manual entry is now first-class
 - **Create a Meal moved into AddFoodModal**: footer link on My Favorites tab

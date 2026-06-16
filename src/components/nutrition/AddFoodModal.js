@@ -8,6 +8,53 @@ import LogConfirmModal from '@/components/nutrition/LogConfirmModal'
 
 const MICRO_KEYS = ['sodium_mg','potassium_mg','calcium_mg','iron_mg','magnesium_mg','zinc_mg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','vitamin_b12_mcg','vitamin_b6_mg','folate_mcg','omega3_g','vitamin_k_mcg','choline_mg']
 
+const NUTRIENT_GROUPS = [
+  { label: 'Minerals', color: '#60a5fa', keys: [
+    { key: 'sodium_mg', label: 'Sodium', unit: 'mg' },
+    { key: 'chloride_mg', label: 'Chloride', unit: 'mg' },
+    { key: 'potassium_mg', label: 'Potassium', unit: 'mg' },
+    { key: 'calcium_mg', label: 'Calcium', unit: 'mg' },
+    { key: 'phosphorus_mg', label: 'Phosphorus', unit: 'mg' },
+    { key: 'iron_mg', label: 'Iron', unit: 'mg' },
+    { key: 'magnesium_mg', label: 'Magnesium', unit: 'mg' },
+    { key: 'zinc_mg', label: 'Zinc', unit: 'mg' },
+    { key: 'copper_mg', label: 'Copper', unit: 'mg' },
+    { key: 'manganese_mg', label: 'Manganese', unit: 'mg' },
+    { key: 'selenium_mcg', label: 'Selenium', unit: 'mcg' },
+    { key: 'chromium_mcg', label: 'Chromium', unit: 'mcg' },
+    { key: 'iodine_mcg', label: 'Iodine', unit: 'mcg' },
+  ]},
+  { label: 'Vitamins', color: '#a78bfa', keys: [
+    { key: 'vitamin_a_mcg', label: 'Vitamin A', unit: 'mcg' },
+    { key: 'vitamin_c_mg', label: 'Vitamin C', unit: 'mg' },
+    { key: 'vitamin_d_mcg', label: 'Vitamin D', unit: 'mcg' },
+    { key: 'thiamine_mg', label: 'B1 / Thiamine', unit: 'mg' },
+    { key: 'riboflavin_mg', label: 'B2 / Riboflavin', unit: 'mg' },
+    { key: 'niacin_mg', label: 'B3 / Niacin', unit: 'mg' },
+    { key: 'pantothenic_acid_mg', label: 'B5 / Pantothenic', unit: 'mg' },
+    { key: 'vitamin_b6_mg', label: 'B6', unit: 'mg' },
+    { key: 'biotin_mcg', label: 'B7 / Biotin', unit: 'mcg' },
+    { key: 'folate_mcg', label: 'Folate', unit: 'mcg' },
+    { key: 'vitamin_b12_mcg', label: 'B12', unit: 'mcg' },
+    { key: 'vitamin_k_mcg', label: 'Vitamin K', unit: 'mcg' },
+    { key: 'omega3_g', label: 'Omega-3', unit: 'g' },
+    { key: 'choline_mg', label: 'Choline', unit: 'mg' },
+  ]},
+  { label: 'Other', color: '#34d399', keys: [
+    { key: 'fiber_g', label: 'Fiber', unit: 'g' },
+    { key: 'sugar_g', label: 'Sugar', unit: 'g' },
+    { key: 'saturated_fat_g', label: 'Saturated Fat', unit: 'g' },
+    { key: 'trans_fat_g', label: 'Trans Fat', unit: 'g' },
+    { key: 'cholesterol_mg', label: 'Cholesterol', unit: 'mg' },
+    { key: 'caffeine_mg', label: 'Caffeine', unit: 'mg' },
+    { key: 'water_g', label: 'Water', unit: 'g' },
+  ]},
+]
+
+const ALL_MICRO_META = Object.fromEntries(
+  NUTRIENT_GROUPS.flatMap(g => g.keys.map(n => [n.key, { ...n, groupLabel: g.label, groupColor: g.color }]))
+)
+
 const BLANK_MANUAL = {
   name: '', brand: '', serving_size_label: '1 serving',
   calories: '', protein_g: '', carbs_g: '', fat_g: '', fiber_g: '', sugar_g: '', sodium_mg: '',
@@ -79,7 +126,8 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
   const [aiFilling, setAiFilling] = useState(false)
   const [aiEstimatedFields, setAiEstimatedFields] = useState(new Set())
   const [microFilling, setMicroFilling] = useState(false)
-  const [showOptionalFields, setShowOptionalFields] = useState(false)
+  const [manualActiveNutrients, setManualActiveNutrients] = useState(new Set())
+  const [showManualPicker, setShowManualPicker] = useState(false)
   const [searchGramInput, setSearchGramInput] = useState('')
   const [dvMode, setDvMode] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
@@ -89,6 +137,46 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
   function parseGramWeight(label) {
     const m = label?.match(/\((\d+(?:\.\d+)?)\s*g\)/i)
     return m ? parseFloat(m[1]) : null
+  }
+
+  function addManualNutrient(key) {
+    setManualActiveNutrients(s => new Set([...s, key]))
+    setShowManualPicker(false)
+  }
+
+  function removeManualNutrient(key) {
+    setManualActiveNutrients(s => { const n = new Set(s); n.delete(key); return n })
+    setManual(m => ({ ...m, [key]: '' }))
+  }
+
+  function manualMicroFieldRow(key) {
+    const meta = ALL_MICRO_META[key]
+    if (!meta) return null
+    const hasDV = dvMode && DV[key] != null
+    const rawVal = manual[key]
+    const displayVal = hasDV && rawVal !== '' && rawVal != null ? String(+(parseFloat(rawVal) / DV[key] * 100).toFixed(1)) : (rawVal || '')
+    const displayLabel = hasDV ? `${meta.label} (% DV, ${DV[key]}${meta.unit})` : `${meta.label}${meta.unit ? ` (${meta.unit})` : ''}`
+    const hasValue = rawVal !== '' && rawVal != null
+    const hint = hasValue
+      ? (!dvMode && DV[key] != null ? `= ${Math.round(parseFloat(rawVal) / DV[key] * 100)}% DV` : dvMode && DV[key] != null ? `= ${Math.round(parseFloat(rawVal) * DV[key] / 100 * 10) / 10}${meta.unit}` : null)
+      : null
+    return (
+      <div key={key} style={{ display: 'grid', gridTemplateColumns: '1fr auto 28px', alignItems: 'start', gap: '8px', marginBottom: '6px' }}>
+        <label style={{ color: 'var(--text-secondary)', fontSize: '12px', paddingTop: '7px' }}>{displayLabel}</label>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+          <input type="number" value={displayVal} placeholder="0" min="0" step={hasDV ? '1' : 'any'}
+            onChange={e => {
+              const raw = e.target.value
+              const actual = hasDV && raw !== '' ? String(Math.round(parseFloat(raw) * DV[key] / 100 * 10) / 10) : raw
+              setManual(m => ({ ...m, [key]: actual }))
+            }}
+            style={{ width: '90px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'right' }} />
+          {hint && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{hint}</div>}
+        </div>
+        <button onClick={() => removeManualNutrient(key)} title="Remove"
+          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '15px', cursor: 'pointer', padding: 0, lineHeight: 1, opacity: 0.5, paddingTop: '5px' }}>×</button>
+      </div>
+    )
   }
 
   const mealInfo = MEAL_SLOTS.find(m => m.key === slot)
@@ -144,8 +232,13 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
     for (const f of numFields) {
       if (fill[f] != null) { filled[f] = String(fill[f]); estimated.add(f) }
     }
+    const activeMicros = new Set()
+    for (const k of Object.keys(ALL_MICRO_META)) {
+      if (filled[k] !== '' && filled[k] != null) activeMicros.add(k)
+    }
     setManual(filled)
     setAiEstimatedFields(estimated)
+    setManualActiveNutrients(activeMicros)
     setAiPreview(filled)
   }
 
@@ -166,8 +259,13 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
     for (const k of MICRO_KEYS) {
       if (data.micros[k] != null && food[k] == null) { filled[k] = String(data.micros[k]); estimated.add(k) }
     }
+    const activeMicros = new Set()
+    for (const k of Object.keys(ALL_MICRO_META)) {
+      if (filled[k] !== '' && filled[k] != null) activeMicros.add(k)
+    }
     setManual(filled)
     setAiEstimatedFields(estimated)
+    setManualActiveNutrients(activeMicros)
     setManualSaveToLib(true)
     setTab('manual')
   }
@@ -360,14 +458,7 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
                 <button onClick={() => setAiEstimatedFields(new Set())} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer', flexShrink: 0, padding: 0, lineHeight: 1 }}>×</button>
               </div>
             ) : null}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>Only Name is required.</p>
-              <button onClick={() => setDvMode(d => !d)}
-                style={{ background: 'none', border: `1px solid ${dvMode ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '6px', padding: '3px 9px', fontSize: '11px', color: dvMode ? 'var(--accent-blue)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>
-                {dvMode ? '% DV mode' : 'Amount mode'}
-              </button>
-            </div>
-            {dvMode && <p style={{ color: 'var(--text-secondary)', fontSize: '11px', margin: '-8px 0 10px', opacity: 0.8 }}>Enter % of Daily Value for supported fields. Other fields stay as amounts.</p>}
+            <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 12px' }}>Only Name is required.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {[{ key: 'name', label: 'Name *', type: 'text' }, { key: 'brand', label: 'Brand', type: 'text' }, { key: 'serving_size_label', label: 'Serving Size', type: 'text' }].map(({ key, label, type }) => (
                 <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
@@ -376,79 +467,76 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
                     style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
                 </div>
               ))}
+              <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Category</div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {FOOD_CATEGORIES.map(c => (
+                  <button key={c.key} type="button" onClick={() => setManualCategory(c.key)}
+                    style={{ padding: '5px 10px', borderRadius: '16px', border: `1px solid ${manualCategory === c.key ? 'var(--accent-blue)' : 'var(--border)'}`, background: manualCategory === c.key ? 'rgba(0,128,255,0.12)' : 'var(--surface)', color: manualCategory === c.key ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: manualCategory === c.key ? 600 : 400 }}>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
               <div style={{ margin: '4px 0 2px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Macros</div>
-              {[{ key: 'calories', label: 'Calories' }, { key: 'protein_g', label: 'Protein (g)' }, { key: 'carbs_g', label: 'Carbs (g)' }, { key: 'fat_g', label: 'Fat (g)' }].map(({ key, label }) => {
-                const hasDV = dvMode && DV[key] != null
-                const displayVal = hasDV && manual[key] !== '' ? String(Math.round((parseFloat(manual[key]) / DV[key]) * 100)) : manual[key]
-                return (
-                  <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
-                    <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                    <input type="number" min="0" step={hasDV ? '1' : '0.1'} value={hasDV ? displayVal : manual[key]} placeholder="0"
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                {[{ key: 'calories', label: 'Calories' }, { key: 'protein_g', label: 'Protein (g)' }, { key: 'carbs_g', label: 'Carbs (g)' }, { key: 'fat_g', label: 'Fat (g)' }].map(({ key, label }) => (
+                  <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <label style={{ color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
+                    <input type="number" min="0" step="0.1" value={manual[key]} placeholder="0"
                       onChange={e => {
-                        const raw = e.target.value
-                        const stored = hasDV && raw !== '' ? String(Math.round((parseFloat(raw) / 100) * DV[key] * 10) / 10) : raw
-                        setManual(m => ({ ...m, [key]: stored }))
+                        setManual(m => ({ ...m, [key]: e.target.value }))
                         setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n })
                       }}
                       style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
                   </div>
-                )
-              })}
-              <button type="button" onClick={() => setShowOptionalFields(v => !v)}
-                style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', padding: '4px 0', textAlign: 'left', fontWeight: '500' }}>
-                {showOptionalFields ? '▲ Hide fiber, sodium & micronutrients' : '▼ Show fiber, sodium & micronutrients'}
-              </button>
-              {showOptionalFields && (
+                ))}
+              </div>
+
+              {manualActiveNutrients.size > 0 && (
                 <>
-                  {[
-                    { key: 'fiber_g', label: dvMode && DV.fiber_g ? `Fiber (% DV, ${DV.fiber_g}g)` : 'Fiber (g)' },
-                    { key: 'sugar_g', label: 'Sugar (g)' },
-                    { key: 'sodium_mg', label: dvMode && DV.sodium_mg ? `Sodium (% DV, ${DV.sodium_mg}mg)` : 'Sodium (mg)' },
-                    { key: 'potassium_mg', label: dvMode && DV.potassium_mg ? `Potassium (% DV, ${DV.potassium_mg}mg)` : 'Potassium (mg)' },
-                    { key: 'saturated_fat_g', label: dvMode && DV.saturated_fat_g ? `Sat. Fat (% DV, ${DV.saturated_fat_g}g)` : 'Saturated Fat (g)' },
-                    { key: 'cholesterol_mg', label: dvMode && DV.cholesterol_mg ? `Cholesterol (% DV, ${DV.cholesterol_mg}mg)` : 'Cholesterol (mg)' },
-                    { key: 'calcium_mg', label: dvMode && DV.calcium_mg ? `Calcium (% DV, ${DV.calcium_mg}mg)` : 'Calcium (mg)' },
-                    { key: 'iron_mg', label: dvMode && DV.iron_mg ? `Iron (% DV, ${DV.iron_mg}mg)` : 'Iron (mg)' },
-                    { key: 'vitamin_c_mg', label: dvMode && DV.vitamin_c_mg ? `Vitamin C (% DV, ${DV.vitamin_c_mg}mg)` : 'Vitamin C (mg)' },
-                    { key: 'vitamin_d_mcg', label: dvMode && DV.vitamin_d_mcg ? `Vitamin D (% DV, ${DV.vitamin_d_mcg}mcg)` : 'Vitamin D (mcg)' },
-                  ].map(({ key, label }) => {
-                    const hasDV = dvMode && DV[key] != null
-                    const displayVal = hasDV && manual[key] !== '' ? String(Math.round((parseFloat(manual[key]) / DV[key]) * 100)) : manual[key]
-                    return (
-                      <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '10px' }}>
-                        <label style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{label}</label>
-                        <input type="number" min="0" step={hasDV ? '1' : '0.1'} value={hasDV ? displayVal : manual[key]} placeholder="0"
-                          onChange={e => {
-                            const raw = e.target.value
-                            const stored = hasDV && raw !== '' ? String(Math.round((parseFloat(raw) / 100) * DV[key] * 10) / 10) : raw
-                            setManual(m => ({ ...m, [key]: stored }))
-                            setAiEstimatedFields(s => { const n = new Set(s); n.delete(key); return n })
-                          }}
-                          style={{ backgroundColor: aiEstimatedFields.has(key) ? 'rgba(241,196,15,0.08)' : 'var(--background)', border: aiEstimatedFields.has(key) ? '1px solid rgba(241,196,15,0.4)' : '1px solid var(--border)', borderRadius: '6px', padding: '7px 10px', color: aiEstimatedFields.has(key) ? 'var(--warning)' : 'var(--text-primary)', fontSize: '13px' }} />
-                      </div>
-                    )
-                  })}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '12px 0 8px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Micronutrients</div>
+                    <button type="button" onClick={() => setDvMode(m => !m)}
+                      style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: `1px solid ${dvMode ? 'var(--accent-blue)' : 'var(--border)'}`, background: 'var(--surface)', color: dvMode ? 'var(--accent-blue)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>
+                      {dvMode ? 'mg' : '% DV'}
+                    </button>
+                  </div>
+                  {[...manualActiveNutrients].map(key => manualMicroFieldRow(key))}
                 </>
               )}
+
+              <div style={{ marginTop: '10px' }}>
+                <button onClick={() => setShowManualPicker(v => !v)}
+                  style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', color: 'var(--accent-blue)', cursor: 'pointer', fontWeight: '600', width: '100%' }}>
+                  {showManualPicker ? '▲ Close picker' : `+ Add ${manualActiveNutrients.size > 0 ? 'more ' : ''}nutrients`}
+                </button>
+                {showManualPicker && (
+                  <div style={{ marginTop: '10px', backgroundColor: 'var(--background)', borderRadius: '10px', padding: '12px', border: '1px solid var(--border)' }}>
+                    {NUTRIENT_GROUPS.map(group => {
+                      const available = group.keys.filter(n => !manualActiveNutrients.has(n.key))
+                      if (available.length === 0) return null
+                      return (
+                        <div key={group.label} style={{ marginBottom: '10px' }}>
+                          <div style={{ fontSize: '10px', fontWeight: '700', color: group.color, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>{group.label}</div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                            {available.map(n => (
+                              <button key={n.key} onClick={() => addManualNutrient(n.key)}
+                                style={{ padding: '4px 10px', borderRadius: '20px', border: `1px solid ${group.color}40`, backgroundColor: `${group.color}10`, color: group.color, fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>
+                                + {n.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '14px 0 4px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <input type="checkbox" id="mansavelib" checked={manualSaveToLib} onChange={e => { setManualSaveToLib(e.target.checked); if (!e.target.checked) { setManualIsIngredient(false); setManualIsSnack(false); setManualIsDrink(false) } }} style={{ accentColor: 'var(--accent-purple)', width: '14px', height: '14px' }} />
+                <input type="checkbox" id="mansavelib" checked={manualSaveToLib} onChange={e => setManualSaveToLib(e.target.checked)} style={{ accentColor: 'var(--accent-purple)', width: '14px', height: '14px' }} />
                 <label htmlFor="mansavelib" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>⭐ Save to My Favorites for quick logging next time</label>
               </div>
-              {manualSaveToLib && (
-                <div style={{ paddingLeft: '20px' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Category</div>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {FOOD_CATEGORIES.map(c => (
-                      <button key={c.key} type="button" onClick={() => setManualCategory(c.key)}
-                        style={{ padding: '5px 10px', borderRadius: '16px', border: `1px solid ${manualCategory === c.key ? 'var(--accent-blue)' : 'var(--border)'}`, background: manualCategory === c.key ? 'rgba(0,128,255,0.12)' : 'var(--surface)', color: manualCategory === c.key ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: manualCategory === c.key ? 600 : 400 }}>
-                        {c.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
