@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { NUTRIENTS, matchSuppToNutrient, parseSuppAmount } from '@/data/nutrients'
 
+const STRUCTURED_NUTRIENT_KEYS = new Set(['sodium_mg','chloride_mg','potassium_mg','calcium_mg','phosphorus_mg','iron_mg','magnesium_mg','zinc_mg','copper_mg','manganese_mg','selenium_mcg','chromium_mcg','iodine_mcg','vitamin_a_mcg','vitamin_c_mg','vitamin_d_mcg','thiamine_mg','riboflavin_mg','niacin_mg','pantothenic_acid_mg','vitamin_b6_mg','biotin_mcg','folate_mcg','vitamin_b12_mcg','vitamin_k_mcg','omega3_g','choline_mg','fiber_g','sugar_g','saturated_fat_g','calories','protein_g','carbs_g','caffeine_mg'])
+
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -57,11 +59,15 @@ export async function GET() {
   // Supplement coverage — sum matched nutrients across all active supplements
   const supp_coverage = {}
   for (const supp of supplements || []) {
-    for (const [label, valueStr] of Object.entries(supp.nutrients || {})) {
-      const nutrient = matchSuppToNutrient(label)
-      if (nutrient) {
-        const amount = parseSuppAmount(valueStr, nutrient)
-        supp_coverage[nutrient.key] = (supp_coverage[nutrient.key] || 0) + amount
+    for (const [key, val] of Object.entries(supp.nutrients || {})) {
+      if (STRUCTURED_NUTRIENT_KEYS.has(key) && typeof val === 'number') {
+        supp_coverage[key] = (supp_coverage[key] || 0) + val
+      } else {
+        const nutrient = matchSuppToNutrient(key)
+        if (nutrient) {
+          const amount = parseSuppAmount(String(val), nutrient)
+          supp_coverage[nutrient.key] = (supp_coverage[nutrient.key] || 0) + amount
+        }
       }
     }
   }

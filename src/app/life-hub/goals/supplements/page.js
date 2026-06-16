@@ -2,6 +2,53 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
+const NUTRIENT_GROUPS = [
+  { label: 'Minerals', color: '#60a5fa', keys: [
+    { key: 'sodium_mg', label: 'Sodium', unit: 'mg' },
+    { key: 'chloride_mg', label: 'Chloride', unit: 'mg' },
+    { key: 'potassium_mg', label: 'Potassium', unit: 'mg' },
+    { key: 'calcium_mg', label: 'Calcium', unit: 'mg' },
+    { key: 'phosphorus_mg', label: 'Phosphorus', unit: 'mg' },
+    { key: 'iron_mg', label: 'Iron', unit: 'mg' },
+    { key: 'magnesium_mg', label: 'Magnesium', unit: 'mg' },
+    { key: 'zinc_mg', label: 'Zinc', unit: 'mg' },
+    { key: 'copper_mg', label: 'Copper', unit: 'mg' },
+    { key: 'manganese_mg', label: 'Manganese', unit: 'mg' },
+    { key: 'selenium_mcg', label: 'Selenium', unit: 'mcg' },
+    { key: 'chromium_mcg', label: 'Chromium', unit: 'mcg' },
+    { key: 'molybdenum_mcg', label: 'Molybdenum', unit: 'mcg' },
+    { key: 'iodine_mcg', label: 'Iodine', unit: 'mcg' },
+  ]},
+  { label: 'Vitamins', color: '#a78bfa', keys: [
+    { key: 'vitamin_a_mcg', label: 'Vitamin A', unit: 'mcg' },
+    { key: 'vitamin_c_mg', label: 'Vitamin C', unit: 'mg' },
+    { key: 'vitamin_d_mcg', label: 'Vitamin D', unit: 'mcg' },
+    { key: 'vitamin_e_mg', label: 'Vitamin E', unit: 'mg' },
+    { key: 'vitamin_k_mcg', label: 'Vitamin K', unit: 'mcg' },
+    { key: 'thiamin_mg', label: 'Thiamin (B1)', unit: 'mg' },
+    { key: 'riboflavin_mg', label: 'Riboflavin (B2)', unit: 'mg' },
+    { key: 'niacin_mg', label: 'Niacin (B3)', unit: 'mg' },
+    { key: 'vitamin_b5_mg', label: 'Pantothenic Acid (B5)', unit: 'mg' },
+    { key: 'vitamin_b6_mg', label: 'Vitamin B6', unit: 'mg' },
+    { key: 'biotin_mcg', label: 'Biotin (B7)', unit: 'mcg' },
+    { key: 'folate_mcg', label: 'Folate (B9)', unit: 'mcg' },
+    { key: 'vitamin_b12_mcg', label: 'Vitamin B12', unit: 'mcg' },
+    { key: 'choline_mg', label: 'Choline', unit: 'mg' },
+  ]},
+  { label: 'Other', color: '#34d399', keys: [
+    { key: 'fiber_g', label: 'Fiber', unit: 'g' },
+    { key: 'omega3_g', label: 'Omega-3', unit: 'g' },
+    { key: 'caffeine_mg', label: 'Caffeine', unit: 'mg' },
+  ]},
+]
+
+const ALL_MICRO_META = {}
+for (const group of NUTRIENT_GROUPS) {
+  for (const item of group.keys) {
+    ALL_MICRO_META[item.key] = { label: item.label, unit: item.unit, color: group.color }
+  }
+}
+
 const TIMING_LABELS = {
   morning: '🌅 Morning',
   afternoon: '☀️ Afternoon',
@@ -12,7 +59,7 @@ const TIMING_LABELS = {
 }
 const TIMING_OPTIONS = Object.entries(TIMING_LABELS)
 
-const EMPTY_FORM = { name: '', dose: '', timing: 'morning', nutrients: [{ nutrient: '', amount: '', unit: 'mg' }] }
+const EMPTY_FORM = { name: '', dose: '', timing: 'morning' }
 
 function computeInteractions(stack) {
   if (stack.length < 1) return []
@@ -254,55 +301,16 @@ function InfoModal({ supplement, onClose }) {
   )
 }
 
-function EditModal({ supplement, onSave, onClose }) {
-  const [form, setForm] = useState({
-    name: supplement.name,
-    dose: supplement.dose,
-    timing: supplement.timing,
-    nutrients: supplement.nutrients_list || [{ nutrient: '', amount: '', unit: 'mg' }],
-  })
-  const [saving, setSaving] = useState(false)
-
-  function updateNutrient(i, field, val) {
-    setForm(prev => ({ ...prev, nutrients: prev.nutrients.map((n, idx) => idx === i ? { ...n, [field]: val } : n) }))
+function SupplementForm({ form, setForm, activeNutrients, setActiveNutrients, nutrientValues, setNutrientValues, showPicker, setShowPicker, hideName }) {
+  function addNutrient(key) {
+    setActiveNutrients(s => new Set([...s, key]))
+    setShowPicker(false)
   }
-  function addNutrient() { setForm(prev => ({ ...prev, nutrients: [...prev.nutrients, { nutrient: '', amount: '', unit: 'mg' }] })) }
-  function removeNutrient(i) { setForm(prev => ({ ...prev, nutrients: prev.nutrients.filter((_, idx) => idx !== i) })) }
-
-  async function handleSave() {
-    if (!form.name.trim() || !form.dose.trim()) return
-    setSaving(true)
-    const nutrientsObj = {}
-    for (const n of form.nutrients) {
-      if (n.nutrient.trim() && n.amount.trim()) {
-        nutrientsObj[n.nutrient.trim()] = `${n.amount.trim()} ${n.unit}`
-      }
-    }
-    await onSave(supplement.id, { name: form.name.trim(), dose: form.dose.trim(), timing: form.timing, nutrients: nutrientsObj })
-    setSaving(false)
+  function removeNutrient(key) {
+    setActiveNutrients(s => { const n = new Set(s); n.delete(key); return n })
+    setNutrientValues(v => { const n = { ...v }; delete n[key]; return n })
   }
 
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, maxWidth: 480, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px 20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 17, fontWeight: 700 }}>Edit Supplement</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 20, cursor: 'pointer' }}>✕</button>
-        </div>
-        <SupplementForm form={form} setForm={setForm} updateNutrient={updateNutrient} addNutrient={addNutrient} removeNutrient={removeNutrient} />
-        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: '11px', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
-          <button onClick={handleSave} disabled={saving || !form.name.trim() || !form.dose.trim()}
-            style={{ flex: 2, padding: '11px', background: 'var(--accent-blue)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700, opacity: saving ? 0.6 : 1 }}>
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SupplementForm({ form, setForm, updateNutrient, addNutrient, removeNutrient, hideName }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {!hideName && (
@@ -325,28 +333,108 @@ function SupplementForm({ form, setForm, updateNutrient, addNutrient, removeNutr
         </select>
       </div>
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>Nutrient Content <span style={{ fontWeight: 400 }}>(optional — from the label)</span></label>
-          <button onClick={addNutrient} style={{ fontSize: 11, color: 'var(--accent-blue)', background: 'none', border: '1px solid var(--accent-blue)', borderRadius: 5, padding: '2px 8px', cursor: 'pointer' }}>+ Add</button>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {form.nutrients.map((n, i) => (
-            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <input value={n.nutrient} onChange={e => updateNutrient(i, 'nutrient', e.target.value)} placeholder="Nutrient (e.g. Magnesium)"
-                style={{ flex: 2, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
-              <input value={n.amount} onChange={e => updateNutrient(i, 'amount', e.target.value)} placeholder="Amount"
-                style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
-              <select value={n.unit} onChange={e => updateNutrient(i, 'unit', e.target.value)}
-                style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 8px', color: 'var(--text-primary)', fontSize: 13 }}>
-                {['mg', 'mcg', 'g', 'IU', 'ml', '%DV'].map(u => <option key={u} value={u}>{u}</option>)}
-              </select>
-              {form.nutrients.length > 1 && (
-                <button onClick={() => removeNutrient(i)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 16, padding: '0 2px', flexShrink: 0 }}>×</button>
-              )}
+        <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+          Nutrient Content <span style={{ fontWeight: 400 }}>(optional — from the label)</span>
+        </label>
+        {[...activeNutrients].map(key => {
+          const meta = ALL_MICRO_META[key]
+          if (!meta) return null
+          return (
+            <div key={key} style={{ display: 'grid', gridTemplateColumns: '1fr auto 28px', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <label style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{meta.label} ({meta.unit})</label>
+              <input type="number" min="0" step="any" value={nutrientValues[key] || ''}
+                onChange={e => setNutrientValues(v => ({ ...v, [key]: e.target.value }))}
+                placeholder="0"
+                style={{ width: 90, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 8px', color: 'var(--text-primary)', fontSize: 13, textAlign: 'right' }} />
+              <button onClick={() => removeNutrient(key)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 15, cursor: 'pointer', padding: 0, lineHeight: 1, opacity: 0.5 }}>×</button>
             </div>
-          ))}
+          )
+        })}
+        <button onClick={() => setShowPicker(v => !v)}
+          style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: 8, padding: '8px 14px', fontSize: 12, color: 'var(--accent-blue)', cursor: 'pointer', fontWeight: 600, width: '100%', marginTop: activeNutrients.size > 0 ? 6 : 0 }}>
+          {showPicker ? '▲ Close picker' : `+ Add ${activeNutrients.size > 0 ? 'more ' : ''}nutrients`}
+        </button>
+        {showPicker && (
+          <div style={{ marginTop: 10, background: 'var(--background)', borderRadius: 10, padding: 12, border: '1px solid var(--border)' }}>
+            {NUTRIENT_GROUPS.map(group => {
+              const available = group.keys.filter(n => !activeNutrients.has(n.key))
+              if (available.length === 0) return null
+              return (
+                <div key={group.label} style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: group.color, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{group.label}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {available.map(n => (
+                      <button key={n.key} onClick={() => addNutrient(n.key)}
+                        style={{ padding: '4px 10px', borderRadius: 20, border: `1px solid ${group.color}40`, backgroundColor: `${group.color}10`, color: group.color, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                        + {n.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 8 }}>Leave blank if you don't know — the AI info card still works without it</div>
+      </div>
+    </div>
+  )
+}
+
+function EditModal({ supplement, onSave, onClose }) {
+  const [form, setForm] = useState({
+    name: supplement.name,
+    dose: supplement.dose,
+    timing: supplement.timing,
+  })
+  const [activeNutrients, setActiveNutrients] = useState(() => {
+    const s = new Set()
+    for (const key of Object.keys(supplement.nutrients || {})) {
+      if (ALL_MICRO_META[key]) s.add(key)
+    }
+    return s
+  })
+  const [nutrientValues, setNutrientValues] = useState(() => {
+    const v = {}
+    for (const [key, val] of Object.entries(supplement.nutrients || {})) {
+      if (ALL_MICRO_META[key] && val != null) v[key] = String(val)
+    }
+    return v
+  })
+  const [showPicker, setShowPicker] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    if (!form.name.trim() || !form.dose.trim()) return
+    setSaving(true)
+    const nutrientsObj = {}
+    for (const key of activeNutrients) {
+      const val = parseFloat(nutrientValues[key])
+      if (!isNaN(val) && val > 0) nutrientsObj[key] = val
+    }
+    await onSave(supplement.id, { name: form.name.trim(), dose: form.dose.trim(), timing: form.timing, nutrients: nutrientsObj })
+    setSaving(false)
+  }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, maxWidth: 480, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+          <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 17, fontWeight: 700 }}>Edit Supplement</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 20, cursor: 'pointer' }}>✕</button>
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 6 }}>Leave blank if you don't know — the AI info card still works without it</div>
+        <SupplementForm form={form} setForm={setForm}
+          activeNutrients={activeNutrients} setActiveNutrients={setActiveNutrients}
+          nutrientValues={nutrientValues} setNutrientValues={setNutrientValues}
+          showPicker={showPicker} setShowPicker={setShowPicker} />
+        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '11px', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+          <button onClick={handleSave} disabled={saving || !form.name.trim() || !form.dose.trim()}
+            style={{ flex: 2, padding: '11px', background: 'var(--accent-blue)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700, opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -357,23 +445,20 @@ export default function SupplementsPage() {
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
+  const [addActiveNutrients, setAddActiveNutrients] = useState(new Set())
+  const [addNutrientValues, setAddNutrientValues] = useState({})
+  const [addShowPicker, setAddShowPicker] = useState(false)
   const [saving, setSaving] = useState(false)
   const [aiFilling, setAiFilling] = useState(false)
   const [aiFilled, setAiFilled] = useState(false)
   const [infoModal, setInfoModal] = useState(null)
   const [editModal, setEditModal] = useState(null)
   const [showWhy, setShowWhy] = useState(false)
-  const [todayLogs, setTodayLogs] = useState(new Set()) // supplement_ids taken today
-  const [adherence, setAdherence] = useState({}) // supplement_id → days taken in last 30
+  const [todayLogs, setTodayLogs] = useState(new Set())
+  const [adherence, setAdherence] = useState({})
   const [markingId, setMarkingId] = useState(null)
 
   const today = new Date().toISOString().split('T')[0]
-
-  function updateNutrient(i, field, val) {
-    setForm(prev => ({ ...prev, nutrients: prev.nutrients.map((n, idx) => idx === i ? { ...n, [field]: val } : n) }))
-  }
-  function addNutrientRow() { setForm(prev => ({ ...prev, nutrients: [...prev.nutrients, { nutrient: '', amount: '', unit: 'mg' }] })) }
-  function removeNutrientRow(i) { setForm(prev => ({ ...prev, nutrients: prev.nutrients.filter((_, idx) => idx !== i) })) }
 
   async function handleAiFill() {
     if (!form.name.trim() || aiFilling) return
@@ -387,13 +472,30 @@ export default function SupplementsPage() {
       const json = await res.json()
       if (json.fill) {
         const { dose, timing, nutrients } = json.fill
-        const nutrientsList = nutrients && Object.keys(nutrients).length
-          ? Object.entries(nutrients).map(([nutrient, val]) => {
-              const parts = String(val).split(' ')
-              return { nutrient, amount: parts[0] || '', unit: parts[1] || 'mg' }
-            })
-          : [{ nutrient: '', amount: '', unit: 'mg' }]
-        setForm(prev => ({ ...prev, dose: dose || prev.dose, timing: timing || prev.timing, nutrients: nutrientsList }))
+        setForm(prev => ({ ...prev, dose: dose || prev.dose, timing: timing || prev.timing }))
+        if (nutrients && typeof nutrients === 'object') {
+          const newActive = new Set()
+          const newValues = {}
+          for (const [key, val] of Object.entries(nutrients)) {
+            if (ALL_MICRO_META[key]) {
+              newActive.add(key)
+              if (val != null) newValues[key] = String(val)
+            } else {
+              // Legacy text format from AI fill — try to map "Magnesium": "400 mg" style
+              const cleanKey = key.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+              const matchedMeta = Object.values(ALL_MICRO_META).find(m => m.label.toLowerCase() === key.toLowerCase())
+              if (matchedMeta) {
+                newActive.add(matchedMeta.key)
+                const num = parseFloat(String(val))
+                if (!isNaN(num)) newValues[matchedMeta.key] = String(num)
+              }
+            }
+          }
+          if (newActive.size > 0) {
+            setAddActiveNutrients(newActive)
+            setAddNutrientValues(newValues)
+          }
+        }
         setAiFilled(true)
       }
     } catch {}
@@ -412,25 +514,16 @@ export default function SupplementsPage() {
       supabase.from('supplement_logs').select('supplement_id, date').eq('user_id', user.id).gte('date', thirtyDaysAgo),
     ])
 
-    // Today's taken set
     const takenToday = new Set((logData || []).filter(l => l.date === today).map(l => l.supplement_id))
     setTodayLogs(takenToday)
 
-    // 30-day adherence per supplement
     const adh = {}
     for (const log of logData || []) {
       adh[log.supplement_id] = (adh[log.supplement_id] || 0) + 1
     }
     setAdherence(adh)
 
-    // Attach a flat nutrients_list for editing
-    setStack((data || []).map(s => ({
-      ...s,
-      nutrients_list: Object.entries(s.nutrients || {}).map(([nutrient, val]) => {
-        const parts = String(val).split(' ')
-        return { nutrient, amount: parts[0] || '', unit: parts[1] || 'mg' }
-      }),
-    })))
+    setStack(data || [])
     setLoading(false)
   }
 
@@ -440,7 +533,6 @@ export default function SupplementsPage() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (todayLogs.has(suppId)) {
-      // Untoggle
       await supabase.from('supplement_logs').delete().eq('user_id', user.id).eq('supplement_id', suppId).eq('date', today)
       setTodayLogs(prev => { const n = new Set(prev); n.delete(suppId); return n })
       setAdherence(prev => ({ ...prev, [suppId]: Math.max(0, (prev[suppId] || 1) - 1) }))
@@ -456,10 +548,9 @@ export default function SupplementsPage() {
     if (!form.name.trim() || !form.dose.trim()) return
     setSaving(true)
     const nutrientsObj = {}
-    for (const n of form.nutrients) {
-      if (n.nutrient.trim() && n.amount.trim()) {
-        nutrientsObj[n.nutrient.trim()] = `${n.amount.trim()} ${n.unit}`
-      }
+    for (const key of addActiveNutrients) {
+      const val = parseFloat(addNutrientValues[key])
+      if (!isNaN(val) && val > 0) nutrientsObj[key] = val
     }
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -470,9 +561,12 @@ export default function SupplementsPage() {
       .single()
 
     if (data) {
-      setStack(prev => [...prev, { ...data, nutrients_list: form.nutrients.filter(n => n.nutrient.trim()) }])
+      setStack(prev => [...prev, data])
     }
     setForm(EMPTY_FORM)
+    setAddActiveNutrients(new Set())
+    setAddNutrientValues({})
+    setAddShowPicker(false)
     setShowAddForm(false)
     setSaving(false)
   }
@@ -480,14 +574,7 @@ export default function SupplementsPage() {
   async function handleEdit(id, updates) {
     const supabase = createClient()
     await supabase.from('supplement_stack').update(updates).eq('id', id)
-    setStack(prev => prev.map(s => s.id !== id ? s : {
-      ...s,
-      ...updates,
-      nutrients_list: Object.entries(updates.nutrients || {}).map(([nutrient, val]) => {
-        const parts = String(val).split(' ')
-        return { nutrient, amount: parts[0] || '', unit: parts[1] || 'mg' }
-      }),
-    }))
+    setStack(prev => prev.map(s => s.id !== id ? s : { ...s, ...updates }))
     setEditModal(null)
   }
 
@@ -530,7 +617,7 @@ export default function SupplementsPage() {
             </div>
           )}
         </div>
-        <button onClick={() => { setShowAddForm(true); setForm(EMPTY_FORM); setAiFilled(false) }}
+        <button onClick={() => { setShowAddForm(true); setForm(EMPTY_FORM); setAddActiveNutrients(new Set()); setAddNutrientValues({}); setAddShowPicker(false); setAiFilled(false) }}
           style={{ padding: '9px 16px', background: 'var(--accent-blue)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, marginTop: 4 }}>
           + Add
         </button>
@@ -558,7 +645,11 @@ export default function SupplementsPage() {
               <div style={{ marginTop: 6, fontSize: 11, color: 'var(--success)' }}>AI estimated dose, timing, and nutrients — review and adjust before saving.</div>
             )}
           </div>
-          <SupplementForm form={form} setForm={setForm} updateNutrient={updateNutrient} addNutrient={addNutrientRow} removeNutrient={removeNutrientRow} hideName />
+          <SupplementForm form={form} setForm={setForm}
+            activeNutrients={addActiveNutrients} setActiveNutrients={setAddActiveNutrients}
+            nutrientValues={addNutrientValues} setNutrientValues={setAddNutrientValues}
+            showPicker={addShowPicker} setShowPicker={setAddShowPicker}
+            hideName />
           <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
             <button onClick={() => setShowAddForm(false)} style={{ flex: 1, padding: '11px', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
             <button onClick={handleAdd} disabled={saving || !form.name.trim() || !form.dose.trim()}
@@ -611,11 +702,15 @@ export default function SupplementsPage() {
                   </div>
                   {nutrientEntries.length > 0 && (
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                      {nutrientEntries.map(([nutrient, val]) => (
-                        <span key={nutrient} style={{ fontSize: 11, color: 'var(--success)', background: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.2)', borderRadius: 5, padding: '2px 8px', textTransform: 'capitalize' }}>
-                          {nutrient}: {val}
-                        </span>
-                      ))}
+                      {nutrientEntries.map(([key, val]) => {
+                        const meta = ALL_MICRO_META[key]
+                        const label = meta ? `${meta.label}: ${val}${meta.unit}` : `${key}: ${val}`
+                        return (
+                          <span key={key} style={{ fontSize: 11, color: 'var(--success)', background: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.2)', borderRadius: 5, padding: '2px 8px' }}>
+                            {label}
+                          </span>
+                        )
+                      })}
                     </div>
                   )}
                 </div>

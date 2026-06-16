@@ -182,6 +182,14 @@ All items are ✅ built. This section is reference only — not a to-do list.
 ## Untested — Needs QA
 Remove items once tested and confirmed working.
 
+### Supplement Chip Picker Upgrade
+- Open Supplements → "+ Add" → verify nutrient section shows "+ Add nutrients" dashed button instead of text input rows
+- Click button → picker opens with Minerals (blue), Vitamins (purple), Other (green) chips
+- Add a few nutrients → number inputs appear with correct unit labels; × removes them
+- Save supplement → card shows "Magnesium: 400mg" style labels (not raw keys)
+- Edit existing supplement → nutrients pre-populated from structured format; save → correct keys/values stored
+- Encyclopedia page → supplement coverage aggregates correctly from new numeric format
+
 ### Phase 52 & 53 — Active Workout Logger + Trainer Chatbot + Rest Timer
 - `?` button on exercise during workout → detail modal opens instantly
 - Cycle set type to "Drop Set" → purple info box appears below that row
@@ -380,6 +388,10 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Supplement nutrient entry upgraded to structured chip picker — Complete
+- `supplements/page.js`: Replaced freetext nutrient rows (nutrient name + amount + unit dropdown) with chip picker pattern matching EditFoodModal — `NUTRIENT_GROUPS` and `ALL_MICRO_META` constants at module level; `SupplementForm` now accepts `activeNutrients` (Set), `nutrientValues` (object key→string), `showPicker` props; picker panel shows Minerals (blue) / Vitamins (purple) / Other (green) chips; nutrient cards on stack display human-readable labels (`meta.label: val + meta.unit`); nutrients stored as `{ "vitamin_d_mcg": 20 }` numeric format instead of `{ "Vitamin D": "20 mcg" }` text format; `handleAiFill` maps AI response to structured keys; `EditModal` initializes from structured keys; `loadStack` simplified (no longer needs `nutrients_list` translation)
+- `encyclopedia/route.js`: Added `STRUCTURED_NUTRIENT_KEYS` Set; supplement aggregation loop checks if key is in the set and val is a number (new format → use directly) before falling back to `matchSuppToNutrient` + `parseSuppAmount` for legacy text format
 
 ### Fix — SearchModal manual entry upgraded to chip picker UI — Complete
 - `SearchModal.js`: Replaced flat list of all micro fields with EditFoodModal-style chip picker UI — macros shown in 2-col grid, micronutrients added on demand via group picker (Minerals/Vitamins/Other), % DV toggle, per-field remove button, AI Fill button in button bar; added `manualCategory` state for category chip picker; `handleManualMicroFill` replaces the old `handleMicroFill` call for manual mode; `EMPTY_MANUAL`, `NUTRIENT_GROUPS`, `ALL_MICRO_META` constants added at module level
