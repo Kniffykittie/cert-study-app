@@ -536,9 +536,10 @@ export default function SupplementsPage() {
         </button>
       </div>
 
-      {/* Add form */}
+      {/* Add form modal */}
       {showAddForm && (
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--accent-blue)', borderRadius: 14, padding: '20px', marginTop: 20, marginBottom: 16 }}>
+        <div onClick={() => setShowAddForm(false)} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, maxWidth: 480, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 15, fontWeight: 700 }}>New Supplement</h3>
             <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 18, cursor: 'pointer' }}>✕</button>
@@ -565,11 +566,12 @@ export default function SupplementsPage() {
               {saving ? 'Adding...' : 'Add to Stack'}
             </button>
           </div>
+          </div>
         </div>
       )}
 
       {/* Stack list */}
-      <div style={{ marginTop: showAddForm ? 0 : 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
         {stack.length === 0 && !showAddForm && (
           <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-secondary)' }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>💊</div>

@@ -381,6 +381,9 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Fix — Add Supplement form converted to modal overlay — Complete
+- `supplements/page.js`: Inline add form was an in-page div with a blue border that visually cut through supplement cards below it; converted to `position: fixed` overlay modal matching the Edit modal pattern
+
 ### Fix — Edit Favorite category not saving — Complete
 - `my-foods/route.js` PUT handler was missing `is_drink`, `is_ingredient`, `is_snack` fields in the update object; category changes were silently ignored on save
 
