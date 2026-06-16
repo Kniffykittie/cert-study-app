@@ -381,6 +381,9 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Fix — Edit Favorite category not saving — Complete
+- `my-foods/route.js` PUT handler was missing `is_drink`, `is_ingredient`, `is_snack` fields in the update object; category changes were silently ignored on save
+
 ### Phase 67c — Audit cleanup — Complete
 - `water/page.js`: Removed dead `quickLogSavedDrink` function (direct-log bypass left over from before Phase 67; never called — all drink logging now goes through LogConfirmModal)
 

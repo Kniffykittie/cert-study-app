@@ -70,6 +70,9 @@ export async function PUT(req) {
     brand: rest.brand?.trim() || null,
     serving_size_label: rest.serving_size_label?.trim() || '1 serving',
     servings_per_container: rest.servings_per_container != null ? Number(rest.servings_per_container) : null,
+    is_drink: rest.is_drink === true,
+    is_ingredient: rest.is_ingredient === true,
+    is_snack: rest.is_snack === true,
     ...nutritionValues,
   }).eq('id', id).eq('user_id', user.id).select().single()
 
