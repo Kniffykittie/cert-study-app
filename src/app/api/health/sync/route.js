@@ -195,13 +195,10 @@ export async function POST(req) {
     const date = estDateStr(d)
     const hour = getEstHour(t)
 
-    // EST hour + minute
-    const estOffset = -5 * 60
-    const estMs = d.getTime() + estOffset * 60000
-    const estD = new Date(estMs)
-    const estHour = estD.getUTCHours()
-    const estMin = estD.getUTCMinutes()
-    const minuteBucket = estHour * 60 + Math.floor(estMin / 5) * 5
+    // Use locale-aware EST/EDT conversion (handles DST automatically)
+    const nyStr = d.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: 'numeric', hour12: false })
+    const [nyHour, nyMin] = nyStr.split(':').map(Number)
+    const minuteBucket = (nyHour % 24) * 60 + Math.floor(nyMin / 5) * 5
 
     // Daily bucket
     if (!hrDailyBucket[date]) hrDailyBucket[date] = []
