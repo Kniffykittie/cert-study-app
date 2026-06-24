@@ -35,6 +35,7 @@ export default function HealthPage() {
   const [hrData, setHrData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [syncError, setSyncError] = useState(false)
   const [showConnectModal, setShowConnectModal] = useState(false)
 
   useEffect(() => {
@@ -64,13 +65,14 @@ export default function HealthPage() {
 
       if (!syncData.error && (syncData.neverSynced || !syncData.lastSyncedAt || Date.now() - new Date(syncData.lastSyncedAt).getTime() > 15 * 60 * 1000)) {
         fetch('/api/health/sync', { method: 'POST' })
+          .then(r => { if (!r.ok) throw new Error('sync_failed') ; return r })
           .then(() => Promise.all([fetch('/api/health/sync'), fetch('/api/health/heart-rate')]))
           .then(([r1, r2]) => Promise.all([r1.json(), r2.json()]))
           .then(([fresh, freshHr]) => {
-            if (!fresh.error) { setData(fresh); localStorage.setItem('health_overview', JSON.stringify(fresh)) }
+            if (!fresh.error) { setData(fresh); setSyncError(false); localStorage.setItem('health_overview', JSON.stringify(fresh)) }
             if (!freshHr.error) setHrData(freshHr)
           })
-          .catch(() => {})
+          .catch(() => setSyncError(true))
       }
     }
     load()
@@ -78,7 +80,9 @@ export default function HealthPage() {
 
   async function handleSync() {
     setSyncing(true)
-    await fetch('/api/health/sync', { method: 'POST' })
+    setSyncError(false)
+    const postRes = await fetch('/api/health/sync', { method: 'POST' })
+    if (!postRes.ok) { setSyncError(true); setSyncing(false); return }
     const [r1, r2] = await Promise.all([fetch('/api/health/sync'), fetch('/api/health/heart-rate')])
     const [syncData, hrJson] = await Promise.all([r1.json(), r2.json()])
     if (!syncData.error) { setData(syncData); localStorage.setItem('health_overview', JSON.stringify(syncData)) }
@@ -132,6 +136,17 @@ export default function HealthPage() {
           {syncing ? 'Syncing...' : '↻ Refresh'}
         </button>
       </div>
+
+      {syncError && (
+        <div style={{ backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid var(--error-border)', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <p style={{ color: 'var(--error)', fontSize: '13px', margin: 0 }}>
+            Google Health sync failed — your connection token expired. Reconnect to restore data.
+          </p>
+          <a href="/api/health/connect" style={{ backgroundColor: 'rgba(239,68,68,0.15)', border: '1px solid var(--error-border)', color: 'var(--error)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: '600', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            Reconnect →
+          </a>
+        </div>
+      )}
 
       {/* Primary stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
