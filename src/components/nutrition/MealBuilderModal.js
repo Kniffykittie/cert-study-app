@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef } from 'react'
 
-const INGR_FIELDS = [
+const MACRO_FIELDS = [
   { key: 'calories', label: 'Calories', unit: '' },
   { key: 'protein_g', label: 'Protein', unit: 'g' },
   { key: 'carbs_g', label: 'Carbs', unit: 'g' },
@@ -9,21 +9,33 @@ const INGR_FIELDS = [
   { key: 'fiber_g', label: 'Fiber', unit: 'g' },
   { key: 'sugar_g', label: 'Sugar', unit: 'g' },
   { key: 'sodium_mg', label: 'Sodium', unit: 'mg' },
-  { key: 'potassium_mg', label: 'Potassium', unit: 'mg' },
-  { key: 'calcium_mg', label: 'Calcium', unit: 'mg' },
-  { key: 'iron_mg', label: 'Iron', unit: 'mg' },
-  { key: 'magnesium_mg', label: 'Magnesium', unit: 'mg' },
-  { key: 'zinc_mg', label: 'Zinc', unit: 'mg' },
-  { key: 'vitamin_c_mg', label: 'Vitamin C', unit: 'mg' },
-  { key: 'vitamin_d_mcg', label: 'Vitamin D', unit: 'mcg' },
-  { key: 'vitamin_a_mcg', label: 'Vitamin A', unit: 'mcg' },
-  { key: 'vitamin_b12_mcg', label: 'Vitamin B12', unit: 'mcg' },
-  { key: 'vitamin_b6_mg', label: 'Vitamin B6', unit: 'mg' },
-  { key: 'folate_mcg', label: 'Folate', unit: 'mcg' },
-  { key: 'saturated_fat_g', label: 'Saturated Fat', unit: 'g' },
-  { key: 'cholesterol_mg', label: 'Cholesterol', unit: 'mg' },
-  { key: 'omega3_g', label: 'Omega-3', unit: 'g' },
 ]
+
+const MICRO_GROUPS = [
+  { label: 'Minerals', color: '#60a5fa', keys: [
+    { key: 'potassium_mg', label: 'Potassium', unit: 'mg' },
+    { key: 'calcium_mg', label: 'Calcium', unit: 'mg' },
+    { key: 'iron_mg', label: 'Iron', unit: 'mg' },
+    { key: 'magnesium_mg', label: 'Magnesium', unit: 'mg' },
+    { key: 'zinc_mg', label: 'Zinc', unit: 'mg' },
+  ]},
+  { label: 'Vitamins', color: '#a78bfa', keys: [
+    { key: 'vitamin_c_mg', label: 'Vitamin C', unit: 'mg' },
+    { key: 'vitamin_d_mcg', label: 'Vitamin D', unit: 'mcg' },
+    { key: 'vitamin_a_mcg', label: 'Vitamin A', unit: 'mcg' },
+    { key: 'vitamin_b12_mcg', label: 'Vitamin B12', unit: 'mcg' },
+    { key: 'vitamin_b6_mg', label: 'Vitamin B6', unit: 'mg' },
+    { key: 'folate_mcg', label: 'Folate', unit: 'mcg' },
+  ]},
+  { label: 'Other', color: '#34d399', keys: [
+    { key: 'saturated_fat_g', label: 'Saturated Fat', unit: 'g' },
+    { key: 'cholesterol_mg', label: 'Cholesterol', unit: 'mg' },
+    { key: 'omega3_g', label: 'Omega-3', unit: 'g' },
+  ]},
+]
+
+const ALL_MICRO_KEYS = MICRO_GROUPS.flatMap(g => g.keys)
+const INGR_FIELDS = [...MACRO_FIELDS, ...ALL_MICRO_KEYS]
 
 export default function MealBuilderModal({ onClose, onSave, savedIngredients = [] }) {
   const [mealName, setMealName] = useState('')
@@ -53,7 +65,8 @@ export default function MealBuilderModal({ onClose, onSave, savedIngredients = [
     const id = Date.now()
     const nutrition = {}
     for (const { key } of INGR_FIELDS) nutrition[key] = food[key] != null ? String(food[key]) : ''
-    setIngredients(prev => [...prev, { food, qty: '1', nutrition, id, name: food.name, serving_size_label: food.serving_size_label || '1 serving' }])
+    const activeMicros = new Set(ALL_MICRO_KEYS.filter(f => food[f.key] != null).map(f => f.key))
+    setIngredients(prev => [...prev, { food, qty: '1', nutrition, id, name: food.name, serving_size_label: food.serving_size_label || '1 serving', activeMicros, showPicker: false }])
     setExpandedId(id)
     setQuery('')
     setResults([])
@@ -64,7 +77,7 @@ export default function MealBuilderModal({ onClose, onSave, savedIngredients = [
     const id = Date.now()
     const nutrition = {}
     for (const { key } of INGR_FIELDS) nutrition[key] = ''
-    setIngredients(prev => [...prev, { food: { name }, qty: '1', nutrition, id, name, serving_size_label: '1 serving' }])
+    setIngredients(prev => [...prev, { food: { name }, qty: '1', nutrition, id, name, serving_size_label: '1 serving', activeMicros: new Set(), showPicker: false }])
     setExpandedId(id)
     setQuery('')
     setResults([])
@@ -81,6 +94,18 @@ export default function MealBuilderModal({ onClose, onSave, savedIngredients = [
 
   function updateNutrition(id, key, val) {
     setIngredients(prev => prev.map(i => i.id === id ? { ...i, nutrition: { ...i.nutrition, [key]: val } } : i))
+  }
+
+  function addMicro(id, key) {
+    setIngredients(prev => prev.map(i => i.id === id ? { ...i, activeMicros: new Set([...i.activeMicros, key]), showPicker: false } : i))
+  }
+
+  function removeMicro(id, key) {
+    setIngredients(prev => prev.map(i => i.id === id ? { ...i, activeMicros: new Set([...i.activeMicros].filter(k => k !== key)), nutrition: { ...i.nutrition, [key]: '' } } : i))
+  }
+
+  function togglePicker(id) {
+    setIngredients(prev => prev.map(i => i.id === id ? { ...i, showPicker: !i.showPicker } : i))
   }
 
   function getNutritionVal(ingr, key) {
@@ -208,7 +233,7 @@ export default function MealBuilderModal({ onClose, onSave, savedIngredients = [
                 const fiber = getNutritionVal(ingr, 'fiber_g')
                 const sodium = getNutritionVal(ingr, 'sodium_mg')
                 const isExpanded = expandedId === ingr.id
-                const missingFields = INGR_FIELDS.filter(f => getNutritionVal(ingr, f.key) == null).length
+                const missingFields = MACRO_FIELDS.filter(f => getNutritionVal(ingr, f.key) == null).length
                 return (
                   <div key={ingr.id} style={{ backgroundColor: 'var(--background)', borderRadius: '10px', border: isExpanded ? '1px solid var(--accent-blue)' : '1px solid var(--border)', overflow: 'hidden' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px' }}>
@@ -241,8 +266,8 @@ export default function MealBuilderModal({ onClose, onSave, savedIngredients = [
                         <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
                           Per serving values — leave blank if unknown. Multiply will happen automatically when logged.
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
-                          {INGR_FIELDS.map(f => (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginBottom: '10px' }}>
+                          {MACRO_FIELDS.map(f => (
                             <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <label style={{ fontSize: '11px', color: 'var(--text-secondary)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {f.label}{f.unit ? ` (${f.unit})` : ''}
@@ -255,7 +280,52 @@ export default function MealBuilderModal({ onClose, onSave, savedIngredients = [
                             </div>
                           ))}
                         </div>
-                        <div style={{ marginTop: '10px' }}>
+                        {ingr.activeMicros.size > 0 && (
+                          <div style={{ marginBottom: '8px' }}>
+                            {[...ingr.activeMicros].map(key => {
+                              const meta = ALL_MICRO_KEYS.find(f => f.key === key)
+                              if (!meta) return null
+                              return (
+                                <div key={key} style={{ display: 'grid', gridTemplateColumns: '1fr auto 24px', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
+                                  <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{meta.label}{meta.unit ? ` (${meta.unit})` : ''}</label>
+                                  <input type="number" min="0" step="0.1"
+                                    value={ingr.nutrition[key]}
+                                    onChange={e => updateNutrition(ingr.id, key, e.target.value)}
+                                    placeholder="—"
+                                    style={{ width: '62px', backgroundColor: 'var(--background)', border: ingr.nutrition[key] !== '' ? '1px solid var(--accent-blue)' : '1px solid var(--border)', borderRadius: '5px', padding: '4px 6px', color: 'var(--text-primary)', fontSize: '12px', textAlign: 'right' }} />
+                                  <button onClick={() => removeMicro(ingr.id, key)}
+                                    style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '15px', cursor: 'pointer', padding: 0, lineHeight: 1, opacity: 0.5 }}>×</button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                        <button onClick={() => togglePicker(ingr.id)}
+                          style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', color: 'var(--accent-blue)', cursor: 'pointer', fontWeight: '600', width: '100%', marginBottom: ingr.showPicker ? '8px' : '0' }}>
+                          {ingr.showPicker ? '▲ Close picker' : `+ Add ${ingr.activeMicros.size > 0 ? 'more ' : ''}nutrients`}
+                        </button>
+                        {ingr.showPicker && (
+                          <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px', border: '1px solid var(--border)', marginBottom: '8px' }}>
+                            {MICRO_GROUPS.map(group => {
+                              const available = group.keys.filter(n => !ingr.activeMicros.has(n.key))
+                              if (available.length === 0) return null
+                              return (
+                                <div key={group.label} style={{ marginBottom: '8px' }}>
+                                  <div style={{ fontSize: '10px', fontWeight: '700', color: group.color, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '5px' }}>{group.label}</div>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                    {available.map(n => (
+                                      <button key={n.key} onClick={() => addMicro(ingr.id, n.key)}
+                                        style={{ padding: '3px 9px', borderRadius: '20px', border: `1px solid ${group.color}40`, backgroundColor: `${group.color}10`, color: group.color, fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>
+                                        + {n.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                        <div style={{ marginTop: '6px' }}>
                           <label style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Serving size label</label>
                           <input value={ingr.serving_size_label} onChange={e => updateIngredient(ingr.id, 'serving_size_label', e.target.value)}
                             placeholder="e.g. 1 medium onion, 100g, 1 cup"
