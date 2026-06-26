@@ -104,6 +104,7 @@ export default function LifeHubPage() {
   const [briefExpanded, setBriefExpanded] = useState(false)
   const [recoveryExpanded, setRecoveryExpanded] = useState(false)
   const [checkinWhyOpen, setCheckinWhyOpen] = useState(false)
+  const [syncStatus, setSyncStatus] = useState('idle') // idle | syncing | done | failed
 
   const briefTriggered = useRef(false)
 
@@ -162,7 +163,7 @@ export default function LifeHubPage() {
         supabase.from('workout_plans').select('plan, schedule').eq('user_id', user.id).eq('is_active', true).limit(1),
         supabase.from('health_heart_rate_daily').select('hrv_rmssd, resting_bpm').eq('user_id', user.id).eq('date', yesterday).maybeSingle(),
         supabase.from('health_heart_rate_daily').select('date, resting_bpm').eq('user_id', user.id).gte('date', (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().split('T')[0] })()).order('date'),
-        supabase.from('google_health_tokens').select('id').eq('user_id', user.id).maybeSingle(),
+        supabase.from('google_health_tokens').select('id,last_synced_at').eq('user_id', user.id).maybeSingle(),
         supabase.from('stretch_logs').select('session_type, stretch_ids').eq('user_id', user.id).eq('date', yesterday),
       ])
 
@@ -267,6 +268,25 @@ export default function LifeHubPage() {
 
       if (!briefTriggered.current) {
         briefTriggered.current = true
+
+        // Sync health data first if connected and stale, then generate brief
+        if (healthTokenData) {
+          const lastSynced = healthTokenData?.last_synced_at ? new Date(healthTokenData.last_synced_at) : null
+          const isStale = !lastSynced || (Date.now() - lastSynced.getTime() > 15 * 60 * 1000)
+          if (isStale) {
+            setSyncStatus('syncing')
+            try {
+              const syncController = new AbortController()
+              const syncTimeout = setTimeout(() => syncController.abort(), 20000)
+              await fetch('/api/health/sync?backfill=true', { method: 'POST', signal: syncController.signal })
+              clearTimeout(syncTimeout)
+              setSyncStatus('done')
+            } catch {
+              setSyncStatus('failed')
+            }
+          }
+        }
+
         const res = await fetch('/api/life-hub/daily-brief')
         const json = await res.json()
         if (json.brief) {
@@ -451,16 +471,24 @@ export default function LifeHubPage() {
 
       {/* Zone 2 — Daily Brief */}
       <div style={{ backgroundColor: 'var(--surface)', borderTop: `1px solid ${brief ? `${SC.overview}44` : 'var(--border)'}`, borderRight: `1px solid ${brief ? `${SC.overview}44` : 'var(--border)'}`, borderBottom: `1px solid ${brief ? `${SC.overview}44` : 'var(--border)'}`, borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: brief ? '12px' : '0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: (brief || syncStatus === 'syncing' || briefLoading) ? '12px' : '0' }}>
           <span style={{ fontSize: '18px' }}>🤖</span>
           <div>
             <div style={{ color: SC.overview, fontSize: '13px', fontWeight: '700' }}>Your Daily Brief</div>
             <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-              {briefLoading ? 'Analyzing your data...' : briefGeneratedAt ? new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'Generating...'}
+              {syncStatus === 'syncing' ? 'Syncing health data...' : briefLoading ? 'Analyzing your data...' : briefGeneratedAt ? new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : (!brief ? 'Preparing...' : '')}
             </div>
           </div>
         </div>
-        {briefLoading && !brief && (
+        {syncStatus === 'syncing' && !brief && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: 4 }}>⌛ Syncing your watch data — this takes about 15 seconds...</div>
+            {[100, 75, 50].map((w, i) => (
+              <div key={i} style={{ height: '14px', borderRadius: '4px', backgroundColor: 'var(--border)', width: `${w}%`, opacity: 0.3 }} />
+            ))}
+          </div>
+        )}
+        {briefLoading && !brief && syncStatus !== 'syncing' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {[100, 85, 60].map((w, i) => (
               <div key={i} style={{ height: '14px', borderRadius: '4px', backgroundColor: 'var(--border)', width: `${w}%`, opacity: 0.5 }} />

@@ -221,6 +221,20 @@ Remove items once tested and confirmed working.
 
 ---
 
+## Phase Log
+
+### Phase 68 — Auto Health Sync + Smart Daily Brief Loading - Complete
+- Extracted all Google Health sync logic from `sync/route.js` into shared `src/lib/healthSync.js` (`syncHealthForUser` function)
+- Added `backfill` mode: instead of fetching since `last_synced_at - 1hr`, queries `health_heart_rate_intraday` for actual gaps in the last 48 hours and fetches from the earliest missing hour
+- Refactored `src/app/api/health/sync/route.js` POST handler to call `syncHealthForUser` — same behavior, no duplication
+- New `src/app/api/cron/health-sync/route.js`: protected by `CRON_SECRET` header, uses service-role Supabase client, loops all users in `google_health_tokens`, syncs each with backfill mode
+- New `vercel.json`: cron schedule every 6 hours (`0 */6 * * *`)
+- Life Hub page (`src/app/life-hub/page.js`): on mount, if health connected and last sync >15 min stale, fires `POST /api/health/sync?backfill=true` with 20s timeout before generating daily brief; shows "Syncing health data..." skeleton in brief card while waiting; falls through to brief generation on timeout or failure
+- `google_health_tokens` select updated to include `last_synced_at` (was only fetching `id`)
+- **Env var required:** `CRON_SECRET` — set in Vercel dashboard; cron endpoint returns 401 without it
+
+---
+
 ## Future Features — Planned Design
 
 **Status tags:** 💬 Discussed | 📋 Fully Specced | ⏳ Pending Build

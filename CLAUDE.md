@@ -59,6 +59,10 @@ Workouts    #3b82f6   (blue)
 
 `src/lib/nutritionUtils.js` is the **single source of truth** for all nutrition constants. Import from it — never redefine locally.
 
+`src/lib/healthSync.js` is the **single source of truth** for Google Health sync logic. Both the user-facing `POST /api/health/sync` and the cron `GET /api/cron/health-sync` call `syncHealthForUser(supabase, userId, tokenRow, { backfill })` from this file. Never duplicate sync logic in route files.
+
+`vercel.json` — cron schedule (every 6 hours). Requires `CRON_SECRET` env var set in Vercel dashboard. Without it, the cron endpoint returns 401 on every call.
+
 ### What's Centralized (import, don't copy)
 | Export | Used by |
 |--------|---------|
@@ -161,6 +165,8 @@ src/
       invite/
         validate/route.js              GET ?code= — public; checks if code exists and unused; IP-based brute force protection (5 failed attempts/hr blocks IP); records attempts in join_attempts table
         redeem/route.js                POST — authenticated; rate-limited (10/hr); unified error message to prevent code enumeration; marks invite code used_by + used_at
+      cron/
+        health-sync/route.js           GET — Vercel cron (every 6hr); protected by CRON_SECRET header; uses service-role Supabase client; loops all users in google_health_tokens, syncs each with backfill=true via syncHealthForUser; requires CRON_SECRET env var set in Vercel dashboard
       lab-summary/route.js             AI lab completion summary (3 sections); uses getUser() + is_disabled check; prompt injection protected
       delete-account/route.js          POST — full cascade delete across all tables + supabase admin auth user removal; uses getUser()
       2fa/
