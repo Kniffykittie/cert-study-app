@@ -295,6 +295,8 @@ The note field is the key input for physical context. Goals setup and check-in n
 
 **Conversation signal seeding:** When any conversational session ends (user closes, hits turn limit, navigates away), a lightweight POST to `/api/coach-memory/from-conversation` records structured signals — did the user apply swap suggestions, did they push back, what body parts were mentioned, any temporal patterns stated ("I always feel this way on Mondays"). These signals feed the weekly Edge Function alongside raw log data, so conversations actively train the coach over time.
 
+**Positive pattern detection (must be explicitly in the generation prompt):** The weekly Edge Function must be instructed to look for WHAT'S WORKING, not just gaps. The most motivating coaching observations are positive reproducible patterns — "on days your sleep score is above 75 AND you eat breakfast before 9am AND hit 6k steps, your afternoon energy check-in is consistently 4–5. That combination is reproducible." The Haiku generation prompt must include an explicit instruction: "For every gap or negative pattern you find, also look for at least one positive pattern — something the user does that reliably produces a good outcome. State it as a reproducible formula the user can intentionally recreate." Without this instruction, Haiku will naturally skew toward identifying deficits because that's what optimization problems look like. Positive patterns require explicit prompting.
+
 ---
 
 **18. Real-Time State Adjustment (Today's Physical/Mental Status)** — 💬 Discussed
@@ -342,71 +344,307 @@ Distinct from coach_memory. This is the check-in note "tired, right shoulder sor
 
 **10. Supplement Logs Table + Adherence Tracking** — ✅ Built (Phase 51)
 
-**12. Food Log Editing Mode + Session-Scoped Meal Insight** — 📋 Fully Specced
+**12. Food Log Editing Mode + Session-Scoped Meal Insight** — 📋 Fully Specced (CONFIRMED REPLACES Feature A)
 
-**The problem with always-on editing:** The current nutrition page has add/delete buttons always visible — the app never knows if you're "done" logging or just paused. This makes AI insight timing impossible to get right, enables accidental deletions, and the page looks cluttered rather than informational when you just want to check your totals.
+**Decision: Feature A (post-meal slot insight) is retired.** The session-based trigger (Finish Editing) gives Claude more context (multiple slots, full backfill picture, complete session totals) and fires less often (once per editing session vs up to 4× per day for individual slots). Feature A's slot-based trigger was always a hack around not knowing when the user was "done." Editing mode solves that problem at the root. Feature A's catch-up detection logic (Feature C) is preserved and used by Feature 12 instead.
 
-**The redesign — two explicit states:**
+---
 
-*Read-only state (default):*
-- Each meal slot shows entries as a clean summary (food names + calorie/protein chip)
-- No add buttons, no delete buttons visible
-- One prominent "✏️ Edit Today's Log" button at the top of the food log section
-- Feels like a dashboard — you can see your day at a glance without visual noise
+### Feature 12 — Comprehensive Build Spec
 
-*Editing state:*
-- A fixed bottom bar slides up: `[ Session: 3 foods · 1,240 cal · 89g protein ] [ ✓ Finish Editing ]`
-- Add buttons appear per slot, delete buttons appear on entries
-- Page scrolls normally — user can add breakfast, navigate to add-food page, return, add lunch, all in one continuous session
-- The editing session persists across add-food page navigations (still in editing mode when they return)
+#### The Problem Being Solved
+The current nutrition page has add/delete buttons always visible. This causes three problems:
+1. The app never knows when you're "done" logging — insight can't fire at the right time
+2. Delete buttons are always live — accidental deletions happen
+3. The page feels cluttered as a dashboard — too much action UI when you just want to check your totals
 
-*Finish Editing trigger:*
-- User taps "✓ Finish Editing" in the fixed bottom bar
-- OR user navigates away from the page with `isEditing && sessionEntries.length > 0` (auto-exit, fires insight silently)
-- Fires ONE Haiku call for the whole session (not per-slot)
-- Result: 2-sentence insight toast above the bottom bar, 5 second auto-dismiss
-- Bottom bar and toast both slide down, page returns to read-only
+#### The Two-State Design
 
-**Backfill + catch-up detection (simplified by editing session container):**
+**Read-only state (default):**
+- Each meal slot shows entries as a clean, tap-to-view summary
+- Entry rows: `[food name] · [cal]kcal [protein]g pro` — clean, no action buttons
+- No ✕ delete buttons visible anywhere in the food log section
+- No "Add [slot]" buttons visible
+- One "✏️ Edit Log" button in the Food Log section header (right side, subtle — secondary style)
+- IMPORTANT: The calorie ring, macro summary, TDEE card, and micronutrient section are always visible regardless of state — these are read-only data displays and never had editing buttons
+
+**Editing state:**
+- A fixed bottom bar slides up from the bottom of the viewport (CSS `position: fixed; bottom: 0; left: 0; right: 0`)
+- Bottom bar content: `[ 📝 Session: 3 added · 1,240 cal · 89g pro ]  [ ✓ Finish Editing ]`
+- "✏️ Edit Log" button changes to "← Back to summary" (or just changes styling to indicate active state)
+- ✕ delete buttons appear on each entry row
+- "Add [Breakfast]" / "Add [Lunch]" etc. buttons appear per slot (same as current behavior)
+- Page body gets `padding-bottom: 80px` to prevent content hiding behind fixed bar
+
+**The bottom bar stacks correctly on mobile:** The existing `viewEntry` modal (tap-to-view entry details) uses `position: fixed` with `zIndex: 1200`. The bottom bar should use `zIndex: 100` so modals (AddFoodModal, viewEntry) always render above it. The insight toast (see below) uses `zIndex: 101` so it renders above the bar but below modals.
+
+#### State Shape in `nutrition/page.js`
+
 ```js
-const sessionEntries = entriesLoggedThisSession  // collected during editing
-const anyBackfill = sessionEntries.some(e => {
-  const loggedAt = new Date(`${e.date}T${e.logged_time}:00`)
-  return (Date.now() - loggedAt) / 60000 > 120  // > 2 hours = backfilling
-})
-const isCatchup = new Set(sessionEntries.map(e => e.meal_slot)).size >= 2
-// Pass both flags to /api/nutrition/meal-insight
-```
-No rolling 10-minute window tracking needed — the session IS the natural container.
-
-**State shape in `nutrition/page.js`:**
-```js
+// New state — add alongside existing useState calls
 const [isEditing, setIsEditing] = useState(false)
-const [sessionEntries, setSessionEntries] = useState([])  // entries added this session
-// On each successful food log: push { meal_slot, food_name, calories, protein, logged_time, date }
-// On Finish Editing: fire insight, clear sessionEntries, setIsEditing(false)
+const [sessionEntries, setSessionEntries] = useState([])
+// { meal_slot, food_name, calories, protein_g, logged_time, date }
+// Populated on every successful handleAddEntry() call during editing
+
+const [insightToast, setInsightToast] = useState(null)
+// null | { text: string, timer: ReturnType<setTimeout> }
+// Shows the 2-sentence AI response above the bottom bar
 ```
 
-**Accidental deletion protection:** Delete buttons only render when `isEditing === true`. In read-only mode, no destructive actions are possible.
+**Editing state must survive navigation to add-food page and back.** The `isEditing` and `sessionEntries` are in-memory React state — they reset on page unmount. The add-food page at `/life-hub/nutrition/add-food` uses Next.js navigation which unmounts this page. To survive the round trip, use `sessionStorage`:
 
-**Insight API call payload at Finish Editing:**
-```json
-{
-  "session_foods": ["Eggs 3 large", "Toast 2 slices", "Chicken breast", "Rice"],
-  "slots_touched": ["breakfast", "lunch"],
-  "backfill_minutes_max": 240,
-  "is_catchup": true,
-  "day_totals": { "calories": 1240, "protein": 89, "carbs": 130, "fat": 38 },
-  "calorie_target": 2400,
-  "protein_target": 160,
-  "current_time": "15:00"
+```js
+// On entering editing mode:
+sessionStorage.setItem('nutrition_editing', 'true')
+sessionStorage.setItem('nutrition_session_entries', JSON.stringify([]))
+
+// On page mount (in useEffect, after load):
+const wasEditing = sessionStorage.getItem('nutrition_editing') === 'true'
+const savedEntries = JSON.parse(sessionStorage.getItem('nutrition_session_entries') || '[]')
+if (wasEditing) {
+  setIsEditing(true)
+  setSessionEntries(savedEntries)
+}
+
+// On each successful food log (during editing):
+const updatedSession = [...sessionEntries, newEntry]
+setSessionEntries(updatedSession)
+sessionStorage.setItem('nutrition_session_entries', JSON.stringify(updatedSession))
+
+// On Finish Editing (after insight fires or user exits):
+sessionStorage.removeItem('nutrition_editing')
+sessionStorage.removeItem('nutrition_session_entries')
+```
+
+**DO NOT use localStorage here** — this is session-scoped. A new page load the next day should not re-enter editing mode. `sessionStorage` clears when the browser tab is closed.
+
+#### The handleAddEntry Upgrade
+
+Current `handleAddEntry(entry)` just posts to the API and updates `entries` state. When `isEditing === true`, also push to session:
+
+```js
+async function handleAddEntry(entry) {
+  const res = await fetch('/api/nutrition/log', { ... })
+  const data = await res.json()
+  if (data.entry) {
+    setEntries(prev => [...prev, data.entry])
+    if (isEditing) {
+      const sessionEntry = {
+        meal_slot: entry.meal_slot,
+        food_name: entry.name,
+        calories: data.entry.calories || 0,
+        protein_g: data.entry.protein_g || 0,
+        logged_time: entry.logged_time || new Date().toTimeString().slice(0,5),
+        date: entry.date || today,
+      }
+      const updated = [...sessionEntries, sessionEntry]
+      setSessionEntries(updated)
+      sessionStorage.setItem('nutrition_session_entries', JSON.stringify(updated))
+    }
+  }
+  // ... rest of function unchanged
 }
 ```
 
-**Files to touch:**
-- `src/app/life-hub/nutrition/page.js` — add `isEditing` state, conditional rendering of add/delete buttons, fixed editing bottom bar, Finish Editing handler
-- `src/app/api/nutrition/meal-insight/route.js` — new Haiku route (POST, `getUser()` + `is_disabled`, rate-limited 6/day)
-- `CLAUDE.md` + `build-notes.md` — update directory structure when route created
+#### Backfill + Catch-Up Detection
+
+Computed at Finish Editing time, not tracked continuously:
+
+```js
+function computeSessionMeta(entries) {
+  const backfillMinutesMax = entries.reduce((max, e) => {
+    const loggedAt = new Date(`${e.date}T${e.logged_time}:00`)
+    const diffMin = (Date.now() - loggedAt) / 60000
+    return Math.max(max, diffMin)
+  }, 0)
+  const isCatchup = new Set(entries.map(e => e.meal_slot)).size >= 2
+  return { backfillMinutesMax: Math.round(backfillMinutesMax), isCatchup }
+}
+```
+
+#### The Finish Editing Flow
+
+```js
+async function handleFinishEditing() {
+  setIsEditing(false)
+  sessionStorage.removeItem('nutrition_editing')
+  sessionStorage.removeItem('nutrition_session_entries')
+
+  if (sessionEntries.length === 0) return  // nothing was added, no insight needed
+
+  const { backfillMinutesMax, isCatchup } = computeSessionMeta(sessionEntries)
+
+  // Fire insight in the background — don't await
+  fetchInsight({
+    session_foods: sessionEntries.map(e => `${e.food_name} (${Math.round(e.calories)} cal)`),
+    slots_touched: [...new Set(sessionEntries.map(e => e.meal_slot))],
+    backfill_minutes_max: backfillMinutesMax,
+    is_catchup: isCatchup,
+    day_totals: {
+      calories: Math.round(totals.calories || 0),
+      protein: Math.round(totals.protein_g || 0),
+      carbs: Math.round(totals.carbs_g || 0),
+      fat: Math.round(totals.fat_g || 0),
+    },
+    calorie_target: effectiveTarget,
+    protein_target: macros.protein,
+    current_time: new Date().toTimeString().slice(0, 5),
+  })
+
+  setSessionEntries([])
+}
+
+async function fetchInsight(payload) {
+  try {
+    const res = await fetch('/api/nutrition/meal-insight', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const data = await res.json()
+    if (data.insight) {
+      const timer = setTimeout(() => setInsightToast(null), 5000)
+      setInsightToast({ text: data.insight, timer })
+    }
+  } catch (e) {
+    // Fail silently — insight is a bonus, not core functionality
+  }
+}
+```
+
+**Auto-exit on navigation:** The "Let me fix something" path from Feature 14 (morning review pop-up) navigates to the nutrition page in editing mode for yesterday. This is a separate concern from the auto-exit. Auto-exit (firing insight silently when user leaves the page) should use the `beforeunload` event or a `useEffect` cleanup — but be careful: `fetch` in a `beforeunload` handler may not complete. Use `navigator.sendBeacon()` for the fire-and-forget insight call on page unload if this is desired. **For first build, skip auto-exit on navigation — only Finish Editing button triggers insight. Add auto-exit in a follow-up once the basic flow is working.**
+
+#### The Insight Toast
+
+Appears above the fixed bottom bar, slides up when `insightToast !== null`:
+
+```jsx
+{insightToast && (
+  <div style={{
+    position: 'fixed',
+    bottom: 70,  // sits above the 60px bottom bar
+    left: 0, right: 0,
+    zIndex: 101,
+    padding: '0 16px',
+    animation: 'slideUp 0.3s ease-out',
+  }}>
+    <div style={{
+      background: 'var(--surface)',
+      border: '1px solid #f9731644',
+      borderLeft: '3px solid #f97316',
+      borderRadius: '10px',
+      padding: '12px 16px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      gap: '10px',
+      boxShadow: '0 -4px 20px rgba(0,0,0,0.3)',
+    }}>
+      <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: '1.5', flex: 1 }}>
+        🤖 {insightToast.text}
+      </div>
+      <button
+        onClick={() => { clearTimeout(insightToast.timer); setInsightToast(null) }}
+        style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '16px', flexShrink: 0, padding: '0 2px' }}>
+        ×
+      </button>
+    </div>
+  </div>
+)}
+```
+
+Add the `slideUp` keyframe to the page's inline style block or use a `<style>` tag at the component root.
+
+#### The Fixed Bottom Bar
+
+```jsx
+{isEditing && (
+  <div style={{
+    position: 'fixed',
+    bottom: 0, left: 0, right: 0,
+    zIndex: 100,
+    background: 'var(--surface)',
+    borderTop: '1px solid var(--border)',
+    padding: '12px 16px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+  }}>
+    <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+      📝 <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{sessionEntries.length} added</span>
+      {sessionEntries.length > 0 && (
+        <span> · {Math.round(sessionEntries.reduce((s, e) => s + e.calories, 0))} cal · {Math.round(sessionEntries.reduce((s, e) => s + e.protein_g, 0))}g pro</span>
+      )}
+    </div>
+    <button
+      onClick={handleFinishEditing}
+      style={{ backgroundColor: '#f97316', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 18px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+      ✓ Finish Editing
+    </button>
+  </div>
+)}
+```
+
+Also add `paddingBottom: isEditing ? '80px' : '0'` to the outermost `<div>` of the page return so content doesn't hide behind the bar.
+
+#### The `/api/nutrition/meal-insight` Route
+
+New file: `src/app/api/nutrition/meal-insight/route.js`
+
+```js
+// POST — Haiku, rate-limited 6/day, getUser() + is_disabled check
+// Request body: { session_foods, slots_touched, backfill_minutes_max, is_catchup,
+//                 day_totals: { calories, protein, carbs, fat },
+//                 calorie_target, protein_target, current_time }
+// Response: { insight: "2-sentence string" } | { error }
+```
+
+**System prompt key rules:**
+- Max 2 sentences. Be specific — name actual foods from `session_foods`. No generic wellness advice.
+- If `backfill_minutes_max > 120`: past tense, reflective framing. NEVER say "great start to your morning" at 3pm.
+- If `is_catchup === true`: acknowledge "looks like you're logging retroactively" in the framing.
+- If `backfill_minutes_max < 30`: present/forward-looking framing — what's coming next, what still needs logging.
+- Reference what the day totals look like vs the targets. Be specific about the gap or the achievement.
+- Rate limit: check `api_rate_limits` for `meal_insight` route, max 6/day. Return `{ error: 'rate_limited' }` — client handles silently (no toast shown).
+
+**All user_input safety:** `session_foods` items come from DB-stored food names, not free-text user input, so no `<user_input>` wrapping needed. They're already sanitized through the food log flow.
+
+#### What to Watch For During Build
+
+1. **SessionStorage key collision:** If user opens nutrition page in two tabs, both write to the same `nutrition_editing` key. This is acceptable edge case behavior — second tab's session will overwrite first. Not worth complex locking for a personal app.
+
+2. **The `entries` state includes both old entries AND new ones added during the session.** When computing the bottom bar's "X added" count, use `sessionEntries.length` (session-only) — NOT `entries.length` (all entries today). These are different state variables for different purposes.
+
+3. **handleRemoveEntry during editing:** Delete is allowed during editing (that's the point). But removing an entry that was added THIS session should also remove it from `sessionEntries`. Best approach: track the entry's ID when adding to sessionEntries, then on delete, filter both `entries` AND `sessionEntries` by ID.
+
+4. **The "Edit Log" button placement:** It goes in the Food Log section header (the `activeTab === 'log'` section), not in the overall page header. The calorie ring / macro summary card is always visible — only the food log section itself has the edit-mode concept. Don't accidentally hide the macro summary.
+
+5. **Supplements tab, My Favorites tab, and Weekly Meal Plan tab:** These are untouched by editing mode. `isEditing` only affects the `activeTab === 'log'` view. If user switches tabs while editing, the bottom bar stays visible. This is correct behavior — they can switch tabs and come back without losing their session.
+
+6. **Rate limit handling:** If the insight API returns a rate limit error, fail silently — no toast, no error message. The rate limit is a protection mechanism, not a user-facing feature. The user doesn't need to know about it.
+
+7. **Insight fires even if 0 calories added:** Guard in `handleFinishEditing` with `if (sessionEntries.length === 0) return` — no reason to call Haiku if nothing was logged this session.
+
+8. **The `today` variable:** Already defined in the page as `new Date().toISOString().split('T')[0]`. Use it consistently — don't recompute `new Date()` in multiple places or you'll get timezone-related bugs near midnight.
+
+9. **Mobile: fixed bottom bar + keyboard:** On mobile, when the user taps the time input in AddFoodModal (which is a modal above the page), the virtual keyboard may push the viewport up and interact weirdly with the fixed bottom bar. The bottom bar is only visible when `isEditing === true` and AddFoodModal is a separate overlay — test this interaction specifically on mobile.
+
+10. **Feature 13 dependency:** Retroactive editing (Feature 13) reuses this same editing mode but for a past date. When Feature 13 is built, it will set `isEditing = true` with a `viewingDate` state set to the past date. The `handleAddEntry` call will pass `date: viewingDate` instead of `today`. The session entries array needs to know which date they're for. When building Feature 12, keep `viewingDate` in mind — don't hardcode `today` into the session entry object; always use whatever date is being viewed.
+
+#### Files to Create/Modify
+
+| File | Change |
+|------|--------|
+| `src/app/life-hub/nutrition/page.js` | Add `isEditing`, `sessionEntries`, `insightToast` state; upgrade `handleAddEntry`; add fixed bottom bar + toast JSX; `sessionStorage` sync; `paddingBottom` on root div |
+| `src/app/api/nutrition/meal-insight/route.js` | **New file** — Haiku route, rate-limited 6/day |
+| `CLAUDE.md` | Add `meal-insight/route.js` to directory structure under `api/nutrition/` |
+| `build-notes.md` | Move Feature 12 from Future Features to Phase Log when built |
+
+#### Feature A Disposition
+
+Feature A (slot-based insight after closing modal) is fully replaced by Feature 12. Remove Feature A from Future Features when Feature 12 is built. Feature C (catch-up session detection) is incorporated into Feature 12's `computeSessionMeta()` — also remove Feature C when Feature 12 ships.
 
 ---
 
@@ -1017,6 +1255,13 @@ create policy "user reads own wraps" on weekly_wraps for all using (user_id = au
 - One consistency observation (e.g. "You hit your water goal 5/7 days — that's your best hydration week in two months")
 - One thing that slipped with no judgment (e.g. "Sleep was below 70 four nights — the two late workout days correlated directly with longer sleep onset")
 - One concrete setup for next week (e.g. "If you want to match or beat this week, the pattern that worked was morning protein before 9am on active days")
+
+**"Next Week Setup" block — required section in every Weekly Wrap narrative:**
+The weekly wrap must close with a dedicated "Next Week" section — one single actionable observation, not five. The format: "The one thing most likely to improve next week based on this week's patterns: [specific action tied to observed data]." This makes the wrap forward-looking instead of purely nostalgic. Examples:
+- "The one thing: your sleep scores were highest the two nights you stopped eating after 8pm — building that cutoff into Monday and Tuesday when you have early mornings would give your two hardest days better recovery."
+- "The one thing: you hit your protein goal 4/7 days this week, all on days you had a high-protein breakfast. Making that the default rather than the exception closes most of the gap automatically."
+- "The one thing: you trained 5 days but your energy ratings show the pattern only dips on back-to-back days. If you shift Wednesday to Thursday, you'd keep the same volume without the back-to-back recovery penalty."
+This section must be in the Claude system prompt as a required output structure — not optional commentary. Without it, Claude will summarize the week without ever pointing forward.
 
 **How Monthly Wrap uses Weekly Wraps:**
 `/api/life-hub/monthly-wrap/route.js` POST handler:
