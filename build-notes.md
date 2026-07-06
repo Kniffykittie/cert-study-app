@@ -255,6 +255,72 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 **10. Supplement Logs Table + Adherence Tracking** — ✅ Built (Phase 51)
 
+**12. Food Log Editing Mode + Session-Scoped Meal Insight** — 📋 Fully Specced
+
+**The problem with always-on editing:** The current nutrition page has add/delete buttons always visible — the app never knows if you're "done" logging or just paused. This makes AI insight timing impossible to get right, enables accidental deletions, and the page looks cluttered rather than informational when you just want to check your totals.
+
+**The redesign — two explicit states:**
+
+*Read-only state (default):*
+- Each meal slot shows entries as a clean summary (food names + calorie/protein chip)
+- No add buttons, no delete buttons visible
+- One prominent "✏️ Edit Today's Log" button at the top of the food log section
+- Feels like a dashboard — you can see your day at a glance without visual noise
+
+*Editing state:*
+- A fixed bottom bar slides up: `[ Session: 3 foods · 1,240 cal · 89g protein ] [ ✓ Finish Editing ]`
+- Add buttons appear per slot, delete buttons appear on entries
+- Page scrolls normally — user can add breakfast, navigate to add-food page, return, add lunch, all in one continuous session
+- The editing session persists across add-food page navigations (still in editing mode when they return)
+
+*Finish Editing trigger:*
+- User taps "✓ Finish Editing" in the fixed bottom bar
+- OR user navigates away from the page with `isEditing && sessionEntries.length > 0` (auto-exit, fires insight silently)
+- Fires ONE Haiku call for the whole session (not per-slot)
+- Result: 2-sentence insight toast above the bottom bar, 5 second auto-dismiss
+- Bottom bar and toast both slide down, page returns to read-only
+
+**Backfill + catch-up detection (simplified by editing session container):**
+```js
+const sessionEntries = entriesLoggedThisSession  // collected during editing
+const anyBackfill = sessionEntries.some(e => {
+  const loggedAt = new Date(`${e.date}T${e.logged_time}:00`)
+  return (Date.now() - loggedAt) / 60000 > 120  // > 2 hours = backfilling
+})
+const isCatchup = new Set(sessionEntries.map(e => e.meal_slot)).size >= 2
+// Pass both flags to /api/nutrition/meal-insight
+```
+No rolling 10-minute window tracking needed — the session IS the natural container.
+
+**State shape in `nutrition/page.js`:**
+```js
+const [isEditing, setIsEditing] = useState(false)
+const [sessionEntries, setSessionEntries] = useState([])  // entries added this session
+// On each successful food log: push { meal_slot, food_name, calories, protein, logged_time, date }
+// On Finish Editing: fire insight, clear sessionEntries, setIsEditing(false)
+```
+
+**Accidental deletion protection:** Delete buttons only render when `isEditing === true`. In read-only mode, no destructive actions are possible.
+
+**Insight API call payload at Finish Editing:**
+```json
+{
+  "session_foods": ["Eggs 3 large", "Toast 2 slices", "Chicken breast", "Rice"],
+  "slots_touched": ["breakfast", "lunch"],
+  "backfill_minutes_max": 240,
+  "is_catchup": true,
+  "day_totals": { "calories": 1240, "protein": 89, "carbs": 130, "fat": 38 },
+  "calorie_target": 2400,
+  "protein_target": 160,
+  "current_time": "15:00"
+}
+```
+
+**Files to touch:**
+- `src/app/life-hub/nutrition/page.js` — add `isEditing` state, conditional rendering of add/delete buttons, fixed editing bottom bar, Finish Editing handler
+- `src/app/api/nutrition/meal-insight/route.js` — new Haiku route (POST, `getUser()` + `is_disabled`, rate-limited 6/day)
+- `CLAUDE.md` + `build-notes.md` — update directory structure when route created
+
 ---
 
 ### 🧘 Stretching & Mobility
