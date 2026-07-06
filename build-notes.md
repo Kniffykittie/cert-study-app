@@ -283,6 +283,64 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ### 🔔 Push Notifications + App Personality — 📋 Fully Specced
 
+#### Key Architecture Decisions Locked In (do not re-litigate)
+
+**pg_cron is Supabase-native, not Vercel.** It runs inside Supabase's PostgreSQL extension (`pg_cron`) and schedules Supabase Edge Functions via SQL. Nothing Vercel is needed. Vercel cron would only matter if the scheduled work needed to run Next.js server code — this work (fetch Google Health → analyze → push notification) has no dependency on Next.js.
+
+**500,000 invocations/month is the free tier Edge Function limit.** This is NOT a notification limit. 3 briefs/day × 30 days = 90 invocations/month. Even with 3 push notifications/day = 180 invocations. Free tier is effectively unlimited for single-user personal use.
+
+**The 3-notification-per-day cap is a UX decision, not a platform limit.** It's enforced by the `push_notification_log` table (UNIQUE on `user_id + date + window`). The platform would allow far more. The cap exists to prevent the app from becoming annoying. It can be raised to any number by changing the business logic in the Edge Function — there is no Supabase pricing tier involved.
+
+**Supabase free → paid upgrade is never needed for notifications.** The free tier supports unlimited push notifications technically. The only reason to upgrade Supabase would be for more database storage, more API requests, or branch environments — not for notification frequency.
+
+**Three-brief system uses `window` column on `daily_briefs` table.** UNIQUE changes from `(user_id, date)` to `(user_id, date, window)`. Each window (`morning`/`afternoon`/`evening`) is generated independently by its own pg_cron schedule. The app shows all three that exist for today + yesterday's evening as fallback context.
+
+**The 4am / 10pm scenario resolved:**
+- At 4am: today has no briefs yet (morning generates at 8am EST). Show yesterday's evening brief labeled "Yesterday evening" + a static "Morning brief generates at 8am" placeholder. No fetch, no spinner.
+- At 10pm: all three today briefs exist (morning generated at 8am, afternoon at 1pm, evening at 7pm). Each captured the real state of the day at that moment — the afternoon brief genuinely reflects what happened by 1pm, not a retroactive reconstruction. Show all three as a chronological day story, newest (evening) expanded by default.
+- pg_cron fires regardless of whether the user opened the app — briefs are generated on schedule, app visit just reads from cache.
+
+**Data freshness: Edge Function does a live Google Health sync before generating content.** It does NOT read from the stale Supabase cache. Replicates the token refresh + API fetch + cache write logic from `sync/route.js`, then reads the now-current tables. Notification about "10,000 steps" will be based on actual current Google Health data, not whatever was cached from the last app visit.
+
+**Load time improvement from pre-generated briefs:** Yes — significantly. Today's overview page currently calls Claude on first daily load (blocks render while waiting for AI). With pg_cron pre-generating at 8am/1pm/7pm, the page load is a DB read (< 100ms) instead of a Claude call (2–4 seconds). The only case where Claude is called on-load is if the user visits before the scheduled window has fired (e.g. 6am before the 8am morning brief). The existing fallback logic handles this gracefully (shows yesterday's brief until today's generates).
+
+**The current Daily Brief does NOT do intraday exercise detection.** It reads yesterday's total step count from `health_steps_hourly` and daily HR summary from `health_heart_rate_daily`. It does not cross-correlate steps + HR by time window. To detect "exercise at 2pm," the brief needs to query both `health_heart_rate_intraday` (hourly) and `health_steps_hourly` (hourly) and find windows where both spiked simultaneously (e.g. HR avg > resting + 30 AND steps in that hour > 800). This is the "intraday exercise detection" upgrade planned below.
+
+#### Smart Brief Design — What Makes Each Window Different
+
+Each window gets a different system prompt focus, different data emphasis, and different tone:
+
+**Morning (8am) — Reflective + Forward**
+Data: last night's sleep (sleep_score, onset_minutes, deep_min, REM_min, awake_count), yesterday's total activity (steps, workout logged), yesterday's nutrition summary, today's supplement timing recommendations.
+Tone: calm, orienting. Tell the story of recovery. Connect sleep quality to expected energy today. If sleep was poor, acknowledge it and give one concrete tip (protein breakfast, avoid caffeine after 2pm). If sleep was great, set an optimistic pace. Mention one thing to watch for today based on yesterday's pattern.
+Example smart point: "Your deep sleep was only 18 minutes last night (target: 60–90). That usually shows up as slower reaction time and stronger sugar cravings by afternoon — a high-protein breakfast reduces both."
+
+**Afternoon (1pm) — Momentum + Course Correction**
+Data: today's steps so far, today's food log (calories, protein, water), today's HR intraday data (was there a workout?), energy check-in if logged.
+Tone: direct, actionable. You have half a day's data — use it. Identify the one biggest gap (protein low? hydration behind? steps at 800?) and give one specific action. If things are on track, acknowledge it briefly and set up the evening.
+Example smart point: "You're at 6,200 steps and 1,100 calories at 1pm. Pace is good. Protein is at 68g against a 160g target — that's the one thing to close before tonight. A Greek yogurt + chicken at dinner puts you within 20g."
+
+**Evening (7pm) — Summative + Recovery Setup**
+Data: full day's food log, total steps, workout logged (with HR zones if available), sleep score from last night for context, water total.
+Tone: closing the loop. Celebrate what went well. Name the one thing that slipped without judgment. Set up sleep: what to eat (or not eat), when to stop caffeine (based on what they logged), when to stop screens if sleep was poor last night.
+Example smart point: "Solid day — you hit your protein goal and 9,200 steps. You had 180mg caffeine at 4pm. If last night's 22-minute sleep onset is a pattern, cutting off caffeine by 2pm tomorrow could make a difference."
+
+#### Intraday Exercise Detection (upgrade to add to brief generation)
+Query `health_heart_rate_intraday` + `health_steps_hourly` for the same user/date. Find hours where:
+- `health_heart_rate_intraday.avg_bpm` > (resting_bpm + 30) AND
+- `health_steps_hourly.steps` > 600 in that same hour
+
+If 2+ consecutive hours match → high confidence exercise window. Inject into AI brief context: "User appears to have exercised from [startHour] to [endHour] based on step+HR correlation." Claude then references this confidently instead of hedging with "if you worked out."
+
+If HR spike but no step spike → stationary elevated HR (could be stress, illness, strength training). Brief notes: "Your HR was elevated from X–Y without significant steps — that could be a strength workout, stress, or heat."
+
+#### What Else to Add (additional ideas from session)
+- **Notification tap-through:** tapping a morning brief notification opens the Life Hub overview directly to the brief panel (already handled by `data.url` in the push payload)
+- **Brief "last updated" timestamp:** small grey label under each brief showing when it generated — helps user understand if afternoon brief reflects a noon sync vs a 12:59pm sync
+- **Manual brief regeneration:** "🔄 Refresh" button on each brief card that calls the POST endpoint on demand (same logic as today's single daily brief) — useful on days when a lot happened after the scheduled window
+- **Week-in-review Saturday morning brief:** pg_cron fires a special Saturday 8am brief with 7-day context instead of yesterday context — calls a separate Edge Function / different `window = 'week'` value; shows in overview as a "This Week" card
+- **Smart notification suppression for quiet hours:** Edge Function checks current time in user's local timezone. If `send_time` falls between 10pm–7am user-local, defer to next window. Store `timezone` in `goals_profiles` or derive from `NEXT_PUBLIC_SITE_URL`.
+
 **Overview**
 Real push notifications delivered to the user's phone lock screen (iOS Safari + Android Chrome) using the Web Push API + Supabase Edge Functions + pg_cron. No Vercel paid plan required. No cron jobs on Vercel. Works even when the app is closed.
 
