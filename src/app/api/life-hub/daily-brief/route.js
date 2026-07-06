@@ -63,7 +63,7 @@ export async function POST(req) {
     supabase.from('goals_profiles').select('*').eq('user_id', user.id).single(),
     supabase.from('body_measurements').select('date, weight_lbs').eq('user_id', user.id).order('date', { ascending: false }).limit(5),
     supabase.from('food_log_entries').select('date, calories, protein_g').eq('user_id', user.id).gte('date', sevenAgo),
-    supabase.from('workout_logs').select('id, day_label, duration_seconds, created_at').eq('user_id', user.id).gte('created_at', `${twentyoneAgo}T00:00:00`).order('created_at', { ascending: false }).limit(20),
+    supabase.from('workout_logs').select('id, day_label, duration_seconds, created_at, post_workout_difficulty, post_workout_energy, post_workout_note, hr_zones').eq('user_id', user.id).gte('created_at', `${twentyoneAgo}T00:00:00`).order('created_at', { ascending: false }).limit(20),
     supabase.from('workout_log_sets').select('exercise_name, set_type').eq('user_id', user.id).gte('created_at', `${yesterday}T00:00:00`).lt('created_at', `${today}T00:00:00`),
     supabase.from('daily_checkins').select('date, energy_level, mood_level, sleep_hours').eq('user_id', user.id).gte('date', fourteenAgo).order('date', { ascending: false }),
     supabase.from('water_logs').select('amount_oz').eq('user_id', user.id).gte('created_at', `${yesterday}T00:00:00`).lt('created_at', `${today}T00:00:00`),
@@ -129,6 +129,14 @@ export async function POST(req) {
   const lastWorkoutAge = lastWorkout
     ? Math.round((Date.now() - new Date(lastWorkout.created_at)) / 86400000) : null
   const lastExercises = [...new Set((lastSets || []).filter(s => s.set_type === 'working').map(s => s.exercise_name))].slice(0, 4)
+  const yesterdayWorkout = (workoutLogs || []).find(w => {
+    const d = new Date(w.created_at).toISOString().split('T')[0]
+    return d === yesterday
+  })
+  const ywDifficulty = yesterdayWorkout?.post_workout_difficulty || null
+  const ywEnergy = yesterdayWorkout?.post_workout_energy || null
+  const ywNote = yesterdayWorkout?.post_workout_note?.trim() || null
+  const ywHrZones = yesterdayWorkout?.hr_zones || null
 
   // Energy/mood trend
   const recentCheckins = (checkins || []).slice(0, 7)
@@ -137,6 +145,13 @@ export async function POST(req) {
   const lowEnergyStreak = (() => {
     let streak = 0
     for (const c of recentCheckins) { if ((c.energy_level || 0) <= 2) streak++; else break }
+    return streak
+  })()
+  const moodScores = recentCheckins.filter(c => c.mood_level).map(c => c.mood_level)
+  const avgMood = moodScores.length ? (moodScores.reduce((s, n) => s + n, 0) / moodScores.length).toFixed(1) : null
+  const lowMoodStreak = (() => {
+    let streak = 0
+    for (const c of recentCheckins) { if ((c.mood_level || 0) <= 2) streak++; else break }
     return streak
   })()
 
@@ -211,15 +226,28 @@ export async function POST(req) {
     `  This week: ${workoutsThisWeek} workouts`,
     lastWorkout ? `  Last workout: ${lastWorkoutAge === 0 ? 'today' : lastWorkoutAge === 1 ? 'yesterday' : `${lastWorkoutAge} days ago`} — ${lastWorkout.day_label || 'session'} (${Math.round(lastWorkout.duration_seconds / 60)} min)` : '  No recent workouts logged',
     lastExercises.length ? `  Yesterday's exercises: ${lastExercises.join(', ')}` : '',
+    ywDifficulty ? `  Yesterday's workout difficulty: ${ywDifficulty}/5` : '',
+    ywEnergy ? `  Post-workout energy yesterday: ${ywEnergy}/5` : '',
+    ywNote ? `  Post-workout note: <user_input>${ywNote}</user_input>` : '',
+    ywHrZones ? `  Yesterday's HR zones: Fat burn ${ywHrZones.fat_burn_min || 0}min | Cardio ${ywHrZones.cardio_min || 0}min | Hard ${ywHrZones.hard_min || 0}min | Peak ${ywHrZones.peak_min || 0}min | Avg ${ywHrZones.avg_bpm || '?'}bpm` : '',
     '',
     `WELLNESS:`,
     avgEnergy ? `  Energy trend: ${avgEnergy}/5 average over last 7 check-ins` : '  No check-in data',
+    avgMood ? `  Mood trend: ${avgMood}/5 average over last 7 check-ins` : '',
     lowEnergyStreak >= 3 ? `  ⚠ ${lowEnergyStreak} consecutive low-energy days` : '',
+    lowMoodStreak >= 3 ? `  ⚠ ${lowMoodStreak} consecutive low-mood days` : '',
     sleepHours ? `  Sleep last night: ${sleepHours} hours${deepSleepMin != null ? ` (${deepSleepMin}min deep, ${remSleepMin ?? '?'}min REM)` : ''}` : '',
     stepsYesterday ? `  Steps yesterday: ${stepsYesterday.toLocaleString()}` : '',
     restingHr ? `  Resting HR yesterday: ${restingHr} bpm` : '',
     hrv ? `  HRV (RMSSD) yesterday: ${Math.round(hrv)}ms` : '',
-    waterYestOz > 0 ? `  Hydration yesterday: ${waterYestOz} oz total${drinkWaterOz > 0 ? ` (${waterLogOz} oz water + ${drinkWaterOz} oz from beverages)` : ''}` : '  Hydration yesterday: not logged',
+    (() => {
+      const goal = goals.water_goal_oz || null
+      if (waterYestOz > 0) {
+        const vs = goal ? ` (goal: ${goal} oz, ${waterYestOz >= goal ? '✓ met' : `${goal - waterYestOz} oz short`})` : (drinkWaterOz > 0 ? ` (${waterLogOz} oz water + ${drinkWaterOz} oz from beverages)` : '')
+        return `  Hydration yesterday: ${waterYestOz} oz${vs}`
+      }
+      return goal ? `  Hydration yesterday: not logged (goal: ${goal} oz)` : '  Hydration yesterday: not logged'
+    })(),
     totalCaffeineYest > 0 ? `  Caffeine yesterday: ${totalCaffeineYest}mg${totalCaffeineYest >= 400 ? ' — HIGH' : ''}` : '',
     (supplements || []).length ? `  Supplements: ${supplements.map(s => s.name).join(', ')}` : '',
     suppInteractionWarnings.length ? `  ⚠ Supplement interactions detected: ${suppInteractionWarnings.join('; ')}` : '',
@@ -248,11 +276,16 @@ export async function POST(req) {
   const goalsTargetSleep = goals.sleep_hours ? Number(goals.sleep_hours) : null
   const sleepGap = sleepHours && goalsTargetSleep ? Math.round((sleepHours - goalsTargetSleep) * 10) / 10 : null
 
+  const dietaryPrefs = [...(goals.dietary_preferences ?? []), ...(goals.dietary_preferences_other ? [goals.dietary_preferences_other] : [])]
+  const calorieHistoryNote = goals.calorie_history_note?.trim() || null
+
   const personalContext = [
     motivations.length ? `USER MOTIVATIONS (use to frame tone — don't recite verbatim): ${motivations.join(', ')}` : null,
     obstacles.length ? `KNOWN OBSTACLES: <user_input>${obstacles.join(', ')}</user_input> — acknowledge relevant ones if they're showing up in the data (e.g. time constraint + short workout = still a win)` : null,
     whyText ? `WHY THEY WANT THIS: <user_input>${whyText}</user_input> — reference only if it genuinely connects to what happened today` : null,
     goalsTargetSleep ? `Sleep target: ${goalsTargetSleep}h/night${sleepGap !== null ? ` | Last night: ${sleepHours}h (${sleepGap >= 0 ? '+' : ''}${sleepGap}h vs target)` : ''}` : null,
+    dietaryPrefs.length ? `DIETARY PREFERENCES: ${dietaryPrefs.join(', ')} — factor into any nutrition commentary (e.g. if vegan and protein is low, suggest plant-based sources; if dairy-free, skip dairy suggestions)` : null,
+    calorieHistoryNote ? `CALORIE HISTORY (user's lived experience — treat as ground truth over formula estimates): <user_input>${calorieHistoryNote}</user_input>` : null,
   ].filter(Boolean).join('\n')
 
   const dataSummary = [lines.join('\n'), personalContext].filter(Boolean).join('\n\n')
@@ -271,11 +304,15 @@ export async function POST(req) {
 - If data is sparse, note what tracking would unlock (make it feel like opportunity, not a scolding).
 - If they're on a streak or doing something well, say so — but be specific about what.
 - When citing resting HR or HRV: briefly explain what the number signals (e.g. elevated resting HR can mean incomplete recovery or stress; low HRV means the nervous system is still taxed; high HRV means you're well-recovered). Only reference these if the data was provided.
-- If sore spots are reported, acknowledge them briefly and connect to the stretch recommendation (e.g. "your [area] is sore — a post-workout stretch targeting it today would help recovery").
+- If sore spots are reported, acknowledge them briefly and connect to the stretch recommendation.
 - Only mention sore spots or stretching if they're in the data; don't force it into every brief.
-- USER MOTIVATIONS AND WHY: use these to shape your tone, not your content. If someone is motivated by "looking good at the beach", frame wins in terms of body comp, not abstract health. If their why is "keeping up with my kids", frame energy and stamina. Don't recite their motivations back at them verbatim — let it inform HOW you say things.
-- KNOWN OBSTACLES: if an obstacle like "busy schedule" or "chronic pain" is relevant to today's data (e.g. they still fit in a workout despite being busy), acknowledge it as a specific win. Don't mention obstacles that aren't relevant to today.
-- Sleep target: if provided and they fell short, mention the gap (e.g. "you slept 5.5h vs your 7h target") — only if sleep is a notable factor today.`,
+- MOOD: if a low-mood streak (≥3 days) is flagged, acknowledge it briefly alongside energy — mood and energy often track together but not always. Don't diagnose; just name the pattern.
+- POST-WORKOUT NOTE: if yesterday's workout note is provided, reference it if it reveals something meaningful (e.g. "you noted you ran out of gas — with only X cal logged before the session, that tracks"). Wrap all user_input tags in your reasoning.
+- DIETARY PREFERENCES: if protein or micronutrient data is included, tailor suggestions to the user's diet (e.g. vegan → plant sources, dairy-free → skip dairy suggestions). Never suggest foods that conflict with stated preferences.
+- CALORIE HISTORY NOTE: if provided, treat the user's lived experience as more reliable than the formula TDEE estimate. Reference it when calibration or target-setting comes up.
+- USER MOTIVATIONS AND WHY: use these to shape your tone, not your content. Don't recite their motivations back at them verbatim — let it inform HOW you say things.
+- KNOWN OBSTACLES: if an obstacle is relevant to today's data, acknowledge it as a specific win. Don't mention obstacles that aren't relevant today.
+- Sleep target: if provided and they fell short, mention the gap — only if sleep is a notable factor today.`,
     messages: [{ role: 'user', content: `Write my daily brief. Today is ${today}.\n\n${dataSummary}` }],
   })
 

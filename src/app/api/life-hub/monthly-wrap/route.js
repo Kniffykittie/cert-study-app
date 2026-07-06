@@ -92,7 +92,7 @@ export async function POST(req) {
     supabase.from('daily_checkins').select('date, energy_level, mood_level').eq('user_id', user.id).gte('date', start).lte('date', end),
     supabase.from('workout_logs').select('created_at, duration_seconds, day_label').eq('user_id', user.id).gte('created_at', start).lte('created_at', end + 'T23:59:59Z'),
     supabase.from('body_measurements').select('date, weight_lbs').eq('user_id', user.id).gte('date', start).lte('date', end).order('date'),
-    supabase.from('goals_profiles').select('goals, weight_lbs, target_weight_lbs').eq('user_id', user.id).single(),
+    supabase.from('goals_profiles').select('goals, weight_lbs, target_weight_lbs, sleep_hours, primary_motivations, primary_motivations_other, biggest_obstacles, biggest_obstacles_other, why_goals, dietary_preferences, dietary_preferences_other').eq('user_id', user.id).single(),
     supabase.from('water_logs').select('amount_oz, date').eq('user_id', user.id).gte('date', start).lte('date', end),
     supabase.from('food_log_entries').select('calories, protein_g, date, meal_slot, caffeine_mg, water_g').eq('user_id', user.id).gte('date', start).lte('date', end),
     supabase.from('health_heart_rate_daily')
@@ -145,9 +145,14 @@ export async function POST(req) {
   const avgCaffeine = cafDays.length ? Math.round(cafDays.reduce((s, d) => s + cafByDate[d], 0) / cafDays.length) : null
 
   const foodByDate = {}
-  for (const f of foodLogs || []) { foodByDate[f.date] = (foodByDate[f.date] || 0) + (f.calories || 0) }
+  for (const f of foodLogs || []) {
+    if (!foodByDate[f.date]) foodByDate[f.date] = { cal: 0, protein: 0 }
+    foodByDate[f.date].cal += f.calories || 0
+    foodByDate[f.date].protein += f.protein_g || 0
+  }
   const foodDates = Object.keys(foodByDate)
-  const avgCalories = foodDates.length ? Math.round(foodDates.reduce((s, d) => s + foodByDate[d], 0) / foodDates.length) : null
+  const avgCalories = foodDates.length ? Math.round(foodDates.reduce((s, d) => s + foodByDate[d].cal, 0) / foodDates.length) : null
+  const avgProtein = foodDates.length ? Math.round(foodDates.reduce((s, d) => s + foodByDate[d].protein, 0) / foodDates.length) : null
 
   // HR stats (watch only — gracefully null when not connected)
   const restingHrValues = (hrDaily || []).map(r => r.resting_bpm).filter(Boolean)
@@ -182,6 +187,7 @@ export async function POST(req) {
     checkin_days: checkins?.length || 0,
     avg_energy: avgEnergy,
     avg_mood: avgMood,
+    avg_protein: avgProtein,
     workout_count: workoutCount,
     total_workout_min: totalWorkoutMin,
     start_weight: startWeight,
@@ -204,13 +210,26 @@ export async function POST(req) {
     workout_hr_zones: hasWorkoutHrData ? zoneAgg : null,
   }
 
+  const motivations = [...(goals?.primary_motivations ?? []), ...(goals?.primary_motivations_other ? [goals.primary_motivations_other] : [])]
+  const obstacles = [...(goals?.biggest_obstacles ?? []), ...(goals?.biggest_obstacles_other ? [goals.biggest_obstacles_other] : [])]
+  const whyText = goals?.why_goals?.trim() || null
+  const sleepTarget = goals?.sleep_hours ? Number(goals.sleep_hours) : null
+  const dietaryPrefs = [...(goals?.dietary_preferences ?? []), ...(goals?.dietary_preferences_other ? [goals.dietary_preferences_other] : [])]
+
   const dataText = `Month: ${month} (${daysInMonth} days)
 Check-ins: ${reportData.checkin_days} days | Avg energy: ${avgEnergy || 'n/a'}/5 | Avg mood: ${avgMood || 'n/a'}/5
 Workouts: ${workoutCount} sessions, ${totalWorkoutMin} total minutes
 Weight: ${startWeight ? startWeight + ' lbs start' : 'no start weight'} → ${endWeight ? endWeight + ' lbs end' : 'no end weight'}${weightDelta !== null ? ` (${weightDelta > 0 ? '+' : ''}${weightDelta} lbs)` : ''}${goals?.target_weight_lbs ? ` | Target: ${goals.target_weight_lbs} lbs` : ''}
 Avg daily hydration: ${avgWater ? avgWater + ' oz (water + beverages)' : 'not tracked'}${avgCaffeine ? ` | Avg caffeine: ${avgCaffeine}mg/day` : ''}
-Avg daily calories: ${avgCalories ? avgCalories + ' cal' : 'not tracked'} (logged ${foodDates.length}/${daysInMonth} days)
-Goals: ${(goals?.goals || []).join(', ') || 'not set'}`
+Avg daily calories: ${avgCalories ? avgCalories + ' cal' : 'not tracked'} (logged ${foodDates.length}/${daysInMonth} days)${avgProtein ? ` | Avg protein: ${avgProtein}g/day` : ''}
+Goals: ${(goals?.goals || []).join(', ') || 'not set'}${sleepTarget && avgSleepHours ? ` | Sleep target: ${sleepTarget}h/night, actual avg: ${avgSleepHours}h` : ''}`
+
+  const personalContextLines = [
+    motivations.length ? `USER MOTIVATIONS (shape the narrative tone — don't recite verbatim): ${motivations.join(', ')}` : null,
+    whyText ? `WHY THEY WANT THIS: <user_input>${whyText}</user_input>` : null,
+    obstacles.length ? `KNOWN OBSTACLES: <user_input>${obstacles.join(', ')}</user_input> — if any are relevant to this month's patterns (e.g. "staying consistent" and they hit a PR in workouts), call it out as overcoming a stated barrier` : null,
+    dietaryPrefs.length ? `DIETARY PREFERENCES: ${dietaryPrefs.join(', ')} — factor into any nutrition or protein commentary` : null,
+  ].filter(Boolean).join('\n')
 
   const healthLines = [
     avgRestingHr ? `Avg resting HR: ${avgRestingHr} bpm${restingHrTrend !== null ? ` (${restingHrTrend > 0 ? '+' : ''}${restingHrTrend} bpm trend across month — ${restingHrTrend < -2 ? 'improving cardiovascular fitness' : restingHrTrend > 2 ? 'slight elevation — check recovery habits' : 'stable'})` : ''}` : '',
@@ -235,15 +254,18 @@ Goals: ${(goals?.goals || []).join(', ') || 'not set'}`
   const fullDataText = dataText
     + (healthLines.length ? '\nHEALTH METRICS (from smartwatch):\n' + healthLines.map(l => '  ' + l).join('\n') : '')
     + (comparisonLines.length ? '\nCOMPARED TO LAST MONTH (' + prevMonth + '):\n' + comparisonLines.map(l => '  ' + l).join('\n') : '')
+    + (personalContextLines ? '\nPERSONAL CONTEXT:\n' + personalContextLines : '')
 
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 400,
     system: `You are writing a one-paragraph monthly wrap-up for someone's personal health app. Be specific using the numbers provided. Acknowledge real wins, name actual gaps honestly (e.g. "only logged food 8 of 30 days"). Be encouraging but not sycophantic. Sound like a coach reviewing film — direct, warm, constructive. 3-5 sentences max.
 
-When including biometric data (resting HR, HRV, sleep, workout HR zones): always explain briefly what the number means and why it matters — don't just state it. For example, instead of "your resting HR dropped 4 bpm", say "your resting HR dropped from 68 to 64 bpm — your heart is becoming more efficient, needing fewer beats to do the same work, which is one of the clearest signs of improving cardiovascular fitness." Same principle for HRV (higher = nervous system recovering better), sleep (context on why it matters), and HR zones (fat burn vs cardio vs hard zones reflect different training adaptations). Only include biometric data if it was provided — never invent or estimate it.
+When including biometric data (resting HR, HRV, sleep, workout HR zones): always explain briefly what the number means and why it matters — don't just state it. For example, instead of "your resting HR dropped 4 bpm", say "your resting HR dropped from 68 to 64 bpm — your heart is becoming more efficient, needing fewer beats to do the same work, which is one of the clearest signs of improving cardiovascular fitness." Same principle for HRV (higher = nervous system recovering better), sleep (context on why it matters), and HR zones. Only include biometric data if it was provided — never invent or estimate it.
 
-If a "COMPARED TO LAST MONTH" section is provided: weave the most meaningful month-over-month changes naturally into the narrative — don't list them, just reference the most impactful ones conversationally. If no comparison data is provided, write the wrap-up without referencing any previous month.`,
+If a "COMPARED TO LAST MONTH" section is provided: weave the most meaningful month-over-month changes naturally into the narrative — don't list them. If no comparison data, write without referencing any previous month.
+
+PERSONAL CONTEXT rules: Use USER MOTIVATIONS to frame wins in terms that matter to this person (e.g. if motivated by "keeping up with my kids", frame stamina and energy wins — not abstract body comp). Use KNOWN OBSTACLES to specifically call out when data shows they overcame a stated barrier. Use WHY THEY WANT THIS to set the emotional tone. Use DIETARY PREFERENCES to tailor any nutrition commentary. Never recite these back verbatim — let them shape HOW you say things.`,
     messages: [{
       role: 'user',
       content: `Write a monthly wrap-up paragraph for this data:\n<user_input>${fullDataText}</user_input>`,

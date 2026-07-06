@@ -242,10 +242,50 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 **3. Dietary Preferences Wired Downstream** — ✅ Built (Phase 50)
 
-**4. Orphaned Inputs — Wire Up Remaining** — ✅ Built (Phase 55)
-- `biggest_obstacles` → workout plan AI prompt (injury-aware adjustments)
-- `primary_motivations` + `why_goals` → Daily Brief personalization (tone shaping)
-- `sleep_hours` → Daily Brief sleep target vs actual gap when relevant
+**4. Orphaned Inputs — Wire Up Remaining** — ✅ Built (Phase 55 + Phase 68)
+- `biggest_obstacles` → workout plan AI prompt (injury-aware adjustments) [Phase 55]
+- `primary_motivations` + `why_goals` → Daily Brief personalization (tone shaping) [Phase 55]
+- `sleep_hours` → Daily Brief sleep target vs actual gap when relevant [Phase 55]
+- `mood_level` → Daily Brief mood streak [Phase 68]
+- `post_workout_difficulty/energy/note/hr_zones` → Daily Brief yesterday's workout coaching context [Phase 68]
+- `dietary_preferences` → Daily Brief nutrition commentary [Phase 68]
+- `calorie_history_note` → Daily Brief as ground truth overriding formula estimates [Phase 68]
+- `primary_motivations/biggest_obstacles/why_goals/dietary_preferences` → Monthly Wrap personal context [Phase 68]
+- `workout_days/equipment/cardio_options` → actually persisted to workout_profiles (were silently lost) [Phase 68]
+
+**17. Persistent Coach Memory (`coach_memory` table)** — 💬 Discussed
+
+The "brand new coach each day" problem: every AI brief, workout response, and meal insight currently runs from a fresh context window — it sees today's data and maybe 7–30 days of aggregated stats, but it has no learned knowledge about this specific user's patterns, tendencies, or exceptions. The result feels like a smart coach who's seeing your file for the first time every morning.
+
+**The concept:** A `coach_memory` table with accumulating, structured observations — not raw data, but processed pattern conclusions. A background job (daily or weekly) scans the user's history and writes observations like:
+- "User's actual TDEE based on 60 days of data appears to be ~2,350 cal — formula said 2,720"
+- "User consistently logs energy ≤ 2 the day after back-to-back training days"  
+- "User rarely logs dinner on weekends — likely eating but not logging"
+- "User's best workout days (difficulty 4+, note mentions 'great') always follow 8+ hour sleep"
+- "Protein target of 160g is rarely hit — average is 98g across 45 logged days"
+
+These observations get injected as a "What I've learned about you" block in every AI prompt — making the brief sound like month 6 of working with a coach, not day 1.
+
+**Table schema:**
+```sql
+CREATE TABLE coach_memory (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users NOT NULL,
+  category TEXT NOT NULL, -- 'nutrition', 'sleep', 'workout', 'lifestyle', 'goal_progress'
+  observation TEXT NOT NULL, -- one plain-English sentence
+  confidence SMALLINT DEFAULT 3, -- 1-5, increases with more supporting data
+  data_points INT DEFAULT 1, -- how many data points back this observation
+  first_seen_at TIMESTAMPTZ DEFAULT NOW(),
+  last_confirmed_at TIMESTAMPTZ DEFAULT NOW(),
+  is_active BOOLEAN DEFAULT TRUE
+);
+```
+
+**Generation:** A weekly Supabase Edge Function scans the past 30/60/90 days of data and calls Haiku with structured data to produce new observations. Existing observations are refreshed (confidence raised) or retracted (is_active=false) if the pattern breaks.
+
+**Injection:** Every AI prompt that currently has a `personalContext` block gets a `WHAT I KNOW ABOUT YOU` section prepended, with the top 5–8 active observations sorted by confidence desc, then recency.
+
+This is the single highest-leverage architectural improvement available — it turns the app from a stateless data reporter into a longitudinal coach.
 
 ---
 
@@ -1066,6 +1106,25 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase 68 — Dead Data Audit Fixes — Complete
+Seven inputs that were collected but never used downstream wired up in the same session.
+
+**daily-brief/route.js:**
+- `mood_level` — was fetched from DB but silently discarded. Now calculates `avgMood` (7-day rolling average) and `lowMoodStreak` (consecutive low-mood days ≤2) and injects both into the brief context. System prompt now has explicit mood rules.
+- `post_workout_difficulty/energy/note/hr_zones` — post-workout check-in data was in `workout_logs` but never fetched for the brief. Now fetches `yesterdayWorkout` and injects difficulty, energy, free-text note, and HR zone breakdown (fat_burn/cardio/hard/peak minutes) into the brief context.
+- Hydration line upgraded: was just `48oz water`. Now shows `48oz / 80oz goal — 32oz short` so Claude can comment meaningfully on hydration shortfalls vs a blank number.
+- `dietary_preferences` — collected in goals_profiles step 3 but never sent to Claude in the brief. Now injected into `personalContext` with instruction to factor into nutrition commentary.
+- `calorie_history_note` — user's lived calorie experience (e.g. "I've always had to eat less than TDEE formulas say"). Now injected as ground truth that overrides formula estimates.
+
+**monthly-wrap/route.js:**
+- `primary_motivations`, `biggest_obstacles`, `why_goals`, `dietary_preferences` — none of these were in the goals_profiles SELECT query. Now fetched and injected as a PERSONAL CONTEXT block in the wrap narrative. Claude uses them to write a wrap that reflects what this user actually cares about.
+- `sleep_hours` (goal target) — fetched but never compared to actual. Now part of personalContextLines for sleep framing.
+- `protein_g` per day — food_log aggregation only tracked calories. Now also tracks protein and computes `avgProtein` for the wrap stats.
+
+**workouts/setup/page.js:**
+- `workout_days`, `has_pullup_bar`, `has_ab_roller`, `cardio_options`, `dumbbell_pairs` — these 5 fields were collected in the 7-step onboarding but never saved to `workout_profiles`. A "Regenerate Plan" feature could never have reconstructed the user's setup. Fixed by adding all 5 to `profileData` in `handleFinish()`.
+- DB migration applied to `workout_profiles` adding the 5 missing columns.
 
 ### Security headers — Complete
 - `next.config.mjs`: Added HTTP security headers applied to all routes — `X-Frame-Options: DENY` (clickjacking protection), `X-Content-Type-Options: nosniff` (MIME sniffing prevention), `Referrer-Policy: strict-origin-when-cross-origin`, `X-DNS-Prefetch-Control: on`, `Permissions-Policy` (disables camera/mic/geolocation/FLoC), `Strict-Transport-Security` with 2-year max-age + preload (forces HTTPS on all future visits)
