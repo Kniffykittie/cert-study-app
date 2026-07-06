@@ -222,6 +222,556 @@ Remove items once tested and confirmed working.
 
 ---
 
+## Master Build Plan
+
+**The canonical build order for everything remaining. Read this before starting any session.**
+**Status:** 📋 Fully Specced (ready to build) | 💬 Discussed (spec needed before building) | ✅ Built
+
+---
+
+### Build Order — Sequenced by Dependency
+
+Each phase below is a discrete build session. Phases must be built in order when they have dependencies. Independent phases can be reordered but the sequence below is the recommended priority.
+
+---
+
+#### Phase A — Feature 13: Retroactive Log Editing 📋
+
+**Why now:** Feature 12 (editing mode) is the foundation. Feature 14 depends on this. Build it while the editing mode code is fresh.
+
+**What to build:**
+- Date picker button in the nutrition page header (calendar emoji, shows current date). Tapping opens a `<input type="date">` or a simple 7-day back picker (not a full calendar — just "Today / Yesterday / [day] / [day]..." chips up to 7 days back).
+- Selecting a past date: fetches that day's entries via `GET /api/nutrition/log?date=YYYY-MM-DD`, replaces `entries` state, auto-enters editing mode (`startEditing()` with the `viewingDate` set), shows "Editing: [Day, Date]" label in the bottom bar instead of "X items added".
+- Add button navigates to `/life-hub/nutrition/add-food?slot=[slot]&date=[date]` — the add-food page already passes `date` to the API, this just wires the param in.
+- Done / Cancel returns to today's date and reloads today's entries.
+- Insight call for past-day edits: pass `is_retroactive: true` and `days_ago: N` to the meal-insight API. Haiku prompt must use past-tense framing ("with those additions, Saturday now shows...") not forward-looking tips.
+- Stale brief warning: if `daily_briefs` has a row for that date, show a subtle `⚠️ Data updated after brief was generated — Refresh` note under the brief on the Life Hub overview page. Refresh button calls POST on the brief API for that date only. No auto-regeneration.
+
+**State changes needed in nutrition/page.js:**
+- Add `viewingDate` state (default: today's date string)
+- `startEditing()` accepts an optional `date` param — if passed, sets `viewingDate`
+- All API calls in the food log section use `viewingDate` not hardcoded `today`
+- Bottom bar label: if `viewingDate !== today`, show "Editing: [formatted date]" instead of session count
+- `handleFinishEditing()`: after Done, reset `viewingDate` to today and reload today's entries
+
+**sessionStorage change:** `nutrition_editing_since` key also stores `{ since: ISO, date: YYYY-MM-DD }` as JSON instead of a bare timestamp — so remount knows both when editing started AND which date was being viewed.
+
+**Watch out for:**
+1. The `today` and `yesterday` consts are defined at component top — don't use them inside the editing flow for past dates. Always use `viewingDate`.
+2. The "Copy from yesterday" button must be hidden when `viewingDate !== today` — copying-to-yesterday makes no sense for past-day editing.
+3. The add-food page's back navigation (`window.location.href = '/life-hub/nutrition'`) will reload the page and restore editing state from sessionStorage — this will correctly restore `viewingDate` if it's stored in the sessionStorage JSON.
+4. The meal-insight API doesn't query the DB for the past date — it just uses what the client sends. No change needed on the API side other than respecting the `is_retroactive` flag in the prompt.
+5. TDEE calibration card and TDEE suggestion should be hidden when viewing a past date — they're today-only features.
+
+---
+
+#### Phase B — Feature 14: Morning Log Review Pop-Up 📋
+
+**Why now:** Depends on Feature 13 being built (the "Let me fix something" flow navigates to retroactive editing for yesterday). Build immediately after Phase A.
+
+**What to build:**
+- New component `DailyLogReview.js` in `src/components/nutrition/`. Mounts in `LifeHubLayout` (`src/app/life-hub/layout.js`) — same pattern as the check-in widget.
+- Fires once per day in the morning window (after 5am, before noon). Check `localStorage` key `log_review_YYYY-MM-DD` — if already set, skip entirely.
+- Fetches yesterday's summary: `GET /api/nutrition/log?date=yesterday` + workout_logs for yesterday + supplement_logs for yesterday + water_logs for yesterday. Bundle as a lightweight fetch from the component.
+- Three states based on yesterday's data:
+  - **Normal** (≥3 food entries and ≥1000 cal logged): show full summary card. Buttons: "✓ Looks good" (sets localStorage flag, dismisses) + "✏️ Let me fix something" (navigates to `/life-hub/nutrition?editDate=yesterday`).
+  - **Sparse** (entries exist but < 1000 cal OR < 3 entries): show "Yesterday looked light" state. Buttons: "🍽️ I forgot — let me add it" / "🚫 I was fasting" / "💤 Rest day, that's accurate" / "Skip". First button navigates to retroactive editing; others set localStorage flag.
+  - **Empty** (0 entries): show "You didn't log anything yesterday" state. Buttons: "🍽️ Let me backfill" / "👍 Intentional" / "Skip". First button navigates to retroactive editing; others dismiss.
+- The component renders as a bottom-sheet (slide up from bottom, semi-transparent overlay, ~40% screen height).
+- Dismissing by tapping the overlay or hitting Skip sets the localStorage flag.
+
+**Watch out for:**
+1. Mount it in `life-hub/layout.js`, not in individual pages — it should fire on any Life Hub page visit in the morning window.
+2. The "Let me fix something" navigation must pass `?editDate=yesterday` as a URL param, and `nutrition/page.js` must read this param on mount to auto-trigger editing mode for that date. Use `useSearchParams()` for this — wrap in Suspense per the project's pattern.
+3. Don't fetch yesterday's data on every Life Hub page mount — check the localStorage flag FIRST, and only fetch if the flag isn't set. This avoids unnecessary API calls.
+4. The morning window check (`after 5am, before noon`) should use the user's local time, not UTC — use `new Date().getHours()` (already local time in the browser).
+5. localStorage key format: `log_review_YYYY-MM-DD` where the date is YESTERDAY's date — the review is about yesterday, keyed to yesterday's date, not today's.
+
+---
+
+#### Phase C — Item 19: Work/Life Schedule Context 💬→📋
+
+**Why now:** This is the highest ROI unbuilt feature with the shortest build time. One UI addition + one JSONB column + injection into existing AI prompts. Build this before the intelligence layer (Items 17/18) because it makes every existing AI feature smarter immediately.
+
+**Spec (completing from discussed state):**
+
+**DB:** `alter table goals_profiles add column weekly_schedule jsonb;`
+Format: `{ "mon": "active_work", "tue": "active_work", "wed": "active_work", "thu": "active_work", "fri": "active_work", "sat": "day_off", "sun": "day_off" }`
+Four valid values per day: `active_work` | `desk_work` | `day_off` | `travel`
+
+**UI:** Add to the Goals Setup "Your Context" step (Step 3 of 5 — the biggest_obstacles/motivations step). Below the existing inputs, add a new section: "**My Weekly Schedule**" with a 7-column grid (Mon–Sun). Each day shows a label and a small dropdown/pill picker with the 4 options. Defaults to `desk_work` for Mon–Fri, `day_off` for Sat–Sun. The picker is compact — 4 short pills per day, selected pill fills with orange (#f97316 — nutrition section color since this affects nutrition/health context).
+
+Also add an edit widget on the Goals Overview page (under the lifestyle card) so the user can update it without going through full setup again.
+
+**AI prompt injection — touch all these in the same commit:**
+1. `daily-brief/route.js` — add schedule reading + inject into personalContext: "User's work schedule: Mon-Fri active_work (on feet all day), Sat-Sun day_off. Today is [day] — [label]. Factor this when interpreting step counts and HR."
+2. `monthly-wrap/route.js` — inject schedule summary: "User has [N] active_work days and [M] day_off days per week."
+3. `workouts/generate-plan/route.js` — already uses goals_profiles; inject schedule so the AI knows which days have high baseline activity.
+4. `life-hub/daily-brief/route.js` step count commentary — if today is `active_work`, prefix step count context with "occupational steps" note.
+
+**Watch out for:**
+1. `weekly_schedule` can be null (existing users who haven't set it yet). All AI prompts must handle null gracefully — skip the schedule block entirely if null, don't inject "User's schedule: null".
+2. The Goals Setup step already saves to `goals_profiles` — add `weekly_schedule` to the upsert payload. Don't create a separate save.
+3. Days of week: store as `mon/tue/wed/thu/fri/sat/sun` (lowercase 3-letter keys) — consistent with JavaScript's `getDay()` mapping after adjustment.
+4. The standalone Goals Overview edit widget should PATCH only the `weekly_schedule` column — don't re-save the full goals_profiles row (risk of overwriting other fields with stale values from state).
+
+---
+
+#### Phase D — Feature 16: AI Post-Workout Coaching Response 📋
+
+**Why now:** Independent of the intelligence layer — no dependencies on Items 17/18. High value, contained build. The post-workout note is the most underused piece of data in the app right now.
+
+**What to build:**
+- New API route: `POST /api/workouts/coaching-response` — Haiku, rate-limited 1/workout via `api_rate_limits` (key: `coaching-response-YYYY-MM-DD`), `getUser()` + `is_disabled` check.
+- Payload (all client-sent, assembled on the workout log page after check-in form submit):
+  - `user_note` (free text from post-workout check-in)
+  - `difficulty` (1–5), `energy_after` (1–5)
+  - `duration_seconds`, `exercises_completed[]`, `sets_completed`, `sets_skipped`
+  - `hr_zones` (fat_burn_min, cardio_min, hard_min, peak_min, avg_bpm) — already computed
+  - `pre_workout_calories` (today's food log total at workout start time)
+  - `pre_workout_carbs_g`, `pre_workout_caffeine_mg`
+  - `water_oz_today`
+  - `sleep_score_last_night` (from health_sleep_sessions)
+  - `morning_energy_rating` (from daily_checkins)
+  - `back_to_back_days` (boolean — was yesterday also a workout day?)
+  - `workouts_this_week` (count)
+  - `resting_hr_today`, `resting_hr_baseline` (7-day avg)
+  - `data_completeness_pct` (calories_logged / calorie_target × 100, capped at 100)
+- Haiku system prompt key rule: if `data_completeness_pct < 60`, preface any nutrition-based hypothesis with "based on what you logged" — never state nutrition causes as fact when data is sparse.
+- Response: `{ coaching: "2–4 sentence response" }` — conversational, specific, cites actual numbers from the payload.
+
+**UI change in `/life-hub/workouts/log/page.js`:**
+- After the post-workout check-in form submits, instead of immediately showing the completion screen, fire the coaching API call.
+- Show a brief loading state ("🤖 Analyzing your workout...") where the coaching response will appear.
+- Coaching response appears as the first card on the completion screen — above the stats summary. Style: dark card with left orange border, 🤖 icon, text body.
+- Stats summary (sets, duration, etc.) appears below the coaching card as usual.
+- If API call fails or times out (3 seconds), skip silently — show the stats-only completion screen with no coaching card.
+
+**Data assembly on the client:**
+- The log page already has `entries` state (today's food log) from a previous fetch. Compute `pre_workout_calories` by summing entries where `created_at` is before `workoutStartTime`.
+- `sleep_score_last_night`: the log page doesn't currently fetch this. Add a lightweight `GET /api/health/sync` cache read for yesterday's sleep score — or just skip it and mark the field as optional. Better to build without it first and add later.
+- `back_to_back_days`: query `workout_logs` for yesterday's date — if a row exists, `true`.
+
+**Watch out for:**
+1. The completion screen already exists in `log/page.js` — don't rebuild it, just prepend the coaching card.
+2. `data_completeness_pct` at workout time is likely to be very low for morning workout users (they haven't logged much yet). The "based on what you logged" caveat is essential — without it, Haiku will confidently diagnose under-eating when the user just hasn't logged yet.
+3. Rate limit key must be date-based (`coaching-response-YYYY-MM-DD`) not call-count-based — one response per workout per day, not one per hour.
+4. The free text `note` from the check-in form is user-supplied — wrap it in `<user_input>` tags in the AI prompt per the prompt injection protection rule.
+5. Don't block the UI waiting for this response indefinitely. Set a 3-second timeout client-side; if exceeded, resolve with no coaching card.
+
+---
+
+#### Phase E — Feature 15: Workout Logger UX Improvements 📋
+
+**Why now:** Independent. Two focused UX fixes, no AI, no new tables. Build together in one session.
+
+**Fix 1 — Auto-scroll after set completion:**
+In `log/page.js`, when the user taps ✓ on a set, after updating state, find the next incomplete set for that exercise. If none, find the first incomplete set of the next exercise. `scrollIntoView({ behavior: 'smooth', block: 'center' })` on that element. Use a `ref` map keyed by `${exerciseId}-${setIndex}` to track DOM nodes for each set row.
+
+**Fix 2 — Add exercise mid-workout FAB:**
+A floating action button (purple circle, `+` icon) fixed at bottom-right of the workout page, above the rest timer bar (z-index between rest bar and any modals). Tapping opens the existing exercise picker modal (already exists on the workout plan page — import/share the component, don't rewrite it). Selected exercise is added to the current session's exercise list with an "Added mid-workout" chip/badge. Sets added to this exercise are logged normally.
+
+**Watch out for:**
+1. The FAB must not appear when the rest timer overlay is visible — either hide it during rest timer display or stack z-indices correctly so it's not accidentally behind the timer.
+2. Auto-scroll should not fire on the initial render — only after a user tap. Guard with a `userInteracted` ref initialized to `false` and set to `true` on first set-complete.
+3. The mid-workout added exercise should be distinguishable in the session (for the overload suggestion on the completion screen) — add an `added_mid_workout: true` flag to the exercise object in state.
+
+---
+
+#### Phase F — Item 17: Persistent Coach Memory 💬→📋
+
+**Why now:** This is the foundation of the intelligence layer. Items 18 and Feature B both inject coach_memory. Must be built before them.
+
+**Spec (completing from discussed state):**
+
+**DB migration:**
+```sql
+create table coach_memory (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users not null,
+  category text not null check (category in ('nutrition', 'sleep', 'workout', 'physical', 'lifestyle', 'goal_progress')),
+  observation text not null,
+  confidence smallint default 3 check (confidence between 1 and 5),
+  data_points int default 1,
+  first_seen_at timestamptz default now(),
+  last_confirmed_at timestamptz default now(),
+  is_active boolean default true
+);
+alter table coach_memory enable row level security;
+create policy "user reads own memory" on coach_memory for select using (user_id = auth.uid());
+-- Insert/update only by service role (Edge Function) — no user-facing write policy
+```
+
+**Supabase Edge Function: `supabase/functions/generate-coach-memory/index.ts`**
+Scheduled via pg_cron: Sunday night at bedtime - 1hr (falls back to 9pm EST).
+Logic per user:
+1. Fetch 90 days of data: food_log_entries (avg macros, protein hit rate, weekend vs weekday patterns), daily_checkins (energy/mood trends, note keywords), workout_logs (frequency, difficulty, energy_after, back-to-back patterns), health_sleep_sessions (sleep score, correlations), body_measurements (weight trend, progress rate), supplement_stack (what they take), stretch_logs (frequency), water_logs (hydration patterns), goals_profiles (targets).
+2. One Haiku call with a structured 90-day data dump. Return format: `[{ category, observation, confidence, data_points }]` — 5–10 observations.
+3. **The generation prompt MUST include this instruction explicitly:** "For every gap or negative pattern you find, also identify at least one POSITIVE pattern — something the user does that reliably produces a good outcome. State it as a reproducible formula: 'When [condition A] + [condition B], [outcome C] consistently follows.' Without this, only deficits are noticed. The most useful coaching observations are positive formulas the user can intentionally recreate."
+4. Upsert logic: for each returned observation, check if a similar observation exists (same category + similar semantic content — use pg_trgm similarity or just match on category + first 50 chars). If match: bump `confidence` + update `last_confirmed_at` + increment `data_points`. If new: insert. Mark as `is_active = false` any observation last confirmed > 60 days ago.
+
+**Injection helper (shared across all AI routes):**
+Create `src/lib/coachMemory.js`:
+```js
+export async function getCoachMemoryContext(supabase, userId) {
+  const { data } = await supabase
+    .from('coach_memory')
+    .select('category, observation, confidence')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .order('confidence', { ascending: false })
+    .limit(8)
+  if (!data?.length) return ''
+  return `WHAT I KNOW ABOUT THIS USER (treat as established facts, not assumptions):\n${data.map(m => `- [${m.category}] ${m.observation}`).join('\n')}`
+}
+```
+
+**Inject into these routes in the same commit:**
+1. `daily-brief/route.js` — prepend to personalContext block
+2. `workouts/coaching-response/route.js` (Phase D) — prepend to system prompt
+3. `checkin/insight/route.js` (Phase G) — prepend to system prompt
+4. `workouts/exercise-chat/route.js` — prepend to system prompt
+5. `nutrition/meal-insight/route.js` — prepend to system prompt
+
+**Watch out for:**
+1. The Edge Function runs as service role — it can read all user data. Be careful the query only fetches data for ONE user at a time when iterating. Don't accidentally cross-contaminate.
+2. The Edge Function is NOT a Next.js route — it runs TypeScript in Deno. The Supabase client initialization is different from the app's `createClient()`. Use `createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))`.
+3. coach_memory observations are user-generated in the sense that they're about the user — but they're AI-written. They must NOT be wrapped in `<user_input>` tags. They ARE AI-generated, curated facts, not untrusted external input.
+4. The injection helper `getCoachMemoryContext()` adds a DB query to every AI route. If coach_memory is empty (new user), it returns an empty string — the AI prompt stays unchanged. Zero overhead for new users.
+5. Don't add coach_memory injection to owner-only routes (`generate-templates`, `generate-flashcards`) — those aren't personal coaching routes.
+
+---
+
+#### Phase G — Item 18 + Feature B: Real-Time Check-In Intelligence 💬→📋
+
+**Why now:** Depends on Phase F (coach_memory). Build together — Feature B (the check-in UI) and Item 18 (what the check-in response does with today's plan) are the same feature from two angles.
+
+**Spec (completing from discussed state):**
+
+**DB migration:**
+```sql
+alter table daily_checkins add column afternoon_energy smallint check (afternoon_energy between 1 and 5);
+alter table daily_checkins add column afternoon_mood smallint check (afternoon_mood between 1 and 5);
+alter table daily_checkins add column afternoon_note text;
+alter table goals_profiles add column wake_time time;
+alter table goals_profiles add column bedtime time;
+```
+`wake_time` and `bedtime` collected during Goals Setup Step 2 (body metrics step — add two time inputs). Default wake_time to 07:00, bedtime to 22:30 if not set. Also used by the push notification system and Weekly Wrap generation.
+
+**New API route: `POST /api/checkin/insight`**
+- Haiku, rate-limited 2/day (one per window), `getUser()` + `is_disabled` check
+- Receives: `{ window: 'morning'|'afternoon', energy_rating, mood_rating, note, sore_spots[], todays_exercises[], sleep_score, deep_sleep_min, rem_sleep_min, yesterday_workout, today_calories_so_far, today_caffeine_mg, today_steps, rolling_7day_morning_avg, rolling_7day_afternoon_avg, coach_memory_context }`
+- Response: `{ insight: "2 sentence string", proposed_actions: [] }`
+- `proposed_actions` format: `[{ type: 'swap_exercise', from_exercise, to_exercise, reason }, { type: 'flag_stretch', stretch_id, session_type }]`
+- The Haiku prompt must read today's exercises and check which ones conflict with mentioned sore spots. Standard conflict mappings to include in the system prompt: shoulder sore → avoid Overhead Press, Lateral Raise, Arnold Press; hip sore → avoid Lunges, Bulgarian Split Squats, Deep Squats; knee sore → avoid step-ups, leg press at deep angles; lower back sore → avoid deadlifts at max weight, bent-over rows (modify, don't skip).
+- The `note` field is user-supplied — wrap in `<user_input>` tags.
+- `coach_memory_context` comes from the client (already fetched or passed from layout) — do NOT re-fetch from DB in this route (respecting the context snapshot pattern).
+
+**Check-in UI: two bottom-sheet pop-ups per day**
+Location: `src/app/life-hub/layout.js` — two `useEffect`s.
+- Morning window: fires within 60 min of `wake_time` (from goals_profiles). If `wake_time` null, fire at 7am.
+- Afternoon window: fires at `wake_time + 7 hours`.
+- localStorage keys: `checkin_morning_YYYY-MM-DD` and `checkin_afternoon_YYYY-MM-DD` (today's date).
+- The layout loads `goals_profiles.wake_time` and `goals_profiles.bedtime` on mount (already has a Supabase client from existing layout code).
+- Check-in sheet state: `sheetVisible` ('none' | 'morning' | 'afternoon'), 30-second delay after page load before showing.
+
+**After save flow (key — this is where Item 18 happens):**
+1. User submits morning check-in ratings + note
+2. Client assembles the payload (energy, mood, note, sore_spots, today's exercises from workout plan, coach_memory from layout state, sleep data from last health sync)
+3. POST to `/api/checkin/insight`
+4. Response arrives: show `insight` text in the bottom sheet for 4 seconds, then close
+5. Store `proposed_actions` in layout state as `pendingWorkoutSuggestions`
+6. Navigate back to current page — `pendingWorkoutSuggestions` is now available in layout context
+
+**Sore spot auto-population (stretching page integration):**
+Parse the morning check-in note client-side with a simple keyword map:
+```js
+const SORE_SPOT_KEYWORDS = {
+  shoulder: ['shoulder', 'shoulders', 'rotator'],
+  hip: ['hip', 'hips', 'hip flexor'],
+  knee: ['knee', 'knees'],
+  lower_back: ['back', 'lower back', 'lumbar'],
+  hamstring: ['hamstring', 'hamstrings'],
+  calf: ['calf', 'calves', 'shin'],
+}
+```
+Store extracted sore spots in layout state. Stretching page reads them from context and pre-checks those chips on mount.
+
+**Watch out for:**
+1. The 30-second delay before showing the check-in sheet must use `setTimeout` in a `useEffect` cleanup — clear the timeout in the cleanup function to prevent showing on unmount.
+2. The layout fires the 30-second timer on EVERY page navigation within Life Hub (each page mount resets). Use a `hasShownToday` ref in the layout (not state — state resets on navigation, ref persists) to prevent showing more than once per session.
+3. The context snapshot pattern: on morning check-in submit, the client fetches coach_memory once (from a lightweight endpoint or from an already-fetched layout state value) and includes it in the payload. Subsequent "Keep Talking" turns (Phase H) re-send the SAME coach_memory snapshot — no new DB queries.
+4. `todays_exercises` comes from workout plan state — the layout doesn't have this. Either (a) the layout fetches today's plan on mount alongside other data, or (b) the check-in sheet receives it as a prop from wherever the workout plan is already loaded. Option (a) is simpler.
+5. The `proposed_actions` from the insight response need to be available on the Workout Plan page. Store them in layout state (Context API or a simple prop-drill via `layoutData`). The Workout Plan page reads `pendingWorkoutSuggestions` from this state.
+
+---
+
+#### Phase H — Feature D + Feature E: Workout Suggestions + Keep Talking 💬→📋
+
+**Why now:** Feature D requires `proposed_actions` from Phase G (the check-in insight). Feature E (Keep Talking) uses the context snapshot pattern from Phase G. Build together.
+
+**Spec (completing from discussed state):**
+
+**Feature D — Workout Suggestions Button:**
+
+DB migration:
+```sql
+create table workout_session_overrides (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users not null,
+  date date not null,
+  original_exercise text not null,
+  override_exercise text not null,
+  reason text,
+  applied_at timestamptz default now()
+);
+alter table workout_session_overrides enable row level security;
+create policy "user manages own overrides" on workout_session_overrides for all using (user_id = auth.uid());
+```
+
+On the Workout Plan page, today's day card gets a small "Suggestions" button (top-right, subtle grey). If `pendingWorkoutSuggestions` has items relevant to today's exercises, show an orange dot on the button.
+
+Tapping → bottom sheet with individual suggestion cards. Each card:
+- Exercise being swapped (original → replacement)
+- One sentence reason citing the user's actual check-in words
+- "✓ Apply" button → writes to `workout_session_overrides` table, updates plan display for today only (original exercise greyed out, replacement shown with a "Modified today" chip)
+- "Skip" → dismisses that suggestion, leaves plan unchanged
+
+The workout log page reads `workout_session_overrides` for today on mount and applies them to the exercise list before displaying. The saved `workout_plans` record is NEVER modified.
+
+**Feature E — "Keep Talking":**
+
+After the check-in insight response is shown in the bottom sheet, add a small "💬 Keep Talking" link at the bottom.
+
+Tapping opens a minimal chat interface (bottom-sheet expands to 70% screen height, or navigates to a dedicated `/life-hub/chat` page).
+
+State: `messages[]`, `contextSnapshot` (the exact payload sent on turn 1 — frozen, never re-fetched), `turnCount` (starts at 1 since the initial insight was turn 1).
+
+API route: `POST /api/checkin/chat` — Haiku, separate rate limit (8 turns/session, 3 sessions/day). Receives: `{ messages[], contextSnapshot, turn_count }`. Response: `{ message, proposed_actions[] }`.
+
+The contextSnapshot is the SAME object sent on the initial insight call — the client just includes it on every follow-up call. The API does NOT re-fetch DB data. The snapshot becomes the AI's knowledge base for the conversation.
+
+Rate limit enforcement: `turn_count >= 8` → replace "Keep Talking" input with "Max conversation length reached. Start a new conversation." Client enforces this client-side first (no API call on turn 9+), API also checks via rate limiter.
+
+Proposed actions from any turn in the conversation are rendered as inline apply-cards below each AI message (see Feature E spec above).
+
+**Watch out for:**
+1. The `contextSnapshot` is assembled on the CLIENT from already-loaded state, not fetched from the DB at conversation time. If the user's data changes during the conversation (they log food, complete a workout), the snapshot is stale — this is intentional and acceptable. The conversation is anchored to the moment it started.
+2. Never log the `contextSnapshot` to the console in production — it contains health data.
+3. The `proposed_actions` from conversation turns (not just the initial insight) also go into `pendingWorkoutSuggestions` — append, don't replace. User might accept suggestions across multiple turns.
+4. "Keep Talking" rate limit (3 sessions/day) is separate from the initial check-in insight rate limit (2/day) — use different `p_route` keys in `increment_rate_limit`.
+5. If the user applies a stretch via `type: 'add_stretch'`, it should write to `stretch_logs` with today's date and `session_type: 'pre_workout'` (or whatever was suggested). The stretch shows up in Stretching page history. Don't just show it as a recommendation chip — log it for real.
+
+---
+
+#### Phase I — Item 20: Stretch System Overhaul 💬→📋
+
+**Why now:** Depends on Phase G (sore spot auto-population from check-in is already built). Independent of Items 21/22.
+
+**Spec (completing from discussed state):**
+
+**A. Proactive "Today's Stretches" card on Workout Plan page:**
+- Below today's exercise list, add a "🧘 Stretches for Today" card.
+- Calls `getRecommendedStretches(bodyParts, soreSpots)` from `stretches.js` — already exists.
+- Shows 3–5 stretch names with timing labels (see B below). Tap to expand inline. "Open Stretching Page" link at bottom.
+- If sore spots exist (from Phase G check-in parsing), top 2 recommended stretches are flagged with "⚠️ Sore area — modified approach" and include the injury-aware copy (see C below).
+
+**B. Timing guidance — add to `stretches.js` data:**
+Each stretch already has `stretch_type: 'dynamic'|'static'|'both'`. Add `ideal_timing` field per stretch:
+- Dynamic → `'pre_workout'` — display: "Do this 10–15 min BEFORE your workout. Needs blood moving first."
+- Static → `'post_workout_or_bed'` — display: "Do this AFTER your workout when muscles are warm, or 10 min before sleep."
+- Both → `'anytime'`
+
+Add `timing_note` to the recommendation cards on the Stretching page (it's shown in context, not just in the library). The stretching page currently shows just the stretch name and how-to — add the timing line below the name.
+
+**C. Injury-aware modification language:**
+On the Stretching page, when a sore spot is active for a body part that this stretch targets, replace the standard instructions with a modified version. This doesn't require new stretch data — it's a rendering decision. If `soreSpots.includes(stretch.muscle_group_key)`, show this block above the normal instructions:
+> "Your [body part] is sore — still do this stretch, but don't push past a 4/10 sensation. When injured, the goal is blood flow and gentle range of motion, not depth. Pushing into pain triggers the stretch reflex (muscle contracts to protect itself), making the problem worse. Ease in slowly and hold without bouncing."
+This is static copy — not AI-generated. Same text every time, parameterized only by the body part name.
+
+**D. Stretch-sleep correlation (coach_memory integration):**
+The weekly coach_memory Edge Function (Phase F) already queries `stretch_logs`. Add this check to the generation prompt: "Check if nights where the user logged any stretch session correlate with higher sleep scores vs nights without. If the correlation is notable (≥5 point avg difference on ≥5 data points each), write it as a `sleep` category observation: 'User's sleep score averages X on nights with pre-sleep stretching vs Y without.'"
+No new code outside the Edge Function prompt — it uses existing data.
+
+**E. "Why this stretch" inline education:**
+On the Stretching page recommendation cards (not the library — the library already has this), add a small "Why?" toggle below each stretch card. Tapping reveals 3 sentences from the stretch's existing `how_to` or a new `why` field added to `stretches.js`. The field is: what muscle/tissue, why it gets tight, what happens if it stays tight.
+Add `why` field to all 38 stretches in `stretches.js` in the same commit.
+
+**Watch out for:**
+1. Adding `ideal_timing` and `why` to all 38 stretches in `stretches.js` is a large data edit — use batch Edit calls, not one per stretch.
+2. The Stretching page currently fetches sore spots from `daily_checkins`. After Phase G, sore spots also come from check-in note parsing (layout state). The page should use BOTH sources: DB-saved sore spots + layout-state parsed sore spots, merged. If the same body part appears in both, de-duplicate.
+3. The "Today's Stretches" card on the Workout Plan page needs `bodyParts` from today's plan (already available on that page) — pass to `getRecommendedStretches()` directly.
+
+---
+
+#### Phase J — Item 21: Micronutrient Daily Awareness 💬→📋
+
+**Why now:** Independent — no dependency on the intelligence layer. Can be built alongside Phase I.
+
+**Spec (completing from discussed state):**
+
+**Where it renders:** New card on the Nutrition page, between the macro ring section and the Food Log section (above the tab bar). Only shown when `activeTab === 'log'` and there are logged entries for today.
+
+**Three callout types (evaluated in priority order — show the highest-priority 2–3):**
+1. **Over 150% DV:** `sodium_mg > 3450` (150% of 2300mg DV) → "Sodium is [X]% of your daily target today — drink an extra glass of water, sodium draws water from cells."
+2. **Under 20% DV by time of day:** If current hour ≥ 15 (3pm) and a tracked micro is < 20% of its DV → "[Nutrient] is at [X]% by 3pm — hard to catch up before the end of the day. [Food source suggestion]."
+3. **Absent 3+ consecutive days:** Check last 3 days' `food_log_entries`. If a micro is 0 in all 3 → "[Nutrient] hasn't appeared in your log in 3+ days. [One-line context about why it matters]."
+
+**Static callout copy per nutrient (write once, hardcoded in the component):**
+```js
+const MICRO_CALLOUT_COPY = {
+  vitamin_d_mcg: {
+    absent: "Vitamin D hasn't appeared in 3+ days — few foods contain it naturally; sunlight or a supplement is usually the only reliable source.",
+    low: "Vitamin D is at {pct}% by {time} — it's fat-soluble, so having it with a meal that has fat helps absorption.",
+  },
+  iron_mg: {
+    low: "Iron is at {pct}% by {time} — pair it with something acidic (lemon, tomato, vitamin C) to roughly double absorption. Avoid coffee or tea within 30 min of iron-rich foods.",
+    over: "Iron is at {pct}% today — high doses on an empty stomach cause GI discomfort; space out sources if you're supplementing.",
+  },
+  omega3_g: {
+    absent: "Omega-3 hasn't appeared in 3+ days — without fatty fish or supplementation, inflammatory responses slow recovery.",
+  },
+  magnesium_mg: {
+    low: "Magnesium is at {pct}% by {time} — it's involved in muscle relaxation and sleep quality; low magnesium often shows as night cramps or restless sleep.",
+  },
+  sodium_mg: {
+    over: "Sodium is at {pct}% of your daily target — your water target has adjusted upward to compensate.",
+  },
+  calcium_mg: {
+    low: "Calcium is at {pct}% by {time} — pair dairy or fortified foods with vitamin D for better absorption.",
+  },
+  // ... extend for all 15 tracked micros
+}
+```
+
+**Sodium → water goal integration (the existing "wow" moment):**
+This already exists conceptually. The callout should be consistent with whatever water goal adjustment logic already exists. If the sodium callout updates water goal, the callout text should say "your water target has adjusted" only if the adjustment actually happens — don't promise it if the code doesn't do it.
+
+**The 3-day absence check:**
+On page load, fetch yesterday and day-before-yesterday's entries (2 extra API calls) OR extend the existing load to pass `days: 3` to the log API and have it return the last 3 days. Comparing this against today's entries gives the 3-day picture. This is a lightweight query — no new AI call.
+
+**Watch out for:**
+1. The DVs used for callout thresholds must come from `src/data/nutrients.js` (already has `rdv` per nutrient) and `calcMicroTargets(age, sex)` from `src/lib/tdee.js` — not hardcoded magic numbers. Always use the personalized DV.
+2. The card should appear only if there's something actually worth surfacing. If all micros are in the normal range and none are absent, don't show the card at all. No "everything looks good" filler.
+3. The sodium callout is the gold standard — it's specific, reactive, and says what it means. Every callout must meet this bar: what the data shows + what it means for the user in one sentence. No generic "this nutrient is important."
+4. The 3-day absence check runs on page load — cache it in state, don't recompute on every render.
+
+---
+
+#### Phase K — Item 22: Teaching Philosophy / ℹ️ Touchpoints 💬→📋
+
+**Why now:** This is additive — it adds ℹ️ chips to existing data displays across multiple pages. Build last in the intelligence sequence because it requires all the underlying features to be stable first.
+
+**Spec (completing from discussed state):**
+
+**Pattern:** A small `ℹ` chip next to any data point that requires domain knowledge. Tapping shows a 150-word inline card that slides open below the chip (no modal — inline expansion, same pattern as the existing sleep education cards on the Sleep Tracker page). The card is static copy — no AI, no DB query.
+
+**First 6 touchpoints to build (prioritized by "user will see this and not know what it means"):**
+
+1. **Sleep score number** (Sleep Tracker page) — already has education cards for stages; add ℹ to the score number itself.
+   > "Your sleep score is a composite of four things: total duration (did you get enough?), deep sleep % (did your body repair?), REM % (did your brain process?), and efficiency (time in bed vs time asleep). A score in the 50s usually means you got the duration but not the quality — you can be in bed 8 hours and get a 52 if most of it was light sleep."
+
+2. **Recovery Score number** (Life Hub overview) — the 5-component composite.
+   > "Recovery Score is a 0–100 composite of: sleep quality (0–30 pts), protein intake vs target (0–20 pts), hydration (0–20 pts), yesterday's energy check-in (0–15 pts), workout load balance (0–10 pts), and recent stretching (0–5 pts). A 100 doesn't mean you're perfect — it means all the inputs the app can measure are in good ranges."
+
+3. **Body recomposition state** (Measurements page — when measurements go up while weight goes down)
+   > "This is body recomposition — your fat-free mass (muscle, bone, glycogen, stored water) is increasing while fat is decreasing. The scale treats both the same weight. Arms and chest growing while your waist stays flat or shrinks is one of the most positive signals the data can show — it means the program is working even when the scale doesn't move."
+
+4. **HRV number** (Heart Rate page)
+   > "HRV (Heart Rate Variability) measures the variation in time between heartbeats. Higher variability = your nervous system is relaxed and adaptive. Lower variability = your body is under stress, recovering from illness, or in early overtraining. Unlike resting HR (which takes weeks to move), HRV responds within 24–48 hours — it's one of the fastest signals your body gives you."
+
+5. **Resting HR number** (Heart Rate page)
+   > "Resting Heart Rate is how many times your heart beats per minute when completely at rest. Lower is generally better — your heart is pumping more blood per beat, so it doesn't have to work as hard. RHR typically drops 5–15 bpm over months of consistent cardio. It rises temporarily with illness, alcohol, poor sleep, or overtraining — so spikes are often more informative than the baseline."
+
+6. **Static stretching before bed recommendation** (Stretching page, when `session_type === 'standalone'` at night)
+   > "Static stretching 10–15 minutes before sleep activates your parasympathetic nervous system — the 'rest and digest' mode. Slow, held stretches lower cortisol and heart rate. The breathing pattern (slow exhales during holds) directly signals your nervous system to downshift. People who stretch before sleep typically fall asleep faster and spend more time in deep sleep."
+
+**Implementation:**
+- Create `src/components/InfoChip.js` — a reusable component. Props: `text` (the education copy), `label` (optional — defaults to "ℹ"). Renders as a small chip. On tap, toggles an inline expansion div below it with the education text. No props for color/style variants — all instances are the same style (grey chip, orange on active).
+- Add the chip to each of the 6 locations above in the same commit.
+- No DB interaction, no AI call. Purely static, purely additive.
+
+**Watch out for:**
+1. The InfoChip must work in both light and dark theme (the app uses CSS variables for colors). Test in both.
+2. Don't add ℹ chips to things that are self-explanatory (calories, protein grams, step count). Only add them where domain knowledge is required to interpret the number.
+3. Keep the education copy under 150 words per chip. Longer defeats the purpose — if you need more, it means the data point needs its own dedicated page (like the Nutrient Encyclopedia).
+4. The sleep education cards already on the Sleep Tracker page are the right pattern — review those before implementing to match the visual style exactly.
+
+---
+
+#### Phase L — Weekly Wrap Page 📋
+
+**Why now:** Fully specced, independent of the intelligence layer. Can be built in any order relative to Phases F–K, but build after Phase D (post-workout coaching) since the Weekly Wrap benefits from that data being populated.
+
+**What to build:**
+1. DB migration: create `weekly_wraps` table with RLS (see schema in spec above).
+2. API routes:
+   - `GET /api/life-hub/weekly-wrap` — returns all past `week_start` dates (for history sidebar). No param → list. `?week=YYYY-MM-DD` → returns single wrap or 404.
+   - `POST /api/life-hub/weekly-wrap` — generates wrap for a completed past week. Same structure as monthly-wrap generation: gather data from 8+ tables for the week, call Sonnet, cache result, never regenerate. Uses `getUser()` + `is_disabled` check. The Claude prompt must include the "Next Week Setup" section as a **required output** (see spec above — one actionable observation pointing forward based on this week's patterns).
+3. Page: `/life-hub/weekly-wrap/page.js` — week picker (← → chips showing "Week of Jul 7"), stat cards, AI narrative, history sidebar. "Week in progress" placeholder for current week.
+4. Sidebar: add "Weekly Wrap" under Overview group (alongside "Monthly Wrap" and "Daily Brief"), in `LifeHubSidebar.js`.
+5. Monthly Wrap upgrade: once weekly_wraps table has data, update `monthly-wrap/route.js` POST handler to query weekly_wraps for the month's weeks first, use their `report_data` as the primary data source instead of raw table queries.
+
+**Watch out for:**
+1. "Week start" is always Monday. Use `getMonday(date)` helper: `const d = new Date(date); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().split('T')[0]`.
+2. Current week (today's week) must show "Week in progress" — don't let users generate a wrap mid-week. Block at both the API level (return 400 if `week_start` is the current week) and UI level (hide Generate button).
+3. The "Next Week Setup" section is required in every wrap narrative. Add it to the Claude system prompt as: "Your response MUST end with a section titled 'Next Week' containing exactly one actionable observation. Format: 'The one thing most likely to improve next week based on this week's patterns: [specific action tied to observed data].' This section is required — do not omit it."
+4. pg_cron for automatic Sunday generation is part of Phase M (push notifications infrastructure). For now, the Generate button is manual — user triggers it for past completed weeks.
+5. The CLAUDE.md directory structure and Database Tables sections must be updated in the same commit.
+
+---
+
+#### Phase M — Push Notifications + Three-Brief System 📋
+
+**Why last:** Complex infrastructure. pg_cron + Edge Functions + VAPID keys + service worker changes. Build after everything else is stable. Follow the 7-step build order documented in the Push Notifications spec above exactly — don't skip steps.
+
+**Key things that are NOT in the spec above that need to be done:**
+1. `daily_briefs` table needs a `window` column added: `alter table daily_briefs add column window text default 'morning' check (window in ('morning', 'afternoon', 'evening'));` — and the UNIQUE constraint changes from `(user_id, date)` to `(user_id, date, window)`. This is a breaking migration — need to handle existing rows (set `window = 'morning'` for all existing rows before adding the constraint).
+2. `goals_profiles.wake_time` and `goals_profiles.bedtime` added in Phase G — confirm they exist before building this phase.
+3. The service worker (`public/sw.js`) already exists for PWA. Add push handler to it — don't replace the file, append to it.
+4. VAPID keys must be generated on your local machine (`npx web-push generate-vapid-keys`), saved to a password manager, and added to BOTH Vercel env vars AND Supabase Edge Function secrets before any code is deployed.
+5. The Edge Function is TypeScript/Deno, not Node.js. Import style is different: `import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'`. Don't try to import from `@/lib/` — those are Next.js paths and don't exist in the Supabase Edge Function runtime.
+
+---
+
+### Dependency Map (quick reference)
+
+```
+Phase A (Feature 13 — retroactive editing)
+  └── Phase B (Feature 14 — morning review popup)
+
+Phase C (Item 19 — work/life schedule)  ← independent, build early
+
+Phase D (Feature 16 — post-workout coaching)  ← independent
+
+Phase E (Feature 15 — workout logger UX)  ← independent
+
+Phase F (Item 17 — coach_memory table + Edge Function)
+  └── Phase G (Item 18 + Feature B — real-time check-in intelligence)
+        └── Phase H (Feature D + E — suggestions + keep talking)
+              └── Phase I (Item 20 — stretch system overhaul)
+
+Phase J (Item 21 — micro daily awareness)  ← independent (can run parallel to F-I)
+Phase K (Item 22 — ℹ️ touchpoints)  ← independent (build last, needs stable features)
+Phase L (Weekly Wrap)  ← mostly independent, pg_cron part waits for Phase M
+Phase M (Push Notifications + Three-Brief System)  ← build last
+```
+
+**Recommended session order:**
+1. Phase A → B (nutrition editing chain — context is warm)
+2. Phase C (work/life schedule — quick win, high AI value)
+3. Phase D (post-workout coaching — independent, high value)
+4. Phase E (workout logger UX — quick polish)
+5. Phase F (coach_memory — foundation of intelligence layer)
+6. Phase G (check-in intelligence — requires F)
+7. Phase H (suggestions + keep talking — requires G)
+8. Phase J + K (micro awareness + info chips — can parallelize)
+9. Phase I (stretch overhaul — requires G for sore spots)
+10. Phase L (Weekly Wrap)
+11. Phase M (push notifications — last, most complex)
+
+---
+
 ## Future Features — Planned Design
 
 **Status tags:** 💬 Discussed | 📋 Fully Specced | ⏳ Pending Build
