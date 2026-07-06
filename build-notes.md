@@ -548,7 +548,106 @@ If `data_completeness_pct < 60`, explicitly caveat nutrition-based hypotheses: s
 
 ### 📊 Cross-Cutting Intelligence
 
-*(Age-adjusted micronutrients and dietary preference wiring above cover the main cross-cutting intelligence work. No additional items currently.)*
+**19. Work / Life Schedule Context** — 💬 Discussed
+
+The "great walk before the heat" problem: fitness apps misinterpret occupational activity as intentional exercise and make embarrassing, wrong assumptions because they have no concept of the user's daily life structure.
+
+**The input:** Weekly schedule, one label per day of week:
+- `active_work` — on your feet all day (warehouse, construction, hospital floor, manual labor)
+- `desk_work` — sitting most of the day (office, remote)
+- `day_off` — no work obligations
+- `travel` — different activity pattern than usual
+
+Stored in `goals_profiles` as a `weekly_schedule` JSONB column: `{ "mon": "active_work", "tue": "active_work", ... "sat": "day_off", "sun": "day_off" }`. Collected during goals setup (new step or existing "Your Context" step).
+
+**What recontextualizes with this data:**
+- **Step count interpretation:** 14k steps on a work day = occupational activity, not exercise. Coach memory: *"User averages 12–15k steps on active_work days from job activity — count only workout logs or steps on day_off as intentional exercise effort."* Daily brief stops praising work-steps as fitness wins.
+- **Heart rate:** Elevated HR on active_work days is physical labor, not stress or cardiac concern. Brief and heart rate page contextualize accordingly.
+- **Meal timing:** *"You're usually done with work by 2:30pm on work days — that's a good window for your larger meal before evening digestion slowdown."*
+- **Weekend logging gaps:** *"Low calorie log on Sunday — day off, user is less likely to log (established pattern), not necessarily a low-intake day."*
+- **HR baseline split:** Brief can say *"your resting HR on days off averages 58 vs 67 on active_work days — that gap is your body's response to sustained physical output at work, not a health concern."*
+- **Coach memory generation:** Weekly Edge Function checks `life_schedule` when computing all patterns — separates occupational vs intentional activity for every metric.
+
+**UI placement:** A simple weekly schedule grid in the Goals Setup "Your Context" step (or a standalone "My Schedule" card on the Goals page). 7 day chips, each with a dropdown of 4 options. Takes 30 seconds to fill out, massively improves AI interpretation accuracy.
+
+---
+
+**20. Stretch System Overhaul — From Passive Library to Proactive Daily Guidance** — 💬 Discussed
+
+**Current problem:** The stretching system has good infrastructure (38 stretches, session types, stretch_logs table) but is entirely passive — you have to navigate to the Stretching tab to see anything. Nobody proactively visits a stretch tab before knowing what they need. The AI has no way to surface stretch recommendations unless you're already on that page.
+
+**What needs to change:**
+
+*A. Proactive "Today's Stretches" card on the Workout Plan page:*
+Surfaced alongside today's exercises — not buried in a separate tab. Shows 3–5 recommended stretches with timing context. User can tap any stretch to expand it inline, or tap "Open Stretching" to go to the full page. This is the hook that gets people to actually stretch.
+
+*B. Specific timing guidance (currently completely missing):*
+- **Dynamic stretches:** 10–15 min BEFORE workout (not 2 min before — you need blood moving first). The card should say "Start these 15 minutes before you begin lifting" not just "Pre-Workout."
+- **Static stretches:** 10+ min AFTER workout when muscles are warm and pliable, OR before bed.
+- **Before-bed framing is an untapped angle:** Static stretching 10–15 min before sleep activates the parasympathetic nervous system, lowers cortisol and HR, and correlates with deeper sleep. The app should recommend this explicitly, not just list "post-workout" as an option.
+- Timing guidance stored as `timing_note` per stretch recommendation (computed by the stretch recommendation engine based on session type and time of day).
+
+*C. Injury-aware modification language:*
+When a stretch is recommended for a body part the user has flagged as sore (via check-in note or coach_memory), the recommendation card must include modification guidance rather than just showing the standard instructions:
+> *"Your hip is sore — still do this stretch, but don't push past a 4/10 sensation. When injured, the goal is blood flow and gentle range of motion, not depth. Pushing into pain triggers the muscle's stretch reflex (it contracts to protect itself), making the problem worse. Ease in slowly and hold without bouncing."*
+This education is critical because the average user thinks "if it doesn't burn it's not working" — which is actively counterproductive for injured tissue. The app should say this clearly, in the moment, not buried in a library article.
+
+*D. Stretch-sleep correlation tracking:*
+`stretch_logs` already has timestamps. `health_sleep_sessions` has sleep scores. The weekly coach_memory Edge Function should check: do nights where the user logged stretches before bed correlate with better sleep scores? If the correlation is meaningful, it becomes an observation: *"User's sleep score averages 72 on nights with any pre-sleep stretching vs 58 without."* The daily brief can then surface this directly.
+
+*E. "Why this stretch" education layer in recommendation cards (not just in the library):*
+Every stretch recommendation card should have a one-tap "Why?" that expands a 3-sentence explanation inline:
+- What muscle/tissue is being stretched
+- What that muscle does in daily life (why it gets tight)
+- What happens if it stays chronically tight
+This exists in the stretch library but never surfaces in recommendation context. The recommendation card is where the user actually sees the stretch — that's where education should live.
+
+---
+
+**21. Micronutrient Daily Awareness — Contextual, Not Just Visible** — 💬 Discussed
+
+**Current problem:** Micros are tracked and visible on the nutrition page, but there's no daily signal telling the user what's notable or what it means. The user has to know what to look for. The sodium → water goal adjustment was a positive moment because it was reactive and contextual — *that's* the standard every micro callout should meet.
+
+*A. Daily micro standout card on the nutrition page:*
+2–3 curated callouts, not a full breakdown. Prioritized by: (1) anything over 150% DV, (2) anything under 20% DV by late afternoon, (3) anything absent for 3+ consecutive days. Each callout is one sentence, specific, and says what it means:
+> *"Sodium is 210% DV today — your water target has adjusted upward to compensate."*
+> *"Iron is at 12% by 5pm — you have spinach tonight which helps; pair it with something acidic (lemon, tomato) to roughly double absorption."*
+> *"Vitamin D has been absent 5 days in a row — no dietary sources or supplement coverage."*
+
+*B. Reactive pairing callouts in meal insight:*
+When a logged meal is high in a specific micro that pairs well or conflicts with another, the post-meal insight (Feature A) mentions it:
+> *"That meal pushes your sodium to 140% for the day — worth a glass of water with it."*
+> *"Good iron in that meal — if you're having coffee or tea with it, try to wait 30 minutes, tannins block iron absorption significantly."*
+
+*C. Streak/pattern micro alerts (the high-value ones):*
+- Vitamin D absent 5+ days → notable callout in daily brief, not just a bar on the nutrition page
+- Omega-3 near zero for 2+ weeks → connect to any joint soreness in check-in notes
+- Magnesium consistently low → connect to sleep quality data if correlation exists
+- These connections are what make the app feel like a coach instead of a spreadsheet
+
+*D. Daily brief must include one micro standout when the story is real:*
+Not every day — only when something is genuinely notable or has a cross-feature connection. *"Your magnesium has averaged 22% of target for the week, and your sleep scores this week are running 15 points below last month's average — these two can be connected for some people."*
+
+---
+
+**22. The Teaching Philosophy — Contextual Education as a Core Feature** — 💬 Discussed
+
+The stated goal of the app is to teach users about themselves. This means education should be contextual (triggered by relevant data, not encyclopedic browsing) and specific (not "here's what omega-3 does" but "your omega-3 has been near zero for 12 days and your joint complaints have increased — these are connected").
+
+**The "ℹ Learn" touchpoint pattern:**
+Any data point with non-obvious meaning gets a small ℹ tap target that opens a 150-word inline education card. These are static copy, written once, triggered by context — not AI-generated. Examples:
+
+- Sleep score 52 → ℹ: *"Most of last night was light sleep — your brain cycled through stages but didn't spend enough time in deep (SWS) or REM. Deep sleep is when your body releases growth hormone and consolidates physical recovery. REM is when your brain processes emotion and consolidates memory. A score in the 50s typically means you got the duration but not the quality — you'll feel rested-ish but not sharp."*
+- Measurements going up while weight goes down → ℹ: *"This is body recomposition — your fat-free mass (muscle, bone, glycogen, water) is increasing while fat is decreasing. The scale treats both the same. Measurements going up in your arms and chest while your waist stays flat or shrinks is one of the most positive signals the data can show."*
+- Stretch recommendation before bed → ℹ: *"Static stretching at night activates your parasympathetic nervous system ('rest and digest'), lowering cortisol and heart rate. The slow breathing during held stretches directly signals your nervous system to downshift. People who stretch 10–15 min before sleep typically fall asleep faster and spend more time in deep sleep."*
+- Omega-3 callout → ℹ: *"Omega-3 fatty acids (EPA/DHA) are incorporated into cell membranes throughout your body, including joint tissue and the brain. Without regular dietary or supplemental sources, inflammatory responses in joints and recovery from exercise both slow down. Most people get almost none from food unless they eat fatty fish 2–3x per week."*
+
+**Rule for this app:** Every number or recommendation that requires domain knowledge to understand should have a ℹ available. This turns data from intimidating into educational. The user who just wants to know their calories can ignore the ℹ chips. The user who wants to actually learn sees them everywhere and gets smarter over time.
+
+**Existing infrastructure to expand:**
+- Sleep Tracker education cards already exist (collapsible Deep/REM/Light/Awake explainers) — this is the right pattern, extend it everywhere
+- Nutrient Encyclopedia already has AI-generated profiles — those are the long-form versions; the ℹ cards are the short contextual versions
+- Body metrics page already has BMI disclaimer — same ℹ pattern
 
 ---
 
