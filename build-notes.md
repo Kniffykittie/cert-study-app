@@ -257,35 +257,79 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 The "brand new coach each day" problem: every AI brief, workout response, and meal insight currently runs from a fresh context window — it sees today's data and maybe 7–30 days of aggregated stats, but it has no learned knowledge about this specific user's patterns, tendencies, or exceptions. The result feels like a smart coach who's seeing your file for the first time every morning.
 
-**The concept:** A `coach_memory` table with accumulating, structured observations — not raw data, but processed pattern conclusions. A background job (daily or weekly) scans the user's history and writes observations like:
-- "User's actual TDEE based on 60 days of data appears to be ~2,350 cal — formula said 2,720"
-- "User consistently logs energy ≤ 2 the day after back-to-back training days"  
-- "User rarely logs dinner on weekends — likely eating but not logging"
-- "User's best workout days (difficulty 4+, note mentions 'great') always follow 8+ hour sleep"
-- "Protein target of 160g is rarely hit — average is 98g across 45 logged days"
+**Two distinct layers of memory:**
 
-These observations get injected as a "What I've learned about you" block in every AI prompt — making the brief sound like month 6 of working with a coach, not day 1.
+*Layer 1 — Persistent context (long-term facts):* Things that don't change day to day. Hip discomfort, recurring shoulder tightness, a bad knee. Behavioral patterns: always under-logs on weekends, actual TDEE is lower than formula, protein target is rarely hit. These live in `coach_memory` indefinitely and get injected into every AI prompt.
 
-**Table schema:**
+*Layer 2 — Real-time state (today's status):* The check-in note "tired, right shoulder sore, maybe slept poorly" is not a long-term fact — it's today's physical/mental state. This needs to change what happens TODAY: which exercises are flagged, which stretches are surfaced, what the check-in micro-response recommends. This is a separate, immediate action — not a stored observation.
+
+**Layer 1 — coach_memory table:**
 ```sql
 CREATE TABLE coach_memory (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users NOT NULL,
-  category TEXT NOT NULL, -- 'nutrition', 'sleep', 'workout', 'lifestyle', 'goal_progress'
+  category TEXT NOT NULL, -- 'nutrition', 'sleep', 'workout', 'physical', 'lifestyle', 'goal_progress'
   observation TEXT NOT NULL, -- one plain-English sentence
   confidence SMALLINT DEFAULT 3, -- 1-5, increases with more supporting data
-  data_points INT DEFAULT 1, -- how many data points back this observation
+  data_points INT DEFAULT 1, -- how many data points support this observation
   first_seen_at TIMESTAMPTZ DEFAULT NOW(),
   last_confirmed_at TIMESTAMPTZ DEFAULT NOW(),
   is_active BOOLEAN DEFAULT TRUE
 );
 ```
 
-**Generation:** A weekly Supabase Edge Function scans the past 30/60/90 days of data and calls Haiku with structured data to produce new observations. Existing observations are refreshed (confidence raised) or retracted (is_active=false) if the pattern breaks.
+Examples of what gets written to coach_memory:
+- "User reports ongoing hip discomfort — flag deep hip flexion exercises (lunges, deep squats, Bulgarian split squats) and always suggest a modification or substitute."
+- "User's actual TDEE from 60 days of weight + food data is ~2,350 cal — formula said 2,720. All calorie commentary should use the empirical number."
+- "User consistently logs energy ≤ 2 the day after back-to-back training days — this appears to be a genuine recovery pattern, not a sleep issue."
+- "User rarely logs dinner on weekends — weekend calorie totals should be treated as likely incomplete."
+- "Protein target of 160g is hit less than 20% of logged days — average actual is 98g. Acknowledge the gap without being repetitive."
+- "User's best-rated workouts always follow 7.5+ hours of sleep. Sleep score below 60 correlates with difficulty ≥4 even on light days."
 
-**Injection:** Every AI prompt that currently has a `personalContext` block gets a `WHAT I KNOW ABOUT YOU` section prepended, with the top 5–8 active observations sorted by confidence desc, then recency.
+**Generation:** Weekly Supabase Edge Function (pg_cron, Sunday night) — one Haiku call per user with a structured 90-day data dump. Haiku returns 5–10 observations as `{ category, observation, confidence, data_points }` JSON. Edge Function upserts: new observations added, existing ones refreshed (confidence bumped), stale/broken patterns marked `is_active=false`.
 
-This is the single highest-leverage architectural improvement available — it turns the app from a stateless data reporter into a longitudinal coach.
+**Injection:** Every route with a `personalContext` block gets a `WHAT I KNOW ABOUT THIS USER (treat as established facts)` section prepended — top 5–8 active observations, sorted by confidence desc.
+
+The note field is the key input for physical context. Goals setup and check-in note should use placeholder text like "e.g. right hip tight, still sore from legs yesterday, low energy" to encourage specific, useful entries rather than vague diary-style notes.
+
+---
+
+**18. Real-Time State Adjustment (Today's Physical/Mental Status)** — 💬 Discussed
+
+Distinct from coach_memory. This is the check-in note "tired, right shoulder sore" changing what happens TODAY — not stored as a long-term pattern, but acted on immediately.
+
+**How it works:** The morning check-in Haiku micro-response (already specced) gets upgraded. Instead of just acknowledging the check-in, it receives today's workout plan and acts as a real-time triage:
+
+1. User writes: *"feeling pretty tired, right shoulder kinda sore, maybe slept poorly"*
+2. Haiku receives: check-in text + energy/mood rating + **today's scheduled exercises** + sore spot chips + coach_memory (persistent issues like the hip)
+3. Haiku response is specific: *"Today has Overhead Press and Lateral Raises — both will load that shoulder. I'd swap those for Chest Press and Bicep Curls. I'm also flagging 3 shoulder/upper-back stretches for you."*
+
+**What Haiku receives for the check-in micro-response:**
+```json
+{
+  "energy": 2,
+  "mood": 3,
+  "note": "tired, right shoulder kinda sore, maybe slept poorly",
+  "sore_spots": ["right_shoulder"],
+  "todays_exercises": ["Overhead Press", "Lateral Raises", "Tricep Dips", "Chest Fly"],
+  "coach_memory": ["User reports ongoing hip discomfort — flag deep hip flexion exercises"],
+  "rest_days_recent": 0,
+  "workouts_last_7_days": 5,
+  "sleep_score_last_night": 48
+}
+```
+
+**Workout adjustment — Option A (recommend, don't auto-change):** Workout plan page shows a subtle banner *"3 suggestions based on your check-in"* → expand to see each swap recommendation → one-tap "Apply" per suggestion. The base plan is never touched automatically — user approves each change. This respects that the user knows their body and might dismiss the recommendation.
+
+**Stretching page auto-population:** Sore spot chips should auto-populate from check-in note parsing (basic keyword match: "shoulder" → right_shoulder chip pre-checked, "hip" → hip chip pre-checked) so the user doesn't have to re-enter what they just told the check-in.
+
+**The full real-time loop:**
+1. Morning check-in note → Haiku reads it + today's plan → specific swap recommendations + stretch flags
+2. Workout plan page → banner shows suggestions → user applies or dismisses
+3. Stretching page → sore spots pre-populated from check-in → recommendations already loaded
+4. If the same soreness appears 3+ times in check-in notes → coach_memory Edge Function writes it as a persistent observation (bridges real-time and long-term)
+
+**Why the note field framing matters:** A "2" energy rating tells Claude you're tired. But *"tired, right shoulder sore, maybe slept poorly"* tells Claude which body part is compromised, which exercises to substitute, and whether this is a one-day thing or a pattern. The check-in UI should use a placeholder like *"How are you feeling physically and mentally? e.g. right hip tight, sore from legs yesterday, low energy"* to prime specific, actionable entries.
 
 ---
 
