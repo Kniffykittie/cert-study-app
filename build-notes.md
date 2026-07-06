@@ -323,6 +323,61 @@ const [sessionEntries, setSessionEntries] = useState([])  // entries added this 
 
 ---
 
+**13. Retroactive Log Editing (Any Past Day)** — 📋 Fully Specced
+
+Backend already supports it — all log API routes accept a `date` param. Only the UI is missing.
+
+**The design:** Date picker (calendar icon) in the nutrition page header next to "Today's Log." Selecting a past date loads that day's entries and enters editing mode automatically. Same editing mode spec as Feature 12 — fixed bottom bar, add/delete buttons, Finish Editing trigger. When done, returns to today.
+
+**AI insight for past-day edits:** Meal-insight call gets `is_retroactive: true` and `days_ago` count. Haiku uses past tense, reflective framing only — no forward-looking tips. Example: "With those additions Saturday now shows 142g protein — that lines up with your PR on squats two days later."
+
+**Stale brief handling:** If a Daily Brief or Weekly Wrap was already generated for the edited date, add a subtle `⚠️ Data updated after brief was generated` note under it with a manual Refresh button. User decides if the change warrants regenerating. No auto-regeneration (expensive, and the old brief reflects how the day actually felt at the time).
+
+**Applies to all log types:** food_log_entries (nutrition), water_logs (hydration), supplement_logs (supplements). Each navigable from their respective pages with the same date picker pattern.
+
+---
+
+**14. "Does This Look Right?" Morning Log Review Pop-Up** — 📋 Fully Specced
+
+Separate from the energy check-in. Fires once per day during the morning window, shows yesterday's summary and asks the user to validate it. The AI doesn't assume you did everything right OR that you missed something — it just shows you what it has and asks.
+
+**Three states:**
+
+*Normal (yesterday had data):*
+```
+Yesterday — Saturday, July 5
+  Calories: 1,840 / 2,400   Protein: 92g / 160g
+  Water: 48oz / 80oz        Workout: ✓ Upper body (52 min)
+  Supplements: 3/4 taken
+
+Does this look right?
+[ ✓ Looks good ]  [ ✏️ Let me fix something ]
+```
+
+*Sparse (some data, clearly incomplete):*
+```
+Yesterday looked light:
+  Calories logged: 420     Water: none logged
+  No workout logged
+  
+Missing a bunch, or intentional?
+[ 🍽️ I forgot — let me add it ]  [ 🚫 I was fasting ]
+[ 💤 Rest day, that's accurate ]  [ Skip ]
+```
+
+*Empty (nothing logged):*
+```
+You didn't log anything yesterday.
+Intentional? Sometimes we all need a day off from tracking.
+[ 🍽️ Let me backfill ]  [ 👍 Intentional ]  [ Skip ]
+```
+
+"Let me fix something" and "Let me backfill" → navigate to nutrition page in editing mode for yesterday. "Looks good" / "Intentional" → store flag in localStorage `log_review_YYYY-MM-DD` so it never resurfaces for that date. Skip → same localStorage flag.
+
+**Why this matters:** All AI briefs, weekly wraps, and trend analyses are only as accurate as what's logged. This is the lightweight daily guardrail that catches multi-day gaps before they corrupt weeks of trend data.
+
+---
+
 ### 🧘 Stretching & Mobility
 
 **11. Full Stretching & Mobility Section** — ✅ Built (Phase 54)
@@ -337,7 +392,71 @@ const [sessionEntries, setSessionEntries] = useState([])  // entries added this 
 
 ### 🏋️ Workouts
 
-*(No new items. Yoga/flexibility exercises will be added to the `exercises` table and `stretches` table as part of the Stretching & Mobility section.)*
+**15. Workout Logger UX Improvements** — 📋 Fully Specced
+
+*Problem 1 — Set logging friction:* After completing a physical set, user has to scroll to find and log it. Fix: when a set is completed (✓ tapped), the page auto-scrolls to the next incomplete set for that exercise. When the last set of an exercise is completed, auto-scroll to the first incomplete set of the next exercise. Always looking at what's next.
+
+*Problem 2 — Adding exercise mid-workout:* Currently requires exiting the workout. Fix: a floating `+` FAB button (bottom-right, purple, above the rest timer bar) opens the exercise picker modal without leaving the workout page. Selected exercise added immediately to the current session with an "Added during workout" badge. Same grouped-by-muscle-group picker as the plan page, with the `?` detail popup.
+
+**16. AI Post-Workout Coaching Response** — 📋 Fully Specced
+
+**Current state of post-workout data:** The app collects `difficulty` (1–5), `energy` (1–5), and a free-text `note` after every workout. HR zone breakdown (fat burn / cardio / hard / peak minutes) computed from intraday HR on finish. All stored in `workout_logs`. The post-workout note is currently saved to the DB and never read again by anything — this is the biggest waste.
+
+**New behavior:** After the post-workout check-in form is submitted, instead of immediately showing the completion screen, fire a Haiku call and show the coaching response as the primary content of the completion screen, above the stats summary.
+
+**API route:** `POST /api/workouts/coaching-response` — Haiku, rate-limited (1/workout via `api_rate_limits`). Uses `getUser()` + `is_disabled` check.
+
+**What Haiku receives:**
+```json
+{
+  "user_note": "ran out of gas halfway through, couldn't finish last two sets",
+  "difficulty": 4,
+  "energy_after": 2,
+  "duration_seconds": 3120,
+  "exercises_completed": ["Squat", "Romanian Deadlift", "Leg Press"],
+  "sets_completed": 14,
+  "sets_skipped": 4,
+  "hr_zones": { "fat_burn_min": 12, "cardio_min": 24, "hard_min": 8, "peak_min": 2, "avg_bpm": 142 },
+  "pre_workout_calories": 420,
+  "pre_workout_carbs_g": 38,
+  "pre_workout_caffeine_mg": 0,
+  "water_oz_today": 24,
+  "sleep_score_last_night": 52,
+  "morning_energy_rating": 2,
+  "back_to_back_days": true,
+  "workouts_this_week": 4,
+  "resting_hr_today": 72,
+  "resting_hr_baseline": 58,
+  "data_completeness_pct": 35
+}
+```
+
+**`data_completeness_pct`:** Rough estimate of how complete today's food log is, relative to the user's calorie target. If 35% logged and workout was at 6pm, the food picture is sparse and nutrition-based hypotheses need qualifying.
+
+**Haiku system prompt key rule — "if your data is correct" framing:**
+If `data_completeness_pct < 60`, explicitly caveat nutrition-based hypotheses: say "based on what you logged" or "if that's everything you ate before the workout" rather than stating causes as fact. Acknowledge the data may be incomplete without making the user feel accused of lying.
+
+**Example coaching responses:**
+
+*"Ran out of gas halfway through" — sparse food log, poor sleep, back-to-back day:*
+> "Running out of gas midway through makes a lot of sense given what's here — you'd only logged 420 calories by workout time and last night's sleep score was 52. Both hit hard in the second half when glycogen and recovery reserves run low. One caveat: if you ate more than what you logged, the nutrition piece might be smaller than it looks. The most consistent factor across everything here is going back-to-back without enough fuel coming in."
+
+*"Felt amazing, crushed it" — solid sleep, rest day yesterday, good food:*
+> "That tracks completely — you came in with a full rest day, 79 sleep score, and solid fuel. Days like this are worth noting because that combination (rest + sleep + carbs ahead of time) is reproducible. This is what your body looks like when all the variables line up."
+
+*"HR seemed really high" — elevated resting HR, low water:*
+> "The elevated HR is worth paying attention to — your resting HR today was 72 against your usual 58, which often signals the body is carrying stress before you even start. That combined with only 24oz of water logged can push working HR up 10–15bpm. If your hydration data is complete, getting ahead of it tomorrow morning should normalize things."
+
+**Workout data usage summary (what's collected vs what needs to be used):**
+| Data | Collected | Currently Used | Should Use |
+|------|-----------|---------------|-----------|
+| Duration | ✅ | Recovery Score | Weekly Wrap trend, coaching response |
+| HR zones | ✅ | Monthly Wrap mention | Coaching response, Daily Brief |
+| Post-workout difficulty | ✅ | Nowhere meaningful | Coaching response, Weekly Wrap |
+| Post-workout energy | ✅ | Nowhere meaningful | Coaching response, Weekly Wrap |
+| Post-workout note | ✅ | **Nowhere at all** | Coaching response — this is the biggest gap |
+| Sets/weights/reps | ✅ | PR tracking | Coaching response (sets skipped = ran out of gas) |
+| Live HR during workout | ✅ | Zone computation | Already wired |
 
 ---
 
