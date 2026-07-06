@@ -389,6 +389,9 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Security headers — Complete
+- `next.config.mjs`: Added HTTP security headers applied to all routes — `X-Frame-Options: DENY` (clickjacking protection), `X-Content-Type-Options: nosniff` (MIME sniffing prevention), `Referrer-Policy: strict-origin-when-cross-origin`, `X-DNS-Prefetch-Control: on`, `Permissions-Policy` (disables camera/mic/geolocation/FLoC), `Strict-Transport-Security` with 2-year max-age + preload (forces HTTPS on all future visits)
+
 ### Measurements page redesign — Complete
 - `measurements/page.js`: Split single form into two separate sections — "⚖️ Log Weight" (inline row with date + weight field + Save Weight button) and "📏 Log Measurements" (date + 8 tape measurement fields + Save Measurements button), each with its own saving state and messages; removed rolling average from weight chart (now shows raw dots + line only); added "📐 Measurement Trends" chart below weight chart — field selector pill buttons (Waist/Hips/Chest/Neck/Left Arm/Right Arm/Left Thigh/Right Thigh), SVG line chart filtered to non-null entries for selected field, start/end date + value labels, total delta shown in color (down=good for waist/hips, up=good for arms/thighs); fixed `interpretBodyComp` to search history for most-recent-non-null per field independently using `getMostRecentPair(history, field)` instead of comparing hist[0] vs hist[1] directly — fixes signal analysis when weight and tape measurements are logged on different days
 
