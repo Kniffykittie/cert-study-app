@@ -281,6 +281,218 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ---
 
+### 🔔 Push Notifications + App Personality — 📋 Fully Specced
+
+**Overview**
+Real push notifications delivered to the user's phone lock screen (iOS Safari + Android Chrome) using the Web Push API + Supabase Edge Functions + pg_cron. No Vercel paid plan required. No cron jobs on Vercel. Works even when the app is closed.
+
+---
+
+#### The Core Data Freshness Problem (and the solution)
+
+The user's concern is valid: if a notification fires at 7pm saying "you've only taken 2,000 steps" when the actual count is 10,000, the notification is worse than useless — it destroys trust. This happens because the Google Health data in Supabase is only as fresh as the last app visit.
+
+**Solution:** The Supabase Edge Function that sends notifications does NOT read from the stale cache. It runs a live refresh first:
+1. Reads the user's tokens from `google_health_tokens`
+2. Refreshes the access token if expired (same logic as `refreshTokenIfNeeded` in `googleHealth.js`)
+3. Calls Google Health API directly to fetch fresh steps, HR, sleep for today
+4. Writes fresh data to the hourly/daily cache tables
+5. THEN reads the now-current data and generates the notification
+
+This means notification data is always live at send time, regardless of whether the user has opened the app. The Edge Function essentially replaces the app's role as the sync trigger — it becomes the scheduled sync that also sends a notification as a side effect.
+
+---
+
+#### Architecture: All Six Pieces
+
+**Piece 1 — VAPID Keys (generated once, stored as secrets)**
+- Run `npx web-push generate-vapid-keys` locally (one-time)
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY` → Vercel env var (all environments — safe to be public, it's a signing key, not a secret)
+- `VAPID_PRIVATE_KEY` → Vercel env var (secret) + Supabase Edge Function secret
+- `VAPID_SUBJECT` → `mailto:sethproper40@yahoo.com`
+- These never rotate unless the subscription system is rebuilt. Store them somewhere safe (password manager).
+
+**Piece 2 — `push_subscriptions` DB table**
+```sql
+create table push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users not null,
+  endpoint text not null,         -- push service URL (browser-generated)
+  p256dh text not null,           -- client public key (browser-generated)
+  auth_key text not null,         -- auth secret (browser-generated)
+  user_agent text,                -- for debugging (e.g. "Chrome/Android")
+  created_at timestamptz default now(),
+  unique(user_id, endpoint)       -- one subscription per browser/device
+);
+alter table push_subscriptions enable row level security;
+-- Users can manage their own subscriptions
+create policy "user manages own subscriptions" on push_subscriptions
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+```
+Note: a user can have MULTIPLE subscriptions if they've granted permission on multiple devices/browsers. The Edge Function sends to ALL of them.
+
+**Piece 3 — `/api/push/subscribe` Vercel route**
+- `POST` — receives `{ endpoint, keys: { p256dh, auth }, userAgent }`
+- Auth-gated with `getUser()` — only authenticated users can register
+- Upserts to `push_subscriptions` (onConflict: user_id + endpoint)
+- `DELETE` — removes the subscription for the current device (called when user revokes permission in Settings)
+- No `is_disabled` check needed — this is not an AI route and doesn't cost money to run
+
+**Piece 4 — Permission UI in Settings**
+- A "Notifications" section in Settings page
+- On first render: check `Notification.permission` — if 'default', show "Enable Notifications" button; if 'granted', show "Notifications enabled ✓" + "Disable" button; if 'denied', show "Notifications blocked in browser — tap the lock icon in your address bar to re-enable"
+- On "Enable": call `Notification.requestPermission()`, then if granted, call `navigator.serviceWorker.ready` → `registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: NEXT_PUBLIC_VAPID_PUBLIC_KEY })`, then POST the subscription object to `/api/push/subscribe`
+- On "Disable": call DELETE on `/api/push/subscribe`, then `registration.pushManager.getSubscription()` → `subscription.unsubscribe()`
+- The permission prompt only appears once ever on each device — after that, the browser remembers the choice
+
+**Piece 5 — Service Worker push handler (`public/sw.js`)**
+The service worker already exists (PWA). Add a `push` event listener:
+```js
+self.addEventListener('push', (event) => {
+  const data = event.data?.json() ?? {}
+  event.waitUntil(
+    self.registration.showNotification(data.title ?? 'Life Hub', {
+      body: data.body,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/badge-72.png',
+      data: { url: data.url ?? '/life-hub' },
+      tag: data.tag ?? 'lifehub-update',   // replaces previous notification with same tag
+      renotify: false,                      // don't vibrate if replacing same tag
+    })
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then(list => {
+      const url = event.notification.data?.url ?? '/life-hub'
+      const match = list.find(c => c.url.includes(location.origin))
+      if (match) { match.focus(); match.navigate(url) }
+      else clients.openWindow(url)
+    })
+  )
+})
+```
+Security note: `tag` deduplication means if 3 pm and 7 pm notifications both use `tag: 'nutrition-nudge'`, the 7 pm one silently replaces the 3 pm one on the lock screen — no notification spam.
+
+**Piece 6 — Supabase Edge Function (`supabase/functions/daily-push/index.ts`)**
+This is the brain. Called by pg_cron on a schedule (e.g. 8am, 1pm, 7pm EST daily).
+
+High-level logic per scheduled window:
+```
+1. Load all push_subscriptions rows (service role read)
+2. For each user:
+   a. Load their google_health_tokens row
+   b. Refresh access token if expired (call oauth2.googleapis.com/token)
+   c. Update access_token + expires_at in DB
+   d. Fetch fresh data from Google Health API:
+      - steps (today's civil date)
+      - heart rate (today)
+      - sleep (last night)
+   e. Write fresh data to health_steps_hourly / health_heart_rate_daily / health_sleep_sessions
+   f. Load their food_log_entries for today (calories, protein, water from food entries)
+   g. Load their water_logs for today
+   h. Load their goals_profiles (step goal, calorie target, protein target, water goal)
+   i. Load their workout_logs for today (did they work out?)
+   j. Load their daily_checkins for today (energy level)
+   k. Determine which notification window this is (morning/midday/evening)
+   l. Apply rule-based logic to pick a notification message
+   m. Call web-push library with the user's subscription endpoint
+3. Mark sent in a `push_notification_log` table (prevents duplicates if function runs twice)
+```
+
+**Notification logic per window:**
+
+*8am — Morning Brief Notification:*
+- Sleep < 6hrs → "You got [X] hrs of sleep. Energy may be lower today — stay ahead of it with a protein-heavy breakfast."
+- Sleep ≥ 7.5hrs → "Solid [X] hrs of sleep. Good recovery base today."
+- Yesterday steps > 10k → "You hit [X] steps yesterday. Good baseline — see if you can match it today."
+- Default → "Morning. Let's see what today looks like."
+
+*1pm — Midday Check:*
+- Steps < 2000 by 1pm → "Only [X] steps so far today. A 10-min walk after lunch gets you to 3,000 easily."
+- No food logged + it's 1pm → "No food logged yet. Even if you're not tracking strictly, a quick log helps the app give you better insights."
+- Water < 32oz → "You're at [X]oz of water at 1pm. Dehydration at this point causes the classic afternoon energy dip — drink 16oz now."
+- Calorie deficit > 800 by 1pm → "You're running a big deficit early. That 3–4pm crash you might feel is usually hunger in disguise."
+
+*7pm — Evening Summary:*
+- Steps > 10k → "You hit [X] steps today. That's about [X] calories burned from movement alone."
+- Steps < 5k + workout logged → "Low step count but you had a workout. Movement quality over quantity — you're good."
+- Protein < 80% of target + calorie goal hit → "Close to your calorie target but protein is at [X]g — [target]g is the goal. A quick protein source before bed protects muscle overnight."
+- All goals hit → "Great day — steps, food, and water all on track. Recovery is tonight's job now."
+- No food logged all day → "Looks like today wasn't a tracking day. No problem — even logging tomorrow's breakfast gets the streak going."
+
+---
+
+#### Security Design
+
+**What could go wrong and how it's prevented:**
+
+| Threat | Mitigation |
+|--------|-----------|
+| Someone intercepts your push subscription endpoint and sends fake notifications | Web Push spec encrypts all payloads end-to-end using ECDH — only your browser's private key can decrypt them. Even if someone has your endpoint URL, they can't send a notification without the VAPID private key. |
+| VAPID private key leaks | Stored only in Vercel env vars (secret) and Supabase Edge Function secrets — never in code, never in git. Rotatable by generating new keys and re-subscribing. |
+| Someone calls the Edge Function directly to spam notifications | The function is invoked by pg_cron only (internal Supabase call). If you add an HTTP trigger, gate it with a shared secret header checked inside the function. |
+| Edge Function reads other users' tokens | Function uses service role but is coded to only read the token for the user_id it's processing. Logic is auditable. |
+| `push_subscriptions` table exposed | RLS enabled — users can only see their own subscriptions. Edge Function uses service role but only touches the subscription of the user it's currently processing. |
+| Notification content leaks health data if phone is shared | Web Push payloads are encrypted in transit. On the lock screen, iOS/Android show the notification body — this is the same as any health app. User can disable lock screen notification previews in phone settings if needed. |
+| Token refresh inside Edge Function exposes client secret | `GOOGLE_HEALTH_CLIENT_SECRET` stored as Supabase secret (encrypted at rest, injected at runtime, never visible in logs). Same security model as Vercel env vars. |
+| `push_notification_log` bypassed — sends duplicate notifications | Table stores `(user_id, date, window)` unique constraint. Function checks before sending, inserts after. If the insert fails (duplicate), the notification was already sent — no retry. |
+
+**What the Edge Function can and cannot do:**
+- ✅ Can read all user health data (service role)
+- ✅ Can call Google Health API with stored tokens
+- ✅ Can send Web Push notifications
+- ✅ Can write to health cache tables
+- ❌ Cannot call Claude/Anthropic API (would cost money per notification, on a schedule = uncontrolled spend). Notification content is rule-based, not AI-generated.
+- ❌ Cannot access Vercel env vars (they're separate from Supabase secrets — VAPID private key needs to be stored in BOTH Vercel AND Supabase secrets)
+
+**Rate limits and cost:**
+- pg_cron fires the Edge Function 3× per day
+- Each Edge Function invocation does 1 Google Health refresh + 1 web-push send per user
+- Single user = trivially cheap. If the app ever gets other users, the rate limiting is 3 notification windows/day/user (enforced by the push_notification_log table)
+
+---
+
+#### Build Order (sequential — each step testable before the next)
+
+**Step 1 — Generate VAPID keys + add to env**
+- Run `npx web-push generate-vapid-keys` locally
+- Add `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` to Vercel (all environments)
+- Add `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `GOOGLE_HEALTH_CLIENT_ID`, `GOOGLE_HEALTH_CLIENT_SECRET` to Supabase Edge Function secrets
+- Commit nothing — no code changes needed for this step
+
+**Step 2 — DB migration**
+- Create `push_subscriptions` table with RLS (see schema above)
+- Create `push_notification_log` table: `(id, user_id, sent_at, window, title, body)` + unique on `(user_id, date(sent_at), window)`
+
+**Step 3 — `/api/push/subscribe` route + Settings UI**
+- POST: receives subscription object, upserts to `push_subscriptions`
+- DELETE: removes subscription for current device
+- Settings page: "Notifications" card with permission state management
+
+**Step 4 — Service worker push handler**
+- Add push + notificationclick listeners to `public/sw.js`
+- Test: use browser DevTools → Application → Service Workers → "Push" button to send a test push
+
+**Step 5 — Supabase Edge Function (rule-based, no Claude)**
+- `supabase/functions/daily-push/index.ts`
+- Implements the full logic: token refresh → Google Health fetch → cache write → rule evaluation → web-push send
+- Test by invoking manually via Supabase dashboard
+
+**Step 6 — pg_cron schedule**
+- SQL migration: `select cron.schedule('morning-push', '0 12 * * *', ...)` etc. (UTC times — 12:00 UTC = 8am EST, 17:00 UTC = 1pm EST, 23:00 UTC = 7pm EST)
+- DST handling: use America/New_York tz conversion in the Edge Function, not in the cron schedule
+
+**Step 7 — Test end-to-end**
+- Grant notification permission in Settings
+- Manually invoke the Edge Function
+- Verify notification appears on phone lock screen
+- Verify tapping it opens the app to the right page
+
+---
+
 ## Vercel Deployment — When Ready
 
 **Steps:**
