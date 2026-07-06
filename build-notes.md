@@ -57,6 +57,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 ### Feature Tracking Rules (Enforced Every Session)
 - **Any feature discussed but not built in the same session must be added to Future Features before the conversation ends.** Even a one-liner placeholder is enough. No exceptions. This is what prevents things from falling through the cracks between sessions.
 - **At the start of any planning session** ("what should we build?", "what's left?", "let's make a plan") — read the Future Features section before discussing new ideas. Do not re-spec things already captured.
+- **Cross-check rule (enforced before finalizing any new feature spec):** Before fully speccing a new feature, scan all existing Future Features items and ask: Does this new idea correlate with, conflict with, duplicate, or depend on anything already specced? If it correlates → update the existing spec to note the connection. If it conflicts → resolve the conflict before writing new spec. If it depends on something → note the dependency explicitly in the spec. This prevents designing features in isolation that later fight each other or unknowingly duplicate work.
 - **When a feature is built**, move its entry from Future Features to the Phase Log. Never leave it in both places.
 - **QA items** are removed from the Untested section once the user confirms tested and passing.
 - **Future Features status tags:** 💬 Discussed (idea floated, not fully specced) | 📋 Fully Specced (design complete, ready to build) | ⏳ Pending Build (specced and queued, not started)
