@@ -292,6 +292,8 @@ Examples of what gets written to coach_memory:
 
 The note field is the key input for physical context. Goals setup and check-in note should use placeholder text like "e.g. right hip tight, still sore from legs yesterday, low energy" to encourage specific, useful entries rather than vague diary-style notes.
 
+**Conversation signal seeding:** When any conversational session ends (user closes, hits turn limit, navigates away), a lightweight POST to `/api/coach-memory/from-conversation` records structured signals — did the user apply swap suggestions, did they push back, what body parts were mentioned, any temporal patterns stated ("I always feel this way on Mondays"). These signals feed the weekly Edge Function alongside raw log data, so conversations actively train the coach over time.
+
 ---
 
 **18. Real-Time State Adjustment (Today's Physical/Mental Status)** — 💬 Discussed
@@ -719,6 +721,104 @@ const isBackfilling = recentSlotLogs.current.filter(
   e => Date.now() - e.timestamp < 600000
 ).length >= 2
 ```
+
+---
+
+#### Feature D — Workout Suggestions Button + Today's Exercise Overrides — 💬 Discussed
+
+Non-blocking, user-in-control system for applying check-in-informed modifications to today's workout.
+
+**Suggestions button on workout plan page:**
+Each day card (especially today's) has a small "Suggestions" button in the top-right corner. If the morning check-in flagged something relevant to today's exercises, the button shows a small orange dot. No alarm, no forced banner — quiet signal, user taps when ready.
+
+Tap → bottom sheet slides up. Each suggestion is its own card:
+```
+⚠️  Overhead Press → Chest Press
+"Your shoulder soreness from this morning — pressing overhead 
+loads the exact area you mentioned. Chest Press hits the same 
+pushing pattern without the shoulder elevation."
+
+[ ✓ Apply ]   [ Skip ]
+```
+Three parts per suggestion: what's swapping, one specific sentence explaining why (references the user's actual words/data), two buttons. User can apply some and skip others in any order.
+
+**Today override vs plan edit — critical distinction:**
+Applied swaps write to a `workout_session_overrides` table (date, original_exercise, override_exercise, reason). The saved `workout_plans` record is NEVER touched. The plan looks identical tomorrow. This maintains the user's permanent plan while accommodating daily physical state — they are completely separate concerns.
+
+**What generates the suggestions:**
+The check-in micro-response (Feature B) already calls Haiku with today's exercises. The action proposals (structured JSON alongside the text response — see Feature E below) get stored in component state / sessionStorage as `today_suggestions`. The Suggestions button reads from this state — no extra API call when the user opens the suggestions sheet.
+
+---
+
+#### Feature E — Conversational AI with Structured Action Proposals — 💬 Discussed
+
+**The "Keep Talking" problem — solved with context snapshots:**
+
+*Security concern:* If every conversational turn re-fetches the user's full data from the DB and sends it to Anthropic, a motivated user could trigger hundreds of expensive API + DB calls. This is a real attack surface.
+
+*Solution — context snapshot pattern:*
+- The FIRST AI response (check-in insight, post-meal insight, post-workout coaching) does one DB fetch of all relevant data
+- That data is returned to the client as a `contextSnapshot` JSON blob alongside the text response
+- Every subsequent "Keep Talking" message sends: conversation history + the SAME contextSnapshot from turn 1 — NO new DB query
+- DB is hit exactly once per conversation session, regardless of turn count
+
+*Rate limits (enforced in api_rate_limits table):*
+- Max 8 turns per conversation session (after that "Keep Talking" replaced with "Start a new conversation")
+- Max 3 conversation sessions per day per context type (check-in, meal, post-workout)
+- Worst-case cost: 3 sessions × 8 turns × Haiku ≈ a few cents. Completely bounded.
+
+**Structured action proposals — how the AI "does things":**
+
+Every AI response in a conversation can include a `proposed_actions` array alongside the `message` text:
+```json
+{
+  "message": "If it's been a few days, I'd actually pull both shoulder exercises, not just the overhead. Want me to flag the other one too?",
+  "proposed_actions": [
+    {
+      "type": "swap_exercise",
+      "from_exercise": "Overhead Press",
+      "to_exercise": "Chest Press",
+      "day": "today",
+      "display": "Swap Overhead Press → Chest Press today"
+    },
+    {
+      "type": "add_stretch",
+      "stretch_id": "sho-static-doorway-pec-stretch",
+      "session_type": "pre_workout",
+      "display": "Add Doorway Pec Stretch to today's pre-workout"
+    }
+  ]
+}
+```
+
+The client renders the `message` as text, then renders each action as an inline apply-card directly below the message in the chat. **Nothing writes to the database until the user taps Apply.** The AI never acts autonomously — it only proposes. This is the tool-use pattern applied to a chat interface.
+
+**Inline stretch cards in conversation:**
+When a proposed action has `type: "add_stretch"`, the client looks up the stretch by ID in `stretches.js` (static local data, no extra API call) and renders a compact card inline in the chat:
+```
+╔══════════════════════════════════╗
+║ 🧘 Doorway Pec Stretch           ║
+║ Static · Chest & Shoulders · 30s ║
+║ Stand in a doorway, forearm on   ║
+║ the frame, lean forward.         ║
+║ [ + Add to Pre-Workout Today ]   ║
+╚══════════════════════════════════╝
+```
+Tapping "Add" fires POST to `/api/workouts/stretch-log` or adds to `recommended_today` local state that surfaces on the Stretching page as **"AI-Recommended for Today"** at the top of the page. Stretches ALWAYS stay separate from workout exercise cards — they live on the Stretching page regardless of which conversation surface recommended them.
+
+**Conversation signal → coach memory bridge:**
+When a conversation session ends (user closes, hits turn limit, navigates away), a lightweight POST to `/api/coach-memory/from-conversation` records structured signals:
+- Did the user apply all suggested swaps? (trust signal)
+- Did the user push back? What did they say? (preference/constraint signal)
+- Which body parts were mentioned? (physical concern tracking)
+- Any temporal patterns stated? ("I always feel like this on Mondays")
+These feed the weekly Edge Function alongside raw log data, so conversations actively train the coach over time — they're not just ephemeral exchanges.
+
+**Applicable conversation surfaces:**
+- Morning/afternoon check-in micro-response (Feature B)
+- Post-meal insight (Feature A)
+- Post-workout coaching response (Feature 16)
+- All three use the same context snapshot + structured action proposal pattern
 
 ---
 
