@@ -295,10 +295,14 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 **Three-brief system uses `window` column on `daily_briefs` table.** UNIQUE changes from `(user_id, date)` to `(user_id, date, window)`. Each window (`morning`/`afternoon`/`evening`) is generated independently by its own pg_cron schedule. The app shows all three that exist for today + yesterday's evening as fallback context.
 
-**The 4am / 10pm scenario resolved:**
-- At 4am: today has no briefs yet (morning generates at 8am EST). Show yesterday's evening brief labeled "Yesterday evening" + a static "Morning brief generates at 8am" placeholder. No fetch, no spinner.
-- At 10pm: all three today briefs exist (morning generated at 8am, afternoon at 1pm, evening at 7pm). Each captured the real state of the day at that moment — the afternoon brief genuinely reflects what happened by 1pm, not a retroactive reconstruction. Show all three as a chronological day story, newest (evening) expanded by default.
+**Brief timing is personalized per user, not hardcoded globally.** Storing `wake_time TIME` and `bedtime TIME` in `goals_profiles` (or `user_preferences` table) means brief windows are derived from the user's personal schedule: morning = wake_time, afternoon = wake_time + 6hrs, evening = bedtime - 2hrs. pg_cron fires hourly; the Edge Function checks if "right now" is within 15 minutes of each user's personal window before generating. A user who wakes at 3:30am gets their morning brief at 3:30am. A user who wakes at 9am gets theirs at 9am.
+
+**The early-riser / 4am scenario resolved:**
+- User opens app at 3:30am: if wake_time is set to 3:30, morning brief generates immediately. If no wake_time set, show yesterday's evening brief + "Morning brief generates at your set wake time" placeholder.
+- User opens app at 10pm: all three today briefs exist (generated at their personal morning/afternoon/evening times). Show as a chronological day story, newest (evening) expanded by default.
 - pg_cron fires regardless of whether the user opened the app — briefs are generated on schedule, app visit just reads from cache.
+
+**Notification cap is configurable with no platform cost.** Default 3/day (one per window). Can be raised to 5, 8, or any number by changing the integer check in the Edge Function. No Supabase pricing tier involved. Smart suppression (don't fire if all signals look good) keeps it from feeling spammy regardless of the cap number.
 
 **Data freshness: Edge Function does a live Google Health sync before generating content.** It does NOT read from the stale Supabase cache. Replicates the token refresh + API fetch + cache write logic from `sync/route.js`, then reads the now-current tables. Notification about "10,000 steps" will be based on actual current Google Health data, not whatever was cached from the last app visit.
 
@@ -338,8 +342,55 @@ If HR spike but no step spike → stationary elevated HR (could be stress, illne
 - **Notification tap-through:** tapping a morning brief notification opens the Life Hub overview directly to the brief panel (already handled by `data.url` in the push payload)
 - **Brief "last updated" timestamp:** small grey label under each brief showing when it generated — helps user understand if afternoon brief reflects a noon sync vs a 12:59pm sync
 - **Manual brief regeneration:** "🔄 Refresh" button on each brief card that calls the POST endpoint on demand (same logic as today's single daily brief) — useful on days when a lot happened after the scheduled window
-- **Week-in-review Saturday morning brief:** pg_cron fires a special Saturday 8am brief with 7-day context instead of yesterday context — calls a separate Edge Function / different `window = 'week'` value; shows in overview as a "This Week" card
-- **Smart notification suppression for quiet hours:** Edge Function checks current time in user's local timezone. If `send_time` falls between 10pm–7am user-local, defer to next window. Store `timezone` in `goals_profiles` or derive from `NEXT_PUBLIC_SITE_URL`.
+- **Smart notification suppression for quiet hours:** Edge Function checks current time in user's local timezone against `bedtime` field. If send time falls within sleep window, defer to next brief window.
+- **Frequent Google Health data sync (no notification):** separate pg_cron job every 2 hours that does token refresh + Google Health fetch + cache write only — no brief, no notification. Keeps step/HR tables fresh for all other features (recovery score, brief generation, notification rules) regardless of app visit recency.
+
+### 📅 Weekly Wrap — 📋 Fully Specced
+
+**Core idea:** A dedicated Weekly Wrap section identical in structure to Monthly Wrap — week picker, stat cards, AI narrative, history sidebar of all past weeks. Linked from the Overview group in the sidebar alongside Monthly Wrap and Daily Briefs.
+
+**Why this improves Monthly Wrap too:** Currently Monthly Wrap gathers raw data from 10 tables across 30 days — expensive query and Claude only sees daily numbers with no sense of weekly momentum or slumps. With Weekly Wrap as a layer, Monthly Wrap instead queries 4–5 pre-computed weekly summaries and uses their `report_data` JSONB as the foundation. Claude can then say: *"Week 1 was your strongest — 4 workouts and sleep above 80 each night. Week 3 dropped off sharply, which tracked with the lower energy check-ins that week. Week 4 showed a strong recovery trend."* That week-over-week narrative is impossible from raw daily data alone.
+
+**DB table: `weekly_wraps`**
+```sql
+create table weekly_wraps (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users not null,
+  week_start date not null,         -- always a Monday (ISO week start)
+  report_data jsonb,                -- aggregated stats: avg_sleep_score, total_steps, workout_days, avg_calories, avg_protein, avg_water_oz, avg_energy, avg_mood, workout_types[], top_foods[], supplement_adherence_pct
+  ai_narrative text,                -- Claude's week narrative (3–4 paragraphs)
+  generated_at timestamptz default now(),
+  unique(user_id, week_start)
+);
+alter table weekly_wraps enable row level security;
+create policy "user reads own wraps" on weekly_wraps for all using (user_id = auth.uid());
+```
+
+**Generation:** pg_cron fires Sunday at `bedtime - 1hr` (user-personalized). Falls back to 8pm Sunday EST if no bedtime set. Same "generated once, cached forever" pattern as Monthly Wrap. GET without `?week=` returns all past week_start dates for the history sidebar.
+
+**Current month still blocked:** Weekly Wrap for the current in-progress week shows "Week in progress — check back Sunday" state (same pattern as Monthly Wrap blocking the current month).
+
+**What the AI narrative covers per week:**
+- Overall tone sentence (strong week / recovery week / mixed bag)
+- Best day and worst day with reason why (e.g. "Tuesday was your peak — 12k steps, 7.8 sleep score, protein goal hit")
+- One consistency observation (e.g. "You hit your water goal 5/7 days — that's your best hydration week in two months")
+- One thing that slipped with no judgment (e.g. "Sleep was below 70 four nights — the two late workout days correlated directly with longer sleep onset")
+- One concrete setup for next week (e.g. "If you want to match or beat this week, the pattern that worked was morning protein before 9am on active days")
+
+**How Monthly Wrap uses Weekly Wraps:**
+`/api/life-hub/monthly-wrap/route.js` POST handler:
+1. Query `weekly_wraps` where `week_start >= month_start AND week_start <= month_end` for this user
+2. Use `report_data` JSONB from each week as the primary data source (pre-aggregated, fast)
+3. Only fall back to raw table queries for metrics not captured in weekly_wraps (e.g. specific food entries, photo milestones)
+4. Claude prompt gets: array of weekly summaries + month-level totals + comparison to previous month's weekly wraps if available
+
+**Page: `/life-hub/weekly-wrap`**
+- Week picker (← →) navigating by 7 days, showing "Week of Jul 7" format
+- Current week: "Week in progress" placeholder
+- Past weeks: stat cards (Sleep Score avg, Total Steps, Workout Days, Avg Calories, Avg Protein, Water Goal Hit %, Energy avg) + AI narrative card
+- Right sidebar: history list of all past weeks (most recent first), clickable to switch
+- "Generate" button only appears if week is complete and wrap hasn't been generated yet (edge case: if Sunday pg_cron missed)
+- Sidebar nav: listed under Overview group alongside Monthly Wrap
 
 **Overview**
 Real push notifications delivered to the user's phone lock screen (iOS Safari + Android Chrome) using the Web Push API + Supabase Edge Functions + pg_cron. No Vercel paid plan required. No cron jobs on Vercel. Works even when the app is closed.
