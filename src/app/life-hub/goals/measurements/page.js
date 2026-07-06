@@ -3,8 +3,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { estimateBodyFatPct } from '@/lib/tdee'
 
-const FIELDS = [
-  { key: 'weight_lbs', label: 'Weight', unit: 'lbs', placeholder: '175' },
+const WEIGHT_FIELD = { key: 'weight_lbs', label: 'Weight', unit: 'lbs', placeholder: '175' }
+
+const MEAS_FIELDS = [
   { key: 'waist_in', label: 'Waist', unit: 'in', placeholder: '32' },
   { key: 'hips_in', label: 'Hips', unit: 'in', placeholder: '38' },
   { key: 'chest_in', label: 'Chest', unit: 'in', placeholder: '40' },
@@ -14,6 +15,8 @@ const FIELDS = [
   { key: 'left_thigh_in', label: 'Left Thigh', unit: 'in', placeholder: '22' },
   { key: 'right_thigh_in', label: 'Right Thigh', unit: 'in', placeholder: '22' },
 ]
+
+const ALL_FIELDS = [WEIGHT_FIELD, ...MEAS_FIELDS]
 
 const HOW_TO = [
   { field: 'Weight', tip: 'First thing in the morning, after using the bathroom, before eating or drinking.' },
@@ -37,7 +40,6 @@ function todayDate() {
 
 function avg(arr) { return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null }
 
-// US Navy Body Fat % — requires waist+neck (male) or waist+hips+neck (female)
 function calcNavyBfPct(entry, heightInches, sex) {
   const w = entry?.waist_in ? parseFloat(entry.waist_in) : null
   const n = entry?.neck_in ? parseFloat(entry.neck_in) : null
@@ -56,31 +58,44 @@ function calcNavyBfPct(entry, heightInches, sex) {
   return null
 }
 
-function interpretBodyComp(current, previous, goalsProfile, supplements, recentCarbAvg) {
-  if (!previous) return null
+// Find most recent non-null value for a field, and the one before it
+function getMostRecentPair(history, field) {
+  const entries = history.filter(r => r[field] != null)
+  if (entries.length < 2) return { current: entries[0]?.[field] ?? null, previous: null }
+  return { current: entries[0][field], previous: entries[1][field] }
+}
 
-  const weightDelta = (current.weight_lbs != null && previous.weight_lbs != null)
-    ? parseFloat(current.weight_lbs) - parseFloat(previous.weight_lbs) : null
-  const waistDelta = (current.waist_in != null && previous.waist_in != null)
-    ? parseFloat(current.waist_in) - parseFloat(previous.waist_in) : null
-  const curLimbs = [current.left_arm_in, current.right_arm_in, current.left_thigh_in, current.right_thigh_in].filter(v => v != null).map(Number)
-  const prevLimbs = [previous.left_arm_in, previous.right_arm_in, previous.left_thigh_in, previous.right_thigh_in].filter(v => v != null).map(Number)
-  const limbDelta = curLimbs.length >= 2 && prevLimbs.length >= 2 ? avg(curLimbs) - avg(prevLimbs) : null
+function interpretBodyComp(history, goalsProfile, supplements, recentCarbAvg) {
+  const { current: curWeight, previous: prevWeight } = getMostRecentPair(history, 'weight_lbs')
+  const { current: curWaist, previous: prevWaist } = getMostRecentPair(history, 'waist_in')
 
-  // Body fat context
-  const navyBf = calcNavyBfPct(current, goalsProfile?.height_inches, goalsProfile?.sex)
+  const limbKeys = ['left_arm_in', 'right_arm_in', 'left_thigh_in', 'right_thigh_in']
+  const limbPairs = limbKeys.map(k => getMostRecentPair(history, k)).filter(p => p.current != null && p.previous != null)
+
+  const weightDelta = (curWeight != null && prevWeight != null)
+    ? parseFloat(curWeight) - parseFloat(prevWeight) : null
+  const waistDelta = (curWaist != null && prevWaist != null)
+    ? parseFloat(curWaist) - parseFloat(prevWaist) : null
+  const curLimbs = limbPairs.map(p => parseFloat(p.current))
+  const prevLimbs = limbPairs.map(p => parseFloat(p.previous))
+  const limbDelta = curLimbs.length >= 2 ? avg(curLimbs) - avg(prevLimbs) : null
+
+  if (weightDelta == null && waistDelta == null && limbDelta == null) return null
+
+  const latestEntryWithMeasurements = history.find(r =>
+    r.waist_in != null || r.neck_in != null
+  )
+  const navyBf = latestEntryWithMeasurements
+    ? calcNavyBfPct(latestEntryWithMeasurements, goalsProfile?.height_inches, goalsProfile?.sex)
+    : null
   const profileBf = goalsProfile?.body_composition ? estimateBodyFatPct(goalsProfile.body_composition, goalsProfile.sex) * 100 : null
   const bfPct = navyBf ?? profileBf
   const sex = goalsProfile?.sex
   const isHighBf = bfPct != null && (sex === 'Male' ? bfPct > 25 : sex === 'Female' ? bfPct > 33 : bfPct > 29)
 
-  // Creatine check
   const hasCreatine = supplements?.some(s => s.is_active && /creatine/i.test(s.name))
-
-  // Low carb check
   const isLowCarb = recentCarbAvg != null && recentCarbAvg < 90
 
-  // --- Determine primary signal ---
   let signal = null, headline = '', bodyText = '', signalColor = 'var(--success)', icon = '📊'
 
   const wUp = weightDelta != null && weightDelta > 0.5
@@ -92,56 +107,33 @@ function interpretBodyComp(current, previous, goalsProfile, supplements, recentC
   const limbsDown = limbDelta != null && limbDelta < -0.2
 
   if (wUp && waistFlat && limbsUp) {
-    signal = 'muscle_gain'
-    icon = '💪'
-    headline = 'Muscle Gain Signal'
-    signalColor = 'var(--accent-blue)'
+    signal = 'muscle_gain'; icon = '💪'; headline = 'Muscle Gain Signal'; signalColor = 'var(--accent-blue)'
     bodyText = `Scale went up ${weightDelta.toFixed(1)} lbs but your waist stayed flat${waistDelta < -0.1 ? ' and even got a bit smaller' : ''} while your arms and thighs grew. That weight is muscle, not fat. This is exactly what you\'re working toward.`
   } else if (wUp && !waistUp && !waistDown && !limbsUp) {
-    signal = 'scale_noise'
-    icon = '💧'
-    headline = 'Probably Water Weight'
-    signalColor = 'var(--accent-blue)'
+    signal = 'scale_noise'; icon = '💧'; headline = 'Probably Water Weight'; signalColor = 'var(--accent-blue)'
     bodyText = `Weight is up ${weightDelta.toFixed(1)} lbs but your waist and limbs haven't moved. This is almost certainly water retention — sodium, a harder workout, hormones, or digestion timing. Real fat gain requires weeks of sustained surplus, not days.`
   } else if (wDown && waistDown) {
-    signal = 'fat_loss'
-    icon = '🔥'
-    headline = 'Fat Loss Confirmed'
-    signalColor = 'var(--success)'
+    signal = 'fat_loss'; icon = '🔥'; headline = 'Fat Loss Confirmed'; signalColor = 'var(--success)'
     bodyText = `Both the scale (${Math.abs(weightDelta).toFixed(1)} lbs down) and your waist (${Math.abs(waistDelta).toFixed(2)} in smaller) are moving in the right direction. This is clean fat loss.`
   } else if (Math.abs(weightDelta ?? 0) < 1 && waistDown && limbsUp) {
-    signal = 'recomp'
-    icon = '⚡'
-    headline = 'Body Recomposition'
-    signalColor = 'var(--accent-purple)'
+    signal = 'recomp'; icon = '⚡'; headline = 'Body Recomposition'; signalColor = 'var(--accent-purple)'
     bodyText = `Scale barely moved, but your waist shrank while your arms and thighs grew. You\'re simultaneously losing fat and building muscle — this is the best possible outcome. Most apps won\'t show you this because they only track weight.`
   } else if (wUp && waistUp) {
-    signal = 'fat_gain'
-    icon = '⚠️'
-    headline = 'Calorie Surplus — Check Intake'
-    signalColor = 'var(--warning)'
+    signal = 'fat_gain'; icon = '⚠️'; headline = 'Calorie Surplus — Check Intake'; signalColor = 'var(--warning)'
     bodyText = `Both your weight (${weightDelta > 0 ? '+' : ''}${weightDelta?.toFixed(1)} lbs) and waist (${waistDelta > 0 ? '+' : ''}${waistDelta?.toFixed(2)} in) increased. This pattern points to fat gain from eating above your target. One bad week happens — just check your logs and recalibrate.`
   } else if (wDown && waistDown && limbsDown) {
     if (isHighBf) {
-      signal = 'fat_loss_highbf'
-      icon = '📉'
-      headline = 'Overall Size Reduction'
-      signalColor = 'var(--success)'
+      signal = 'fat_loss_highbf'; icon = '📉'; headline = 'Overall Size Reduction'; signalColor = 'var(--success)'
       bodyText = `Weight, waist, and limbs are all trending down. At your estimated body fat level (~${bfPct ? Math.round(bfPct) + '%' : 'higher range'}), reducing in all areas is overwhelmingly fat loss — not muscle. Your body has substantial fat reserves and will draw from those long before it touches muscle.`
     } else {
-      signal = 'check_protein'
-      icon = '⚠️'
-      headline = 'Protect Your Muscle'
-      signalColor = 'var(--warning)'
+      signal = 'check_protein'; icon = '⚠️'; headline = 'Protect Your Muscle'; signalColor = 'var(--warning)'
       bodyText = `You\'re losing weight, waist, and limb size together. At your body composition, some of this may be muscle alongside fat. Make sure you\'re hitting ${goalsProfile?.weight_lbs ? Math.round(goalsProfile.weight_lbs * 0.82) + 'g' : 'your body weight in grams'} of protein daily and maintaining training intensity.`
     }
   } else {
     return null
   }
 
-  // Context modifiers
   const context = []
-
   if (hasCreatine && (limbsDown || (wDown && limbDelta != null && limbDelta < 0))) {
     context.push({ icon: '🧪', text: 'You\'re taking creatine — it pulls water into muscle cells, making them appear fuller. Missed doses or deload weeks can temporarily deflate muscle appearance without any actual tissue loss. Check your recent dosing.' })
   }
@@ -149,7 +141,8 @@ function interpretBodyComp(current, previous, goalsProfile, supplements, recentC
     context.push({ icon: '🍚', text: `Your carb intake has been low recently (avg ~${recentCarbAvg}g/day). Muscles store glycogen (carbs + water) — low-carb periods visually flatten muscles and can reduce circumference by 0.2–0.5 inches. This is glycogen depletion, not muscle loss. Eat a higher-carb day and re-measure.` })
   }
   if (navyBf != null) {
-    const leanMass = goalsProfile?.weight_lbs ? Math.round(parseFloat(goalsProfile.weight_lbs) * (1 - navyBf / 100)) : null
+    const latestWeight = history.find(r => r.weight_lbs != null)?.weight_lbs
+    const leanMass = latestWeight ? Math.round(parseFloat(latestWeight) * (1 - navyBf / 100)) : null
     context.push({ icon: '📐', text: `Navy Method estimate: ~${Math.round(navyBf)}% body fat${leanMass ? ` · ~${leanMass} lbs of lean mass` : ''}. This uses your actual tape measurements and is more accurate than self-reported body composition.` })
   }
 
@@ -162,12 +155,19 @@ export default function MeasurementsPage() {
   const [supplements, setSupplements] = useState([])
   const [recentCarbAvg, setRecentCarbAvg] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saveMsg, setSaveMsg] = useState('')
+
+  const [weightVal, setWeightVal] = useState('')
+  const [weightDate, setWeightDate] = useState(todayDate())
+  const [weightSaving, setWeightSaving] = useState(false)
+  const [weightMsg, setWeightMsg] = useState('')
+
+  const [measForm, setMeasForm] = useState(() => Object.fromEntries(MEAS_FIELDS.map(f => [f.key, ''])))
+  const [measDate, setMeasDate] = useState(todayDate())
+  const [measSaving, setMeasSaving] = useState(false)
+  const [measMsg, setMeasMsg] = useState('')
+
   const [showHowTo, setShowHowTo] = useState(false)
   const [showWhy, setShowWhy] = useState(false)
-  const [form, setForm] = useState(() => Object.fromEntries(FIELDS.map(f => [f.key, ''])))
-  const [formDate, setFormDate] = useState(todayDate())
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [photos, setPhotos] = useState([])
   const [photoUploading, setPhotoUploading] = useState(false)
@@ -179,6 +179,7 @@ export default function MeasurementsPage() {
   const [signal, setSignal] = useState(null)
   const [goalCompletionAction, setGoalCompletionAction] = useState(null)
   const [goalActionSaving, setGoalActionSaving] = useState(false)
+  const [measChartField, setMeasChartField] = useState('waist_in')
 
   useEffect(() => { loadAll(); loadPhotos() }, [])
 
@@ -196,8 +197,7 @@ export default function MeasurementsPage() {
       supabase.from('food_log_entries').select('carbs_g, date').eq('user_id', user.id).gte('date', twoWeeksAgo),
     ])
 
-    const hist = measurements ?? []
-    setHistory(hist)
+    setHistory(measurements ?? [])
     setGoalsProfile(gp)
     setSupplements(sups ?? [])
 
@@ -216,29 +216,67 @@ export default function MeasurementsPage() {
     setPhotos(data.photos || [])
   }
 
+  async function reloadAndSignal() {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data } = await supabase.from('body_measurements').select('*').eq('user_id', user.id).order('date', { ascending: false })
+    const hist = data ?? []
+    setHistory(hist)
+    const sig = interpretBodyComp(hist, goalsProfile, supplements, recentCarbAvg)
+    if (sig) setSignal(sig)
+  }
+
+  async function handleWeightSave() {
+    if (!weightVal) { setWeightMsg('Enter a weight value.'); setTimeout(() => setWeightMsg(''), 3000); return }
+    setWeightSaving(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error } = await supabase.from('body_measurements')
+      .upsert({ user_id: user.id, date: weightDate, weight_lbs: parseFloat(weightVal) }, { onConflict: 'user_id,date' })
+    setWeightSaving(false)
+    if (error) { setWeightMsg('Failed to save.'); setTimeout(() => setWeightMsg(''), 3000); return }
+    setWeightMsg('Saved!')
+    setTimeout(() => setWeightMsg(''), 2000)
+    setWeightVal('')
+    setWeightDate(todayDate())
+    await reloadAndSignal()
+  }
+
+  async function handleMeasSave() {
+    const anyFilled = MEAS_FIELDS.some(f => measForm[f.key] !== '')
+    if (!anyFilled) { setMeasMsg('Enter at least one measurement.'); setTimeout(() => setMeasMsg(''), 3000); return }
+    setMeasSaving(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const row = { user_id: user.id, date: measDate }
+    for (const f of MEAS_FIELDS) row[f.key] = measForm[f.key] !== '' ? parseFloat(measForm[f.key]) : null
+    const { error } = await supabase.from('body_measurements').upsert(row, { onConflict: 'user_id,date' })
+    setMeasSaving(false)
+    if (error) { setMeasMsg('Failed to save.'); setTimeout(() => setMeasMsg(''), 3000); return }
+    setMeasMsg('Saved!')
+    setTimeout(() => setMeasMsg(''), 2000)
+    setMeasForm(Object.fromEntries(MEAS_FIELDS.map(f => [f.key, ''])))
+    setMeasDate(todayDate())
+    await reloadAndSignal()
+  }
+
   async function handlePhotoUpload(e) {
     const file = e.target.files?.[0]
     if (!file) return
-    setPhotoUploading(true)
-    setPhotoMsg('')
+    setPhotoUploading(true); setPhotoMsg('')
     const formData = new FormData()
     formData.append('file', file)
     formData.append('taken_date', new Date().toISOString().slice(0, 10))
     const res = await fetch('/api/goals/progress-photos', { method: 'POST', body: formData })
     const data = await res.json()
-    if (res.ok) {
-      setPhotos(prev => [data.photo, ...prev])
-      setPhotoMsg('Photo uploaded!')
-    } else {
-      setPhotoMsg(data.error || 'Upload failed')
-    }
-    setPhotoUploading(false)
-    e.target.value = ''
+    if (res.ok) { setPhotos(prev => [data.photo, ...prev]); setPhotoMsg('Photo uploaded!') }
+    else setPhotoMsg(data.error || 'Upload failed')
+    setPhotoUploading(false); e.target.value = ''
   }
 
   function getGoalCompletion(hist, gp) {
     if (!gp?.target_weight_lbs || !gp?.goals?.includes('lose_weight') || !hist.length) return null
-    const latest = hist[0]?.weight_lbs
+    const latest = hist.find(r => r.weight_lbs)?.weight_lbs
     if (!latest) return null
     const diff = parseFloat(latest) - parseFloat(gp.target_weight_lbs)
     if (diff <= 0) return 'reached'
@@ -259,31 +297,6 @@ export default function MeasurementsPage() {
     if (b < 25) return { text: 'Normal', color: 'var(--success)' }
     if (b < 30) return { text: 'Overweight', color: 'var(--warning)' }
     return { text: 'Obese', color: 'var(--error)' }
-  }
-
-  async function handleSave() {
-    const anyFilled = FIELDS.some(f => form[f.key] !== '')
-    if (!anyFilled) { setSaveMsg('Enter at least one measurement.'); setTimeout(() => setSaveMsg(''), 3000); return }
-    setSaving(true)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    const row = { user_id: user.id, date: formDate }
-    for (const f of FIELDS) row[f.key] = form[f.key] !== '' ? parseFloat(form[f.key]) : null
-    const { error } = await supabase.from('body_measurements').upsert(row, { onConflict: 'user_id,date' })
-    setSaving(false)
-    if (error) { setSaveMsg('Failed to save.'); setTimeout(() => setSaveMsg(''), 3000); return }
-    setSaveMsg('Saved!')
-    setTimeout(() => setSaveMsg(''), 2000)
-    setForm(Object.fromEntries(FIELDS.map(f => [f.key, ''])))
-    setFormDate(todayDate())
-    // Reload history then compute signal
-    const { data: newHist } = await supabase.from('body_measurements').select('*').eq('user_id', user.id).order('date', { ascending: false })
-    const hist = newHist ?? []
-    setHistory(hist)
-    if (hist.length >= 2) {
-      const sig = interpretBodyComp(hist[0], hist[1], goalsProfile, supplements, recentCarbAvg)
-      setSignal(sig)
-    }
   }
 
   async function handleGoalAction(action) {
@@ -314,26 +327,10 @@ export default function MeasurementsPage() {
     loadAll()
   }
 
-  function rollingAvg(vals, window = 7) {
-    return vals.map((_, i) => {
-      const slice = vals.slice(Math.max(0, i - window + 1), i + 1)
-      return slice.reduce((a, b) => a + b, 0) / slice.length
-    })
-  }
-
-  function recentBigJump() {
-    const wPts = history.filter(r => r.weight_lbs).slice(0, 3)
-    if (wPts.length < 2) return null
-    const diff = parseFloat(wPts[0].weight_lbs) - parseFloat(wPts[1].weight_lbs)
-    const daysBetween = Math.round((new Date(wPts[0].date) - new Date(wPts[1].date)) / 86400000)
-    if (Math.abs(diff) >= 1.5 && daysBetween <= 3) return { diff: Math.round(diff * 10) / 10, days: daysBetween }
-    return null
-  }
-
-  function delta(field, current) {
+  function delta(field, currentValue) {
     const prev = history.find((r, i) => i > 0 && r[field] != null)
-    if (!prev || !current) return null
-    const diff = (parseFloat(current) - parseFloat(prev[field])).toFixed(1)
+    if (!prev || currentValue == null) return null
+    const diff = (parseFloat(currentValue) - parseFloat(prev[field])).toFixed(1)
     if (diff == 0) return null
     const up = diff > 0
     const isWeight = field === 'weight_lbs'
@@ -345,44 +342,31 @@ export default function MeasurementsPage() {
     const pts = useMemo(() => history.filter(r => r.weight_lbs).slice(0, 60).reverse(), [history])
     if (pts.length < 2) return null
     const CW = 560, CH = 130, CPAD = 10
-    const { vals, rawPath, avgPath, cx, cy } = useMemo(() => {
-      const v = pts.map(r => parseFloat(r.weight_lbs))
-      const av = rollingAvg(v)
-      const all = [...v, ...av]
-      const mn = Math.min(...all) - 1.5
-      const mx = Math.max(...all) + 1.5
-      const xFn = i => CPAD + (i / (pts.length - 1)) * (CW - CPAD * 2)
-      const yFn = val => CH - CPAD - ((val - mn) / (mx - mn)) * (CH - CPAD * 2)
-      return {
-        vals: v,
-        rawPath: pts.map((_, i) => `${i === 0 ? 'M' : 'L'}${xFn(i).toFixed(1)},${yFn(v[i]).toFixed(1)}`).join(' '),
-        avgPath: pts.map((_, i) => `${i === 0 ? 'M' : 'L'}${xFn(i).toFixed(1)},${yFn(av[i]).toFixed(1)}`).join(' '),
-        cx: xFn,
-        cy: yFn,
-      }
-    }, [pts])
-    const jump = recentBigJump()
+    const vals = pts.map(r => parseFloat(r.weight_lbs))
+    const mn = Math.min(...vals) - 1.5
+    const mx = Math.max(...vals) + 1.5
+    const xFn = i => CPAD + (i / (pts.length - 1)) * (CW - CPAD * 2)
+    const yFn = val => CH - CPAD - ((val - mn) / (mx - mn)) * (CH - CPAD * 2)
+    const rawPath = pts.map((_, i) => `${i === 0 ? 'M' : 'L'}${xFn(i).toFixed(1)},${yFn(vals[i]).toFixed(1)}`).join(' ')
+
+    const recentPts = history.filter(r => r.weight_lbs).slice(0, 3)
+    const jump = (() => {
+      if (recentPts.length < 2) return null
+      const diff = parseFloat(recentPts[0].weight_lbs) - parseFloat(recentPts[1].weight_lbs)
+      const days = Math.round((new Date(recentPts[0].date) - new Date(recentPts[1].date)) / 86400000)
+      if (Math.abs(diff) >= 1.5 && days <= 3) return { diff: Math.round(diff * 10) / 10, days }
+      return null
+    })()
 
     return (
       <div style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <div style={{ color: '#06b6d4', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em' }}>📈 Weight Over Time</div>
-          <div style={{ display: 'flex', gap: 12, fontSize: '11px', color: 'var(--text-secondary)' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 20, height: 2, background: 'rgba(167,139,250,0.35)', display: 'inline-block' }} /> Raw
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 20, height: 2, background: 'var(--accent-purple)', display: 'inline-block' }} /> 7-day avg
-            </span>
-          </div>
-        </div>
+        <div style={{ color: '#06b6d4', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>📈 Weight Over Time</div>
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px', overflowX: 'auto' }}>
           <svg viewBox={`0 0 ${CW} ${CH}`} style={{ width: '100%', minWidth: '280px', display: 'block' }}>
-            <path d={rawPath} fill="none" stroke="rgba(167,139,250,0.3)" strokeWidth="1.5" strokeLinejoin="round" />
+            <path d={rawPath} fill="none" stroke="var(--accent-purple)" strokeWidth="2" strokeLinejoin="round" />
             {pts.map((_, i) => (
-              <circle key={i} cx={cx(i)} cy={cy(vals[i])} r="2.5" fill="rgba(167,139,250,0.4)" />
+              <circle key={i} cx={xFn(i)} cy={yFn(vals[i])} r="3" fill="var(--accent-purple)" />
             ))}
-            <path d={avgPath} fill="none" stroke="var(--accent-purple)" strokeWidth="2.5" strokeLinejoin="round" />
           </svg>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
             <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{formatDate(pts[0].date)}</span>
@@ -395,10 +379,85 @@ export default function MeasurementsPage() {
               💧 About that {jump.diff > 0 ? '+' : ''}{jump.diff} lbs {jump.days === 1 ? 'overnight' : `in ${jump.days} days`}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-              Day-to-day weight swings of 1–3 lbs are almost always water weight, not fat. High-carb meals, sodium, harder workouts, and hormones all shift the scale by 2–3 lbs overnight. The 7-day average line filters that noise.
+              Day-to-day weight swings of 1–3 lbs are almost always water weight, not fat. High-carb meals, sodium, harder workouts, and hormones all shift the scale by 2–3 lbs overnight.
             </div>
           </div>
         )}
+      </div>
+    )
+  }
+
+  function MeasurementChart() {
+    const fieldDef = MEAS_FIELDS.find(f => f.key === measChartField)
+    const pts = useMemo(() =>
+      history.filter(r => r[measChartField] != null)
+        .slice(0, 60)
+        .reverse()
+    , [history, measChartField])
+
+    if (pts.length < 2) return (
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ color: '#06b6d4', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>📐 Measurement Trends</div>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+          {MEAS_FIELDS.map(f => (
+            <button key={f.key} onClick={() => setMeasChartField(f.key)}
+              style={{ backgroundColor: measChartField === f.key ? '#06b6d4' : 'var(--surface)', border: `1px solid ${measChartField === f.key ? '#06b6d4' : 'var(--border)'}`, color: measChartField === f.key ? '#fff' : 'var(--text-secondary)', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer', fontWeight: measChartField === f.key ? '600' : '400' }}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '28px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+          Log at least 2 {fieldDef?.label} entries to see the trend chart.
+        </div>
+      </div>
+    )
+
+    const CW = 560, CH = 120, CPAD = 10
+    const vals = pts.map(r => parseFloat(r[measChartField]))
+    const mn = Math.min(...vals) - 0.5
+    const mx = Math.max(...vals) + 0.5
+    const xFn = i => CPAD + (i / (pts.length - 1)) * (CW - CPAD * 2)
+    const yFn = val => CH - CPAD - ((val - mn) / (mx - mn)) * (CH - CPAD * 2)
+    const path = pts.map((_, i) => `${i === 0 ? 'M' : 'L'}${xFn(i).toFixed(1)},${yFn(vals[i]).toFixed(1)}`).join(' ')
+
+    const first = vals[0], last = vals[vals.length - 1]
+    const totalDelta = last - first
+    const isDown = totalDelta < 0
+    const color = measChartField === 'waist_in' || measChartField === 'hips_in'
+      ? (isDown ? 'var(--success)' : totalDelta > 0 ? 'var(--warning)' : '#06b6d4')
+      : (isDown ? 'var(--warning)' : totalDelta > 0 ? 'var(--accent-blue)' : '#06b6d4')
+
+    return (
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ color: '#06b6d4', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>📐 Measurement Trends</div>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+          {MEAS_FIELDS.map(f => (
+            <button key={f.key} onClick={() => setMeasChartField(f.key)}
+              style={{ backgroundColor: measChartField === f.key ? '#06b6d4' : 'var(--surface)', border: `1px solid ${measChartField === f.key ? '#06b6d4' : 'var(--border)'}`, color: measChartField === f.key ? '#fff' : 'var(--text-secondary)', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer', fontWeight: measChartField === f.key ? '600' : '400' }}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600' }}>{fieldDef?.label}</span>
+            {totalDelta !== 0 && (
+              <span style={{ fontSize: '12px', color, fontWeight: '600' }}>
+                {totalDelta > 0 ? '+' : ''}{totalDelta.toFixed(1)} {fieldDef?.unit} overall
+              </span>
+            )}
+          </div>
+          <svg viewBox={`0 0 ${CW} ${CH}`} style={{ width: '100%', minWidth: '280px', display: 'block' }}>
+            <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" />
+            {pts.map((_, i) => (
+              <circle key={i} cx={xFn(i)} cy={yFn(vals[i])} r="3" fill={color} />
+            ))}
+          </svg>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{formatDate(pts[0].date)} · {first.toFixed(1)} {fieldDef?.unit}</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{formatDate(pts[pts.length - 1].date)} · {last.toFixed(1)} {fieldDef?.unit}</span>
+          </div>
+        </div>
       </div>
     )
   }
@@ -419,7 +478,7 @@ export default function MeasurementsPage() {
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.55', marginBottom: '16px' }}>
             {goalStatus === 'reached'
               ? `You hit ${goalsProfile.target_weight_lbs} lbs. What happens now depends on what you want next. Choose below and the app will automatically adjust your calorie target.`
-              : `You're close. Keep your current plan going, or decide now what you\'ll do when you hit your target.`}
+              : `You're close. Keep your current plan going, or decide now what you'll do when you hit your target.`}
           </p>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button onClick={() => handleGoalAction('maintain')} disabled={goalActionSaving}
@@ -473,11 +532,37 @@ export default function MeasurementsPage() {
       </div>
 
       <WeightChart />
+      <MeasurementChart />
 
-      {/* Log Form */}
+      {/* Log Weight */}
+      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
+        <h2 style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: '700', marginBottom: '16px' }}>⚖️ Log Weight</h2>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div>
+            <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>DATE</label>
+            <input type="date" value={weightDate} onChange={e => setWeightDate(e.target.value)}
+              style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} />
+          </div>
+          <div style={{ flex: 1, minWidth: '120px' }}>
+            <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>WEIGHT (lbs)</label>
+            <input type="number" value={weightVal} onChange={e => setWeightVal(e.target.value)}
+              placeholder="175" step="0.1" min="0"
+              style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} />
+          </div>
+          <div>
+            {weightMsg && <div style={{ fontSize: '12px', color: weightMsg === 'Saved!' ? 'var(--success)' : 'var(--error)', marginBottom: '6px' }}>{weightMsg}</div>}
+            <button onClick={handleWeightSave} disabled={weightSaving}
+              style={{ backgroundColor: '#06b6d4', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: weightSaving ? 'not-allowed' : 'pointer', opacity: weightSaving ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+              {weightSaving ? 'Saving...' : 'Save Weight'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Log Measurements */}
       <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h2 style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: '700' }}>Log Measurements</h2>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: '700' }}>📏 Log Measurements</h2>
           <button onClick={() => setShowHowTo(o => !o)}
             style={{ background: 'none', border: 'none', color: 'var(--accent-purple)', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}>
             {showHowTo ? 'Hide guide' : 'How to measure'}
@@ -485,7 +570,7 @@ export default function MeasurementsPage() {
         </div>
         {showHowTo && (
           <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '14px', marginBottom: '16px' }}>
-            {HOW_TO.map(h => (
+            {HOW_TO.filter(h => h.field !== 'Weight').map(h => (
               <div key={h.field} style={{ marginBottom: '8px', fontSize: '13px' }}>
                 <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{h.field}: </span>
                 <span style={{ color: 'var(--text-secondary)' }}>{h.tip}</span>
@@ -495,23 +580,23 @@ export default function MeasurementsPage() {
         )}
         <div style={{ marginBottom: '16px' }}>
           <label style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>DATE</label>
-          <input type="date" value={formDate} onChange={e => setFormDate(e.target.value)}
+          <input type="date" value={measDate} onChange={e => setMeasDate(e.target.value)}
             style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-          {FIELDS.map(f => (
+          {MEAS_FIELDS.map(f => (
             <div key={f.key}>
               <label style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '600', display: 'block', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{f.label} <span style={{ fontWeight: '400' }}>({f.unit})</span></label>
-              <input type="number" value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+              <input type="number" value={measForm[f.key]} onChange={e => setMeasForm(p => ({ ...p, [f.key]: e.target.value }))}
                 placeholder={f.placeholder} step="0.1" min="0"
                 style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} />
             </div>
           ))}
         </div>
-        {saveMsg && <div style={{ fontSize: '13px', color: saveMsg === 'Saved!' ? 'var(--success)' : 'var(--error)', marginBottom: '10px' }}>{saveMsg}</div>}
-        <button onClick={handleSave} disabled={saving}
-          style={{ backgroundColor: 'var(--accent-purple)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}>
-          {saving ? 'Saving...' : 'Save Entry'}
+        {measMsg && <div style={{ fontSize: '13px', color: measMsg === 'Saved!' ? 'var(--success)' : 'var(--error)', marginBottom: '10px' }}>{measMsg}</div>}
+        <button onClick={handleMeasSave} disabled={measSaving}
+          style={{ backgroundColor: 'var(--accent-purple)', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: measSaving ? 'not-allowed' : 'pointer', opacity: measSaving ? 0.6 : 1 }}>
+          {measSaving ? 'Saving...' : 'Save Measurements'}
         </button>
       </div>
 
@@ -521,8 +606,6 @@ export default function MeasurementsPage() {
           <div style={{ fontSize: '11px', fontWeight: '700', color: signal.signalColor, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
             📊 Body Composition Signal
           </div>
-
-          {/* Delta chips */}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
             {signal.weightDelta != null && (
               <div style={{ backgroundColor: 'var(--background)', borderRadius: '7px', padding: '6px 12px', textAlign: 'center' }}>
@@ -549,25 +632,18 @@ export default function MeasurementsPage() {
               </div>
             )}
           </div>
-
-          {/* Headline + body */}
           <div style={{ backgroundColor: `${signal.signalColor}10`, border: `1px solid ${signal.signalColor}30`, borderRadius: '8px', padding: '12px 14px', marginBottom: signal.context.length ? '10px' : '0' }}>
             <div style={{ fontSize: '14px', fontWeight: '700', color: signal.signalColor, marginBottom: '6px' }}>
               {signal.icon} {signal.headline}
             </div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6', margin: 0 }}>
-              {signal.bodyText}
-            </p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6', margin: 0 }}>{signal.bodyText}</p>
           </div>
-
-          {/* Context modifiers */}
           {signal.context.map((c, i) => (
             <div key={i} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 14px', marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
               <span style={{ fontSize: '15px', flexShrink: 0, marginTop: '1px' }}>{c.icon}</span>
               <p style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.55', margin: 0 }}>{c.text}</p>
             </div>
           ))}
-
           <button onClick={() => setSignal(null)}
             style={{ marginTop: '12px', background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '11px', cursor: 'pointer', opacity: 0.6 }}>
             Dismiss
@@ -582,6 +658,8 @@ export default function MeasurementsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {history.map((row, idx) => {
               const navyBf = calcNavyBfPct(row, heightInches, goalsProfile?.sex)
+              const filledFields = ALL_FIELDS.filter(f => row[f.key] != null)
+              if (!filledFields.length) return null
               return (
                 <div key={row.id} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px 16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -597,7 +675,7 @@ export default function MeasurementsPage() {
                       style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', opacity: 0.6 }}>✕ Delete</button>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                    {FIELDS.filter(f => row[f.key] != null).map(f => {
+                    {filledFields.map(f => {
                       const bmi = f.key === 'weight_lbs' ? calcBmi(row[f.key]) : null
                       const bl = bmi ? bmiLabel(bmi) : null
                       return (
