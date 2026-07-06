@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { calcTDEE as calcTDEEShared, calcMacros as calcMacrosShared, calcGoalAdjustment, calcMicroTargets } from '@/lib/tdee'
@@ -66,7 +67,9 @@ function MacroBar({ value, goal, color, warn }) {
   )
 }
 
-export default function NutritionPage() {
+function NutritionPageInner() {
+  const searchParams = useSearchParams()
+  const editDateParam = searchParams.get('editDate')
   const [goalsGated, setGoalsGated] = useState(false)
   const [checked, setChecked] = useState(false)
   const [showWhy, setShowWhy] = useState(false)
@@ -184,6 +187,16 @@ export default function NutritionPage() {
         } catch (_) {
           sessionStorage.removeItem('nutrition_editing_since')
         }
+      } else if (editDateParam && editDateParam !== today) {
+        // Came from DailyLogReview "fix something" button — load that date and start editing
+        const res = await fetch(`/api/nutrition/log?date=${editDateParam}`)
+        const d = await res.json()
+        setEntries(d.entries || [])
+        const since = new Date().toISOString()
+        sessionStorage.setItem('nutrition_editing_since', JSON.stringify({ since, date: editDateParam }))
+        setViewingDate(editDateParam)
+        setSessionEntries([])
+        setIsEditing(true)
       }
 
       const yestEntries = yestData.entries || []
@@ -964,5 +977,13 @@ export default function NutritionPage() {
       )}
 
     </div>
+  )
+}
+
+export default function NutritionPage() {
+  return (
+    <Suspense>
+      <NutritionPageInner />
+    </Suspense>
   )
 }

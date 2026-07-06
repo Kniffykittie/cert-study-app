@@ -205,7 +205,7 @@ src/
         daily-brief/route.js           GET returns cached brief for today; POST gathers 10+ tables, calls Claude, caches; uses getUser() + is_disabled check
         monthly-wrap/route.js          GET cached wrap for ?month=YYYY-MM; POST generates (6-table gather + Claude narrative), caches forever; uses getUser() + is_disabled check
     life-hub/
-      layout.js                        Life Hub layout with LifeHubSidebar
+      layout.js                        Life Hub layout with LifeHubSidebar + LifeHubClientShell (mounts DailyLogReview popup)
       page.js                          Life Hub landing — 3-zone dashboard: Zone 1 = 4-pill status bar (calories/workouts/steps/water, section-colored); Zone 2 = Daily Brief (AI paragraph, cached daily, section-colored left border, collapsible); Zone 3 = 2×2 live section summary cards (Nutrition/Workouts/Health/Goals with real data + left-border accents); below: Recovery Score (5-component 0–100), Smart Contextual Check-In, 28-day heatmap
       monthly-wrap/page.js             Monthly Wrap — month picker, AI narrative card, stat grid (workouts/energy/mood/weight/calories/water); Generate button on first visit; cached forever per month; grouped under Overview in sidebar
       health/
@@ -276,8 +276,10 @@ src/
       MealBuilderModal.js            Meal recipe builder — ingredient search, custom ingredients, save as recipe
       SearchModal.js                 OFFs search + manual entry + AI fill + AI micro-fill; dietary warning chips; manual form uses chip picker UI matching EditFoodModal (NUTRIENT_GROUPS, ALL_MICRO_META, dvMode toggle, per-field remove, manualCategory picker)
       AddFoodModal.js                3-tab add-food modal (⭐ Favorites | ✏️ Manual | 🔍 Search); Favorites has sub-tabs (All | Foods & Meals | Drinks | Snacks | Ingredients) with counts; smart default tab based on meal slot; last sub-tab persisted to localStorage; manual entry has Drink checkbox
+      DailyLogReview.js              Morning log review bottom sheet (5am–noon, once/day via localStorage key log_review_YYYY-MM-DD); 3 states: Normal / Sparse / Empty; "Fix something" navigates to /life-hub/nutrition?editDate=YYYY-MM-DD
     StudyHubSidebar.js                 Nav sidebar with test-in-progress guard
     LifeHubSidebar.js                  Life Hub nav — section color system (overview=purple, health=green, nutrition=orange, workouts=blue, goals=teal); Overview section (Dashboard + Monthly Wrap), Goals dropdown (Overview + Measurements + Setup), Health dropdown (Overview + Step Tracker + Heart Rate + Sleep Tracker), Nutrition dropdown (Food Log + Meal Plan + Encyclopedia + Hydration + Supplements), Workouts dropdown (My Plan + History + Exercise Library + Stretching & Mobility + Stretch Library); Hydration and Supplements live under Nutrition group; auto-opens on active routes; SECTION_COLORS constant defines all section accent colors
+    LifeHubClientShell.js              Thin 'use client' wrapper; dynamically imports DailyLogReview (SSR disabled); mounted in life-hub/layout.js
     BookmarkModal.js                   Bookmark reason + notes modal
     DailyStreak.js                     30q/day streak tracker with 28-day calendar heatmap
     DomainTrend.js                     Per-domain score trend SVG chart (no library)

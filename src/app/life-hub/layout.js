@@ -1,4 +1,5 @@
 import LifeHubSidebar from '@/components/LifeHubSidebar'
+import LifeHubClientShell from '@/components/LifeHubClientShell'
 
 export default function LifeHubLayout({ children }) {
   return (
@@ -14,6 +15,7 @@ export default function LifeHubLayout({ children }) {
           {children}
         </main>
       </div>
+      <LifeHubClientShell />
     </>
   )
 }

@@ -265,7 +265,7 @@ Each phase below is a discrete build session. Phases must be built in order when
 
 ---
 
-#### Phase B — Feature 14: Morning Log Review Pop-Up 📋
+#### Phase B — Feature 14: Morning Log Review Pop-Up ✅ Built (Phase 71)
 
 **Why now:** Depends on Feature 13 being built (the "Let me fix something" flow navigates to retroactive editing for yesterday). Build immediately after Phase A.
 
@@ -2145,6 +2145,13 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase 71 — Feature 14: Morning Log Review Pop-Up — Complete
+
+- `src/components/nutrition/DailyLogReview.js` (new): client component, fires 5am–noon once per day via `localStorage` key `log_review_YYYY-MM-DD` (keyed to yesterday's date). Fetches yesterday's food log; three states: Normal (≥3 entries, ≥1000 cal) / Sparse / Empty. Renders as a slide-up bottom sheet (fixed overlay, borderRadius 16px top, slide-up animation). Normal: shows top-3 entries + kcal total + "✓ Looks good" / "✏️ Fix something". Sparse: "Yesterday looked light" + 3 dismissal options. Empty: "Nothing logged" + backfill / intentional / skip. "Fix something" / backfill buttons navigate to `/life-hub/nutrition?editDate=YYYY-MM-DD` and set the localStorage flag before navigating.
+- `src/components/LifeHubClientShell.js` (new): thin `'use client'` wrapper that dynamically imports `DailyLogReview` (SSR disabled). Mounted in Life Hub layout.
+- `src/app/life-hub/layout.js` — imports and renders `LifeHubClientShell` so the popup fires on every Life Hub page in the morning window.
+- `src/app/life-hub/nutrition/page.js` — added `useSearchParams` + Suspense wrapper (project pattern). Reads `?editDate=` on mount: if set and not today, fetches that date's entries, sets `viewingDate`, writes sessionStorage JSON, auto-enters editing mode. The `NutritionPage` default export wraps `NutritionPageInner` in `<Suspense>`.
 
 ### Phase 70 — Feature 13: Retroactive Log Editing — Complete
 
