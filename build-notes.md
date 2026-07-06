@@ -413,32 +413,91 @@ const diffMin = (Date.now() - loggedAt) / 60000
 
 ---
 
-#### Feature B — Global Daily Check-In Pop-Up
+#### Feature B — Two Daily Check-Ins with AI Micro-Response
 
-**Current state:** Check-in is a buried card at the bottom of the Life Hub overview. Users miss it constantly.
+**Current state:** Check-in is a buried card at the bottom of the Life Hub overview. Users miss it, and a single morning rating misses the full picture — someone tired at 3:30am from cut sleep may feel completely different by 10am after food and caffeine.
 
-**New behavior:** A bottom-sheet that slides up from the bottom of ANY page in the Life Hub, once per day, 30 seconds after the user has been in the app.
+**New behavior:** Two bottom-sheet pop-ups per day — morning and afternoon — each tied to the user's personal `wake_time`. Each fires once per window per day, across any Life Hub page, 30 seconds after the user opens the app within that window.
 
-**Rules for when it appears:**
-1. Only appears once per calendar day — tracked in localStorage: `checkin_prompted_YYYY-MM-DD`
-2. Only appears between `wake_time` and `wake_time + 8hrs` (no middle-of-the-night prompts)
-3. Minimum 30 seconds after page load (don't ambush on landing)
-4. Once answered or dismissed (Skip), stores today's date → never shows again today
-5. Does NOT block navigation — user can still interact with the page behind it
+**Two windows:**
+- Morning: appears within 60 minutes of `wake_time` (e.g. user at 3:30am → morning pop-up triggers between 3:30–4:30am)
+- Afternoon: appears at `wake_time + 7hrs` (e.g. user → afternoon triggers around 10:30am)
+- LocalStorage tracking: `checkin_morning_YYYY-MM-DD` and `checkin_afternoon_YYYY-MM-DD` — separate keys so one doesn't block the other
+
+**DB change (backward compatible, no migration of existing data):**
+Keep current columns (`energy_level`, `mood_level`, `note`) as morning values. Add:
+```sql
+alter table daily_checkins add column afternoon_energy smallint;
+alter table daily_checkins add column afternoon_mood smallint;
+alter table daily_checkins add column afternoon_note text;
+```
+
+**Scale: 1–5 numeric, not emoji.**
+Five tap buttons labeled 1 through 5. Anchor labels at each end: `1 — Low` and `5 — High`. Selected button fills with the Life Hub Overview accent color (purple). Professional, fast, takes 5 seconds. Afternoon check-in has a subtle framing line: *"How are you feeling now vs this morning?"* — orients the comparison without making it complicated.
 
 **Design (bottom-sheet, not full overlay):**
 - Slides up ~40% of screen height from the bottom
-- Semi-transparent dark overlay on the content above (not fully blocked)
-- Title: "Quick Check-In" with the current date
-- Energy row: 5 emoji buttons (😴 Drained / 😑 Low / 😐 Okay / 🙂 Good / ⚡ Energized)
-- Mood row: 5 emoji buttons (😤 Stressed / 😔 Low / 😐 Neutral / 😊 Good / 😄 Great)
-- Optional: one-line text input for a note ("sore from yesterday", etc.)
-- Two buttons: "Save" (purple, logs to `daily_checkins`) + "Skip today" (grey, dismisses for the day)
-- After Save: sheet slides down, brief animation ("✓ Logged"), then recovers the screen
+- Semi-transparent dark overlay on content above (not fully blocked)
+- Title: "Morning Check-In" or "Afternoon Check-In" with today's date
+- Energy row: 5 tap buttons labeled 1–5, label "Energy"
+- Mood row: 5 tap buttons labeled 1–5, label "Mood"
+- Optional one-line text input for a note
+- Two buttons: "Save" (purple) + "Skip" (grey, dismisses for the day)
+- After Save: inputs fade, brief loading pulse (1–2 seconds while Haiku runs), AI response appears in the same sheet, sheet auto-closes after 4 seconds or user taps to dismiss
 
-**Implementation:** Global pop-up lives in `LifeHubLayout` (`src/app/life-hub/layout.js`) — mounted once, appears across all Life Hub pages. Uses a `useEffect` with a 30-second setTimeout. State managed in the layout so it persists across page navigations within Life Hub.
+**Implementation:** Lives in `LifeHubLayout` (`src/app/life-hub/layout.js`). Two separate `useEffect`s with `setTimeout` — one for each window. State managed in layout so it persists across page navigations within Life Hub.
 
-**Why bottom-sheet, not full overlay:** Full blocking overlays feel aggressive. A bottom-sheet feels like a notification that slid up — clearly visible, easy to dismiss, but impossible to miss. The content above is still visible (but dimmed), which reduces anxiety vs a hard block.
+**AI micro-response after submission:**
+API route: `POST /api/checkin/insight` — Haiku, < $0.001/call. Rate-limited (2/day via `api_rate_limits` — one per window). Uses `getUser()` + `is_disabled` check.
+
+What it receives:
+```json
+{
+  "window": "morning",
+  "energy_rating": 2,
+  "mood_rating": 3,
+  "note": "woke up mid sleep cycle",
+  "sleep_score": 48,
+  "deep_sleep_min": 14,
+  "rem_sleep_min": 42,
+  "yesterday_workout": true,
+  "today_calories_so_far": 0,
+  "today_caffeine_mg": 0,
+  "today_steps": 200,
+  "rolling_7day_morning_avg": 3.1,
+  "rolling_7day_afternoon_avg": 4.2
+}
+```
+
+Haiku system prompt rules:
+- Always cite at least one specific data point — never generic ("sounds good!")
+- If rating matches data predictions → validate and briefly explain the physiological mechanism
+- If rating contrasts with data → acknowledge with curiosity ("your sleep data would have predicted a 2–3, but you're at 4 — the body surprises you sometimes")
+- 2 sentences maximum, conversational and warm
+- If 7-day rolling avg is available, contextualize: "this is above/below your usual"
+- Never medical advice framing
+
+Example responses:
+
+*Morning 2/5, sleep score 48:*
+> "That tracks — your sleep score last night was 48, which means most of it was light sleep without much deep recovery. Afternoons tend to run 1–2 points higher for you once food and movement kick in."
+
+*Morning 4/5, sleep score 81:*
+> "A 4 makes sense — you got solid deep sleep last night, and that's when your body does its real repair work. That kind of sleep tends to show up as a strong first half of the day."
+
+*Morning 4/5, sleep score 52 (contrast case):*
+> "A 4 on that sleep is actually above your recent trend — your data would have predicted a 2–3 today. Whatever you did yesterday seems to be paying off."
+
+*Afternoon 3/5 after a midday workout, morning was 4/5:*
+> "A slight dip from this morning makes sense — your body is in recovery mode after that workout. Protein and water in the next couple hours tends to close that gap."
+
+*Afternoon 5/5 after rating 2/5 morning:*
+> "Nice turnaround from a 2 this morning — going from a 2 to a 5 in one day usually means the grogginess cleared after food and movement hit. That's a strong bounce-back pattern."
+
+**How briefs use both check-ins:**
+- Afternoon brief (1pm): knows morning rating + trajectory, can say "you were at 2 this morning after short sleep — based on your steps and caffeine timing, you're probably tracking higher now"
+- Evening brief (7pm): knows both — "morning 2, afternoon 4 — that's a classic bounce-back day for you"
+- Weekly Wrap: morning vs afternoon avg by day — can surface patterns like "your mornings averaged 2.8 this week but afternoons averaged 4.1 — strongest correlation is days you hit 8k+ steps"
 
 ---
 
