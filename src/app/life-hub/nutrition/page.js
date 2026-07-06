@@ -94,6 +94,7 @@ export default function NutritionPage() {
   const [sessionEntries, setSessionEntries] = useState([])
   const [insightToast, setInsightToast] = useState(null)
   const [insightLoading, setInsightLoading] = useState(false)
+  const [viewingDate, setViewingDate] = useState(null) // null = today
 
   const MICRO_LABEL_MAP = {
     fiber_g: { label: 'Fiber', unit: 'g' },
@@ -172,11 +173,17 @@ export default function NutritionPage() {
       setEntries(loadedEntries)
       setMyFoods(foodsData.foods || [])
 
-      const editingSince = sessionStorage.getItem('nutrition_editing_since')
-      if (editingSince) {
-        setIsEditing(true)
-        const sinceDate = new Date(editingSince)
-        setSessionEntries(loadedEntries.filter(e => e.created_at && new Date(e.created_at) >= sinceDate))
+      const editingRaw = sessionStorage.getItem('nutrition_editing_since')
+      if (editingRaw) {
+        try {
+          const { since, date: editDate } = JSON.parse(editingRaw)
+          setIsEditing(true)
+          setViewingDate(editDate === today ? null : editDate)
+          const sinceDate = new Date(since)
+          setSessionEntries(loadedEntries.filter(e => e.created_at && new Date(e.created_at) >= sinceDate))
+        } catch (_) {
+          sessionStorage.removeItem('nutrition_editing_since')
+        }
       }
 
       const yestEntries = yestData.entries || []
@@ -281,28 +288,54 @@ export default function NutritionPage() {
     setCopyingYesterday(false)
   }
 
-  function startEditing() {
+  function startEditing(date = null) {
     const since = new Date().toISOString()
-    sessionStorage.setItem('nutrition_editing_since', since)
+    const editDate = date || today
+    sessionStorage.setItem('nutrition_editing_since', JSON.stringify({ since, date: editDate }))
     setSessionEntries([])
     setInsightToast(null)
+    setViewingDate(date)
     setIsEditing(true)
+  }
+
+  async function loadDateEntries(date) {
+    const res = await fetch(`/api/nutrition/log?date=${date}`)
+    const data = await res.json()
+    setEntries(data.entries || [])
+    setViewingDate(date)
+  }
+
+  async function returnToToday() {
+    const res = await fetch('/api/nutrition/log')
+    const data = await res.json()
+    setEntries(data.entries || [])
+    setViewingDate(null)
   }
 
   async function handleFinishEditing() {
     sessionStorage.removeItem('nutrition_editing_since')
+    const wasViewingDate = viewingDate
     setIsEditing(false)
+    if (wasViewingDate) {
+      await returnToToday()
+    }
+    setViewingDate(null)
     if (sessionEntries.length === 0) return
     setInsightLoading(true)
     const slotsTouched = [...new Set(sessionEntries.map(e => e.meal_slot))]
     const now = new Date()
+    const isRetroactive = !!wasViewingDate
+    const daysAgo = wasViewingDate
+      ? Math.round((now - new Date(wasViewingDate)) / 86400000)
+      : 0
     const oldestEntry = sessionEntries.reduce((oldest, e) => {
       const t = e.created_at ? new Date(e.created_at) : now
       return t < oldest ? t : oldest
     }, now)
     const backfillMinutes = Math.round((now - oldestEntry) / 60000)
     const isCatchup = backfillMinutes > 30
-    const dayTotals = entries.reduce((acc, e) => {
+    const currentEntries = isRetroactive ? sessionEntries : entries
+    const dayTotals = currentEntries.reduce((acc, e) => {
       for (const k of ['calories', 'protein_g', 'carbs_g', 'fat_g']) acc[k] = (acc[k] || 0) + (e[k] || 0)
       return acc
     }, {})
@@ -316,8 +349,10 @@ export default function NutritionPage() {
           slots_touched: slotsTouched,
           backfill_minutes_max: backfillMinutes,
           is_catchup: isCatchup,
+          is_retroactive: isRetroactive,
+          days_ago: daysAgo,
           day_totals: dayTotals,
-          calorie_target: effectiveTarget,
+          calorie_target: isRetroactive ? null : effectiveTarget,
           protein_target: macroCalc?.protein || null,
           current_time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         }),
@@ -386,10 +421,12 @@ export default function NutritionPage() {
       {isEditing && (
         <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100, backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
           <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-            {insightLoading ? '🤖 Analyzing your session…' : `${sessionEntries.length} item${sessionEntries.length !== 1 ? 's' : ''} added this session`}
+            {insightLoading ? '🤖 Analyzing your session…' : viewingDate
+              ? `Editing: ${new Date(viewingDate + 'T12:00:00').toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}`
+              : `${sessionEntries.length} item${sessionEntries.length !== 1 ? 's' : ''} added this session`}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => { sessionStorage.removeItem('nutrition_editing_since'); setIsEditing(false); setSessionEntries([]) }}
+            <button onClick={() => { sessionStorage.removeItem('nutrition_editing_since'); setIsEditing(false); setSessionEntries([]); if (viewingDate) returnToToday() }}
               style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
               Cancel
             </button>
@@ -629,7 +666,7 @@ export default function NutritionPage() {
       </div>
 
       {/* TDEE Calibration Card */}
-      {tdeeSuggestion && !tdeeDismissed && (
+      {tdeeSuggestion && !tdeeDismissed && !viewingDate && (
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--warning)', borderRadius: '10px', padding: '16px 20px', marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
             <div style={{ flex: 1 }}>
@@ -660,13 +697,43 @@ export default function NutritionPage() {
       {/* Food Log Tab */}
       {activeTab === 'log' && (
         <div>
+          {/* Date picker chips */}
+          {(() => {
+            const chips = []
+            for (let i = 0; i < 7; i++) {
+              const d = new Date()
+              d.setDate(d.getDate() - i)
+              const dateStr = d.toISOString().split('T')[0]
+              const label = i === 0 ? 'Today' : i === 1 ? 'Yesterday' : d.toLocaleDateString([], { weekday: 'short' })
+              const isActive = i === 0 ? viewingDate === null : viewingDate === dateStr
+              chips.push(
+                <button key={dateStr} onClick={async () => {
+                  if (isEditing) return
+                  if (i === 0) { if (viewingDate) await returnToToday() }
+                  else await loadDateEntries(dateStr)
+                }}
+                  style={{ padding: '5px 12px', borderRadius: '20px', border: 'none', fontSize: '12px', fontWeight: isActive ? '700' : '400', cursor: isEditing ? 'default' : 'pointer', backgroundColor: isActive ? '#f97316' : 'var(--surface)', color: isActive ? '#fff' : 'var(--text-secondary)', opacity: isEditing && !isActive ? 0.4 : 1, transition: 'all 0.15s' }}>
+                  {label}
+                </button>
+              )
+            }
+            return (
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                {chips}
+              </div>
+            )
+          })()}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <button onClick={handleCopyYesterday} disabled={copyingYesterday}
-              style={{ background: 'none', border: 'none', fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', opacity: copyingYesterday ? 0.5 : 1 }}>
-              {copyingYesterday ? 'Copying...' : '📋 Copy from yesterday'}
-            </button>
+            {!viewingDate && (
+              <button onClick={handleCopyYesterday} disabled={copyingYesterday}
+                style={{ background: 'none', border: 'none', fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', opacity: copyingYesterday ? 0.5 : 1 }}>
+                {copyingYesterday ? 'Copying...' : '📋 Copy from yesterday'}
+              </button>
+            )}
+            {viewingDate && <div />}
             {!isEditing && (
-              <button onClick={startEditing}
+              <button onClick={() => startEditing(viewingDate)}
                 style={{ background: 'none', border: '1px solid rgba(249,115,22,0.4)', borderRadius: '7px', fontSize: '12px', fontWeight: '600', color: '#f97316', cursor: 'pointer', padding: '4px 12px' }}>
                 ✏️ Edit Log
               </button>
@@ -792,7 +859,7 @@ export default function NutritionPage() {
                       {slotCals > 0 && <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{Math.round(slotCals)} kcal</span>}
                     </div>
                     {isEditing && (
-                      <button onClick={() => { window.location.href = `/life-hub/nutrition/add-food?slot=${slot.key}` }}
+                      <button onClick={() => { window.location.href = `/life-hub/nutrition/add-food?slot=${slot.key}${viewingDate ? `&date=${viewingDate}` : ''}` }}
                         style={{ backgroundColor: 'rgba(0,128,255,0.12)', color: 'var(--accent-blue)', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
                         + Add
                       </button>
@@ -824,7 +891,7 @@ export default function NutritionPage() {
                     </div>
                   )}
                   {slotEntries.length === 0 && isEditing && (
-                    <button onClick={() => { window.location.href = `/life-hub/nutrition/add-food?slot=${slot.key}` }}
+                    <button onClick={() => { window.location.href = `/life-hub/nutrition/add-food?slot=${slot.key}${viewingDate ? `&date=${viewingDate}` : ''}` }}
                       style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: '7px', padding: '8px 12px', cursor: 'pointer', textAlign: 'left', width: '100%', marginTop: '6px', color: 'var(--text-secondary)', fontSize: '12px' }}>
                       + Log {slot.label.toLowerCase()}…
                     </button>

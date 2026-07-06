@@ -235,7 +235,7 @@ Each phase below is a discrete build session. Phases must be built in order when
 
 ---
 
-#### Phase A — Feature 13: Retroactive Log Editing 📋
+#### Phase A — Feature 13: Retroactive Log Editing ✅ Built (Phase 70)
 
 **Why now:** Feature 12 (editing mode) is the foundation. Feature 14 depends on this. Build it while the editing mode code is fresh.
 
@@ -2145,6 +2145,22 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase 70 — Feature 13: Retroactive Log Editing — Complete
+
+- `viewingDate` state (null = today) added to nutrition page
+- 7-day date picker chips in food log header: Today / Yesterday / Mon / Tue... up to 6 days back; tapping switches the log view for that date (no editing required); chips are locked while in editing mode
+- Selecting a past date calls `loadDateEntries(date)` — fetches `GET /api/nutrition/log?date=YYYY-MM-DD`, replaces entries state
+- "✏️ Edit Log" now calls `startEditing(viewingDate)` — accepts optional date so past-day edits start in the correct context
+- `startEditing()` updated: stores `{ since, date }` JSON in sessionStorage instead of bare ISO string
+- sessionStorage restore in `load()` updated: `JSON.parse()` extracts `since` + `date`, restores `viewingDate` correctly after navigation round-trip
+- Bottom bar label: shows "Editing: [Day, Date]" when `viewingDate !== null` instead of session count
+- Cancel button: calls `returnToToday()` if `viewingDate` was set (navigates back to today's log)
+- `handleFinishEditing()`: calls `returnToToday()` after Done if past-date editing, passes `is_retroactive: true` + `days_ago: N` to meal-insight API
+- `+ Add` and empty-slot dashed buttons include `?date=${viewingDate}` in the add-food URL when viewing a past date
+- add-food page: reads `?date=` param, injects into log POST payload (`date: dateParam`)
+- "Copy from yesterday" button hidden when `viewingDate !== null`
+- TDEE calibration card hidden when `viewingDate !== null`
 
 ### Phase 69 — Feature 12: Food Log Editing Mode + Session-Scoped Meal Insight — Complete
 

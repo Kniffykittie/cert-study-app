@@ -22,6 +22,7 @@ function AddFoodPageInner() {
   const router = useRouter()
   const params = useSearchParams()
   const slot = params.get('slot') || 'breakfast'
+  const dateParam = params.get('date') || null
   const slotLabel = SLOT_LABELS[slot] || slot
 
   const [tab, setTab] = useState('favorites')
@@ -56,7 +57,8 @@ function AddFoodPageInner() {
 
   async function logEntry(entry) {
     setLogging(true)
-    await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry) })
+    const payload = dateParam ? { ...entry, date: dateParam } : entry
+    await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     window.location.href = '/life-hub/nutrition'
   }
 
