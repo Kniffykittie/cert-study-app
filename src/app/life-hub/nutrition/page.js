@@ -90,6 +90,10 @@ export default function NutritionPage() {
   const [dismissedBanners, setDismissedBanners] = useState(new Set())
   const [workoutFinishedAt, setWorkoutFinishedAt] = useState(null)
   const [viewEntry, setViewEntry] = useState(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [sessionEntries, setSessionEntries] = useState([])
+  const [insightToast, setInsightToast] = useState(null)
+  const [insightLoading, setInsightLoading] = useState(false)
 
   const MICRO_LABEL_MAP = {
     fiber_g: { label: 'Fiber', unit: 'g' },
@@ -164,8 +168,17 @@ export default function NutritionPage() {
         fetch('/api/health/manual-steps').catch(() => null),
       ])
       const [logData, foodsData, yestData] = await Promise.all([logRes.json(), foodsRes.json(), yesterdayRes.json()])
-      setEntries(logData.entries || [])
+      const loadedEntries = logData.entries || []
+      setEntries(loadedEntries)
       setMyFoods(foodsData.foods || [])
+
+      const editingSince = sessionStorage.getItem('nutrition_editing_since')
+      if (editingSince) {
+        setIsEditing(true)
+        const sinceDate = new Date(editingSince)
+        setSessionEntries(loadedEntries.filter(e => e.created_at && new Date(e.created_at) >= sinceDate))
+      }
+
       const yestEntries = yestData.entries || []
       const yestProtein = yestEntries.reduce((s, e) => s + (e.protein_g || 0), 0)
       setYesterdayProtein(Math.round(yestProtein))
@@ -188,7 +201,10 @@ export default function NutritionPage() {
   async function handleAddEntry(entry) {
     const res = await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry) })
     const data = await res.json()
-    if (data.entry) setEntries(prev => [...prev, data.entry])
+    if (data.entry) {
+      setEntries(prev => [...prev, data.entry])
+      if (isEditing) setSessionEntries(prev => [...prev, data.entry])
+    }
     if (entry.my_food_id) {
       const now = new Date().toISOString()
       setMyFoods(prev => {
@@ -208,6 +224,7 @@ export default function NutritionPage() {
   async function handleRemoveEntry(id) {
     await fetch('/api/nutrition/log', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     setEntries(prev => prev.filter(e => e.id !== id))
+    setSessionEntries(prev => prev.filter(e => e.id !== id))
   }
 
   async function handleSaveToMyFoods(food) {
@@ -264,6 +281,54 @@ export default function NutritionPage() {
     setCopyingYesterday(false)
   }
 
+  function startEditing() {
+    const since = new Date().toISOString()
+    sessionStorage.setItem('nutrition_editing_since', since)
+    setSessionEntries([])
+    setInsightToast(null)
+    setIsEditing(true)
+  }
+
+  async function handleFinishEditing() {
+    sessionStorage.removeItem('nutrition_editing_since')
+    setIsEditing(false)
+    if (sessionEntries.length === 0) return
+    setInsightLoading(true)
+    const slotsTouched = [...new Set(sessionEntries.map(e => e.meal_slot))]
+    const now = new Date()
+    const oldestEntry = sessionEntries.reduce((oldest, e) => {
+      const t = e.created_at ? new Date(e.created_at) : now
+      return t < oldest ? t : oldest
+    }, now)
+    const backfillMinutes = Math.round((now - oldestEntry) / 60000)
+    const isCatchup = backfillMinutes > 30
+    const dayTotals = entries.reduce((acc, e) => {
+      for (const k of ['calories', 'protein_g', 'carbs_g', 'fat_g']) acc[k] = (acc[k] || 0) + (e[k] || 0)
+      return acc
+    }, {})
+    const macroCalc = goals ? calcMacrosShared(goals.custom_tdee || calcTDEEShared(goals) || 2000, { weight_lbs: goals.weight_lbs }) : null
+    try {
+      const res = await fetch('/api/nutrition/meal-insight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_foods: sessionEntries,
+          slots_touched: slotsTouched,
+          backfill_minutes_max: backfillMinutes,
+          is_catchup: isCatchup,
+          day_totals: dayTotals,
+          calorie_target: effectiveTarget,
+          protein_target: macroCalc?.protein || null,
+          current_time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }),
+      })
+      const data = await res.json()
+      if (data.insight) setInsightToast(data.insight)
+    } catch (_) {}
+    setInsightLoading(false)
+    setSessionEntries([])
+  }
+
   if (!checked) return null
 
   if (goalsGated) return (
@@ -307,7 +372,34 @@ export default function NutritionPage() {
   const overBudget = remaining !== null && remaining < 0
 
   return (
-    <div>
+    <div style={{ paddingBottom: isEditing ? '80px' : '0' }}>
+      {insightToast && (
+        <div style={{ position: 'fixed', bottom: isEditing ? '72px' : '16px', left: '50%', transform: 'translateX(-50%)', zIndex: 101, maxWidth: '440px', width: 'calc(100% - 32px)', backgroundColor: 'var(--surface)', border: '1px solid rgba(249,115,22,0.4)', borderRadius: '12px', padding: '14px 16px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+          <span style={{ fontSize: '18px', flexShrink: 0 }}>🤖</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Meal Insight</div>
+            <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: '1.5' }}>{insightToast}</div>
+          </div>
+          <button onClick={() => setInsightToast(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '18px', cursor: 'pointer', lineHeight: 1, flexShrink: 0, padding: 0 }}>×</button>
+        </div>
+      )}
+      {isEditing && (
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100, backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+            {insightLoading ? '🤖 Analyzing your session…' : `${sessionEntries.length} item${sessionEntries.length !== 1 ? 's' : ''} added this session`}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => { sessionStorage.removeItem('nutrition_editing_since'); setIsEditing(false); setSessionEntries([]) }}
+              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+              Cancel
+            </button>
+            <button onClick={handleFinishEditing} disabled={insightLoading}
+              style={{ backgroundColor: '#f97316', border: 'none', borderRadius: '8px', padding: '8px 20px', fontSize: '13px', fontWeight: '700', color: '#fff', cursor: insightLoading ? 'wait' : 'pointer', opacity: insightLoading ? 0.7 : 1 }}>
+              {insightLoading ? 'Analyzing…' : 'Done'}
+            </button>
+          </div>
+        </div>
+      )}
       {viewEntry && (
         <div onClick={() => setViewEntry(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, maxWidth: 400, width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
@@ -568,11 +660,17 @@ export default function NutritionPage() {
       {/* Food Log Tab */}
       {activeTab === 'log' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <button onClick={handleCopyYesterday} disabled={copyingYesterday}
               style={{ background: 'none', border: 'none', fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', opacity: copyingYesterday ? 0.5 : 1 }}>
               {copyingYesterday ? 'Copying...' : '📋 Copy from yesterday'}
             </button>
+            {!isEditing && (
+              <button onClick={startEditing}
+                style={{ background: 'none', border: '1px solid rgba(249,115,22,0.4)', borderRadius: '7px', fontSize: '12px', fontWeight: '600', color: '#f97316', cursor: 'pointer', padding: '4px 12px' }}>
+                ✏️ Edit Log
+              </button>
+            )}
           </div>
 
           {/* Contextual banners */}
@@ -693,10 +791,12 @@ export default function NutritionPage() {
                       <span style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>{slot.label}</span>
                       {slotCals > 0 && <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{Math.round(slotCals)} kcal</span>}
                     </div>
-                    <button onClick={() => { window.location.href = `/life-hub/nutrition/add-food?slot=${slot.key}` }}
-                      style={{ backgroundColor: 'rgba(0,128,255,0.12)', color: 'var(--accent-blue)', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
-                      + Add
-                    </button>
+                    {isEditing && (
+                      <button onClick={() => { window.location.href = `/life-hub/nutrition/add-food?slot=${slot.key}` }}
+                        style={{ backgroundColor: 'rgba(0,128,255,0.12)', color: 'var(--accent-blue)', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                        + Add
+                      </button>
+                    )}
                   </div>
                   {slotEntries.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -714,14 +814,16 @@ export default function NutritionPage() {
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: '8px' }}>
                             <span style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '600' }}>{e.calories ? Math.round(e.calories) : '?'} kcal</span>
-                            <button onClick={() => handleRemoveEntry(e.id)}
-                              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '17px', cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>×</button>
+                            {isEditing && (
+                              <button onClick={() => handleRemoveEntry(e.id)}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '17px', cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>×</button>
+                            )}
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
-                  {slotEntries.length === 0 && (
+                  {slotEntries.length === 0 && isEditing && (
                     <button onClick={() => { window.location.href = `/life-hub/nutrition/add-food?slot=${slot.key}` }}
                       style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: '7px', padding: '8px 12px', cursor: 'pointer', textAlign: 'left', width: '100%', marginTop: '6px', color: 'var(--text-secondary)', fontSize: '12px' }}>
                       + Log {slot.label.toLowerCase()}…
@@ -794,56 +896,6 @@ export default function NutritionPage() {
         </p>
       )}
 
-      {viewEntry && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={() => setViewEntry(null)}>
-          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px', maxWidth: '400px', width: '100%', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div style={{ marginBottom: '12px' }}>
-              <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>{viewEntry.name}</div>
-              {viewEntry.brand && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>{viewEntry.brand}</div>}
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                {viewEntry.servings !== 1 ? `${viewEntry.servings}× ` : ''}{viewEntry.serving_size_label || '1 serving'}
-                {MEAL_SLOTS.find(s => s.key === viewEntry.meal_slot) ? ` · ${MEAL_SLOTS.find(s => s.key === viewEntry.meal_slot).label}` : ''}
-                {viewEntry.created_at ? ` · ${new Date(viewEntry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
-              {[
-                { label: 'Calories', value: viewEntry.calories, unit: 'kcal', color: 'var(--accent-blue)' },
-                { label: 'Protein', value: viewEntry.protein_g, unit: 'g', color: 'var(--success)' },
-                { label: 'Carbs', value: viewEntry.carbs_g, unit: 'g', color: 'var(--warning)' },
-                { label: 'Fat', value: viewEntry.fat_g, unit: 'g', color: '#f97316' },
-              ].map(m => (
-                <div key={m.label} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 12px' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>{m.label}</div>
-                  <div style={{ fontSize: '15px', fontWeight: '700', color: m.color }}>{m.value != null ? Math.round(m.value * 10) / 10 : '—'}<span style={{ fontSize: '11px', fontWeight: '400', color: 'var(--text-secondary)', marginLeft: '3px' }}>{m.unit}</span></div>
-                </div>
-              ))}
-            </div>
-            {(() => {
-              const microKeys = Object.keys(MICRO_LABEL_MAP)
-              const rows = microKeys.filter(k => viewEntry[k] != null && viewEntry[k] !== 0)
-              if (rows.length === 0) return null
-              return (
-                <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {rows.map(k => {
-                    const { label, unit } = MICRO_LABEL_MAP[k]
-                    return (
-                      <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                        <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
-                        <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>{Math.round(viewEntry[k] * 10) / 10} {unit}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            })()}
-            <button onClick={() => setViewEntry(null)}
-              style={{ width: '100%', marginTop: '16px', padding: '10px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer' }}>
-              Close
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

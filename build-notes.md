@@ -344,9 +344,9 @@ Distinct from coach_memory. This is the check-in note "tired, right shoulder sor
 
 **10. Supplement Logs Table + Adherence Tracking** — ✅ Built (Phase 51)
 
-**12. Food Log Editing Mode + Session-Scoped Meal Insight** — 📋 Fully Specced (CONFIRMED REPLACES Feature A)
+**12. Food Log Editing Mode + Session-Scoped Meal Insight** — ✅ Built (Phase 69)
 
-**Decision: Feature A (post-meal slot insight) is retired.** The session-based trigger (Finish Editing) gives Claude more context (multiple slots, full backfill picture, complete session totals) and fires less often (once per editing session vs up to 4× per day for individual slots). Feature A's slot-based trigger was always a hack around not knowing when the user was "done." Editing mode solves that problem at the root. Feature A's catch-up detection logic (Feature C) is preserved and used by Feature 12 instead.
+**Decision: Feature A (post-meal slot insight) is retired.** Replaced fully by Feature 12. Feature C (catch-up detection) is incorporated into Feature 12's session metadata — also retired.
 
 ---
 
@@ -1595,6 +1595,32 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase 69 — Feature 12: Food Log Editing Mode + Session-Scoped Meal Insight — Complete
+
+Two-state nutrition page: read-only dashboard (default) vs editing mode with AI session analysis.
+
+**`src/app/life-hub/nutrition/page.js`:**
+- New state: `isEditing`, `sessionEntries`, `insightToast`, `insightLoading`
+- `startEditing()`: writes `nutrition_editing_since` ISO timestamp to sessionStorage, resets session state
+- `handleFinishEditing()`: clears sessionStorage key, exits editing mode, posts session foods to meal-insight API, shows toast on success
+- `handleAddEntry()` upgraded: tracks new entry in `sessionEntries` when `isEditing`
+- `handleRemoveEntry()` upgraded: removes from `sessionEntries` too
+- Load function: on mount, checks `nutrition_editing_since` in sessionStorage — if present, restores editing mode and populates `sessionEntries` with entries created after that timestamp (survives add-food navigation round-trips)
+- "✏️ Edit Log" button added to food log header (orange border, hidden when already editing)
+- "Cancel" clears sessionStorage + resets, "Done" fires insight + clears
+- Add button (slot header), delete × button, and empty-slot dashed button all hidden in read-only mode
+- Fixed bottom bar (zIndex 100): shows session count + Cancel + Done; shows "Analyzing…" while Haiku runs
+- Insight toast (zIndex 101): appears above bottom bar, 🤖 header, orange border, dismissable
+- Root div gets `paddingBottom: 80px` when editing to prevent content under the fixed bar
+- Removed duplicate `viewEntry` modal that existed at both line ~311 and ~797 — kept the first (zIndex 1200), removed the second (zIndex 1000)
+
+**`src/app/api/nutrition/meal-insight/route.js`:** (new file)
+- Haiku model, max_tokens 150, rate-limited 6/day via `api_rate_limits`
+- `getUser()` + `is_disabled` check
+- Accepts: `session_foods`, `slots_touched`, `backfill_minutes_max`, `is_catchup`, `day_totals`, `calorie_target`, `protein_target`, `current_time`
+- Detects catch-up logging (backfill > 30 min) and annotates prompt
+- Returns: `{ insight: "2-sentence string" }` — first sentence: specific observation; second: actionable suggestion for rest of day
 
 ### Phase 68 — Dead Data Audit Fixes — Complete
 Seven inputs that were collected but never used downstream wired up in the same session.
