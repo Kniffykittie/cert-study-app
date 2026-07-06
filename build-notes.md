@@ -281,6 +281,119 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ---
 
+### 💬 App Personality Layer — 📋 Fully Specced
+
+**Philosophy:** The app should feel like a coach who's paying attention, not a chatbot that reacts to every tap. Personality lives in three places: post-meal micro-insights, daily brief windows (already specced), and a global check-in pop-up. No blocking modals, no commentary on every food item — batched and context-aware.
+
+---
+
+#### Feature A — Post-Meal Micro-Insight (Haiku call after closing a meal slot)
+
+**When it fires:** After the user finishes logging to a meal slot and closes the modal or navigates back. NOT after every individual food item. Only fires if the meal slot has ≥ 2 items OR total calories for the slot > 200 (single coffee doesn't warrant commentary).
+
+**API route:** `POST /api/nutrition/meal-insight` — Haiku, short prompt, < $0.001/call. Rate-limited (max 6/day via `api_rate_limits`). Uses `getUser()` + `is_disabled` check.
+
+**What it receives:**
+```json
+{
+  "meal_slot": "lunch",
+  "foods_logged": ["Chicken breast 6oz", "Brown rice 1 cup", "Broccoli 1 cup"],
+  "logged_time": "12:30",
+  "current_time": "15:00",
+  "backfill_minutes": 150,
+  "slot_calories": 620,
+  "slot_protein_g": 52,
+  "day_totals_so_far": { "calories": 1050, "protein": 74, "carbs": 110, "fat": 32, "water_oz": 24 },
+  "calorie_target": 2400,
+  "protein_target": 160,
+  "is_catchup_session": true
+}
+```
+
+**`backfill_minutes` calculation:**
+```js
+const loggedAt = new Date(`${date}T${logged_time}:00`)
+const diffMin = (Date.now() - loggedAt) / 60000
+// > 120 = backfill, < 30 = real-time, between = neutral
+```
+
+**`is_catchup_session` detection:** If the user logs 2+ different meal slots within the same 10-minute window in this session, flag as catch-up. Tracked client-side in session state.
+
+**Haiku system prompt key instruction:**
+- If `backfill_minutes > 120`: use past tense, reflective framing. Do NOT say "great start to your morning" if it's 3pm and the meal was at 7am. Reference it as something that already happened.
+- If `backfill_minutes < 30`: use present/forward-looking framing. Tips about what's coming next.
+- If `is_catchup_session`: acknowledge they're catching up ("looks like you're logging your day retroactively — here's where things stand...").
+- Max 2 sentences. Be specific — name the actual foods. Don't be generic.
+- Reference what's ahead (dinner still to come?) or what's already done. Connect to their actual goal (deficit, surplus, protein focus).
+
+**UI:** Dismissible toast banner sliding up from the bottom of the nutrition page — NOT a modal. 4 seconds auto-dismiss, or user taps × to close early. No persistent storage needed (it's ephemeral commentary, not a cached insight).
+
+**Example outputs by context:**
+
+*Backfill, 3pm, logging breakfast (logged_time 7am):*
+> "Solid breakfast — eggs and toast gave you a strong protein start for the morning. You're at 1,050 calories for the day so far, which leaves good room for dinner."
+
+*Real-time, 7am:*
+> "Good morning fuel. That much protein at breakfast typically holds you 4–5 hours — no mid-morning crash if you stay hydrated."
+
+*Catch-up session, 6pm, logging both breakfast and lunch at once:*
+> "Looks like you're catching up on today's log — breakfast and lunch together put you at 1,050 calories and 74g protein. Protein's running a bit low for midday, so leaning heavier at dinner helps close that gap."
+
+*Backfill, 8pm, logging lunch that was low-protein:*
+> "Your lunch was mostly carb-forward — 12g protein for a full meal is on the lighter side. You've still got dinner, so a protein-heavy close to the day evens things out."
+
+*On track, real-time dinner:*
+> "That dinner puts you right at your calorie target and 148 of 160g protein — essentially a complete day. Whatever you have for a snack won't move the needle much."
+
+---
+
+#### Feature B — Global Daily Check-In Pop-Up
+
+**Current state:** Check-in is a buried card at the bottom of the Life Hub overview. Users miss it constantly.
+
+**New behavior:** A bottom-sheet that slides up from the bottom of ANY page in the Life Hub, once per day, 30 seconds after the user has been in the app.
+
+**Rules for when it appears:**
+1. Only appears once per calendar day — tracked in localStorage: `checkin_prompted_YYYY-MM-DD`
+2. Only appears between `wake_time` and `wake_time + 8hrs` (no middle-of-the-night prompts)
+3. Minimum 30 seconds after page load (don't ambush on landing)
+4. Once answered or dismissed (Skip), stores today's date → never shows again today
+5. Does NOT block navigation — user can still interact with the page behind it
+
+**Design (bottom-sheet, not full overlay):**
+- Slides up ~40% of screen height from the bottom
+- Semi-transparent dark overlay on the content above (not fully blocked)
+- Title: "Quick Check-In" with the current date
+- Energy row: 5 emoji buttons (😴 Drained / 😑 Low / 😐 Okay / 🙂 Good / ⚡ Energized)
+- Mood row: 5 emoji buttons (😤 Stressed / 😔 Low / 😐 Neutral / 😊 Good / 😄 Great)
+- Optional: one-line text input for a note ("sore from yesterday", etc.)
+- Two buttons: "Save" (purple, logs to `daily_checkins`) + "Skip today" (grey, dismisses for the day)
+- After Save: sheet slides down, brief animation ("✓ Logged"), then recovers the screen
+
+**Implementation:** Global pop-up lives in `LifeHubLayout` (`src/app/life-hub/layout.js`) — mounted once, appears across all Life Hub pages. Uses a `useEffect` with a 30-second setTimeout. State managed in the layout so it persists across page navigations within Life Hub.
+
+**Why bottom-sheet, not full overlay:** Full blocking overlays feel aggressive. A bottom-sheet feels like a notification that slid up — clearly visible, easy to dismiss, but impossible to miss. The content above is still visible (but dimmed), which reduces anxiety vs a hard block.
+
+---
+
+#### Feature C — Catch-Up Session Detection (client-side, no API)
+
+**The pattern:** Track which meal slots have been logged in the current browser session and at what time. If 2+ slots are logged within 10 minutes of each other, set `is_catchup_session = true` in session state. Pass this flag to the meal-insight API call.
+
+**Why it matters:** Changes the entire framing of the insight. Without it, logging breakfast at 6pm and lunch at 6pm would generate "great morning start" commentary that feels completely wrong. With it: "looks like you're catching up on your day — here's where things stand."
+
+**Client-side state in `nutrition/page.js`:**
+```js
+const recentSlotLogs = useRef([]) // { slot, timestamp }
+// On each log: push { slot, timestamp: Date.now() }
+// Before meal-insight call: check if last 2 entries are < 10min apart AND different slots
+const isBackfilling = recentSlotLogs.current.filter(
+  e => Date.now() - e.timestamp < 600000
+).length >= 2
+```
+
+---
+
 ### 🔔 Push Notifications + App Personality — 📋 Fully Specced
 
 #### Key Architecture Decisions Locked In (do not re-litigate)
