@@ -87,6 +87,27 @@ async function generateMemoryForUser(userId: string): Promise<void> {
   const supplementList = (supplements ?? []).map(s => `${s.name} (${s.dose}, ${s.timing})`).join(', ') || 'none'
   const stretchCount = stretchLogs?.length ?? 0
 
+  // Stretch-sleep correlation
+  const stretchDates = new Set((stretchLogs ?? []).map(s => s.date))
+  const sleepWithStretch: number[] = []
+  const sleepWithoutStretch: number[] = []
+  for (const session of sleepSessions ?? []) {
+    if (!session.sleep_score) continue
+    const date = session.created_at.slice(0, 10)
+    const prevDate = new Date(new Date(date).getTime() - 86400000).toISOString().slice(0, 10)
+    if (stretchDates.has(prevDate)) sleepWithStretch.push(session.sleep_score)
+    else sleepWithoutStretch.push(session.sleep_score)
+  }
+  const avgSleepWithStretch = sleepWithStretch.length >= 3
+    ? Math.round(sleepWithStretch.reduce((a, b) => a + b, 0) / sleepWithStretch.length)
+    : null
+  const avgSleepWithoutStretch = sleepWithoutStretch.length >= 3
+    ? Math.round(sleepWithoutStretch.reduce((a, b) => a + b, 0) / sleepWithoutStretch.length)
+    : null
+  const stretchSleepNote = avgSleepWithStretch !== null && avgSleepWithoutStretch !== null
+    ? `Nights after stretching: avg sleep score ${avgSleepWithStretch}/100 (n=${sleepWithStretch.length}) vs. nights without: ${avgSleepWithoutStretch}/100 (n=${sleepWithoutStretch.length})`
+    : 'Not enough paired stretch+sleep data for correlation'
+
   const dataSummary = `
 90-DAY DATA SUMMARY FOR ONE USER (generate observations ONLY about this user):
 
@@ -116,6 +137,7 @@ ENERGY CHECK-INS (${energyReadings.length} readings):
 
 SUPPLEMENTS: ${supplementList}
 STRETCH SESSIONS: ${stretchCount} in 90 days
+STRETCH-SLEEP CORRELATION: ${stretchSleepNote}
 `.trim()
 
   const prompt = `You are a personal coach analyzing 90 days of a user's health and fitness data. Generate 5–10 observations about this specific user's patterns.

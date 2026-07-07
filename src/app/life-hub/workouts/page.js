@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { BODY_PART_TO_STRETCH_GROUPS, getRecommendedStretches, getTimingLabel } from '@/data/stretches'
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -55,6 +56,7 @@ export default function WorkoutsPage() {
   const [suggestionsSheet, setSuggestionsSheet] = useState(false)
   const [appliedOverrides, setAppliedOverrides] = useState({}) // original_exercise -> override_exercise
   const [applyingOverride, setApplyingOverride] = useState(null)
+  const [todaySoreSpots, setTodaySoreSpots] = useState([])
 
   useEffect(() => { load() }, [])
 
@@ -77,7 +79,7 @@ export default function WorkoutsPage() {
       supabase.from('workout_plans').select('*').eq('user_id', session.user.id).eq('is_active', true).single(),
       supabase.from('exercises').select('id,name,body_part,equipment').in('equipment', ['dumbbell', 'body weight']).order('name'),
       supabase.from('workout_logs').select('day_of_week').eq('user_id', session.user.id).eq('is_partial', false).eq('date', today),
-      supabase.from('daily_checkins').select('energy_level').eq('user_id', session.user.id).eq('date', today).single(),
+      supabase.from('daily_checkins').select('energy_level,sore_spots').eq('user_id', session.user.id).eq('date', today).single(),
     ])
 
     setProfile(prof)
@@ -85,6 +87,7 @@ export default function WorkoutsPage() {
     setAllExercises(exercises ?? [])
     setCompletedTodayDays(new Set((todayLogs ?? []).map(l => l.day_of_week).filter(Boolean)))
     if (checkin?.energy_level) setTodayEnergy(checkin.energy_level)
+    if (checkin?.sore_spots?.length) setTodaySoreSpots(checkin.sore_spots)
 
     // Check localStorage for paused workout
     try {
@@ -266,6 +269,13 @@ export default function WorkoutsPage() {
 
   const todayDowName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()]
 
+  const todayPlan = plan?.plan?.find(d => d.day_of_week === todayDowName)
+  const todayBodyParts = todayPlan?.day_label
+    ? Object.entries(BODY_PART_TO_STRETCH_GROUPS).filter(([k]) => todayPlan.day_label.toLowerCase().includes(k)).flatMap(([, v]) => v)
+    : []
+  const { dynamic: stretchDyn, static: stretchSta } = getRecommendedStretches(todayBodyParts, todaySoreSpots)
+  const todayStretches = [...stretchDyn.slice(0, 3), ...stretchSta.slice(0, 2)]
+
   const sortedDays = plan?.plan
     ? [...plan.plan].sort((a, b) => DAYS_OF_WEEK.indexOf(a.day_of_week) - DAYS_OF_WEEK.indexOf(b.day_of_week))
     : []
@@ -441,6 +451,29 @@ export default function WorkoutsPage() {
             <div style={{ backgroundColor: 'rgba(46,204,113,0.06)', border: '1px solid rgba(46,204,113,0.2)', borderRadius: '10px', padding: '14px 18px' }}>
               <div style={{ color: 'var(--success)', fontSize: '11px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px' }}>Progression</div>
               <p style={{ color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6', margin: 0 }}>{plan.progression_notes}</p>
+            </div>
+          )}
+
+          {todayStretches.length > 0 && (
+            <div style={{ marginTop: '20px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderLeft: '3px solid #3b82f6', borderRadius: '10px', padding: '16px 18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>🧘 Stretches for Today</div>
+                <Link href="/life-hub/workouts/stretching" style={{ fontSize: '12px', color: '#3b82f6', textDecoration: 'none', fontWeight: '600' }}>Open →</Link>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {todayStretches.map(s => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', backgroundColor: 'var(--background)', borderRadius: '7px', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '99px', backgroundColor: s.stretch_type === 'dynamic' ? 'rgba(59,130,246,0.15)' : 'rgba(167,139,250,0.15)', color: s.stretch_type === 'dynamic' ? '#3b82f6' : '#a78bfa', fontWeight: '600', flexShrink: 0 }}>
+                      {s.stretch_type === 'dynamic' ? '⚡' : '🧘'}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500' }}>{s.name}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>{getTimingLabel(s.ideal_timing)}</div>
+                    </div>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', flexShrink: 0 }}>{s.duration_seconds}s</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </>

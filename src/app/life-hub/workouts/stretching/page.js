@@ -2,12 +2,15 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { STRETCHES, BODY_PART_TO_STRETCH_GROUPS, getRecommendedStretches } from '@/data/stretches'
+import { STRETCHES, BODY_PART_TO_STRETCH_GROUPS, getRecommendedStretches, getTimingLabel } from '@/data/stretches'
 
 const COLOR = '#3b82f6'
 
-function StretchCard({ stretch, checked, onToggle }) {
+function StretchCard({ stretch, checked, onToggle, soreSpots = [] }) {
   const [expanded, setExpanded] = useState(false)
+  const [whyOpen, setWhyOpen] = useState(false)
+  const isSore = soreSpots.includes(stretch.muscle_group)
+  const timingLabel = getTimingLabel(stretch.ideal_timing)
   return (
     <div style={{ backgroundColor: 'var(--surface)', border: `1px solid ${checked ? COLOR : 'var(--border)'}`, borderRadius: '10px', padding: '14px 16px', transition: 'border-color 0.2s' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
@@ -26,11 +29,29 @@ function StretchCard({ stretch, checked, onToggle }) {
             <span style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '2px 7px', borderRadius: '99px', border: '1px solid var(--border)' }}>{stretch.muscle_group}</span>
             <span style={{ fontSize: '11px', color: 'var(--text-secondary)', marginLeft: 'auto' }}>{stretch.duration_seconds}s</span>
           </div>
-          <button onClick={() => setExpanded(e => !e)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', padding: '4px 0 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {expanded ? '▲ Hide details' : '▼ How to do it'}
-          </button>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px', opacity: 0.8 }}>{timingLabel}</div>
+          <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+            <button onClick={() => setExpanded(e => !e)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              {expanded ? '▲ Hide details' : '▼ How to do it'}
+            </button>
+            {stretch.why && (
+              <button onClick={() => setWhyOpen(w => !w)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: '12px', cursor: 'pointer', padding: 0, fontWeight: '600' }}>
+                {whyOpen ? '▲ Why?' : '▼ Why?'}
+              </button>
+            )}
+          </div>
+          {whyOpen && stretch.why && (
+            <div style={{ marginTop: '8px', backgroundColor: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: '7px', padding: '8px 12px', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+              {stretch.why}
+            </div>
+          )}
           {expanded && (
             <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {isSore && (
+                <div style={{ backgroundColor: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.3)', borderRadius: '7px', padding: '8px 12px', fontSize: '12px', color: '#fb923c', lineHeight: '1.6' }}>
+                  🩹 Your <strong>{stretch.muscle_group}</strong> is sore — still do this stretch, but don't push past a 4/10 sensation. Move gently, stay in the tolerable zone, and skip any position that spikes pain.
+                </div>
+              )}
               <p style={{ color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6', margin: 0 }}>{stretch.how_to}</p>
               {stretch.common_mistakes && (
                 <div style={{ backgroundColor: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.2)', borderRadius: '7px', padding: '8px 12px' }}>
@@ -221,7 +242,7 @@ export default function StretchingPage() {
                   style={{ fontSize: '12px', color: COLOR, background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}>Select All</button>
               </div>
               {(dynStretches.length ? dynStretches : STRETCHES.filter(s => s.stretch_type === 'dynamic').slice(0, 6)).map(s =>
-                <div key={s.id} style={{ marginBottom: '8px' }}><StretchCard stretch={s} checked={checkedIds.has(s.id)} onToggle={toggleCheck} /></div>
+                <div key={s.id} style={{ marginBottom: '8px' }}><StretchCard stretch={s} checked={checkedIds.has(s.id)} onToggle={toggleCheck} soreSpots={soreSpots} /></div>
               )}
             </section>
           ) : sessionType === 'post_workout' ? (
@@ -232,7 +253,7 @@ export default function StretchingPage() {
                   style={{ fontSize: '12px', color: '#a78bfa', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}>Select All</button>
               </div>
               {(staticStretches.length ? staticStretches : STRETCHES.filter(s => s.stretch_type === 'static').slice(0, 6)).map(s =>
-                <div key={s.id} style={{ marginBottom: '8px' }}><StretchCard stretch={s} checked={checkedIds.has(s.id)} onToggle={toggleCheck} /></div>
+                <div key={s.id} style={{ marginBottom: '8px' }}><StretchCard stretch={s} checked={checkedIds.has(s.id)} onToggle={toggleCheck} soreSpots={soreSpots} /></div>
               )}
             </section>
           ) : (
@@ -243,7 +264,7 @@ export default function StretchingPage() {
                     <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: COLOR }}>⚡ Dynamic Stretches</h2>
                     <button onClick={() => selectAll(dynStretches)} style={{ fontSize: '12px', color: COLOR, background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}>Select All</button>
                   </div>
-                  {dynStretches.map(s => <div key={s.id} style={{ marginBottom: '8px' }}><StretchCard stretch={s} checked={checkedIds.has(s.id)} onToggle={toggleCheck} /></div>)}
+                  {dynStretches.map(s => <div key={s.id} style={{ marginBottom: '8px' }}><StretchCard stretch={s} checked={checkedIds.has(s.id)} onToggle={toggleCheck} soreSpots={soreSpots} /></div>)}
                 </section>
               )}
               {showPost && (
@@ -252,7 +273,7 @@ export default function StretchingPage() {
                     <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#a78bfa' }}>🧘 Static Stretches</h2>
                     <button onClick={() => selectAll(staticStretches)} style={{ fontSize: '12px', color: '#a78bfa', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}>Select All</button>
                   </div>
-                  {staticStretches.map(s => <div key={s.id} style={{ marginBottom: '8px' }}><StretchCard stretch={s} checked={checkedIds.has(s.id)} onToggle={toggleCheck} /></div>)}
+                  {staticStretches.map(s => <div key={s.id} style={{ marginBottom: '8px' }}><StretchCard stretch={s} checked={checkedIds.has(s.id)} onToggle={toggleCheck} soreSpots={soreSpots} /></div>)}
                 </section>
               )}
               {!showPre && !showPost && (
@@ -261,7 +282,7 @@ export default function StretchingPage() {
                     <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>🌟 Full Body Mobility</h2>
                     <button onClick={() => selectAll(STRETCHES.slice(0, 8))} style={{ fontSize: '12px', color: COLOR, background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}>Select All</button>
                   </div>
-                  {STRETCHES.slice(0, 8).map(s => <div key={s.id} style={{ marginBottom: '8px' }}><StretchCard stretch={s} checked={checkedIds.has(s.id)} onToggle={toggleCheck} /></div>)}
+                  {STRETCHES.slice(0, 8).map(s => <div key={s.id} style={{ marginBottom: '8px' }}><StretchCard stretch={s} checked={checkedIds.has(s.id)} onToggle={toggleCheck} soreSpots={soreSpots} /></div>)}
                 </section>
               )}
             </>

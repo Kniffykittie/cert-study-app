@@ -565,7 +565,7 @@ Proposed actions from any turn in the conversation are rendered as inline apply-
 
 ---
 
-#### Phase I — Item 20: Stretch System Overhaul 💬→📋
+#### Phase I — Item 20: Stretch System Overhaul ✅ Built (Phase 78)
 
 **Why now:** Depends on Phase G (sore spot auto-population from check-in is already built). Independent of Items 21/22.
 
@@ -2146,6 +2146,13 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase 78 — Item 20: Stretch System Overhaul — Complete
+
+- `src/data/stretches.js` — added `ideal_timing` field to all 38 stretches (`'pre_workout'` / `'post_workout_or_bed'` / `'anytime'`); added `why` field (2–3 sentences per stretch: what muscle/tissue, why it gets tight, consequence if untreated); added `SORE_SPOT_TO_MUSCLE_GROUP` export map (`shoulder→Shoulders`, `hip→Hips`, etc.); updated `getRecommendedStretches()` to use the map for proper group name matching; added `getTimingLabel(ideal_timing)` export returning human-readable guidance
+- `src/app/life-hub/workouts/stretching/page.js` — `StretchCard` updated: timing label line below stretch name; "Why?" toggle button reveals `stretch.why` in a purple callout; injury-aware copy block above instructions when `soreSpots.includes(stretch.muscle_group)` ("Your [X] is sore — still do this stretch, but don't push past a 4/10 sensation..."); all `StretchCard` usages now pass `soreSpots` prop
+- `src/app/life-hub/workouts/page.js` — imports `getRecommendedStretches`, `getTimingLabel`, `BODY_PART_TO_STRETCH_GROUPS`; fetches `sore_spots` from `daily_checkins` on load; computes `todayBodyParts` from today's plan `day_label`; computes `todayStretches` (top 3 dynamic + top 2 static); renders "🧘 Stretches for Today" card below progression notes — shows stretch chips with timing labels, duration, and "Open →" link to stretching page
+- `supabase/functions/generate-coach-memory/index.ts` — added stretch-sleep correlation computation: builds `stretchDates` Set from `stretch_logs`; for each `health_sleep_sessions` row checks if the prior date had a stretch session; computes `avgSleepWithStretch` vs `avgSleepWithoutStretch` (both require ≥3 data points); injects `STRETCH-SLEEP CORRELATION` line into the Haiku data summary so the AI can write a `sleep` category observation when the correlation is notable
 
 ### Phase 77 — Feature D + Feature E: Workout Suggestions + Keep Talking — Complete
 
