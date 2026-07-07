@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { STRETCHES, BODY_PART_TO_STRETCH_GROUPS, getRecommendedStretches, getTimingLabel } from '@/data/stretches'
+import InfoChip from '@/components/InfoChip'
 
 const COLOR = '#3b82f6'
 
@@ -198,13 +199,16 @@ export default function StretchingPage() {
       </div>
 
       {/* Session type */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {[['pre_workout', '⚡ Pre-Workout'], ['post_workout', '🧘 Post-Workout'], ['standalone', '🌟 Standalone']].map(([val, label]) => (
-          <button key={val} onClick={() => setSessionType(val)}
-            style={{ fontSize: '13px', padding: '7px 14px', borderRadius: '8px', border: `1px solid ${sessionType === val ? COLOR : 'var(--border)'}`, backgroundColor: sessionType === val ? `${COLOR}20` : 'transparent', color: sessionType === val ? COLOR : 'var(--text-secondary)', cursor: 'pointer', fontWeight: sessionType === val ? '600' : '400', transition: 'all 0.15s' }}>
-            {label}
-          </button>
-        ))}
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+          {[['pre_workout', '⚡ Pre-Workout'], ['post_workout', '🧘 Post-Workout'], ['standalone', '🌟 Standalone']].map(([val, label]) => (
+            <button key={val} onClick={() => setSessionType(val)}
+              style={{ fontSize: '13px', padding: '7px 14px', borderRadius: '8px', border: `1px solid ${sessionType === val ? COLOR : 'var(--border)'}`, backgroundColor: sessionType === val ? `${COLOR}20` : 'transparent', color: sessionType === val ? COLOR : 'var(--text-secondary)', cursor: 'pointer', fontWeight: sessionType === val ? '600' : '400', transition: 'all 0.15s' }}>
+              {label}
+            </button>
+          ))}
+          <InfoChip label="ℹ️" text="Dynamic stretches (leg swings, arm circles, hip circles) involve movement and are best before exercise — they increase blood flow and range of motion without reducing muscle strength. Static stretches (holding a position) are best post-workout or before bed — they improve long-term flexibility and help your nervous system down-regulate for sleep." style={{ alignSelf: 'center' }} />
+        </div>
       </div>
 
       {sessionType === 'pre_workout' && (
@@ -270,7 +274,10 @@ export default function StretchingPage() {
               {showPost && (
                 <section style={{ marginBottom: '28px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#a78bfa' }}>🧘 Static Stretches</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#a78bfa' }}>🧘 Static Stretches</h2>
+                      <InfoChip label="ℹ️" text="Static stretches (holding for 20–60 seconds) activate your parasympathetic nervous system — slowing your heart rate, releasing muscle tension, and signaling your body to shift into rest mode. Doing them within 1–2 hours of bed can measurably shorten the time it takes to fall asleep." />
+                    </div>
                     <button onClick={() => selectAll(staticStretches)} style={{ fontSize: '12px', color: '#a78bfa', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}>Select All</button>
                   </div>
                   {staticStretches.map(s => <div key={s.id} style={{ marginBottom: '8px' }}><StretchCard stretch={s} checked={checkedIds.has(s.id)} onToggle={toggleCheck} soreSpots={soreSpots} /></div>)}

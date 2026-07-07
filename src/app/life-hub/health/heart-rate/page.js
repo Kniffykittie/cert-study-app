@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback, useRef, useMemo, Component } from 'react'
 import Link from 'next/link'
+import InfoChip from '@/components/InfoChip'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
@@ -203,11 +204,14 @@ function HeartRatePageInner() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
         {[
           { label: 'Avg Today', value: data?.todayAvg != null ? data.todayAvg : '—', unit: 'bpm', color: bpmColor(data?.todayAvg) },
-          { label: 'Resting HR', value: data?.todayResting != null ? data.todayResting : '—', unit: 'bpm', color: 'var(--accent-blue)', sub: 'Google-computed' },
-          { label: 'HRV (RMSSD)', value: data?.todayHrv != null ? Math.round(data.todayHrv) : '—', unit: 'ms', color: 'var(--accent-purple)', sub: 'higher = better recovery' },
+          { label: 'Resting HR', value: data?.todayResting != null ? data.todayResting : '—', unit: 'bpm', color: 'var(--accent-blue)', sub: 'Google-computed', info: "Your resting heart rate (RHR) is Google's algorithm — more accurate than raw sample averages. Lower is better for cardiovascular fitness. Elite athletes: 40–60 bpm. Healthy adults: 60–80 bpm. Consistent elevation above your baseline can signal stress, illness, or overtraining." },
+          { label: 'HRV (RMSSD)', value: data?.todayHrv != null ? Math.round(data.todayHrv) : '—', unit: 'ms', color: 'var(--accent-purple)', sub: 'higher = better recovery', info: "Heart Rate Variability measures the millisecond variation between heartbeats. Higher HRV means your autonomic nervous system is balanced and recovered. Lower HRV signals stress, fatigue, or your body fighting something. Typical adults: 20–60 ms. Day-to-day trends matter more than any single reading — look for a 7-day pattern." },
         ].map(card => (
           <div key={card.label} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '8px' }}>{card.label}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '8px' }}>
+              {card.label}
+              {card.info && <InfoChip label="ℹ️" text={card.info} />}
+            </div>
             <div style={{ color: card.color, fontSize: '30px', fontWeight: '700', lineHeight: 1 }}>{card.value}</div>
             <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>{card.unit}</div>
             {card.sub && <div style={{ color: 'var(--text-secondary)', fontSize: '10px', marginTop: '2px', opacity: 0.7 }}>{card.sub}</div>}

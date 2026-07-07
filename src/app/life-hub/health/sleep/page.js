@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import InfoChip from '@/components/InfoChip'
 
 const STAGE_COLORS = {
   'Deep': 'var(--accent-blue)',
@@ -95,7 +96,7 @@ function ScoreRing({ score }) {
         <text x="55" y="50" textAnchor="middle" fill={color} fontSize="22" fontWeight="700" dy="0">{score ?? '—'}</text>
         <text x="55" y="68" textAnchor="middle" fill="var(--text-secondary)" fontSize="11">{label}</text>
       </svg>
-      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>Sleep Score</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>Sleep Score <InfoChip label="ℹ️" text="Your Sleep Score (0–100) is computed from four weighted factors: total sleep duration, sleep efficiency (time asleep vs. time in bed), number of awakenings, and restlessness. A score above 80 reflects genuinely restorative sleep. Below 60 means your body likely didn't fully recover overnight." /></div>
     </div>
   )
 }
@@ -250,7 +251,7 @@ export default function SleepTrackerPage() {
                   <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>to fall asleep</div>
                 </div>
                 <div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '4px' }}>Efficiency</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '4px' }}>Efficiency <InfoChip label="ℹ️" text="Sleep efficiency = total time asleep ÷ total time in bed. Above 85% is healthy — below 80% suggests restless nights, trouble falling asleep, or frequent waking. If yours is low, consistent sleep and wake times help the most." /></div>
                   <div style={{ color: sleepEfficiency != null && sleepEfficiency >= 85 ? 'var(--success)' : 'var(--warning)', fontSize: '22px', fontWeight: '700' }}>
                     {sleepEfficiency != null ? `${sleepEfficiency}%` : '—'}
                   </div>

@@ -659,7 +659,7 @@ On page load, fetch yesterday and day-before-yesterday's entries (2 extra API ca
 
 ---
 
-#### Phase K — Item 22: Teaching Philosophy / ℹ️ Touchpoints 💬→📋
+#### Phase K — Item 22: Teaching Philosophy / ℹ️ Touchpoints ✅ Built (Phase 80)
 
 **Why now:** This is additive — it adds ℹ️ chips to existing data displays across multiple pages. Build last in the intelligence sequence because it requires all the underlying features to be stable first.
 
@@ -2146,6 +2146,18 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase 80 — Item 22: ℹ️ InfoChip Touchpoints — Complete
+
+- `src/components/InfoChip.js` (new): reusable grey chip component; toggles inline expansion on tap; orange when active; `text` prop rendered in a warm callout box; `label` defaults to "ℹ️"; CSS variables for theme compatibility; works inline next to any label
+- 11 touchpoints added across 8 files:
+  - `src/app/life-hub/health/sleep/page.js` — Sleep Score (ScoreRing) + Sleep Efficiency % label
+  - `src/app/life-hub/health/heart-rate/page.js` — Resting HR + HRV (RMSSD) stat cards
+  - `src/app/life-hub/page.js` — Recovery Score subtitle label
+  - `src/app/life-hub/goals/measurements/page.js` — Body Composition Signal card header + Navy BF% badge on each history entry
+  - `src/app/life-hub/workouts/stretching/page.js` — Dynamic vs Static session type toggle area + Static Stretches section header in standalone mode (before-bed tip)
+  - `src/app/life-hub/nutrition/page.js` — "Maintenance (TDEE)" row label
+  - `src/app/life-hub/workouts/log/page.js` — "❤️ Heart Rate Zones" heading on workout completion screen
 
 ### Phase 79 — Item 21: Micronutrient Daily Awareness — Complete
 

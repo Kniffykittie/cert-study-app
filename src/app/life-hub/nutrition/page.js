@@ -12,6 +12,7 @@ import MealBuilderModal from '@/components/nutrition/MealBuilderModal'
 import NutrientBars from '@/components/nutrition/NutrientBars'
 import EditFoodModal from '@/components/nutrition/EditFoodModal'
 import SavedFoodsTab from '@/components/nutrition/SavedFoodsTab'
+import InfoChip from '@/components/InfoChip'
 
 const TIMING_LABELS = {
   morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening',
@@ -606,7 +607,7 @@ function NutritionPageInner() {
             </div>
             {goalAdjustment !== 0 && tdee && (
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Maintenance (TDEE)</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: 'var(--text-secondary)', fontSize: '11px' }}>Maintenance (TDEE) <InfoChip label="ℹ️" text="TDEE (Total Daily Energy Expenditure) is your estimated daily calorie burn — calculated from your basal metabolic rate, activity level, and workout output. Your eating target is TDEE adjusted by your goal (deficit for fat loss, surplus for muscle gain). After 14+ days with weight data, the app refines this automatically." /></span>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{(tdee + workoutBonus).toLocaleString()} kcal</span>
               </div>
             )}

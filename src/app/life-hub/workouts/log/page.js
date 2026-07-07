@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import InfoChip from '@/components/InfoChip'
 
 const SET_TYPES = ['warmup', 'working', 'dropset']
 const SET_TYPE_COLORS = { warmup: 'var(--text-secondary)', working: 'var(--accent-blue)', dropset: 'var(--accent-purple)' }
@@ -724,7 +725,7 @@ function LogWorkoutPageInner() {
         {done.hrZones && (done.hrZones.fat_burn_min > 0 || done.hrZones.cardio_min > 0 || done.hrZones.hard_min > 0 || done.hrZones.peak_min > 0) && (
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--error)' }}>❤️ Heart Rate Zones</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 13, fontWeight: 700, color: 'var(--error)' }}>❤️ Heart Rate Zones <InfoChip label="ℹ️" text="HR zones are based on % of your estimated max heart rate (220 − your age). Fat Burn (60–70%) is lower intensity and oxidizes more fat per calorie — ideal for aerobic base building. Cardio (70–80%) builds cardiovascular fitness and endurance. Hard (80–90%) and Peak (90%+) zones develop VO2 max and anaerobic capacity. All zones contribute to overall calorie burn." /></div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                 {done.hrZones.avg_bpm > 0 && `avg ${done.hrZones.avg_bpm} bpm`}
                 {done.hrZones.max_bpm > 0 && ` · max ${done.hrZones.max_bpm} bpm`}

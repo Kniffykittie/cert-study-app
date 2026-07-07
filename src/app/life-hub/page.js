@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { calcTDEE } from '@/lib/tdee'
+import InfoChip from '@/components/InfoChip'
 
 const SC = {
   overview: '#a78bfa',
@@ -589,7 +590,7 @@ export default function LifeHubPage() {
                 </div>
                 <div>
                   <div style={{ fontSize: '17px', fontWeight: '700', color: scoreColor, marginBottom: '2px' }}>⚡ {scoreLabel}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Recovery Score — based on yesterday's data</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>Recovery Score — based on yesterday's data <InfoChip label="ℹ️" text="Recovery Score (0–100) combines five factors from yesterday: Sleep (25 pts), Hydration (20 pts), Protein (20 pts), Daily Energy (15 pts), and Workout Load + Stretching (up to 20 pts). The score reflects how ready your body is for today's training and daily demands." /></div>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>

@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { estimateBodyFatPct } from '@/lib/tdee'
+import InfoChip from '@/components/InfoChip'
 
 const WEIGHT_FIELD = { key: 'weight_lbs', label: 'Weight', unit: 'lbs', placeholder: '175' }
 
@@ -603,8 +604,9 @@ export default function MeasurementsPage() {
       {/* Body Composition Signal Card */}
       {signal && (
         <div style={{ backgroundColor: 'var(--surface)', border: `2px solid ${signal.signalColor}`, borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
-          <div style={{ fontSize: '11px', fontWeight: '700', color: signal.signalColor, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', fontWeight: '700', color: signal.signalColor, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
             📊 Body Composition Signal
+            <InfoChip label="ℹ️" text="This signal interprets your most recent weight and tape measurement changes together. Weight going up + waist shrinking = muscle gain. Weight dropping + waist shrinking = fat loss. Weight up + waist up = surplus. When weight and measurements move in opposite directions — that's body recomposition (losing fat while building muscle simultaneously)." />
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
             {signal.weightDelta != null && (
@@ -666,8 +668,9 @@ export default function MeasurementsPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                       <span style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>{formatDate(row.date)}</span>
                       {navyBf != null && (
-                        <span style={{ fontSize: '11px', backgroundColor: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '5px', padding: '1px 7px', color: 'var(--accent-purple)', fontWeight: '600' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', backgroundColor: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '5px', padding: '1px 7px', color: 'var(--accent-purple)', fontWeight: '600' }}>
                           ~{Math.round(navyBf)}% body fat (Navy)
+                          <InfoChip label="ℹ️" text="The Navy Method estimates body fat % from waist, neck, and height (plus hips for women). It's more accurate than BMI and self-reported body composition because it uses your actual tape measurements. Health ranges: Men 10–20% (athletic 6–13%), Women 18–28% (athletic 14–20%). This updates automatically with every measurement entry." />
                         </span>
                       )}
                     </div>

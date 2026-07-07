@@ -290,6 +290,7 @@ src/
   supabase/
     functions/
       generate-coach-memory/index.ts   Deno Edge Function — runs weekly (Sunday 9pm EST via pg_cron); aggregates 90 days of data per user across 9 tables; one Haiku call returns 5–10 observations; upserts with confidence bumping + stale deactivation
+    InfoChip.js                        Reusable ℹ️ education chip — grey pill, orange when active, toggles inline callout; props: text, label (default "ℹ️"), style; used at 11 touchpoints across 8 pages for domain-knowledge data points
     BookmarkModal.js                   Bookmark reason + notes modal
     DailyStreak.js                     30q/day streak tracker with 28-day calendar heatmap
     DomainTrend.js                     Per-domain score trend SVG chart (no library)
