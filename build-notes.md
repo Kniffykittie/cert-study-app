@@ -1058,19 +1058,51 @@ Every place in the app that shows a nutrient amount (mg, g, mcg) should also sho
 
 Allow the user to take or upload a photo of food and have Claude identify the dish, estimate portions, and return a structured nutrition estimate that flows into the existing log-manual flow.
 
-**Use case:** food truck stops, restaurant meals, home-cooked dishes with no barcode — anywhere the user doesn't know exact weights or ingredients. A rough estimate beats a gap in the log.
+**Use case:** food truck stops, restaurant meals, home-cooked dishes with no barcode — anywhere the user doesn't know exact weights or ingredients. A rough estimate beats a gap in the log. Even a rough estimate is better than a missing entry.
 
-**Flow:**
-1. Camera button on add-food surfaces (alongside Search and Manual tabs in AddFoodModal, or as a standalone tab)
-2. User takes photo or uploads from camera roll
-3. Client resizes image to ~800px max dimension, converts to base64 (keep under 1MB)
-4. `POST /api/nutrition/ai-photo-log` — sends base64 image to `claude-sonnet-4-6` with vision input; system prompt asks Claude to identify dishes, estimate portions, and return structured JSON (name, serving_size_label, estimated_calories, protein_g, carbs_g, fat_g, confidence: 'high'|'medium'|'low', notes)
-5. Response pre-fills `log-manual/page.js` via `sessionStorage` (same pattern as `ai-food-fill`) — user reviews and adjusts before logging
-6. UI must clearly show this is an estimate: "AI estimate — review before logging" header, confidence chip (High / Medium / Low), Claude's notes field shown below form
+**UX Flow — single shot with inline confidence + clarification:**
 
-**Prompt design:** Claude should break a multi-item plate into components when visible (e.g. rice + chicken + sauce as separate line items returned as an array). If it can't identify the food or confidence is very low, it should say so rather than guess wildly. The prompt should reference common portion cues (plate size, hand size comparisons, item count).
+1. Camera button added as a 4th tab in AddFoodModal (📷 Photo) alongside ⭐ Favorites, ✏️ Manual, 🔍 Search
+2. User taps "Take Photo" (camera) or "Upload" (camera roll) — browser `<input type="file" accept="image/*" capture="environment">`
+3. Client resizes image to max ~800px on longest side before sending (keeps payload under 600KB; Canvas API for resize)
+4. `POST /api/nutrition/ai-photo-log` — sends base64 image + optional user_description field
+5. Claude returns structured JSON with confidence tier and either results or a retake reason
 
-**API route guards:** `getUser()` + `is_disabled` check. No caching (each photo is unique). Rate-limit to 10/day via `api_rate_limits` (vision calls are more expensive than text).
+**API response structure:**
+```json
+{
+  "status": "identified" | "low_confidence" | "needs_retake",
+  "confidence": "high" | "medium" | "low",
+  "confidence_note": "I can see grilled chicken and rice with a dark glaze — this looks like a teriyaki bowl.",
+  "retake_reason": null,   // or: "The plate is cut off — please retake with the full plate in frame"
+  "items": [
+    { "name": "Teriyaki Chicken Bowl", "serving_size_label": "1 bowl (~400g)", "calories": 520, "protein_g": 38, "carbs_g": 58, "fat_g": 9 }
+  ]
+}
+```
+
+**UI states after photo is sent:**
+
+*High confidence:*
+Green chip "I'm pretty confident about this one" + Claude's description sentence + pre-filled form fields. User reviews and taps Log.
+
+*Medium confidence:*
+Yellow chip "Best estimate — I'm not certain" + description + pre-filled fields. A "Help me guess better" text field appears below: user types e.g. "it's a shawarma wrap with garlic sauce" and taps "Re-analyze" — same photo + description re-sent, Claude almost always corrects to high confidence on second pass.
+
+*Low confidence / needs retake:*
+Red chip + specific retake instruction shown as a card:
+> "Please retake with the full plate in frame" 
+> "Better lighting would help — try moving to a brighter spot"
+> "I can't identify this dish — can you describe what's in it?"
+Last option opens the text description field directly so user can skip retake entirely and just type "dal makhani with rice and naan."
+
+**Prompt design:**
+- Claude should break a multi-item plate into separate components where visible (rice + chicken + sauce = 3 entries OR 1 combined "Chicken Teriyaki Bowl" entry — prefer combined for unknown dishes, separate for clearly distinct items)
+- Portion cues in prompt: estimate from visual references (plate size, hand comparison, item count), note the estimate in `confidence_note`
+- Never fabricate a confident answer — returning `low_confidence` with a helpful note is better than a wild guess presented as fact
+- System prompt must state: "This user will review and adjust before logging. Your job is to give the best honest estimate. If you're uncertain, say so and explain why."
+
+**API route guards:** `getUser()` + `is_disabled` check. No caching (each photo is unique). Rate-limit to 10/day via `api_rate_limits` (vision calls cost more than text). Image is never stored — base64 is processed in-memory only.
 
 **5. Pre/Post Workout Meal Advisor** — ✅ Built (Phase 51)
 
@@ -1592,51 +1624,168 @@ This exists in the stretch library but never surfaces in recommendation context.
 
 ---
 
-**22. Workout Day Hub + Dates on Plan Page** — 💬 Discussed
+**22. Workout Day Hub — Full Architecture** — 💬 Discussed
 
-**The core problem:** Workouts and stretches are separate pages, completion happens in different flows, there's no single place that owns "today's full training picture," and the plan page shows day names (Monday) without actual dates (July 7), making it hard to track the week.
+**The architectural shift:** The Day Hub collapses four current pages (plan day expand, standalone stretching page, workout logger entry, coaching completion screen) into one coherent owner for the full training day. It is the single entry point for starting any workout or stretch session. The standalone Stretching & Mobility page (`/life-hub/workouts/stretching`) is retired — that flow lives exclusively inside the Day Hub. The Stretch Library stays but becomes reference documentation under the Workouts section, not a flow destination.
 
-**Part A — Dates on the Workout Plan Page (small, quick win):**
-Each day card on `/life-hub/workouts` should show the actual calendar date next to the day name:
-- Compute the Monday of the current week, then offset by day index
-- Display: `Monday · Jul 7` or `Wednesday · Jul 9` as a subtitle under the day name
+---
+
+**Part A — Dates on the Workout Plan Page (prerequisite, quick win):**
+
+Each day card on `/life-hub/workouts` shows the actual calendar date next to the day name. Compute the Monday of the current week (same `getMonday()` logic already in weekly-wrap route), then offset by day index (0–6).
+- Display as subtitle under day name: `Monday · Jul 7` or `Wednesday · Jul 9`
 - Rest days and active days both get dates
-- Makes it immediately obvious which day is today and which days have passed this week
+- Tapping any day card (including rest days) navigates to the Day Hub for that day — inline expand removed entirely
+
+---
 
 **Part B — Day Hub Page (`/life-hub/workouts/day/[dayOfWeek]`):**
-Tapping a day card navigates to a dedicated page instead of expanding inline. This page owns the full picture for that training day.
 
-*Page sections in order:*
-1. **Header:** Day name + actual date + muscle group label (e.g. "Wednesday · Jul 9 — Pull Day")
-2. **Phase 1 — Pre-Workout Stretches:** Dynamic stretches recommended for today's muscle group. Each card shows name, duration, why it matters for today specifically (e.g. "Your lats are trained today — opening the thoracic spine now improves your pull range"). "Start Pre-Workout Stretches →" button navigates to the stretching page with session_type=pre_workout pre-selected. Phase marked complete when a pre-workout stretch log exists for today.
-3. **Phase 2 — Today's Workout:** Exercise cards (same data as current expanded day view — sets/reps/notes). Each exercise has a "Why this today?" chip that expands a 2-sentence explanation (what it trains, why it fits this week's split). "Start Workout →" button navigates to the active workout logger. Phase marked complete when a workout_log exists for today.
-4. **Phase 3 — Post-Workout Stretches:** Static stretches for the trained muscle group. "Best done within 30 minutes of finishing — muscles are still warm." "Start Post-Workout Stretches →" button. Phase marked complete when a post-workout stretch log exists for today.
-5. **Phase 4 — Bedtime Stretches:** 3–5 full-body static stretches focused on parasympathetic activation. "10–15 minutes before sleep — lowers cortisol, reduces resting HR, correlates with better sleep scores." "Start Bedtime Stretches →" button. Phase marked complete when a standalone or post stretch log exists for the evening.
-6. **AI Coaching Review (collapsible, shown after workout complete):** Displays the `ai_coaching_response` from `workout_logs` for today's session. User can come back hours or days later and re-read what the AI said. Shows workout stats summary above the narrative (duration, sets, HR zones if available).
+The Day Hub is the same page in two modes: **active** (current week) and **read-only** (past weeks/days). URL param is day of week (0=Mon…6=Sun); the page derives the actual date from that + the current week's Monday. For historical access, add optional `?date=YYYY-MM-DD` param so history can link directly to any past Day Hub.
 
-*Phase completion tracking:*
-- Each phase shows a status indicator: ⬜ Not started · 🔵 In progress · ✅ Done
-- Computed at load time from: `stretch_logs` (pre/post/standalone), `workout_logs` (workout phase)
-- State is already in the DB — no new tables needed
-- Phases remain independently completable — user can do pre-workout at 6am, workout at 7am, post at 8am, bedtime stretches at 10pm
+**Header:**
+- Day name + actual date (e.g. "Wednesday · July 9")
+- Muscle group / day label (e.g. "Pull Day" or "Rest Day")
+- Phase progress dots: four small circles color-coded by completion status — visible at a glance without scrolling
 
-*Historical Day Hub (read-only):*
-When navigating to a past day (not the current week), the same page renders in read-only mode showing: what was planned, which phases were actually completed (with timestamps), and the AI coaching review if one was generated. This replaces the need to dig through workout history to understand a past session.
+**Phase 1 — Pre-Workout Stretches (dynamic stretches):**
+- 3–5 dynamic stretches auto-selected by `getRecommendedStretches()` for today's muscle group
+- Each card: stretch name, duration, and a *one-sentence context note* explaining why it matters for today's specific muscle group (e.g. "Your lats are trained today — opening the thoracic spine now improves overhead pull range and reduces impingement risk")
+- Tap card to expand: full instructions + "Why?" text (same content as stretch library)
+- "Start Pre-Workout Stretches →" button: navigates to stretching page with `session_type=pre_workout` and today's muscle group pre-selected — no configuration needed on that page
+- Phase status: ✅ Done when a `stretch_logs` entry with `session_type='pre_workout'` exists for today
 
-**Part C — Workout History Revamp:**
-Current history page shows a flat list of workout sessions with timestamps. Proposed redesign:
-- **Group by week** (most recent week first) — collapsible week header showing "Week of Jul 7 — 3 sessions · 4h 20m total"
-- Each week group shows its sessions as compact cards; tapping a session opens the read-only Day Hub view for that date
-- **Weekly Wrap link** inside each history week group — if a wrap exists for that week, show "📊 View Weekly Wrap →" link
-- Session cards in history should show: day + date, muscle group/label, duration, HR zone summary (if available), and a 1-line excerpt of the AI coaching response (truncated at 80 chars with "read more")
+**Phase 2 — Today's Workout:**
+- Exercise list matching today's plan (same data as current expanded day view — exercise name, sets × reps, rep range)
+- Each exercise has a collapsible "Why this today?" section: 2 sentences — what the exercise trains + why it belongs in this week's split (e.g. "Barbell rows hit mid-back thickness. On pull days these are your primary horizontal pull — they build the strength base your curls and pulldowns sit on top of.")
+- Previous session hints shown inline per exercise ("Last time: 3 × 185lbs") — currently only shown in the workout logger, surfacing them here helps you plan load before you start
+- "Start Workout →" button: navigates to `/life-hub/workouts/log` with today's day pre-selected — logger skips the day-selection step
+- Phase status: ✅ Done when a `workout_logs` entry exists for today
+- When done: small excerpt of AI coaching response shown with "Read full feedback ↓" chevron
 
-**Build order recommendation:**
-1. Add dates to plan page (15 min, independent)
-2. Build Day Hub page with phase sections (new route, phases are read-only summaries + nav buttons to existing flows)
-3. Add "Why this?" descriptions to exercises and stretches within the Day Hub
-4. Wire phase completion status indicators
-5. Add AI coaching review panel to Day Hub
-6. Revamp history page to week-grouped layout with Day Hub links
+**Phase 3 — Post-Workout Stretches (static stretches):**
+- 3–5 static stretches for today's trained muscle group
+- Subtitle: "Best done within 30 minutes of finishing — muscles are warm and pliable"
+- Same card format as Phase 1 with context notes (e.g. "Lat stretch — holds this muscle at its longest to prevent the chronic shortening that limits your range on next pull day")
+- "Start Post-Workout Stretches →" button: same flow, `session_type=post_workout`
+- Phase status: ✅ Done when a `stretch_logs` entry with `session_type='post_workout'` exists for today
+
+**Phase 4 — Bedtime Stretches:**
+- 4–5 full-body static stretches focused on parasympathetic activation (not muscle-group-specific — always the same regardless of training day)
+- Subtitle: "10–15 minutes before sleep — activates your rest-and-digest system, lowers cortisol and resting HR"
+- If user has sleep data: show their avg sleep score on nights with vs without bedtime stretching if coach_memory has tracked this correlation
+- "Start Bedtime Stretches →" button: `session_type=standalone` with bedtime-appropriate stretch set pre-selected
+- Phase status: ✅ Done when a `stretch_logs` entry with `session_type='standalone'` and `logged_at` after 8pm exists for today (rough heuristic)
+
+**AI Coaching Review (collapsible panel, shown after workout phase complete):**
+- Triggered by: `workout_logs` entry exists for today AND `ai_coaching_response` is populated
+- Header: workout stats row (duration, sets completed, HR zones if available)
+- Body: full `ai_coaching_response` text
+- If response not yet generated (still async): show "Coaching feedback generating..." spinner — poll once per 3 seconds for up to 15 seconds, then show "Check back in a few minutes" if still pending
+- User can collapse this panel; it re-opens on next visit if they haven't read it
+- `coaching_feedback_read_at` timestamp in `workout_logs` — set when user opens the panel in expanded state (useful for future notification logic)
+
+**Rest Day Hub:**
+Rest days get a Day Hub too, just with different content:
+- Recovery note based on recent training load (e.g. "You trained 3 days in a row — today's rest is structural, not optional")
+- Light movement recommendation: a short walk, foam rolling note, or mobility suggestion based on body parts trained yesterday
+- Bedtime stretches section (same Phase 4 as active days)
+- No workout phase, no pre/post stretches
+
+---
+
+**Phase completion tracking:**
+- Status computed at page load from existing DB data — no new tables needed
+- `stretch_logs`: `session_type` + `date` + `logged_at` (for bedtime heuristic)
+- `workout_logs`: `created_at` matching today
+- Each phase shows: ⬜ Not started · 🔄 Started (stretch log for session exists but may be incomplete) · ✅ Done
+- Phases are completely independent — user can do pre-workout at 6am, leave, do workout at 7pm, come back at 10pm for bedtime stretches. State persists between visits because it's all in the DB.
+
+**Phase progress dots on plan page:**
+Small colored indicator dots under each day's title on the plan page — visible without opening the Day Hub:
+- 🟣 Pre-stretch done
+- 🔵 Workout done
+- 🟢 Post-stretch done
+- ⚪ Bedtime stretches done
+These give a glanceable completion picture across the whole week without navigating into each day.
+
+---
+
+**Part C — Sidebar Restructure:**
+
+Current Workouts dropdown (5 items): My Plan · Workout History · Exercise Library · Stretching & Mobility · Stretch Library
+
+Proposed (4 items):
+- **My Plan** — week view, day cards tap to Day Hub
+- **History** — unified week-grouped history (see Part D)
+- **Exercise Library** — reference, unchanged
+- **Stretch Reference** — the current Stretch Library renamed and reframed as documentation (the "Stretching & Mobility" active page is retired)
+
+The standalone `/life-hub/workouts/stretching` page is retired. All stretch session initiation flows through Day Hub phase buttons. The Stretch Library at `/life-hub/workouts/stretching/library` becomes "Stretch Reference" at a cleaner URL like `/life-hub/workouts/stretches`.
+
+---
+
+**Part D — Unified History (Workout + Stretch merged):**
+
+Current history page: flat list of `workout_logs` ordered by date.
+
+Proposed: week-grouped view where workouts and stretch sessions appear together under the week they happened, all accessible via the read-only Day Hub.
+
+*Week group header:*
+"Week of Jul 7 — 3 workouts · 8 stretch sessions · 4h 40m total"
+→ Tap to expand/collapse
+
+*Within each week group — Day cards instead of session cards:*
+Each day that had any activity (workout OR stretch session) shows as a compact card:
+- Day + date (e.g. "Wednesday · Jul 9")
+- Day label (Pull Day / Rest Day)
+- Phase completion dots (same 4-dot indicator from plan page)
+- If workout: duration + HR zone summary chip
+- 1-line excerpt of AI coaching response (80 chars, truncated)
+- "📊 View Weekly Wrap →" link shown at week group level if a wrap exists for that week
+
+Tapping a day card opens the **read-only Day Hub** for that date — the exact same page component in read-only mode:
+- Shows what was planned vs what was actually completed
+- All stretch sessions shown with timestamps
+- Full AI coaching response
+- Previous session data for each exercise (same data as "prev session hints" in the logger)
+
+This means there is only ONE page design for viewing a day's training — the Day Hub — whether you're looking at today, yesterday, or a session from 6 weeks ago. No separate "history detail" page to build or maintain.
+
+---
+
+**Part E — Weekly Completion Tracking:**
+
+No streak for workouts currently. Add a weekly completion picture visible on both the plan page (top of page, current week) and the history page (per week group):
+
+`Phases completed this week: 7 / 16` — broken down as:
+- Pre-workout: 2/4 planned workout days
+- Workouts: 3/4 planned workout days
+- Post-workout: 1/4 planned workout days
+- Bedtime: 3/7 nights
+
+This data feeds coach_memory (Edge Function can see phase completion patterns over time) and the Daily Brief (can note "you've completed 3 of 4 planned workouts but only 1 post-workout stretch session — post-stretch is where today's plan has the biggest gap").
+
+---
+
+**Part F — Coaching Feedback Notification:**
+
+Current problem: AI coaching response is generated async (up to 8s) after workout finish. User typically leaves the completion screen before it's ready and never reads it.
+
+Fix: when the user opens the Day Hub for a day that has a `workout_logs` entry but `coaching_feedback_read_at` is null, show a badge on the AI Coaching Review panel header: "💬 New feedback". The panel auto-expands on first visit if unread. This naturally pulls the user back to read it without requiring push notifications for this specific case.
+
+---
+
+**Build order:**
+1. Add dates to plan page + remove inline expand (day card taps navigate to Day Hub URL)
+2. Build Day Hub page — active mode, phases with static content (no "Why this?" AI yet, just layout + completion indicators)
+3. Wire all "Start X" buttons to existing stretch/workout flows with pre-selection params
+4. Add "Why this today?" text to exercise cards (can be hardcoded per exercise in the exercise data, or a simple AI call per workout plan generation that adds context notes to the plan JSONB)
+5. Add AI coaching review panel + unread badge
+6. Build rest day Day Hub variant
+7. Revamp history page to week-grouped Day cards with read-only Day Hub links
+8. Retire standalone stretching page, rename Stretch Library to Stretch Reference, update sidebar
+9. Add weekly completion tracking bar to plan page and history week groups
 
 ---
 
