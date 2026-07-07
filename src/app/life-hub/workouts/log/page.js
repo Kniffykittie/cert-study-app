@@ -514,7 +514,81 @@ function LogWorkoutPageInner() {
     const workingSets = sets.filter(s => s.set_type === 'working' && s.weight_lbs != null && s.reps != null)
     const totalVolume = workingSets.reduce((sum, s) => sum + s.weight_lbs * s.reps, 0)
     const completedCount = exercises.reduce((sum, ex) => sum + ex.sets.filter(s => s.completed).length, 0)
-    setDone({ duration: elapsed, totalVolume, completedCount, totalSets: exercises.reduce((sum, ex) => sum + ex.sets.length, 0), overloadSuggestions: json.overloadSuggestions || [], hrZones: json.hrZones || null, difficulty, energy })
+    const completedSetsForCoach = exercises.reduce((sum, ex) => sum + ex.sets.filter(s => s.completed).length, 0)
+    const skippedSets = exercises.reduce((sum, ex) => sum + ex.sets.filter(s => !s.completed).length, 0)
+
+    setDone({ duration: elapsed, totalVolume, completedCount, totalSets: exercises.reduce((sum, ex) => sum + ex.sets.length, 0), overloadSuggestions: json.overloadSuggestions || [], hrZones: json.hrZones || null, difficulty, energy, coaching: null, coachingLoading: true })
+
+    // Gather context for coaching call
+    ;(async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        const today = new Date().toISOString().slice(0, 10)
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+
+        const [
+          waterRes,
+          checkinRes,
+          backToBackRes,
+          weekWorkoutsRes,
+          foodRes,
+          calorieTargetRes,
+        ] = await Promise.all([
+          supabase.from('water_logs').select('amount_oz').eq('user_id', user.id).gte('created_at', `${today}T00:00:00`),
+          supabase.from('daily_checkins').select('energy_level').eq('user_id', user.id).eq('date', today).single(),
+          supabase.from('workout_logs').select('id').eq('user_id', user.id).gte('created_at', `${yesterday}T00:00:00`).lt('created_at', `${today}T00:00:00`),
+          supabase.from('workout_logs').select('id').eq('user_id', user.id).gte('created_at', `${today.slice(0,7)}-01T00:00:00`),
+          supabase.from('food_log_entries').select('calories,carbs_g,caffeine_mg,created_at').eq('user_id', user.id).eq('date', today),
+          supabase.from('goals_profiles').select('custom_tdee,activity_level').eq('user_id', user.id).single(),
+        ])
+
+        const water_oz_today = (waterRes.data ?? []).reduce((s, r) => s + parseFloat(r.amount_oz), 0)
+        const morning_energy_rating = checkinRes.data?.energy_level ?? null
+        const back_to_back_days = (backToBackRes.data ?? []).length > 0
+        const workouts_this_week = (weekWorkoutsRes.data ?? []).length + 1
+
+        const foodEntries = foodRes.data ?? []
+        const calorieTarget = calorieTargetRes.data?.custom_tdee || 2000
+        const pre_workout_calories = Math.round(foodEntries.reduce((s, f) => s + (f.calories || 0), 0))
+        const pre_workout_carbs_g = Math.round(foodEntries.reduce((s, f) => s + (f.carbs_g || 0), 0))
+        const pre_workout_caffeine_mg = Math.round(foodEntries.reduce((s, f) => s + (f.caffeine_mg || 0), 0))
+        const data_completeness_pct = Math.min(100, Math.round((pre_workout_calories / calorieTarget) * 100))
+
+        const coachPayload = {
+          user_note: note || null,
+          difficulty,
+          energy_after: energy,
+          duration_seconds: elapsed,
+          exercises_completed: exercises.map(ex => ex.name),
+          sets_completed: completedSetsForCoach,
+          sets_skipped: skippedSets,
+          hr_zones: json.hrZones || null,
+          pre_workout_calories,
+          pre_workout_carbs_g,
+          pre_workout_caffeine_mg,
+          water_oz_today,
+          morning_energy_rating,
+          back_to_back_days,
+          workouts_this_week,
+          data_completeness_pct,
+        }
+
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 8000)
+        const coachRes = await fetch('/api/workouts/coaching-response', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(coachPayload),
+          signal: controller.signal,
+        })
+        clearTimeout(timeout)
+        const coachJson = await coachRes.json()
+        setDone(prev => prev ? { ...prev, coaching: coachJson.coaching || null, coachingLoading: false } : prev)
+      } catch {
+        setDone(prev => prev ? { ...prev, coaching: null, coachingLoading: false } : prev)
+      }
+    })()
   }
 
   if (loading) return <div style={{ padding: 40, color: 'var(--text-secondary)', textAlign: 'center' }}>Loading workout...</div>
@@ -531,6 +605,19 @@ function LogWorkoutPageInner() {
           <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 24 }}>Workout Complete!</h2>
           <p style={{ color: 'var(--text-secondary)', margin: '6px 0 0' }}>{dayLabel}</p>
         </div>
+
+        {(done.coachingLoading || done.coaching) && (
+          <div style={{ background: 'var(--surface)', border: '1px solid #f97316', borderLeft: '4px solid #f97316', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#f97316', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              🤖 Coach
+            </div>
+            {done.coachingLoading ? (
+              <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Analyzing your workout...</div>
+            ) : (
+              <div style={{ color: 'var(--text-primary)', fontSize: 13, lineHeight: 1.6 }}>{done.coaching}</div>
+            )}
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
           {[

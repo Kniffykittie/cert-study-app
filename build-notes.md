@@ -317,7 +317,7 @@ Also add an edit widget on the Goals Overview page (under the lifestyle card) so
 
 ---
 
-#### Phase D — Feature 16: AI Post-Workout Coaching Response 📋
+#### Phase D — Feature 16: AI Post-Workout Coaching Response ✅ Built (Phase 73)
 
 **Why now:** Independent of the intelligence layer — no dependencies on Items 17/18. High value, contained build. The post-workout note is the most underused piece of data in the app right now.
 
@@ -2145,6 +2145,11 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase 73 — Feature 16: AI Post-Workout Coaching Response — Complete
+
+- `src/app/api/workouts/coaching-response/route.js` (new): POST, Haiku, rate-limited 1/day via `api_rate_limits` key `coaching-response-YYYY-MM-DD`. Accepts workout stats + context (difficulty, energy, HR zones, pre-workout nutrition, water, morning energy, back-to-back days, workouts this week). If `data_completeness_pct < 60`, instructs Haiku to caveat nutrition observations with "based on what you logged". User note wrapped in `<user_input>` tags. Returns `{ coaching: "2–4 sentences" }`.
+- `src/app/life-hub/workouts/log/page.js` — after saving the workout log, fires async coaching fetch (8s timeout, fail silently). Gathers context in parallel: water logs, today's check-in energy, yesterday's workout (back-to-back flag), this week's workout count, today's food entries, calorie target. Shows coaching card above the stats grid on the completion screen — orange left border, 🤖 Coach header, "Analyzing your workout..." loading state while in-flight. Disappears silently if API fails or rate-limited.
 
 ### Phase 72 — Item 19: Work/Life Schedule Context — Complete
 
