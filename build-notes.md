@@ -1041,6 +1041,37 @@ Distinct from coach_memory. This is the check-in note "tired, right shoulder sor
 
 ### 🍎 Nutrition
 
+**DV% Display Next to Nutrient Values** — 💬 Discussed
+
+Every place in the app that shows a nutrient amount (mg, g, mcg) should also show the % Daily Value in a smaller, faint color right next to it — e.g. `100mg · 25% DV` where the percentage is `var(--text-secondary)` at ~11px. This removes the need for the user to mentally convert numbers into meaning.
+
+**Surfaces to update (all in one pass):**
+- Food detail modal / food log entry expanded view (wherever macros + micros are listed per item)
+- Nutrition page micronutrient panel (the per-nutrient rows already show amounts)
+- Any food card in AddFoodModal, SearchModal, EditFoodModal that shows a nutrient breakdown
+
+**Implementation:** `DV` constant already exists in `src/lib/nutritionUtils.js` with values for all tracked nutrients. Formula: `Math.round((amount / DV[key]) * 100)`. Show `—` if the nutrient has no DV (e.g. water_g, caffeine_mg). Don't show DV% for calories (not how FDA formats it — it uses a 2000 cal reference separately). Show "(no DV)" or omit the chip entirely for nutrients without an established DV.
+
+**Watch out for:** very high values (e.g. sodium 3200mg = 139% DV) — show as `139%` not `1.39×`. Cap display at 999% to avoid layout breaks.
+
+**Photo-Based Food Logging** — 💬 Discussed
+
+Allow the user to take or upload a photo of food and have Claude identify the dish, estimate portions, and return a structured nutrition estimate that flows into the existing log-manual flow.
+
+**Use case:** food truck stops, restaurant meals, home-cooked dishes with no barcode — anywhere the user doesn't know exact weights or ingredients. A rough estimate beats a gap in the log.
+
+**Flow:**
+1. Camera button on add-food surfaces (alongside Search and Manual tabs in AddFoodModal, or as a standalone tab)
+2. User takes photo or uploads from camera roll
+3. Client resizes image to ~800px max dimension, converts to base64 (keep under 1MB)
+4. `POST /api/nutrition/ai-photo-log` — sends base64 image to `claude-sonnet-4-6` with vision input; system prompt asks Claude to identify dishes, estimate portions, and return structured JSON (name, serving_size_label, estimated_calories, protein_g, carbs_g, fat_g, confidence: 'high'|'medium'|'low', notes)
+5. Response pre-fills `log-manual/page.js` via `sessionStorage` (same pattern as `ai-food-fill`) — user reviews and adjusts before logging
+6. UI must clearly show this is an estimate: "AI estimate — review before logging" header, confidence chip (High / Medium / Low), Claude's notes field shown below form
+
+**Prompt design:** Claude should break a multi-item plate into components when visible (e.g. rice + chicken + sauce as separate line items returned as an array). If it can't identify the food or confidence is very low, it should say so rather than guess wildly. The prompt should reference common portion cues (plate size, hand size comparisons, item count).
+
+**API route guards:** `getUser()` + `is_disabled` check. No caching (each photo is unique). Rate-limit to 10/day via `api_rate_limits` (vision calls are more expensive than text).
+
 **5. Pre/Post Workout Meal Advisor** — ✅ Built (Phase 51)
 
 **10. Supplement Logs Table + Adherence Tracking** — ✅ Built (Phase 51)
@@ -1416,6 +1447,23 @@ Intentional? Sometimes we all need a day off from tracking.
 
 ---
 
+### 💧 Hydration
+
+**Food Water Content in Hydration Tab** — 💬 Discussed
+
+The Hydration page (`water/page.js`) currently only counts explicit water logs and drink entries from `food_log_entries` (meal_slot='drink'). It does not surface the passive water content in solid foods (e.g. fruits, vegetables, oatmeal, soups — all of which have `water_g` values in `food_log_entries`).
+
+The Life Hub dashboard home and the Weekly/Monthly Wrap already include this via `f.water_g * 0.0338` (g → oz conversion). The Hydration page should match.
+
+**What to add:**
+- Query all non-drink `food_log_entries` for the day where `water_g > 0`
+- Convert to oz and add to the hydration ring total as a third segment (distinct color from water-blue and beverage-purple — use a light green or teal)
+- Show a "from food" line in the breakdown: `Water from food: 8 oz (cucumbers, oatmeal, apple)`
+- Keep this visually secondary — passive food water is a "bonus" category, not a primary hydration source. The ring should show it but the goal progress bar should only count explicit water + drinks (that's what users control and intend)
+- The 7-day bar chart should also include food water in the stacked totals for completeness
+
+---
+
 ### 🏋️ Workouts
 
 **15. Workout Logger UX Improvements** — 📋 Fully Specced
@@ -1541,6 +1589,54 @@ Every stretch recommendation card should have a one-tap "Why?" that expands a 3-
 - What that muscle does in daily life (why it gets tight)
 - What happens if it stays chronically tight
 This exists in the stretch library but never surfaces in recommendation context. The recommendation card is where the user actually sees the stretch — that's where education should live.
+
+---
+
+**22. Workout Day Hub + Dates on Plan Page** — 💬 Discussed
+
+**The core problem:** Workouts and stretches are separate pages, completion happens in different flows, there's no single place that owns "today's full training picture," and the plan page shows day names (Monday) without actual dates (July 7), making it hard to track the week.
+
+**Part A — Dates on the Workout Plan Page (small, quick win):**
+Each day card on `/life-hub/workouts` should show the actual calendar date next to the day name:
+- Compute the Monday of the current week, then offset by day index
+- Display: `Monday · Jul 7` or `Wednesday · Jul 9` as a subtitle under the day name
+- Rest days and active days both get dates
+- Makes it immediately obvious which day is today and which days have passed this week
+
+**Part B — Day Hub Page (`/life-hub/workouts/day/[dayOfWeek]`):**
+Tapping a day card navigates to a dedicated page instead of expanding inline. This page owns the full picture for that training day.
+
+*Page sections in order:*
+1. **Header:** Day name + actual date + muscle group label (e.g. "Wednesday · Jul 9 — Pull Day")
+2. **Phase 1 — Pre-Workout Stretches:** Dynamic stretches recommended for today's muscle group. Each card shows name, duration, why it matters for today specifically (e.g. "Your lats are trained today — opening the thoracic spine now improves your pull range"). "Start Pre-Workout Stretches →" button navigates to the stretching page with session_type=pre_workout pre-selected. Phase marked complete when a pre-workout stretch log exists for today.
+3. **Phase 2 — Today's Workout:** Exercise cards (same data as current expanded day view — sets/reps/notes). Each exercise has a "Why this today?" chip that expands a 2-sentence explanation (what it trains, why it fits this week's split). "Start Workout →" button navigates to the active workout logger. Phase marked complete when a workout_log exists for today.
+4. **Phase 3 — Post-Workout Stretches:** Static stretches for the trained muscle group. "Best done within 30 minutes of finishing — muscles are still warm." "Start Post-Workout Stretches →" button. Phase marked complete when a post-workout stretch log exists for today.
+5. **Phase 4 — Bedtime Stretches:** 3–5 full-body static stretches focused on parasympathetic activation. "10–15 minutes before sleep — lowers cortisol, reduces resting HR, correlates with better sleep scores." "Start Bedtime Stretches →" button. Phase marked complete when a standalone or post stretch log exists for the evening.
+6. **AI Coaching Review (collapsible, shown after workout complete):** Displays the `ai_coaching_response` from `workout_logs` for today's session. User can come back hours or days later and re-read what the AI said. Shows workout stats summary above the narrative (duration, sets, HR zones if available).
+
+*Phase completion tracking:*
+- Each phase shows a status indicator: ⬜ Not started · 🔵 In progress · ✅ Done
+- Computed at load time from: `stretch_logs` (pre/post/standalone), `workout_logs` (workout phase)
+- State is already in the DB — no new tables needed
+- Phases remain independently completable — user can do pre-workout at 6am, workout at 7am, post at 8am, bedtime stretches at 10pm
+
+*Historical Day Hub (read-only):*
+When navigating to a past day (not the current week), the same page renders in read-only mode showing: what was planned, which phases were actually completed (with timestamps), and the AI coaching review if one was generated. This replaces the need to dig through workout history to understand a past session.
+
+**Part C — Workout History Revamp:**
+Current history page shows a flat list of workout sessions with timestamps. Proposed redesign:
+- **Group by week** (most recent week first) — collapsible week header showing "Week of Jul 7 — 3 sessions · 4h 20m total"
+- Each week group shows its sessions as compact cards; tapping a session opens the read-only Day Hub view for that date
+- **Weekly Wrap link** inside each history week group — if a wrap exists for that week, show "📊 View Weekly Wrap →" link
+- Session cards in history should show: day + date, muscle group/label, duration, HR zone summary (if available), and a 1-line excerpt of the AI coaching response (truncated at 80 chars with "read more")
+
+**Build order recommendation:**
+1. Add dates to plan page (15 min, independent)
+2. Build Day Hub page with phase sections (new route, phases are read-only summaries + nav buttons to existing flows)
+3. Add "Why this?" descriptions to exercises and stretches within the Day Hub
+4. Wire phase completion status indicators
+5. Add AI coaching review panel to Day Hub
+6. Revamp history page to week-grouped layout with Day Hub links
 
 ---
 
