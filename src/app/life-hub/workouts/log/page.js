@@ -259,6 +259,14 @@ function LogWorkoutPageInner() {
   // Hydration banner
   const [hydrationWarning, setHydrationWarning] = useState(false)
 
+  // Auto-scroll refs
+  const setRowRefs = useRef({})
+  const userInteractedRef = useRef(false)
+
+  // Mid-workout add exercise
+  const [showMidWorkoutPicker, setShowMidWorkoutPicker] = useState(false)
+  const [allExercises, setAllExercises] = useState([])
+
   useEffect(() => {
     async function checkHydration() {
       try {
@@ -284,6 +292,17 @@ function LogWorkoutPageInner() {
     load()
     return () => { clearInterval(timerRef.current); clearInterval(restIntervalRef.current) }
   }, [day])
+
+  useEffect(() => {
+    async function loadAllExercises() {
+      try {
+        const supabase = createClient()
+        const { data } = await supabase.from('exercises').select('id,name,body_part,equipment').in('equipment', ['dumbbell', 'body weight']).order('name')
+        if (data) setAllExercises(data)
+      } catch {}
+    }
+    loadAllExercises()
+  }, [])
 
   // Live HR polling during active workout — every 90s when running and wearable connected
   useEffect(() => {
@@ -420,15 +439,40 @@ function LogWorkoutPageInner() {
   function toggleComplete(exIdx, setIdx) {
     let wasCompleted = false
     let setType = 'working'
-    setExercises(prev => prev.map((ex, i) => {
-      if (i !== exIdx) return ex
-      return { ...ex, sets: ex.sets.map((s, j) => {
-        if (j !== setIdx) return s
-        wasCompleted = s.completed
-        setType = s.set_type
-        return { ...s, completed: !s.completed }
-      })}
-    }))
+    setExercises(prev => {
+      const next = prev.map((ex, i) => {
+        if (i !== exIdx) return ex
+        return { ...ex, sets: ex.sets.map((s, j) => {
+          if (j !== setIdx) return s
+          wasCompleted = s.completed
+          setType = s.set_type
+          return { ...s, completed: !s.completed }
+        })}
+      })
+      if (!wasCompleted) {
+        userInteractedRef.current = true
+        // Find next incomplete set to scroll to
+        setTimeout(() => {
+          let targetKey = null
+          let found = false
+          for (let ei = exIdx; ei < next.length; ei++) {
+            const startSet = ei === exIdx ? setIdx + 1 : 0
+            for (let si = startSet; si < next[ei].sets.length; si++) {
+              if (!next[ei].sets[si].completed) {
+                targetKey = `${ei}-${si}`
+                found = true
+                break
+              }
+            }
+            if (found) break
+          }
+          if (targetKey && setRowRefs.current[targetKey]) {
+            setRowRefs.current[targetKey].scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        }, 50)
+      }
+      return next
+    })
     if (!wasCompleted && setType === 'working') startRest(90)
   }
 
@@ -445,6 +489,19 @@ function LogWorkoutPageInner() {
       if (i !== exIdx || ex.sets.length <= 1) return ex
       return { ...ex, sets: ex.sets.filter((_, j) => j !== setIdx) }
     }))
+  }
+
+  function addMidWorkoutExercise(ex) {
+    setShowMidWorkoutPicker(false)
+    setExercises(prev => [...prev, {
+      exercise_id: ex.id,
+      exercise_name: ex.name,
+      reps: '10-12',
+      rest_seconds: 60,
+      notes: '',
+      added_mid_workout: true,
+      sets: [{ id: crypto.randomUUID(), set_type: 'working', weight: '', reps: '', completed: false }],
+    }])
   }
 
   async function handlePause() {
@@ -766,8 +823,9 @@ function LogWorkoutPageInner() {
           <div key={exIdx} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 15 }}>{ex.exercise_name}</span>
+                  {ex.added_mid_workout && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-purple)', background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.4)', borderRadius: 4, padding: '2px 6px', letterSpacing: '0.04em' }}>+ ADDED</span>}
                   <button
                     onClick={() => fetchExerciseDetail(ex.exercise_name)}
                     title="What is this exercise?"
@@ -799,7 +857,7 @@ function LogWorkoutPageInner() {
             {ex.sets.map((s, setIdx) => {
               const dropsetNote = s.set_type === 'dropset' ? getDropsetNote(ex.exercise_name, exDetail?.equipment) : null
               return (
-                <div key={s.id}>
+                <div key={s.id} ref={el => { if (el) setRowRefs.current[`${exIdx}-${setIdx}`] = el; else delete setRowRefs.current[`${exIdx}-${setIdx}`] }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 1fr 36px 36px', gap: 6, marginBottom: dropsetNote ? 4 : 6, alignItems: 'center', opacity: s.completed ? 0.5 : 1 }}>
                     <button onClick={() => cycleSetType(exIdx, setIdx)}
                       style={{ fontSize: 11, fontWeight: 600, color: SET_TYPE_COLORS[s.set_type], background: 'transparent', border: `1px solid ${SET_TYPE_COLORS[s.set_type]}`, borderRadius: 6, padding: '4px 6px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
@@ -840,6 +898,59 @@ function LogWorkoutPageInner() {
           </div>
         </div>
       )}
+
+      {/* Mid-workout add exercise FAB */}
+      {!restActive && (
+        <button
+          onClick={() => setShowMidWorkoutPicker(true)}
+          style={{ position: 'fixed', bottom: 80, right: 16, width: 48, height: 48, borderRadius: '50%', background: 'var(--accent-purple)', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer', zIndex: 98, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(167,139,250,0.4)' }}
+          title="Add exercise"
+        >+</button>
+      )}
+
+      {/* Mid-workout exercise picker modal */}
+      {showMidWorkoutPicker && (() => {
+        const EX_GROUPS = [
+          { label: 'Arms', parts: ['upper arms', 'lower arms', 'forearms'] },
+          { label: 'Back', parts: ['back'] },
+          { label: 'Chest', parts: ['chest'] },
+          { label: 'Core', parts: ['waist'] },
+          { label: 'Legs', parts: ['upper legs', 'lower legs', 'calves'] },
+          { label: 'Shoulders', parts: ['shoulders'] },
+        ]
+        return (
+          <div onClick={() => setShowMidWorkoutPicker(false)} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 9998, padding: '0' }}>
+            <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: 520, maxHeight: '70vh', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                <h2 style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: '700', margin: 0 }}>Add Exercise</h2>
+                <button onClick={() => setShowMidWorkoutPicker(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer' }}>✕</button>
+              </div>
+              <div style={{ overflowY: 'auto', padding: '12px' }}>
+                {EX_GROUPS.map(group => {
+                  const groupExercises = allExercises.filter(ex => group.parts.includes(ex.body_part))
+                  if (!groupExercises.length) return null
+                  return (
+                    <div key={group.label} style={{ marginBottom: '16px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--accent-purple)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '4px 4px 8px', borderBottom: '1px solid var(--border)', marginBottom: '6px' }}>
+                        {group.label} <span style={{ color: 'var(--text-secondary)', fontWeight: '400' }}>({groupExercises.length})</span>
+                      </div>
+                      {groupExercises.map(ex => (
+                        <button key={ex.id} onClick={() => addMidWorkoutExercise(ex)}
+                          style={{ width: '100%', marginBottom: 4, padding: '9px 12px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-primary)', fontSize: '13px' }}
+                          onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-purple)'}
+                          onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                          <span style={{ textTransform: 'capitalize' }}>{ex.name}</span>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'capitalize' }}>{ex.equipment}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Rest timer bar */}
       {restActive && (

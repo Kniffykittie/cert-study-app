@@ -361,7 +361,7 @@ Also add an edit widget on the Goals Overview page (under the lifestyle card) so
 
 ---
 
-#### Phase E — Feature 15: Workout Logger UX Improvements 📋
+#### Phase E — Feature 15: Workout Logger UX Improvements ✅ Built (Phase 74)
 
 **Why now:** Independent. Two focused UX fixes, no AI, no new tables. Build together in one session.
 
@@ -2145,6 +2145,12 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase 74 — Feature 15: Workout Logger UX Improvements — Complete
+
+- `src/app/life-hub/workouts/log/page.js` — two UX fixes:
+  - **Auto-scroll after set completion:** `setRowRefs` Map (keyed `${exIdx}-${setIdx}`) tracks each set row DOM node via ref callback. `userInteractedRef` guards against firing on initial render. After marking a set complete, `toggleComplete` computes the next incomplete set (same exercise first, then next exercise) and calls `scrollIntoView({ behavior: 'smooth', block: 'center' })` after a 50ms delay (allows React to re-render first).
+  - **Mid-workout FAB:** Purple `+` circle (zIndex 98, below rest timer bar at 99 and finish bar at 100) fixed bottom-right. Hidden when rest timer is active. Taps open a bottom-sheet picker (grouped by muscle group, same EX_GROUPS as plan page). `addMidWorkoutExercise()` appends to `exercises` state with `added_mid_workout: true` flag; shows a "+ ADDED" purple chip on the exercise card header. Exercise library loaded lazily on mount from Supabase.
 
 ### Phase 73 — Feature 16: AI Post-Workout Coaching Response — Complete
 
