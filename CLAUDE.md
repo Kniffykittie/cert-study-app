@@ -208,9 +208,11 @@ src/
       life-hub/
         daily-brief/route.js           GET returns cached brief for today; POST gathers 10+ tables, calls Claude, caches; uses getUser() + is_disabled check
         monthly-wrap/route.js          GET cached wrap for ?month=YYYY-MM; POST generates (6-table gather + Claude narrative), caches forever; uses getUser() + is_disabled check
+        weekly-wrap/route.js           GET list of week_starts or ?week=YYYY-MM-DD single wrap; POST generates (9-table gather + Sonnet narrative with required "Next week:" paragraph), caches forever; blocks current week; uses getUser() + is_disabled check
     life-hub/
       layout.js                        Life Hub layout with LifeHubSidebar + LifeHubClientShell (mounts DailyLogReview popup)
       page.js                          Life Hub landing — 3-zone dashboard: Zone 1 = 4-pill status bar (calories/workouts/steps/water, section-colored); Zone 2 = Daily Brief (AI paragraph, cached daily, section-colored left border, collapsible); Zone 3 = 2×2 live section summary cards (Nutrition/Workouts/Health/Goals with real data + left-border accents); below: Recovery Score (5-component 0–100), Smart Contextual Check-In, 28-day heatmap
+      weekly-wrap/page.js              Weekly Wrap — prev/next week nav, history sidebar, AI narrative card (main paragraph + highlighted "Next week:" action block), stat grid (workouts/energy/mood/weight/calories/water/sleep/steps/HR/protein); Generate button; blocks current week; grouped under Overview in sidebar
       monthly-wrap/page.js             Monthly Wrap — month picker, AI narrative card, stat grid (workouts/energy/mood/weight/calories/water); Generate button on first visit; cached forever per month; grouped under Overview in sidebar
       health/
         page.js                        Health Overview — 3 primary cards (Steps/HR/Sleep, each a link to sub-page) + 3 secondary cards (Resting HR / HRV / Sleep Score); all clickable to sub-pages; Refresh syncs health + heart-rate in parallel

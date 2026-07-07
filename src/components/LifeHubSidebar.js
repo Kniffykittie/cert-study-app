@@ -146,7 +146,7 @@ export default function LifeHubSidebar() {
     </div>
   )
 
-  const overviewActive = pathname === '/life-hub' || pathname === '/life-hub/monthly-wrap'
+  const overviewActive = pathname === '/life-hub' || pathname === '/life-hub/monthly-wrap' || pathname === '/life-hub/weekly-wrap'
   const healthActive = pathname.startsWith('/life-hub/health') && pathname !== '/life-hub/health/water'
   const nutritionActive = pathname.startsWith('/life-hub/nutrition') || pathname === '/life-hub/goals/supplements' || pathname === '/life-hub/health/water'
   const workoutsActive = pathname.startsWith('/life-hub/workouts')
@@ -169,6 +169,7 @@ export default function LifeHubSidebar() {
 
       {sectionHeader('Overview', SECTION_COLORS.overview)}
       {navLink('Dashboard', '/life-hub', SECTION_COLORS.overview)}
+      {navLink('Weekly Wrap', '/life-hub/weekly-wrap', SECTION_COLORS.overview)}
       {navLink('Monthly Wrap', '/life-hub/monthly-wrap', SECTION_COLORS.overview)}
 
       {sectionHeader('Goals', SECTION_COLORS.goals)}

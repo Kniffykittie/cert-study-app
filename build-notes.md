@@ -1925,59 +1925,7 @@ If HR spike but no step spike → stationary elevated HR (could be stress, illne
 - **Smart notification suppression for quiet hours:** Edge Function checks current time in user's local timezone against `bedtime` field. If send time falls within sleep window, defer to next brief window.
 - **Frequent Google Health data sync (no notification):** separate pg_cron job every 2 hours that does token refresh + Google Health fetch + cache write only — no brief, no notification. Keeps step/HR tables fresh for all other features (recovery score, brief generation, notification rules) regardless of app visit recency.
 
-### 📅 Weekly Wrap — 📋 Fully Specced
-
-**Core idea:** A dedicated Weekly Wrap section identical in structure to Monthly Wrap — week picker, stat cards, AI narrative, history sidebar of all past weeks. Linked from the Overview group in the sidebar alongside Monthly Wrap and Daily Briefs.
-
-**Why this improves Monthly Wrap too:** Currently Monthly Wrap gathers raw data from 10 tables across 30 days — expensive query and Claude only sees daily numbers with no sense of weekly momentum or slumps. With Weekly Wrap as a layer, Monthly Wrap instead queries 4–5 pre-computed weekly summaries and uses their `report_data` JSONB as the foundation. Claude can then say: *"Week 1 was your strongest — 4 workouts and sleep above 80 each night. Week 3 dropped off sharply, which tracked with the lower energy check-ins that week. Week 4 showed a strong recovery trend."* That week-over-week narrative is impossible from raw daily data alone.
-
-**DB table: `weekly_wraps`**
-```sql
-create table weekly_wraps (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users not null,
-  week_start date not null,         -- always a Monday (ISO week start)
-  report_data jsonb,                -- aggregated stats: avg_sleep_score, total_steps, workout_days, avg_calories, avg_protein, avg_water_oz, avg_energy, avg_mood, workout_types[], top_foods[], supplement_adherence_pct
-  ai_narrative text,                -- Claude's week narrative (3–4 paragraphs)
-  generated_at timestamptz default now(),
-  unique(user_id, week_start)
-);
-alter table weekly_wraps enable row level security;
-create policy "user reads own wraps" on weekly_wraps for all using (user_id = auth.uid());
-```
-
-**Generation:** pg_cron fires Sunday at `bedtime - 1hr` (user-personalized). Falls back to 8pm Sunday EST if no bedtime set. Same "generated once, cached forever" pattern as Monthly Wrap. GET without `?week=` returns all past week_start dates for the history sidebar.
-
-**Current month still blocked:** Weekly Wrap for the current in-progress week shows "Week in progress — check back Sunday" state (same pattern as Monthly Wrap blocking the current month).
-
-**What the AI narrative covers per week:**
-- Overall tone sentence (strong week / recovery week / mixed bag)
-- Best day and worst day with reason why (e.g. "Tuesday was your peak — 12k steps, 7.8 sleep score, protein goal hit")
-- One consistency observation (e.g. "You hit your water goal 5/7 days — that's your best hydration week in two months")
-- One thing that slipped with no judgment (e.g. "Sleep was below 70 four nights — the two late workout days correlated directly with longer sleep onset")
-- One concrete setup for next week (e.g. "If you want to match or beat this week, the pattern that worked was morning protein before 9am on active days")
-
-**"Next Week Setup" block — required section in every Weekly Wrap narrative:**
-The weekly wrap must close with a dedicated "Next Week" section — one single actionable observation, not five. The format: "The one thing most likely to improve next week based on this week's patterns: [specific action tied to observed data]." This makes the wrap forward-looking instead of purely nostalgic. Examples:
-- "The one thing: your sleep scores were highest the two nights you stopped eating after 8pm — building that cutoff into Monday and Tuesday when you have early mornings would give your two hardest days better recovery."
-- "The one thing: you hit your protein goal 4/7 days this week, all on days you had a high-protein breakfast. Making that the default rather than the exception closes most of the gap automatically."
-- "The one thing: you trained 5 days but your energy ratings show the pattern only dips on back-to-back days. If you shift Wednesday to Thursday, you'd keep the same volume without the back-to-back recovery penalty."
-This section must be in the Claude system prompt as a required output structure — not optional commentary. Without it, Claude will summarize the week without ever pointing forward.
-
-**How Monthly Wrap uses Weekly Wraps:**
-`/api/life-hub/monthly-wrap/route.js` POST handler:
-1. Query `weekly_wraps` where `week_start >= month_start AND week_start <= month_end` for this user
-2. Use `report_data` JSONB from each week as the primary data source (pre-aggregated, fast)
-3. Only fall back to raw table queries for metrics not captured in weekly_wraps (e.g. specific food entries, photo milestones)
-4. Claude prompt gets: array of weekly summaries + month-level totals + comparison to previous month's weekly wraps if available
-
-**Page: `/life-hub/weekly-wrap`**
-- Week picker (← →) navigating by 7 days, showing "Week of Jul 7" format
-- Current week: "Week in progress" placeholder
-- Past weeks: stat cards (Sleep Score avg, Total Steps, Workout Days, Avg Calories, Avg Protein, Water Goal Hit %, Energy avg) + AI narrative card
-- Right sidebar: history list of all past weeks (most recent first), clickable to switch
-- "Generate" button only appears if week is complete and wrap hasn't been generated yet (edge case: if Sunday pg_cron missed)
-- Sidebar nav: listed under Overview group alongside Monthly Wrap
+### 📅 Weekly Wrap — ✅ Built (Phase L)
 
 **Overview**
 Real push notifications delivered to the user's phone lock screen (iOS Safari + Android Chrome) using the Web Push API + Supabase Edge Functions + pg_cron. No Vercel paid plan required. No cron jobs on Vercel. Works even when the app is closed.
@@ -2296,6 +2244,13 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase L — Weekly Wrap Page — Complete
+
+- `src/app/api/life-hub/weekly-wrap/route.js` (new): GET returns list of past `week_start` dates or single wrap; POST validates Monday + completed week, gathers 9 tables (checkins, workouts, measurements, goals, water, food, sleep sessions, HR daily, steps hourly), computes 11 summary stats, calls `claude-sonnet-4-6` (max_tokens 350) with required "Next week:" paragraph, upserts to `weekly_wraps`; blocks current week with 400 + `next_monday`; `getUser()` + `is_disabled` check; free text wrapped in `<user_input>` tags
+- `src/app/life-hub/weekly-wrap/page.js` (new): prev/next week nav chips, history sidebar (past wrap buttons), "Week in progress" block for current week, AI narrative split into main paragraph + highlighted "Next week:" action block, stat grid (workouts/energy/mood/weight/calories/water/sleep/steps/HR/protein), Generate button for past weeks with no wrap
+- `src/components/LifeHubSidebar.js`: added "Weekly Wrap" navLink under Overview section (above Monthly Wrap); `overviewActive` now includes `/life-hub/weekly-wrap`
+- DB: `weekly_wraps` table already existed from this session (migration applied earlier)
 
 ### Phase N — Background Health Sync Edge Function — Complete
 
