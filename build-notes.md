@@ -289,7 +289,7 @@ Each phase below is a discrete build session. Phases must be built in order when
 
 ---
 
-#### Phase C — Item 19: Work/Life Schedule Context 💬→📋
+#### Phase C — Item 19: Work/Life Schedule Context ✅ Built (Phase 72)
 
 **Why now:** This is the highest ROI unbuilt feature with the shortest build time. One UI addition + one JSONB column + injection into existing AI prompts. Build this before the intelligence layer (Items 17/18) because it makes every existing AI feature smarter immediately.
 
@@ -2145,6 +2145,15 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase 72 — Item 19: Work/Life Schedule Context — Complete
+
+- DB: `alter table goals_profiles add column if not exists weekly_schedule jsonb;` — stores `{ mon: 'active_work'|'desk_work'|'day_off'|'travel', ... }` per-day
+- `src/app/life-hub/goals/setup/page.js` — added `weeklySchedule` state + `WeeklySchedulePicker` component in Step 3 (after sleep hours); saves to `goals_profiles.weekly_schedule` on finish
+- `src/app/life-hub/goals/page.js` — added "Weekly Schedule" read-only card with pill grid + Edit → inline picker + Save/Cancel (PATCHes only `weekly_schedule` column)
+- `src/app/api/life-hub/daily-brief/route.js` — injects `scheduleContext` (today's type + full week summary); null-safe; filtered via `.filter(Boolean)`
+- `src/app/api/life-hub/monthly-wrap/route.js` — injects `scheduleMonthlyContext` (active/desk/off day counts per week); null-safe
+- `src/app/api/workouts/generate-plan/route.js` — added `weekly_schedule` to goals_profiles select; injects schedule block into `bodyContext` noting active work days and placement advice for harder sessions
 
 ### Phase 71 — Feature 14: Morning Log Review Pop-Up — Complete
 

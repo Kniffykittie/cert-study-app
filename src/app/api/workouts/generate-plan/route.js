@@ -77,7 +77,7 @@ export async function POST(req) {
   const { goals, experience, days_per_week, workout_days, pushup_count, pullup_count, squat_count,
     has_pullup_bar, has_ab_roller, dumbbell_pairs, dumbbell_note, limitations, cardio_options } = body
 
-  const { data: goalsProfile } = await supabase.from('goals_profiles').select('goals,height_inches,weight_lbs,age,sex,body_composition,activity_level,daily_steps,target_weight_lbs,timeline,biggest_obstacles,biggest_obstacles_other').eq('user_id', user.id).single()
+  const { data: goalsProfile } = await supabase.from('goals_profiles').select('goals,height_inches,weight_lbs,age,sex,body_composition,activity_level,daily_steps,target_weight_lbs,timeline,biggest_obstacles,biggest_obstacles_other,weekly_schedule').eq('user_id', user.id).single()
 
   const goalsArray = Array.isArray(goals) ? goals : (goals || '').split(',')
   const wantsWeightLoss = goalsArray.includes('weight_loss')
@@ -149,6 +149,14 @@ BODY & LIFESTYLE CONTEXT (from user's goals profile):
 ${(() => {
   const obs = [...(goalsProfile.biggest_obstacles ?? []), ...(goalsProfile.biggest_obstacles_other ? [goalsProfile.biggest_obstacles_other] : [])]
   return obs.length ? `- Biggest obstacles the client has flagged: ${obs.join(', ')} — factor these into exercise selection and recovery planning (e.g. chronic pain/injuries affect exercise choice; time constraints affect session length)` : ''
+})()}
+${(() => {
+  const sched = goalsProfile.weekly_schedule
+  if (!sched) return ''
+  const SCHED_LABELS = { active_work: 'active/physical job (high baseline steps)', desk_work: 'desk/sedentary job (low baseline steps)', day_off: 'day off (full recovery available)', travel: 'travel day (schedule disrupted)' }
+  const summary = Object.entries(sched).map(([d, t]) => `${d}: ${SCHED_LABELS[t] || t}`).join(', ')
+  const activeDays = Object.values(sched).filter(t => t === 'active_work').length
+  return `- Weekly work/life schedule: ${summary}. ${activeDays > 0 ? `Has ${activeDays} physically active work day(s) — already accumulating significant baseline movement; schedule harder training sessions on desk/off days where possible.` : 'Primarily sedentary work schedule — cardio recommendations are especially important.'}`
 })()}
 Use this context to fine-tune volume, intensity, and cardio recommendations.` : ''
 

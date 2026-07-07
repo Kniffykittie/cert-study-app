@@ -92,7 +92,7 @@ export async function POST(req) {
     supabase.from('daily_checkins').select('date, energy_level, mood_level').eq('user_id', user.id).gte('date', start).lte('date', end),
     supabase.from('workout_logs').select('created_at, duration_seconds, day_label').eq('user_id', user.id).gte('created_at', start).lte('created_at', end + 'T23:59:59Z'),
     supabase.from('body_measurements').select('date, weight_lbs').eq('user_id', user.id).gte('date', start).lte('date', end).order('date'),
-    supabase.from('goals_profiles').select('goals, weight_lbs, target_weight_lbs, sleep_hours, primary_motivations, primary_motivations_other, biggest_obstacles, biggest_obstacles_other, why_goals, dietary_preferences, dietary_preferences_other').eq('user_id', user.id).single(),
+    supabase.from('goals_profiles').select('goals, weight_lbs, target_weight_lbs, sleep_hours, primary_motivations, primary_motivations_other, biggest_obstacles, biggest_obstacles_other, why_goals, dietary_preferences, dietary_preferences_other, weekly_schedule').eq('user_id', user.id).single(),
     supabase.from('water_logs').select('amount_oz, date').eq('user_id', user.id).gte('date', start).lte('date', end),
     supabase.from('food_log_entries').select('calories, protein_g, date, meal_slot, caffeine_mg, water_g').eq('user_id', user.id).gte('date', start).lte('date', end),
     supabase.from('health_heart_rate_daily')
@@ -224,11 +224,25 @@ Avg daily hydration: ${avgWater ? avgWater + ' oz (water + beverages)' : 'not tr
 Avg daily calories: ${avgCalories ? avgCalories + ' cal' : 'not tracked'} (logged ${foodDates.length}/${daysInMonth} days)${avgProtein ? ` | Avg protein: ${avgProtein}g/day` : ''}
 Goals: ${(goals?.goals || []).join(', ') || 'not set'}${sleepTarget && avgSleepHours ? ` | Sleep target: ${sleepTarget}h/night, actual avg: ${avgSleepHours}h` : ''}`
 
+  const scheduleMonthlyContext = (() => {
+    const sched = goals?.weekly_schedule
+    if (!sched) return null
+    const activeDays = Object.values(sched).filter(v => v === 'active_work').length
+    const offDays = Object.values(sched).filter(v => v === 'day_off').length
+    const deskDays = Object.values(sched).filter(v => v === 'desk_work').length
+    const parts = []
+    if (activeDays) parts.push(`${activeDays} active work day${activeDays > 1 ? 's' : ''}/week (occupational steps)`)
+    if (deskDays) parts.push(`${deskDays} desk day${deskDays > 1 ? 's' : ''}/week (sedentary baseline)`)
+    if (offDays) parts.push(`${offDays} day${offDays > 1 ? 's' : ''} off/week`)
+    return parts.length ? `WEEKLY SCHEDULE: ${parts.join(', ')} — factor this when interpreting monthly step counts and activity patterns` : null
+  })()
+
   const personalContextLines = [
     motivations.length ? `USER MOTIVATIONS (shape the narrative tone — don't recite verbatim): ${motivations.join(', ')}` : null,
     whyText ? `WHY THEY WANT THIS: <user_input>${whyText}</user_input>` : null,
     obstacles.length ? `KNOWN OBSTACLES: <user_input>${obstacles.join(', ')}</user_input> — if any are relevant to this month's patterns (e.g. "staying consistent" and they hit a PR in workouts), call it out as overcoming a stated barrier` : null,
     dietaryPrefs.length ? `DIETARY PREFERENCES: ${dietaryPrefs.join(', ')} — factor into any nutrition or protein commentary` : null,
+    scheduleMonthlyContext,
   ].filter(Boolean).join('\n')
 
   const healthLines = [

@@ -127,6 +127,47 @@ const PICKY_KEYS = new Set(['picky_eater', 'very_picky_eater'])
 
 const STEPS = ['Your Goals', 'Your Body', 'Activity & Exercise', 'Your Context', 'What Happens Now']
 
+const SCHEDULE_OPTIONS = [
+  { key: 'active_work', label: 'Active', desc: 'On feet all day (construction, nursing, retail)' },
+  { key: 'desk_work', label: 'Desk', desc: 'Mostly seated (office, remote, driving)' },
+  { key: 'day_off', label: 'Off', desc: 'Rest day, no work obligations' },
+  { key: 'travel', label: 'Travel', desc: 'Traveling, disrupted routine' },
+]
+const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+const DAY_LABELS = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' }
+
+function WeeklySchedulePicker({ value, onChange }) {
+  const [openDay, setOpenDay] = useState(null)
+  return (
+    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+      {DAYS.map(day => {
+        const current = value[day] || 'desk_work'
+        const opt = SCHEDULE_OPTIONS.find(o => o.key === current)
+        const isOpen = openDay === day
+        return (
+          <div key={day} style={{ position: 'relative' }}>
+            <button type="button" onClick={() => setOpenDay(isOpen ? null : day)}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '8px 10px', borderRadius: '10px', border: `1px solid ${isOpen ? '#f97316' : 'var(--border)'}`, backgroundColor: isOpen ? 'rgba(249,115,22,0.08)' : 'var(--surface)', cursor: 'pointer', minWidth: '48px' }}>
+              <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)' }}>{DAY_LABELS[day]}</span>
+              <span style={{ fontSize: '10px', fontWeight: '600', color: current === 'day_off' ? 'var(--text-secondary)' : '#f97316' }}>{opt?.label}</span>
+            </button>
+            {isOpen && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 50, backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '6px', marginTop: '4px', minWidth: '140px', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
+                {SCHEDULE_OPTIONS.map(o => (
+                  <button key={o.key} type="button" onClick={() => { onChange({ ...value, [day]: o.key }); setOpenDay(null) }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: '7px', border: 'none', backgroundColor: current === o.key ? 'rgba(249,115,22,0.12)' : 'transparent', color: current === o.key ? '#f97316' : 'var(--text-primary)', fontSize: '12px', fontWeight: current === o.key ? '700' : '400', cursor: 'pointer' }}>
+                    {o.label} <span style={{ color: 'var(--text-secondary)', fontWeight: '400' }}>— {o.desc}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function ChipSelect({ options, selected, onSelect, multi = false }) {
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -183,6 +224,7 @@ function GoalsSetupPageInner() {
   const [dietaryPreferences, setDietaryPreferences] = useState([])
   const [dietaryPreferencesOther, setDietaryPreferencesOther] = useState('')
   const [sleepHours, setSleepHours] = useState('')
+  const [weeklySchedule, setWeeklySchedule] = useState({ mon: 'desk_work', tue: 'desk_work', wed: 'desk_work', thu: 'desk_work', fri: 'desk_work', sat: 'day_off', sun: 'day_off' })
 
   useEffect(() => {
     async function checkExisting() {
@@ -214,6 +256,7 @@ function GoalsSetupPageInner() {
         if (data.dietary_preferences?.length) setDietaryPreferences(data.dietary_preferences)
         if (data.dietary_preferences_other) setDietaryPreferencesOther(data.dietary_preferences_other)
         if (data.sleep_hours) setSleepHours(String(data.sleep_hours))
+        if (data.weekly_schedule) setWeeklySchedule(data.weekly_schedule)
       }
     }
     checkExisting()
@@ -306,6 +349,7 @@ function GoalsSetupPageInner() {
       dietary_preferences: dietaryPreferences,
       dietary_preferences_other: dietaryPreferencesOther.trim() || null,
       sleep_hours: sleepHours ? parseFloat(sleepHours) : null,
+      weekly_schedule: weeklySchedule,
       updated_at: new Date().toISOString(),
     }
   }
@@ -698,6 +742,11 @@ function GoalsSetupPageInner() {
                     style={{ width: '100px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
                   <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>hours / night</span>
                 </div>
+              </div>
+
+              <div>
+                <label style={{ color: 'var(--accent-purple)', fontSize: '15px', fontWeight: '700', display: 'block', marginBottom: '6px' }}>My Weekly Schedule <span style={{ fontWeight: '400', fontSize: '13px', color: 'var(--text-secondary)' }}>(optional — helps AI interpret your step count and energy)</span></label>
+                <WeeklySchedulePicker value={weeklySchedule} onChange={setWeeklySchedule} />
               </div>
 
             </div>

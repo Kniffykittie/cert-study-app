@@ -279,6 +279,17 @@ export async function POST(req) {
   const dietaryPrefs = [...(goals.dietary_preferences ?? []), ...(goals.dietary_preferences_other ? [goals.dietary_preferences_other] : [])]
   const calorieHistoryNote = goals.calorie_history_note?.trim() || null
 
+  const scheduleContext = (() => {
+    const sched = goals.weekly_schedule
+    if (!sched) return null
+    const dow = ['sun','mon','tue','wed','thu','fri','sat']
+    const todayKey = dow[new Date().getDay()]
+    const todayType = sched[todayKey]
+    const SCHED_LABELS = { active_work: 'active work day (on feet all day — occupational steps, not exercise)', desk_work: 'desk/sedentary work day', day_off: 'day off', travel: 'travel day (disrupted routine)' }
+    const summary = Object.entries(sched).map(([d, t]) => `${d}=${t}`).join(', ')
+    return `WORK SCHEDULE: ${summary}. Today (${todayKey}) is a ${SCHED_LABELS[todayType] || todayType}. Factor this when interpreting step counts (active_work steps are occupational, not fitness-driven), HR elevation, and energy context.`
+  })()
+
   const personalContext = [
     motivations.length ? `USER MOTIVATIONS (use to frame tone — don't recite verbatim): ${motivations.join(', ')}` : null,
     obstacles.length ? `KNOWN OBSTACLES: <user_input>${obstacles.join(', ')}</user_input> — acknowledge relevant ones if they're showing up in the data (e.g. time constraint + short workout = still a win)` : null,
@@ -286,6 +297,7 @@ export async function POST(req) {
     goalsTargetSleep ? `Sleep target: ${goalsTargetSleep}h/night${sleepGap !== null ? ` | Last night: ${sleepHours}h (${sleepGap >= 0 ? '+' : ''}${sleepGap}h vs target)` : ''}` : null,
     dietaryPrefs.length ? `DIETARY PREFERENCES: ${dietaryPrefs.join(', ')} — factor into any nutrition commentary (e.g. if vegan and protein is low, suggest plant-based sources; if dairy-free, skip dairy suggestions)` : null,
     calorieHistoryNote ? `CALORIE HISTORY (user's lived experience — treat as ground truth over formula estimates): <user_input>${calorieHistoryNote}</user_input>` : null,
+    scheduleContext,
   ].filter(Boolean).join('\n')
 
   const dataSummary = [lines.join('\n'), personalContext].filter(Boolean).join('\n\n')
