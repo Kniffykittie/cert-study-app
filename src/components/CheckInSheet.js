@@ -23,6 +23,8 @@ function extractSoreSpots(text) {
     .map(([spot]) => spot)
 }
 
+const MAX_TURNS = 8
+
 export default function CheckInSheet({ checkInWindow, wakeTime, onClose, onInsight }) {
   const [energy, setEnergy] = useState(null)
   const [mood, setMood] = useState(null)
@@ -30,8 +32,21 @@ export default function CheckInSheet({ checkInWindow, wakeTime, onClose, onInsig
   const [saving, setSaving] = useState(false)
   const [insight, setInsight] = useState(null)
 
+  // Keep Talking state
+  const [chatOpen, setChatOpen] = useState(false)
+  const [messages, setMessages] = useState([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const [turnCount, setTurnCount] = useState(1)
+  const contextSnapshotRef = useRef(null)
+  const chatEndRef = useRef(null)
+
   const label = checkInWindow === 'morning' ? 'Morning' : 'Afternoon'
   const accentColor = checkInWindow === 'morning' ? '#f59e0b' : '#a78bfa'
+
+  useEffect(() => {
+    if (chatOpen) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, chatOpen])
 
   async function handleSave() {
     if (!energy) return
@@ -44,7 +59,6 @@ export default function CheckInSheet({ checkInWindow, wakeTime, onClose, onInsig
       const today = new Date().toISOString().slice(0, 10)
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
 
-      // Gather context in parallel
       const [
         sleepRes,
         yesterdayWorkoutRes,
@@ -75,13 +89,11 @@ export default function CheckInSheet({ checkInWindow, wakeTime, onClose, onInsig
       const today_caffeine_mg = Math.round((foodRes.data ?? []).reduce((s, f) => s + (f.caffeine_mg || 0), 0))
       const today_steps = (stepsRes.data ?? []).reduce((s, r) => s + (r.steps || 0), 0) || null
 
-      // Today's exercises from active plan
       const dowMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
       const todayDow = dowMap[new Date().getDay()]
       const todayPlan = planRes.data?.plan?.find(d => d.day_of_week?.toLowerCase().startsWith(todayDow.slice(0, 3)))
       const todays_exercises = (todayPlan?.exercises ?? []).map(e => e.exercise_name).filter(Boolean)
 
-      // Rolling 7-day avg energy
       const history = checkinHistoryRes.data ?? []
       const morningReadings = history.filter(c => c.energy_level).map(c => c.energy_level)
       const afternoonReadings = history.filter(c => c.afternoon_energy).map(c => c.afternoon_energy)
@@ -95,7 +107,7 @@ export default function CheckInSheet({ checkInWindow, wakeTime, onClose, onInsig
 
       const sore_spots = extractSoreSpots(note)
 
-      const payload = {
+      const snapshot = {
         window: checkInWindow,
         energy_rating: energy,
         mood_rating: mood,
@@ -114,17 +126,24 @@ export default function CheckInSheet({ checkInWindow, wakeTime, onClose, onInsig
         coach_memory_context,
       }
 
+      contextSnapshotRef.current = snapshot
+
       const res = await fetch('/api/checkin/insight', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(snapshot),
       })
       const json = await res.json()
       if (json.insight) {
         setInsight(json.insight)
-        onInsight?.(json.proposed_actions ?? [], sore_spots)
-        // Auto-close after 5 seconds
-        setTimeout(() => onClose(), 5000)
+        const actions = json.proposed_actions ?? []
+        onInsight?.(actions, sore_spots)
+        if (actions.length) {
+          const todayKey = new Date().toISOString().slice(0, 10)
+          localStorage.setItem(`workout_suggestions_${todayKey}`, JSON.stringify(actions))
+        }
+        setMessages([{ role: 'assistant', content: json.insight }])
+        setTurnCount(1)
       } else {
         onClose()
       }
@@ -135,15 +154,119 @@ export default function CheckInSheet({ checkInWindow, wakeTime, onClose, onInsig
     }
   }
 
+  async function handleChatSend() {
+    if (!chatInput.trim() || chatLoading || turnCount >= MAX_TURNS) return
+    const userMsg = { role: 'user', content: chatInput.trim() }
+    const newMessages = [...messages, userMsg]
+    setMessages(newMessages)
+    setChatInput('')
+    setChatLoading(true)
+
+    try {
+      const res = await fetch('/api/checkin/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: newMessages,
+          contextSnapshot: contextSnapshotRef.current,
+          turn_count: turnCount + 1,
+        }),
+      })
+      const json = await res.json()
+      const assistantMsg = { role: 'assistant', content: json.message || '...' }
+      setMessages(prev => [...prev, assistantMsg])
+      setTurnCount(t => t + 1)
+
+      if (json.proposed_actions?.length) {
+        const todayKey = new Date().toISOString().slice(0, 10)
+        const key = `workout_suggestions_${todayKey}`
+        const existing = JSON.parse(localStorage.getItem(key) || '[]')
+        const merged = [...existing, ...json.proposed_actions]
+        localStorage.setItem(key, JSON.stringify(merged))
+        onInsight?.(merged, contextSnapshotRef.current?.sore_spots ?? [])
+      }
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. Try again.' }])
+    } finally {
+      setChatLoading(false)
+    }
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 9990 }}>
-      <div style={{ backgroundColor: 'var(--surface)', border: `1px solid ${accentColor}`, borderTop: `3px solid ${accentColor}`, borderRadius: '16px 16px 0 0', width: '100%', maxWidth: 520, padding: '20px 20px 32px', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ backgroundColor: 'var(--surface)', border: `1px solid ${accentColor}`, borderTop: `3px solid ${accentColor}`, borderRadius: '16px 16px 0 0', width: '100%', maxWidth: 520, padding: '20px 20px 32px', maxHeight: chatOpen ? '85vh' : '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
 
         {insight ? (
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>✨</div>
-            <div style={{ color: 'var(--text-primary)', fontSize: 14, lineHeight: 1.7, marginBottom: 16 }}>{insight}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Closing in a moment...</div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            {!chatOpen ? (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>✨</div>
+                <div style={{ color: 'var(--text-primary)', fontSize: 14, lineHeight: 1.7, marginBottom: 20 }}>{insight}</div>
+                <button
+                  onClick={() => setChatOpen(true)}
+                  style={{ background: 'none', border: `1px solid ${accentColor}`, color: accentColor, borderRadius: 8, padding: '8px 20px', fontSize: 13, cursor: 'pointer', marginBottom: 12, display: 'block', margin: '0 auto 12px' }}>
+                  💬 Keep Talking
+                </button>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>Tap outside to close</div>
+              </div>
+            ) : (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: accentColor }}>💬 Keep Talking</div>
+                  <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 18, cursor: 'pointer' }}>✕</button>
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12, paddingRight: 4, minHeight: 200 }}>
+                  {messages.map((m, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                      <div style={{
+                        maxWidth: '85%',
+                        backgroundColor: m.role === 'user' ? `${accentColor}22` : 'var(--background)',
+                        border: `1px solid ${m.role === 'user' ? accentColor + '44' : 'var(--border)'}`,
+                        borderRadius: m.role === 'user' ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
+                        padding: '10px 13px',
+                        color: 'var(--text-primary)',
+                        fontSize: 13,
+                        lineHeight: 1.6,
+                      }}>
+                        {m.content}
+                      </div>
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                      <div style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '12px 12px 12px 4px', padding: '10px 14px', color: 'var(--text-secondary)', fontSize: 13 }}>
+                        ...
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {turnCount >= MAX_TURNS ? (
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', padding: '8px 0' }}>
+                    Max conversation length reached. Come back tomorrow!
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      value={chatInput}
+                      onChange={e => setChatInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleChatSend() } }}
+                      placeholder="Ask a follow-up..."
+                      style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}
+                    />
+                    <button onClick={handleChatSend} disabled={!chatInput.trim() || chatLoading}
+                      style={{ padding: '10px 16px', backgroundColor: chatInput.trim() ? accentColor : 'var(--border)', border: 'none', borderRadius: 8, color: '#fff', cursor: chatInput.trim() ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 700 }}>
+                      Send
+                    </button>
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', textAlign: 'right', marginTop: 6 }}>
+                  {turnCount}/{MAX_TURNS} turns used
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <>

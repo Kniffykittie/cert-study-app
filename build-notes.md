@@ -140,6 +140,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `workout_logs` | Completed sessions — plan_id, day_of_week, day_label, duration_seconds, hr_zones JSONB, is_partial, post_workout_difficulty/energy/note; RLS enabled |
 | `workout_log_sets` | Sets per session — log_id, exercise_name, set_number, set_type (warmup/working/dropset), weight_lbs, reps, rep_range; RLS enabled |
 | `stretch_logs` | Stretch session logs — user_id, date, stretch_ids TEXT[], session_type (pre_workout/post_workout/standalone), duration_seconds, logged_at; RLS user-scoped |
+| `workout_session_overrides` | Today-only exercise swaps from check-in suggestions — user_id, date, original_exercise, override_exercise, reason, applied_at; RLS user-scoped |
 
 ### Reporting
 | Table | Purpose |
@@ -506,7 +507,7 @@ Store extracted sore spots in layout state. Stretching page reads them from cont
 
 ---
 
-#### Phase H — Feature D + Feature E: Workout Suggestions + Keep Talking 💬→📋
+#### Phase H — Feature D + Feature E: Workout Suggestions + Keep Talking ✅ Built (Phase 77)
 
 **Why now:** Feature D requires `proposed_actions` from Phase G (the check-in insight). Feature E (Keep Talking) uses the context snapshot pattern from Phase G. Build together.
 
@@ -2145,6 +2146,14 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase 77 — Feature D + Feature E: Workout Suggestions + Keep Talking — Complete
+
+- DB: `workout_session_overrides` table — `user_id`, `date`, `original_exercise`, `override_exercise`, `reason`, `applied_at`; RLS user-scoped
+- `src/app/api/checkin/chat/route.js` (new): POST Keep Talking multi-turn; Haiku; rate-limited 24 turns/day (`checkin-chat-YYYY-MM-DD`); receives frozen `contextSnapshot` from client + `messages[]`; returns `{ message, proposed_actions[] }`; note/context protected by system prompt injection; no DB re-fetch
+- `src/components/CheckInSheet.js` updated: after insight displays, shows "💬 Keep Talking" button instead of 5s auto-close; tapping expands to inline chat UI (bubble layout, turn counter, 8-turn max client-enforced); each AI reply may include new `proposed_actions` merged into localStorage `workout_suggestions_${today}`; `contextSnapshotRef` frozen on first save — all chat turns reuse the same snapshot
+- `src/app/life-hub/workouts/page.js` updated: reads `workout_suggestions_${today}` from localStorage on load; reads `workout_session_overrides` from DB for already-applied overrides; today's card highlighted with orange border; Suggestions button with orange dot badge appears when pending swaps exist; Suggestions bottom-sheet shows swap cards (original → replacement, reason, Apply/Skip); Apply writes to `workout_session_overrides` + updates `appliedOverrides` state; applied overrides render inline as strikethrough → orange replacement + "Modified" chip
+- `src/app/life-hub/workouts/log/page.js` updated: on fresh start (not resume), queries `workout_session_overrides` for today and substitutes exercise names before building the set list — the saved plan is never modified
 
 ### Phase 76 — Item 18 + Feature B: Real-Time Check-In Intelligence — Complete
 

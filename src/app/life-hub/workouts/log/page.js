@@ -380,7 +380,21 @@ function LogWorkoutPageInner() {
       setElapsed(resumeState.elapsed || 0)
       setResumingLogId(resumeState.log_id || null)
     } else {
-      const exList = (todayPlan.exercises || []).map(ex => ({ ...ex, sets: buildDefaultSets(ex) }))
+      // Apply any workout_session_overrides for today
+      const today = new Date().toLocaleDateString('en-CA')
+      const { data: overrides } = await supabase
+        .from('workout_session_overrides')
+        .select('original_exercise,override_exercise,reason')
+        .eq('user_id', session.user.id)
+        .eq('date', today)
+
+      const overrideMap = {}
+      for (const o of overrides ?? []) overrideMap[o.original_exercise.toLowerCase()] = o.override_exercise
+
+      const exList = (todayPlan.exercises || []).map(ex => {
+        const override = overrideMap[ex.exercise_name?.toLowerCase()]
+        return { ...ex, exercise_name: override ?? ex.exercise_name, sets: buildDefaultSets(ex) }
+      })
       setExercises(exList)
     }
 

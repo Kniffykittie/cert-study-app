@@ -51,6 +51,10 @@ export default function WorkoutsPage() {
   const [completedTodayDays, setCompletedTodayDays] = useState(new Set())
   const [pausedWorkout, setPausedWorkout] = useState(null)
   const [todayEnergy, setTodayEnergy] = useState(null)
+  const [suggestions, setSuggestions] = useState([]) // proposed_actions from check-in
+  const [suggestionsSheet, setSuggestionsSheet] = useState(false)
+  const [appliedOverrides, setAppliedOverrides] = useState({}) // original_exercise -> override_exercise
+  const [applyingOverride, setApplyingOverride] = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -91,6 +95,24 @@ export default function WorkoutsPage() {
         else localStorage.removeItem('paused_workout')
       }
     } catch {}
+
+    // Load workout suggestions from check-in
+    try {
+      const raw = localStorage.getItem(`workout_suggestions_${today}`)
+      if (raw) setSuggestions(JSON.parse(raw))
+    } catch {}
+
+    // Load already-applied overrides for today
+    const { data: overrideRows } = await supabase
+      .from('workout_session_overrides')
+      .select('original_exercise,override_exercise')
+      .eq('user_id', session.user.id)
+      .eq('date', today)
+    if (overrideRows?.length) {
+      const map = {}
+      for (const row of overrideRows) map[row.original_exercise.toLowerCase()] = row.override_exercise
+      setAppliedOverrides(map)
+    }
 
     const { data: cardio } = await supabase.from('exercises').select('id,name,body_part').eq('body_part', 'cardio').order('name')
     setCardioExercises(cardio ?? [])
@@ -222,6 +244,28 @@ export default function WorkoutsPage() {
     setAiCheckinLoading(false)
   }
 
+  async function applyOverride(suggestion) {
+    setApplyingOverride(suggestion.from_exercise)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const today = new Date().toLocaleDateString('en-CA')
+      await supabase.from('workout_session_overrides').insert({
+        user_id: user.id,
+        date: today,
+        original_exercise: suggestion.from_exercise,
+        override_exercise: suggestion.to_exercise,
+        reason: suggestion.reason,
+      })
+      setAppliedOverrides(prev => ({ ...prev, [suggestion.from_exercise.toLowerCase()]: suggestion.to_exercise }))
+    } finally {
+      setApplyingOverride(null)
+    }
+  }
+
+  const todayDowName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()]
+
   const sortedDays = plan?.plan
     ? [...plan.plan].sort((a, b) => DAYS_OF_WEEK.indexOf(a.day_of_week) - DAYS_OF_WEEK.indexOf(b.day_of_week))
     : []
@@ -289,8 +333,13 @@ export default function WorkoutsPage() {
               const isRest = !day.exercises?.length
               const color = focusColor(day.focus)
               const cardKey = day.day_of_week ?? day.day_number ?? sortedIndex
+              const isToday = day.day_of_week === todayDowName
+              const todaySuggestions = isToday && !isRest
+                ? suggestions.filter(s => day.exercises?.some(ex => ex.exercise_name?.toLowerCase() === s.from_exercise?.toLowerCase()))
+                : []
+              const hasPendingSuggestions = todaySuggestions.some(s => !appliedOverrides[s.from_exercise?.toLowerCase()])
               return (
-                <div key={cardKey} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+                <div key={cardKey} style={{ backgroundColor: 'var(--surface)', border: `1px solid ${isToday ? '#f97316' : 'var(--border)'}`, borderRadius: '12px', overflow: 'hidden' }}>
                   <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                     <div style={{ flex: 1 }}>
                       <select value={day.day_of_week} onChange={e => { moveDay(dayIndex, e.target.value); setTimeout(saveDayChanges, 300) }}
@@ -302,6 +351,13 @@ export default function WorkoutsPage() {
                     <span style={{ fontSize: '11px', color: isRest ? 'var(--text-secondary)' : color, backgroundColor: `${color}18`, border: `1px solid ${color}28`, borderRadius: '6px', padding: '3px 8px', fontWeight: '600', whiteSpace: 'nowrap' }}>
                       {day.focus}
                     </span>
+                    {isToday && todaySuggestions.length > 0 && (
+                      <button onClick={() => setSuggestionsSheet(true)}
+                        style={{ position: 'relative', background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 11, flexShrink: 0 }}>
+                        💡 Suggestions
+                        {hasPendingSuggestions && <span style={{ position: 'absolute', top: -4, right: -4, width: 8, height: 8, borderRadius: '50%', backgroundColor: '#f97316' }} />}
+                      </button>
+                    )}
                   </div>
 
                   {isRest ? (
@@ -320,9 +376,23 @@ export default function WorkoutsPage() {
                   ) : (
                     <div style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
-                        {day.exercises?.map((ex, i) => (
+                        {day.exercises?.map((ex, i) => {
+                          const override = isToday ? appliedOverrides[ex.exercise_name?.toLowerCase()] : null
+                          return (
                           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                            <div style={{ color: 'var(--text-primary)', fontSize: '13px', textTransform: 'capitalize', flex: 1 }}>{ex.exercise_name}</div>
+                            <div style={{ flex: 1 }}>
+                              {override ? (
+                                <div>
+                                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', textDecoration: 'line-through', textTransform: 'capitalize' }}>{ex.exercise_name}</div>
+                                  <div style={{ color: '#f97316', fontSize: '13px', textTransform: 'capitalize', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    {override}
+                                    <span style={{ fontSize: 10, backgroundColor: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: 4, padding: '1px 5px', fontWeight: 600 }}>Modified</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div style={{ color: 'var(--text-primary)', fontSize: '13px', textTransform: 'capitalize' }}>{ex.exercise_name}</div>
+                              )}
+                            </div>
                             <div style={{ color: 'var(--text-secondary)', fontSize: '12px', whiteSpace: 'nowrap' }}>{ex.sets}×{ex.reps}</div>
                             <button onClick={() => openRemoveExercise(dayIndex, i)} title="Remove exercise"
                               style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}
@@ -331,7 +401,8 @@ export default function WorkoutsPage() {
                               ×
                             </button>
                           </div>
-                        ))}
+                          )
+                        })}
                       </div>
                       {day.cardio && (
                         <div style={{ backgroundColor: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.2)', borderRadius: '6px', padding: '8px 10px', fontSize: '12px', color: 'var(--text-primary)', marginBottom: '10px' }}>
@@ -373,6 +444,55 @@ export default function WorkoutsPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Suggestions Sheet */}
+      {suggestionsSheet && (
+        <div onClick={() => setSuggestionsSheet(false)} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 9990 }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: '1px solid #f97316', borderTop: '3px solid #f97316', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: 520, padding: '20px 20px 32px', maxHeight: '70vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#f97316' }}>💡 Check-In Suggestions</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Based on your morning check-in sore spots</div>
+              </div>
+              <button onClick={() => setSuggestionsSheet(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 20, cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {suggestions
+                .filter(s => {
+                  const todayDay = sortedDays.find(d => d.day_of_week === todayDowName)
+                  return todayDay?.exercises?.some(ex => ex.exercise_name?.toLowerCase() === s.from_exercise?.toLowerCase())
+                })
+                .map((s, i) => {
+                  const applied = !!appliedOverrides[s.from_exercise?.toLowerCase()]
+                  return (
+                    <div key={i} style={{ backgroundColor: 'var(--background)', border: `1px solid ${applied ? 'var(--success)' : 'var(--border)'}`, borderRadius: 10, padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 13, color: 'var(--text-secondary)', textDecoration: 'line-through', textTransform: 'capitalize' }}>{s.from_exercise}</span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>→</span>
+                        <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600, textTransform: 'capitalize' }}>{s.to_exercise}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.5 }}>{s.reason}</div>
+                      {applied ? (
+                        <div style={{ fontSize: 12, color: 'var(--success)', fontWeight: 600 }}>✓ Applied for today</div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => applyOverride(s)} disabled={applyingOverride === s.from_exercise}
+                            style={{ flex: 1, padding: '8px 12px', backgroundColor: '#f97316', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                            {applyingOverride === s.from_exercise ? 'Applying...' : '✓ Apply'}
+                          </button>
+                          <button onClick={() => setSuggestions(prev => prev.filter((_, j) => j !== i))}
+                            style={{ padding: '8px 16px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }}>
+                            Skip
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Add Exercise Modal */}
