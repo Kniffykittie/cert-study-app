@@ -200,14 +200,35 @@ async function syncUser(supabase: any, userId: string, tokenRow: any): Promise<v
 }
 
 Deno.serve(async (_req: Request) => {
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-  )
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-  const { data: tokenRows, error } = await supabase
-    .from('google_health_tokens')
-    .select('user_id, access_token, refresh_token, expires_at, last_synced_at')
+  if (!supabaseUrl || !serviceRoleKey) {
+    return new Response(JSON.stringify({ ok: false, error: 'Missing env vars', supabaseUrl: !!supabaseUrl, serviceRoleKey: !!serviceRoleKey }), {
+      status: 500, headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey)
+
+  let queryResult: any
+  try {
+    queryResult = await supabase
+      .from('google_health_tokens')
+      .select('user_id, access_token, refresh_token, expires_at, last_synced_at')
+  } catch (e: any) {
+    return new Response(JSON.stringify({ ok: false, error: 'Query threw', detail: e?.message }), {
+      status: 500, headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  if (!queryResult) {
+    return new Response(JSON.stringify({ ok: false, error: 'Query returned undefined' }), {
+      status: 500, headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const { data: tokenRows, error } = queryResult
 
   if (error) {
     return new Response(JSON.stringify({ ok: false, error: error.message }), {
