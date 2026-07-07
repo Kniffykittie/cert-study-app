@@ -716,37 +716,52 @@ function NutritionPageInner() {
         const microTargets = goals?.age && goals?.sex ? calcMicroTargets(goals.age, goals.sex) : null
         const hour = new Date().getHours()
 
-        const MICRO_CALLOUT_COPY = {
+        const MICRO_NAMES = {
+          sodium_mg: 'Sodium', vitamin_d_mcg: 'Vitamin D', iron_mg: 'Iron',
+          omega3_g: 'Omega-3', magnesium_mg: 'Magnesium', calcium_mg: 'Calcium',
+          potassium_mg: 'Potassium', vitamin_c_mg: 'Vitamin C', zinc_mg: 'Zinc', fiber_g: 'Fiber',
+        }
+
+        const MICRO_COPY = {
           sodium_mg: {
-            over: 'Sodium is at {pct}% of your daily target — drink an extra glass of water; sodium draws water out of cells and raises blood pressure temporarily.',
+            over: 'Sodium is at {pct}% of your daily target — drink an extra glass of water; sodium draws water out of cells and temporarily raises blood pressure.',
           },
           vitamin_d_mcg: {
             absent: 'Vitamin D hasn\'t appeared in your log in 3+ days — few foods contain it naturally; sunlight or a supplement is usually the only reliable source.',
             low: 'Vitamin D is at {pct}% by {time} — it\'s fat-soluble, so having it with a fatty meal improves absorption significantly.',
+            good: 'Vitamin D is at {pct}% today — it\'s helping your body absorb calcium, keeping your immune system responsive, and supporting the mood-regulating pathways in your brain.',
           },
           iron_mg: {
             low: 'Iron is at {pct}% by {time} — pair it with something acidic (lemon, tomato, vitamin C) to roughly double absorption. Avoid coffee or tea within 30 min of iron-rich foods.',
+            good: 'Iron is at {pct}% today — your red blood cells are carrying oxygen efficiently to your muscles and brain, which directly supports your energy level and mental clarity.',
           },
           omega3_g: {
             absent: 'Omega-3 hasn\'t appeared in your log in 3+ days — without fatty fish or supplementation, inflammatory responses and recovery both slow down.',
+            good: 'Omega-3 is at {pct}% today — it\'s actively dampening systemic inflammation, which speeds up muscle recovery and protects your joints over time.',
           },
           magnesium_mg: {
             low: 'Magnesium is at {pct}% by {time} — it\'s involved in muscle relaxation and sleep quality; low magnesium often shows as night cramps or restless sleep.',
+            good: 'Magnesium is at {pct}% today — it\'s relaxing your smooth muscles, supporting nerve signal transmission, and setting your body up for deeper sleep tonight.',
           },
           calcium_mg: {
             low: 'Calcium is at {pct}% by {time} — pair dairy or fortified foods with vitamin D for better absorption.',
+            good: 'Calcium is at {pct}% today — beyond bones, it\'s enabling the muscle contractions that power every rep you do, and triggering the neurotransmitter releases that drive nerve signaling.',
           },
           potassium_mg: {
             low: 'Potassium is at {pct}% by {time} — it counterbalances sodium for blood pressure and helps prevent muscle cramps.',
+            good: 'Potassium is at {pct}% today — it\'s keeping your sodium-potassium balance in check, which means better blood pressure regulation and smoother muscle contractions during workouts.',
           },
           vitamin_c_mg: {
             absent: 'Vitamin C hasn\'t appeared in your log in 3+ days — it\'s water-soluble (not stored), so daily intake from fruits or vegetables matters.',
+            good: 'Vitamin C is at {pct}% today — it\'s driving collagen synthesis for tissue and tendon repair, and acting as a free-radical scavenger that protects your cells from oxidative stress.',
           },
           zinc_mg: {
             low: 'Zinc is at {pct}% by {time} — it\'s critical for immune function and testosterone production; absorption drops significantly when taken with high-fiber foods.',
+            good: 'Zinc is at {pct}% today — it\'s supporting your immune system, enabling protein synthesis for muscle repair, and maintaining testosterone levels that drive energy and recovery.',
           },
           fiber_g: {
             low: 'Fiber is at {pct}% by {time} — the gut microbiome relies on it; most people fall short by 10–15g/day without intentional effort.',
+            good: 'Fiber is at {pct}% today — it\'s feeding beneficial gut bacteria, slowing glucose absorption so your energy stays steadier, and supporting the hormones that control hunger.',
           },
         }
 
@@ -760,8 +775,7 @@ function NutritionPageInner() {
         }
 
         function getDV(key) {
-          if (!microTargets) return null
-          if (microTargets[key] != null) return microTargets[key]
+          if (microTargets?.[key] != null) return microTargets[key]
           const defaults = {
             sodium_mg: 2300, vitamin_d_mcg: 20, iron_mg: 18, omega3_g: 1.6,
             magnesium_mg: 420, calcium_mg: 1000, potassium_mg: 4700,
@@ -770,89 +784,79 @@ function NutritionPageInner() {
           return defaults[key] ?? null
         }
 
-        const callouts = []
+        const warnCallouts = []
+        const goodCandidates = []
         const timeStr = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
         for (const key of TRACKED_MICROS) {
-          const copy = MICRO_CALLOUT_COPY[key]
+          const copy = MICRO_COPY[key]
           if (!copy) continue
           const dv = getDV(key)
           if (!dv) continue
           const todayVal = sumEntries(entries, key)
           const pct = Math.round((todayVal / dv) * 100)
 
-          // Over 150% DV (sodium only flagged high)
           if (key === 'sodium_mg' && pct > 150 && copy.over) {
-            callouts.push({
-              key,
-              type: 'over',
-              text: copy.over.replace('{pct}', pct).replace('{time}', timeStr),
-              priority: 1,
-              color: 'rgba(239,68,68,0.12)',
-              border: 'rgba(239,68,68,0.3)',
-              icon: '🔴',
-              label: 'High',
-              labelColor: '#ef4444',
-            })
+            warnCallouts.push({ key, type: 'over', text: copy.over.replace('{pct}', pct), priority: 1, color: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)', icon: '🔴', label: 'High', labelColor: '#ef4444' })
             continue
           }
 
-          // Under 20% DV after 3pm
           if (hour >= 15 && pct < 20 && copy.low) {
-            callouts.push({
-              key,
-              type: 'low',
-              text: copy.low.replace('{pct}', pct).replace('{time}', timeStr),
-              priority: 2,
-              color: 'rgba(251,146,60,0.1)',
-              border: 'rgba(251,146,60,0.3)',
-              icon: '⚠️',
-              label: 'Low by ' + timeStr,
-              labelColor: '#fb923c',
-            })
+            warnCallouts.push({ key, type: 'low', text: copy.low.replace('{pct}', pct).replace('{time}', timeStr), priority: 2, color: 'rgba(251,146,60,0.1)', border: 'rgba(251,146,60,0.3)', icon: '⚠️', label: 'Low by ' + timeStr, labelColor: '#fb923c' })
             continue
           }
 
-          // Absent 3+ consecutive days
-          if (copy.absent && todayVal === 0) {
-            const yestVal = sumEntries(prevDaysEntries[0], key)
-            const dayBeforeVal = sumEntries(prevDaysEntries[1], key)
-            if (yestVal === 0 && dayBeforeVal === 0) {
-              callouts.push({
-                key,
-                type: 'absent',
-                text: copy.absent,
-                priority: 3,
-                color: 'rgba(167,139,250,0.1)',
-                border: 'rgba(167,139,250,0.25)',
-                icon: '💜',
-                label: '3+ days absent',
-                labelColor: '#a78bfa',
-              })
-            }
+          if (copy.absent && todayVal === 0 && sumEntries(prevDaysEntries[0], key) === 0 && sumEntries(prevDaysEntries[1], key) === 0) {
+            warnCallouts.push({ key, type: 'absent', text: copy.absent, priority: 3, color: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.25)', icon: '💜', label: '3+ days absent', labelColor: '#a78bfa' })
+            continue
+          }
+
+          if (copy.good && pct >= 70 && pct <= 150 && key !== 'sodium_mg') {
+            goodCandidates.push({ key, pct, text: copy.good.replace('{pct}', pct) })
           }
         }
 
-        if (callouts.length === 0) return null
-        const shown = callouts.sort((a, b) => a.priority - b.priority).slice(0, 3)
-        const MICRO_NAMES = {
-          sodium_mg: 'Sodium', vitamin_d_mcg: 'Vitamin D', iron_mg: 'Iron',
-          omega3_g: 'Omega-3', magnesium_mg: 'Magnesium', calcium_mg: 'Calcium',
-          potassium_mg: 'Potassium', vitamin_c_mg: 'Vitamin C', zinc_mg: 'Zinc', fiber_g: 'Fiber',
-        }
+        const shownWarns = warnCallouts.sort((a, b) => a.priority - b.priority).slice(0, 3)
+        const shownGood = goodCandidates.sort((a, b) => b.pct - a.pct).slice(0, 2)
+
+        if (shownWarns.length === 0 && shownGood.length === 0) return null
 
         return (
-          <div style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {shown.map(c => (
-              <div key={c.key} style={{ backgroundColor: c.color, border: `1px solid ${c.border}`, borderRadius: '10px', padding: '12px 16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '12px' }}>{c.icon}</span>
-                  <span style={{ fontSize: '11px', fontWeight: '700', color: c.labelColor, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{MICRO_NAMES[c.key]}</span>
-                  <span style={{ fontSize: '11px', color: c.labelColor, opacity: 0.8 }}>· {c.label}</span>
-                </div>
-                <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>{c.text}</p>
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', marginBottom: '16px', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px 8px', borderBottom: shownWarns.length > 0 || shownGood.length > 0 ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '13px' }}>🧬</span>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Today's Micro Snapshot</span>
+            </div>
+
+            {shownWarns.length > 0 && (
+              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '8px', borderBottom: shownGood.length > 0 ? '1px solid var(--border)' : 'none' }}>
+                {shownWarns.map(c => (
+                  <div key={c.key} style={{ backgroundColor: c.color, border: `1px solid ${c.border}`, borderRadius: '8px', padding: '10px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                      <span style={{ fontSize: '11px' }}>{c.icon}</span>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: c.labelColor, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{MICRO_NAMES[c.key]}</span>
+                      <span style={{ fontSize: '11px', color: c.labelColor, opacity: 0.75 }}>· {c.label}</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>{c.text}</p>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+
+            {shownGood.length > 0 && (
+              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>✅ Working for you today</div>
+                {shownGood.map(c => (
+                  <div key={c.key} style={{ backgroundColor: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '8px', padding: '10px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{MICRO_NAMES[c.key]}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--success)', opacity: 0.75 }}>· {c.pct}% of daily target</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>{c.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )
       })()}

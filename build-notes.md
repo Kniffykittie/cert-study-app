@@ -2149,7 +2149,7 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ### Phase 79 — Item 21: Micronutrient Daily Awareness — Complete
 
-- `src/app/life-hub/nutrition/page.js` — added `prevDaysEntries` state (yesterday + day-before entries); load() fetches a 3rd day (`/api/nutrition/log?date=dayBefore`) in parallel; new inline callout block renders between TDEE card and Food Log tab — only when `activeTab === 'log'`, there are entries, and `!viewingDate`; evaluates 10 tracked micros (sodium, vitamin D, iron, omega-3, magnesium, calcium, potassium, vitamin C, zinc, fiber); three trigger types: over 150% DV (red, priority 1), under 20% DV after 3pm (orange, priority 2), absent 3+ consecutive days (purple, priority 3); shows highest-priority 2–3 callouts max; DVs pulled from `calcMicroTargets(age, sex)` with hardcoded fallbacks; no AI call — all copy is static and hardcoded per nutrient; card hidden entirely when no callouts fire
+- `src/app/life-hub/nutrition/page.js` — added `prevDaysEntries` state (yesterday + day-before entries); load() fetches a 3rd day in parallel; unified "🧬 Today's Micro Snapshot" card renders between TDEE card and Food Log tab; two zones: warnings (red/orange/purple) + "✅ Working for you today" (green); warning triggers: over 150% DV (red), under 20% DV after 3pm (orange), absent 3+ consecutive days (purple); good trigger: 70–150% DV shows top 2 by coverage with what the nutrient is actively doing for the body; all copy is static and specific per nutrient (10 micros covered); DVs from `calcMicroTargets(age, sex)` with hardcoded fallbacks; card hidden when nothing to show
 
 ### Phase 78 — Item 20: Stretch System Overhaul — Complete
 
