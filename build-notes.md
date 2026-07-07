@@ -3319,3 +3319,690 @@ Seven inputs that were collected but never used downstream wired up in the same 
 ### Recovery Score Upgrade — HRV Component + Normalization — Complete
 - Rebalanced: Sleep 25 + Hydration 20 + Protein 20 + Energy 15 + Workout Load 10 = 90 base; HRV +10 with watch; normalized to 100
 - HRV scoring: ≥60ms=10, ≥40ms=8, ≥20ms=5, <20ms=2, null=excluded
+
+---
+
+## Master Build Plan — Full Roadmap with Specs, Risks, and What We Haven't Built Yet
+
+*Written after extensive design discussion. This section captures every planned feature, the exact files touched, what can break, what's missing from earlier specs, and ideas beyond what's been discussed so far. Use this as the authoritative planning reference.*
+
+---
+
+### SECTION 1 — Build Queue (Prioritized Order)
+
+The correct build sequence balances: (a) unblocking dependent features, (b) low-risk quick wins that improve the app immediately, (c) avoiding doing heavy UI work before infrastructure is ready.
+
+```
+TIER 1 — Foundation changes (unblock everything else)
+  Step 1:  DB migration — stretch_logs.context + workout_logs.coaching_feedback_read_at
+  Step 2:  Add dates to workout plan page (Mon · Jul 7 format)
+  Step 3:  DV% display next to nutrient values (touches 4 files, no DB work)
+
+TIER 2 — Day Hub core (biggest architectural shift)
+  Step 4:  Day Hub page — active mode, layout + phase sections + completion indicators
+  Step 5:  Remove inline day expand from plan page; all day taps → Day Hub
+  Step 6:  Wire "Start X" buttons with session_type + context params
+  Step 7:  Update generate-plan/route.js to produce context_note per exercise
+  Step 8:  AI coaching review panel + unread badge on Day Hub
+  Step 9:  Rest day Day Hub variant
+
+TIER 3 — History revamp + sidebar cleanup
+  Step 10: Workout history → week-grouped Day Hub cards (unified workout + stretch)
+  Step 11: PRs → Exercise Library detail modal; remove from history page
+  Step 12: Retire standalone stretching page; rename Stretch Library → Stretch Reference
+  Step 13: Sidebar restructure (4 items under Workouts, updated active states)
+  Step 14: Add weekly completion tracking bar to plan page + history week groups
+
+TIER 4 — Nutrition enhancements
+  Step 15: Food water_g from solid food in Hydration page (3rd ring segment)
+  Step 16: Photo food logging route + AddFoodModal 4th tab
+
+TIER 5 — Intelligence upgrades (build last, needs stable data)
+  Step 17: Update Daily Brief to use stretch_logs.context for bedtime correlation
+  Step 18: Update Weekly Wrap to include bedtime stretch nights + stretch phase completion
+  Step 19: Update coach_memory Edge Function to use stretch context field
+  Step 20: Monthly Wrap upgrade — use weekly_wraps.report_data as primary source
+```
+
+---
+
+### SECTION 2 — Complete File-Level Spec for Each Step
+
+---
+
+#### Step 1 — DB Migration: stretch_logs.context + workout_logs.coaching_feedback_read_at
+
+**Why first:** `stretch_logs.context` is a prerequisite for Day Hub phase completion detection (Steps 4–14). `coaching_feedback_read_at` is needed for the unread badge (Step 8). Both are non-breaking — existing rows get NULL, nothing currently reads these columns.
+
+**Migration SQL:**
+```sql
+-- Add context field to stretch_logs
+ALTER TABLE stretch_logs ADD COLUMN context TEXT;
+-- Values: 'pre_workout', 'post_workout', 'bedtime', 'standalone'
+-- NULL for existing rows — treated as 'standalone' in UI
+
+-- Add coaching feedback read tracking to workout_logs
+ALTER TABLE workout_logs ADD COLUMN coaching_feedback_read_at TIMESTAMPTZ;
+-- NULL = unread (or no coaching response yet)
+```
+
+**Files to update after migration:**
+- `src/app/api/workouts/stretch-log/route.js` — POST handler must accept and save `context` field from request body; GET returns it in results
+- `src/app/life-hub/workouts/stretching/page.js` — when logging a session, pass `context` based on which session_type the user selected AND where they navigated from (Day Hub pre/post/bedtime vs direct visit)
+
+**Risk:** Stretching page currently uses `session_type` (pre_workout/post_workout/standalone) to label sessions. `context` is a parallel field that captures the same intent but from the Day Hub's perspective. Need to ensure both are written consistently. Decision: `context` = same value as `session_type` for pre/post; `context = 'bedtime'` overrides `standalone` when user entered from Day Hub bedtime phase button. The `session_type` field stays for backward compat.
+
+---
+
+#### Step 2 — Dates on Workout Plan Page
+
+**File:** `src/app/life-hub/workouts/page.js`
+
+**Logic:** Compute the Monday of the current week using the same `getMonday()` helper from `src/app/api/life-hub/weekly-wrap/route.js`. Since this is client-side, inline the logic: `new Date()` → find most recent Monday → offset by `dayOfWeek` index (0=Mon, 6=Sun) to get each day's date.
+
+**Display:** Under each day card's title, add a subtitle line:
+```
+Monday · Jul 7     (today highlighted differently — accent-blue border or "today" chip)
+Tuesday · Jul 8    (past days — text-secondary, slightly muted)
+Wednesday · Jul 9  (future days — normal)
+```
+
+**Today indicator:** Current day card gets `border: '2px solid var(--accent-blue)'` or a small `TODAY` chip in the card header.
+
+**Tap behavior change:** Day cards no longer expand inline. Every tap navigates to `/life-hub/workouts/day/[dayIndex]`. The "Start Workout" and "▶ Resume Workout" buttons that currently appear inline move to the Day Hub.
+
+**Risk:** The current page has complex expand/collapse state, the "✓ Done Today" button, and a day reassignment dropdown. All of that moves to the Day Hub. The plan page becomes a cleaner week-at-a-glance view only. The "Done Today" indicator (green checkmark) can stay on the plan page as a completion signal driven by `workout_logs`.
+
+---
+
+#### Step 3 — DV% Display Next to Nutrient Values
+
+**The formula:** `Math.round((amount / DV[key]) * 100)` — `DV` is already exported from `src/lib/nutritionUtils.js`.
+
+**Display pattern:** `100mg · 25% DV` — the `· 25% DV` portion is `var(--text-secondary)` at font-size 11px, rendered inline after the amount.
+
+**Nutrients with no established DV:** `water_g`, `caffeine_mg`, `calories` (FDA uses 2000 cal reference separately — don't show % next to calories). Show nothing in the DV slot for these rather than "—" to avoid visual noise.
+
+**Files to update:**
+
+*`src/components/nutrition/EditFoodModal.js`*
+- Every nutrient row in the chip-picker UI that shows an amount (e.g. "320mg") adds `· 25% DV` after it
+- Import `DV` from `@/lib/nutritionUtils`
+- Compute inline: `DV[key] ? `· ${Math.round((val / DV[key]) * 100)}% DV` : ''`
+
+*`src/components/nutrition/AddFoodModal.js`*
+- Same treatment in the manual entry review section where macros/micros are displayed before logging
+- Also in the Favorites tab where a food's nutrient summary is shown
+
+*`src/components/nutrition/SearchModal.js`*
+- Food detail expansion shows nutrient rows — add DV% to each
+
+*`src/app/life-hub/nutrition/page.js`*
+- Micronutrient panel: already computes % for progress bars. Add the percentage as text next to the amount label in the per-nutrient row (e.g. "Vitamin C: 45mg · 50% DV")
+
+*`src/app/life-hub/nutrition/log-manual/page.js`*
+- Manual entry form — show DV% next to any field where user has entered a value (live-computed as they type)
+
+**Risk:** Some nutrient values are 0 when not logged (don't show "0 · 0% DV" — only show DV% when value > 0). Cap display at 999% to prevent layout breaks for extreme values.
+
+**What this unlocks for the user:** Transforms abstract numbers ("320mg sodium") into meaningful context ("320mg · 14% DV") at a glance. Particularly valuable for sodium (people chronically underestimate), iron (women often deficient), and vitamin D (almost everyone deficient). No coaching needed — the number tells the story.
+
+---
+
+#### Step 4 — Day Hub Page: Active Mode
+
+**Route:** `src/app/life-hub/workouts/day/[dayIndex]/page.js`
+- `dayIndex` is 0–6 (Mon–Sun)
+- Page derives actual date: `getThisWeeksMonday() + dayIndex * 86400000`
+- For historical access: accept optional `?date=YYYY-MM-DD` query param — if present, renders in read-only mode for that specific date regardless of dayIndex
+
+**Data fetched on load (parallel `Promise.all`):**
+1. `workout_plans` — active plan for user (for today's exercises + context_notes)
+2. `workout_session_overrides` — any exercise swaps for today
+3. `stretch_logs` — today's sessions (to compute phase completion per context field)
+4. `workout_logs` — today's workout session (Phase 2 completion + coaching response)
+5. `daily_checkins` — today's sore_spots (to flag relevant exercises)
+6. `goals_profiles` — for bedtime stretch sleep correlation note
+
+**Page sections:**
+
+*Header row:*
+```
+[← Back to My Plan]    Wednesday · July 9 — Pull Day    [Phase dots: ⬜🔵⬜⬜]
+```
+Phase dots are 8px circles, left to right = Pre/Workout/Post/Bedtime. Color: grey=not started, blue=started (stretch log exists but today's full session may not be), green=complete.
+
+*Phase 1 — Pre-Workout Stretches card:*
+- Pulls recommended stretches via `getRecommendedStretches(todayBodyParts, soreSpots)` (already exported from `src/data/stretches.js`)
+- Shows 3–5 dynamic stretches (filter by `stretch_type: 'dynamic'` or `ideal_timing: 'pre_workout'`)
+- Each stretch card: name + duration + context_note (e.g. "Your lats are trained today — thoracic spine mobility improves overhead pull range")
+- Tap to expand: full how-to instructions + why field from stretches.js
+- Bottom: "▶ Start Pre-Workout Stretches" button → navigate to `/life-hub/workouts/stretching?context=pre_workout&bodyParts=back,biceps`
+- Phase status banner: ✅ "Pre-workout stretches logged at 6:32am" if complete
+
+*Phase 2 — Today's Workout card:*
+- Exercise list from `workout_plans.plan[dayIndex].exercises`
+- Applies `workout_session_overrides` — if override exists for today, show overridden exercise with small "(adjusted)" chip
+- Each exercise: name + sets × reps + rep_range
+- "Why this today?" collapsible: `exercise.context_note` from plan JSONB (empty on old plans — show nothing)
+- "Prev session" hint: `MAX(weight_lbs)` from `workout_log_sets` for this exercise_name — shown in grey below the sets line ("Last time: 3 × 185 lbs")
+- Sore spot flag: if today's sore_spots includes a body part relevant to this exercise → amber chip "⚠️ Your [body part] is flagged as sore — consider reducing load or modifying"
+- Bottom: "▶ Start Workout" button → navigate to `/life-hub/workouts/log?day=[dayIndex]`
+- Phase status banner: ✅ "Workout logged — 52 min · 3 working sets" if complete
+
+*Coaching feedback panel (shown after Phase 2 complete):*
+- Appears collapsed with header: "💬 Coach Feedback" + "NEW" badge if `coaching_feedback_read_at` is null
+- Auto-expands on first visit if unread; marks `coaching_feedback_read_at = now()` on open
+- Content: workout stats row (duration, sets, HR zones) + full `ai_coaching_response` text
+- If response still generating: "Your coaching feedback is being generated — check back in a minute" (no spinner, just a note)
+- If no coaching response was generated (e.g. workout pre-dates the feature): panel hidden
+
+*Phase 3 — Post-Workout Stretches card:*
+- Shows ONLY if Phase 2 is complete (no point doing post-workout stretches without a workout)
+- Static stretches for today's muscle groups (filter `stretch_type: 'static'`, `ideal_timing: 'post_workout_or_bed'`)
+- Context note per stretch (e.g. "Lat stretch — holding at longest position for 45s prevents the chronic shortening that limits range on next pull day")
+- Bottom: "▶ Start Post-Workout Stretches" button → `/life-hub/workouts/stretching?context=post_workout&bodyParts=back,biceps`
+- Subtitle: "Best done within 30 minutes — muscles are still warm and pliable"
+
+*Phase 4 — Bedtime Stretches card:*
+- Always shown regardless of workout completion (rest days have this too)
+- Full-body static stretches for parasympathetic activation — 4–5 stretches, not muscle-group-specific
+- If sleep correlation exists in coach_memory: show "Based on your history, stretching before bed improves your sleep score by ~12 points on average" — only if that observation exists
+- Context note per stretch (e.g. "Supine twist — compresses and then decompresses the spinal discs; the bilateral asymmetry release lowers overall nervous system tension before sleep")
+- Bottom: "▶ Start Bedtime Stretches" button → `/life-hub/workouts/stretching?context=bedtime`
+- Subtitle: "10–15 minutes before sleep — activates parasympathetic nervous system, lowers resting HR"
+
+**Read-only mode (past dates via `?date=`):**
+- All "Start X" buttons replaced with "Completed at HH:MM" labels or "Not completed" in grey
+- Phase status computed from historical logs on that date
+- Coaching review always expanded (already read, historical context)
+- Header shows actual past date prominently
+
+---
+
+#### Step 5 — Remove Inline Expand from Plan Page
+
+**File:** `src/app/life-hub/workouts/page.js`
+
+Remove: `selectedDay` state, the inline expand div that renders exercises, "Start Workout" / "Resume" / "Done Today" buttons within the expand.
+
+Keep on the plan page: day card title + date + muscle group label + phase completion dots + "Today" indicator. The card itself is now a navigation link to `/life-hub/workouts/day/[dayIndex]`.
+
+**The "Done Today" green state:** Preserve as a visual indicator on the plan page day card (green dot or checkmark on the card), driven by `workout_logs` query. This tells you at a glance which days are done without opening Day Hub.
+
+**Risk:** `workout_session_overrides` are currently applied on this page. Once the page stops showing exercises, the override display moves entirely to the Day Hub. The override creation (from check-in) still writes to `workout_session_overrides` — no change there.
+
+---
+
+#### Step 6 — Wire "Start X" Buttons to Stretching Flow
+
+The stretching page (`/life-hub/workouts/stretching/page.js`) currently determines session_type from a toggle the user sets manually. The Day Hub passes it via URL params.
+
+**URL params accepted by stretching page:**
+- `?context=pre_workout` — pre-selects the pre-workout session type, skips the toggle
+- `?context=post_workout` — pre-selects post-workout
+- `?context=bedtime` — pre-selects standalone, marks context as bedtime for log write
+- `?bodyParts=back,biceps` — filters recommended stretches to these muscle groups (skip the "today's workout" inference logic since we already know)
+
+**Stretching page update:**
+```javascript
+const searchParams = useSearchParams()
+const contextParam = searchParams.get('context')
+const bodyPartsParam = searchParams.get('bodyParts')?.split(',') || []
+```
+- If `contextParam` is set, lock the session_type toggle to that value (show read-only label, don't let user change it — they came from Day Hub for a specific phase)
+- If `bodyParts` is set, pass directly to `getRecommendedStretches()` instead of inferring from today's workout logs
+
+**Stretch log POST update:**
+When logging session, include `context: contextParam || session_type` in the POST body. The API route saves it to `stretch_logs.context`.
+
+**Risk:** If user navigates directly to the stretching page without params (e.g. from old bookmark), everything still works — `contextParam` is null, toggle shows normally, context saved as null or the selected session_type. Backward compatible.
+
+---
+
+#### Step 7 — Update generate-plan/route.js for context_note
+
+**File:** `src/app/api/workouts/generate-plan/route.js`
+
+**Change:** Add to the Claude prompt's output specification that each exercise object in the plan must include a `context_note` field — one sentence explaining why this exercise belongs in this specific split.
+
+**Prompt addition (append to existing system prompt):**
+```
+For each exercise in the plan, add a "context_note" field — one sentence explaining 
+why this exercise belongs in today's training context. Reference the muscle group split, 
+movement pattern, or weekly programming logic. Examples:
+- "Barbell rows are the primary horizontal pull — they build mid-back thickness that all other pulling accessories reinforce."
+- "Romanian deadlifts hit the hamstrings eccentrically; pairing them with leg curls on the same day creates both eccentric and concentric stimulus for complete hamstring development."
+- "Tricep pushdowns follow chest pressing because the triceps are already pre-fatigued from pressing — isolation at the end of a push day maximizes total tricep time-under-tension."
+```
+
+**Plan JSONB shape after update:**
+```json
+{
+  "day_of_week": 2,
+  "exercises": [
+    {
+      "name": "Barbell Row",
+      "sets": 4,
+      "reps": "8-10",
+      "notes": "Retract scapula at top",
+      "context_note": "Primary horizontal pull — builds mid-back thickness that all pulling accessories reinforce."
+    }
+  ]
+}
+```
+
+**Backward compat:** Old plans without `context_note` just show nothing in the "Why this?" section. No migration needed on existing data. Users regenerate plans naturally as goals/equipment change.
+
+---
+
+#### Step 8 — AI Coaching Review Panel + Unread Badge
+
+**DB column needed:** `workout_logs.coaching_feedback_read_at TIMESTAMPTZ` (from Step 1 migration)
+
+**Day Hub coaching panel behavior:**
+- Query: `SELECT ai_coaching_response, coaching_feedback_read_at, created_at, duration_seconds, hr_zones FROM workout_logs WHERE user_id = ? AND date(created_at) = today ORDER BY created_at DESC LIMIT 1`
+- If `ai_coaching_response` is null AND `created_at` < 5 minutes ago: show "Generating coaching feedback..." (it's in-flight)
+- If `ai_coaching_response` is null AND `created_at` > 15 minutes ago: show "No coaching feedback available for this session" (it failed silently)
+- If `ai_coaching_response` is populated AND `coaching_feedback_read_at` is null: auto-expand panel, show "NEW" badge, call PATCH to set `coaching_feedback_read_at = now()` on open
+- If already read: panel collapsed by default, no badge
+
+**API route update:** `src/app/api/workouts/coaching-response/route.js` — when coaching response is saved, it's already writing to `workout_logs`. No change here.
+
+**New PATCH endpoint or inline update:** The Day Hub needs to mark `coaching_feedback_read_at`. Options: (a) a tiny PATCH `/api/workouts/log/[id]/read` route, or (b) inline Supabase client update from the page component using `createClient`. Option (b) is simpler — the page already has auth context, no new route needed.
+
+---
+
+#### Step 9 — Rest Day Day Hub
+
+**Same component, different data path:**
+
+When `workout_plans.plan[dayIndex]` has `day_type: 'rest'` (or exercises array is empty/null), render the rest day variant:
+
+*Header:* "Thursday · Jul 10 — Rest Day"
+
+*Recovery Note card:*
+- Queries `workout_logs` for the past 3 days — if 2+ active training days in a row: "You trained back-to-back on Tuesday and Wednesday — today's rest is structural, not optional. Your muscles repair during rest, not during training."
+- If no recent training: "A planned rest day. Light movement is fine if you want it — a walk, some mobility work. Avoid anything that creates DOMS."
+
+*Light Movement Suggestion card:*
+- Based on what was trained recently: "Yesterday was a push day — your chest, shoulders, and triceps are in active repair. A walk or some light cycling is fine; avoid pressing movements."
+- Static: computed from `workout_logs.day_label` of the most recent session
+
+*Bedtime Stretches card:* Same Phase 4 content as active days
+
+*No workout, no pre/post stretch phases shown.*
+
+---
+
+#### Step 10 — Unified History: Week-Grouped Day Hub Cards
+
+**File:** `src/app/life-hub/workouts/history/page.js` — full rewrite
+
+**Data query:** 
+```sql
+-- Get all workout sessions grouped by week
+SELECT date_trunc('week', created_at) as week_start, 
+       created_at, duration_seconds, day_label, hr_zones, 
+       ai_coaching_response, coaching_feedback_read_at
+FROM workout_logs 
+WHERE user_id = ? 
+ORDER BY created_at DESC
+
+-- Get all stretch sessions grouped by week  
+SELECT date_trunc('week', date::timestamptz) as week_start,
+       date, session_type, context, duration_seconds, logged_at
+FROM stretch_logs
+WHERE user_id = ?
+ORDER BY date DESC
+```
+
+**Page structure:**
+```
+Week of Jul 7                              [📊 View Weekly Wrap →]
+  3 workouts · 8 stretch sessions · 4h 40m total
+  ─────────────────────────────────────────
+  Monday · Jul 7 — Push Day    ⬜⬜🟢⬜  → [tap = read-only Day Hub]
+  Wednesday · Jul 9 — Pull Day ✅✅✅⬜  → [tap = read-only Day Hub]  
+  Friday · Jul 11 — Legs       ✅⬜⬜✅  → [tap = read-only Day Hub]
+
+Week of Jun 30                             [📊 View Weekly Wrap →]
+  ...
+```
+
+Each day row in history:
+- Day name + date + muscle group label
+- 4 phase completion dots (computed from stretch_logs.context + workout_logs for that date)
+- Duration chip if workout was logged
+- 1-line coaching response excerpt (first 80 chars of `ai_coaching_response` + "...")
+- Tapping opens read-only Day Hub at `?date=YYYY-MM-DD`
+
+**Weekly Wrap link:** Query `weekly_wraps` for each week_start to show link only if wrap exists.
+
+**Risk:** Performance — loading ALL history to group by week could be slow for users with years of data. Add pagination: load 8 weeks at a time, "Load more" button at bottom. First load = most recent 8 weeks only.
+
+---
+
+#### Step 11 — PRs in Exercise Library
+
+**File:** `src/app/life-hub/workouts/exercises/page.js`
+
+**Current detail modal:** Shows exercise name, muscle tags, instructions, "WHERE YOU SHOULD FEEL IT", "DO NOT" sections.
+
+**Add "Your PR" section at top of modal:**
+```
+Your PR
+─────────────────────────
+Barbell Row    185 lbs × 5    Set on Jun 14
+No PR yet — complete a working set to start tracking
+```
+
+**Query (on modal open, lazy-loaded per exercise):**
+```sql
+SELECT MAX(weight_lbs) as pr_weight, reps, created_at
+FROM workout_log_sets
+WHERE user_id = ? AND exercise_name = ? AND set_type = 'working' AND weight_lbs > 0
+ORDER BY weight_lbs DESC
+LIMIT 1
+```
+
+**Risk:** `exercise_name` matching — logged names must match library names exactly. Currently the workout log writes the name string from the plan. If names drift between the plan and the library, PRs won't surface. Add a note in the spec: the exercise library and exercise plan must use identical name strings. This is already the case today but worth being explicit.
+
+---
+
+#### Steps 12–13 — Sidebar Restructure + Stretch Library Rename
+
+**`src/components/LifeHubSidebar.js` changes:**
+
+Remove from Workouts dropdown:
+- "Stretching & Mobility" link (page being retired)
+
+Rename:
+- "Stretch Library" → "Stretch Reference" (same URL or new URL `/life-hub/workouts/stretches`)
+
+Update `workoutsActive` condition to include new routes and exclude retired one.
+
+**File rename/move:** `src/app/life-hub/workouts/stretching/library/page.js` → `src/app/life-hub/workouts/stretches/page.js` (cleaner URL). Keep old URL redirecting for 30 days via `next.config.js` redirect rule in case of bookmarks.
+
+**Retire:** `src/app/life-hub/workouts/stretching/page.js` — this file stays alive during the transition (Steps 4–9) because Day Hub buttons navigate to it. Once everything is wired and tested, delete this file. Add a note in the plan to confirm deletion at Step 13.
+
+---
+
+#### Step 14 — Weekly Completion Tracking Bar
+
+**Where it appears:**
+1. Top of workout plan page (`/life-hub/workouts`) — current week's completion
+2. Each week group header in history — that week's completion
+
+**Computation:**
+- Planned workout days this week: count of days in `workout_plans.plan` where exercises array is non-empty (from active plan)
+- Completed workout days: count of `workout_logs` entries this week
+- Pre-workout stretch sessions: count of `stretch_logs` where `context = 'pre_workout'` this week
+- Post-workout stretch sessions: count where `context = 'post_workout'`
+- Bedtime stretch nights: count where `context = 'bedtime'`
+
+**Display on plan page:**
+```
+This week: 2/3 workouts done · 1/3 pre-stretches · 1/3 post-stretches · 4/7 bedtime
+[━━━━━━━━━━━━━━░░░░░░]  67% of training phases complete
+```
+
+**Data feeds into Daily Brief and coach_memory:** "User completed 4 of 12 training phases this week — workouts are consistent but stretch phases are being skipped" is exactly the kind of pattern the weekly Edge Function should be generating.
+
+---
+
+#### Step 15 — Food Water Content in Hydration Tab
+
+**File:** `src/app/life-hub/health/water/page.js`
+
+**New query:** Add to the existing data fetch:
+```javascript
+supabase.from('food_log_entries')
+  .select('name, water_g, date, meal_slot')
+  .eq('user_id', user.id)
+  .eq('date', todayEST)
+  .neq('meal_slot', 'drink') // drinks already counted in their own flow
+  .gt('water_g', 0)
+```
+
+**Compute:** `foodWaterOz = foodEntries.reduce((s, f) => s + (f.water_g * 0.0338), 0)`
+
+**Ring:** Add a 3rd arc segment to the hydration ring. Current: water blue + beverage purple. New: + food teal/green. Keep the goal progress bar counting only intentional water + drinks (not food water) — food water is a bonus display, not a target component.
+
+**Breakdown text below ring:**
+```
+💧 Water logged:     48 oz
+🥤 Beverages:        12 oz
+🥗 From food:         8 oz  (cucumber, oatmeal, apple, broccoli)
+──────────────────────────
+Total hydration:     68 oz / 80 oz goal
+```
+The "from food" line lists up to 3 food names that contributed the most water_g.
+
+**7-day chart:** Add food water as a stacked segment in each bar so the chart accurately represents total hydration over the week, not just logged water.
+
+---
+
+#### Step 16 — Photo Food Logging
+
+**New route:** `src/app/api/nutrition/ai-photo-log/route.js`
+
+```javascript
+export async function POST(req) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: profile } = await supabase.from('profiles').select('is_disabled').eq('id', user.id).single()
+  if (profile?.is_disabled) return NextResponse.json({ error: 'Account disabled' }, { status: 403 })
+
+  // Rate limit: 10/day
+  const { data: limitData } = await supabase.rpc('increment_rate_limit', {
+    p_user_id: user.id, p_route: 'ai-photo-log', p_limit: 10
+  })
+  if (limitData?.blocked) return NextResponse.json({ error: 'Daily photo limit reached (10/day)' }, { status: 429 })
+
+  const { imageBase64, mimeType = 'image/jpeg', userDescription } = await req.json()
+  if (!imageBase64) return NextResponse.json({ error: 'imageBase64 required' }, { status: 400 })
+
+  const systemPrompt = `You are analyzing a food photo to estimate nutritional content. 
+Be honest about confidence. Return valid JSON only — no prose outside the JSON.
+If user provided a description, use it to correct or refine your visual analysis.
+Never store or reference the image beyond this analysis.`
+
+  const userContent = [
+    {
+      type: 'image',
+      source: { type: 'base64', media_type: mimeType, data: imageBase64 }
+    },
+    {
+      type: 'text',
+      text: `Analyze this food photo. ${userDescription ? `User says: <user_input>${userDescription}</user_input>` : ''}
+      
+Return JSON:
+{
+  "status": "identified" | "low_confidence" | "needs_retake",
+  "confidence": "high" | "medium" | "low",
+  "confidence_note": "Plain English explanation of what you see and how certain you are",
+  "retake_reason": null or "Specific instruction for better photo",
+  "items": [
+    {
+      "name": "Food name",
+      "serving_size_label": "Estimated portion",
+      "calories": number,
+      "protein_g": number,
+      "carbs_g": number,
+      "fat_g": number
+    }
+  ]
+}
+
+Rules:
+- Break multi-item plates into separate items when clearly distinct
+- For unknown dishes: use visual cues (plate size, item count, sauce color) to estimate
+- If confidence is low, still return your best guess in items[] but set status to low_confidence
+- Only use needs_retake when the image quality prevents ANY meaningful analysis
+- Never guess wildly on a high-confidence claim — state uncertainty honestly`
+    }
+  ]
+
+  const message = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 600,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userContent }]
+  })
+
+  let result
+  try {
+    result = JSON.parse(message.content[0].text)
+  } catch {
+    return NextResponse.json({ error: 'Parse failed', raw: message.content[0].text }, { status: 500 })
+  }
+
+  return NextResponse.json(result)
+}
+```
+
+**AddFoodModal.js changes:**
+- Add 📷 Photo tab as 4th tab (after 🔍 Search Database)
+- Tab content: file input (`<input type="file" accept="image/*" capture="environment">`) + drag-drop zone for desktop
+- Client-side resize before upload: Canvas API, max 800px on longest dimension, output as JPEG base64
+- On upload: show preview + "Analyzing..." spinner while POST fires
+- On response: render confidence chip + Claude's note + pre-filled form fields (same pattern as AI fill → log-manual flow via sessionStorage)
+- "Help me guess better" text field: appears when confidence is medium/low; user types description; re-runs POST with same image + userDescription
+- "Retake" button: clears image, shows retake_reason as instruction text above the file input
+
+**What gets passed to log-manual via sessionStorage:**
+```json
+{
+  "source": "photo",
+  "items": [...],  // array of items from Claude
+  "confidence": "medium",
+  "confidence_note": "Looks like a chicken shawarma wrap...",
+  "isEstimate": true
+}
+```
+The log-manual page shows "📷 AI Photo Estimate — review before logging" banner at top when `source = 'photo'`.
+
+---
+
+### SECTION 3 — What Can Break: Risk Registry
+
+**Risk 1 — workout_session_overrides ignored on Day Hub**
+The check-in system can propose exercise swaps that write to `workout_session_overrides`. The current plan page reads these on mount and substitutes exercise names. If the Day Hub forgets to do the same, a user with an override will see the wrong exercise in Phase 2.
+*Fix:* Day Hub must query `workout_session_overrides WHERE date = today` on load and apply substitutions before rendering Phase 2 exercise list. Also show a chip: "⚡ Modified from check-in suggestion: Lunges → Leg Press (knee concern)".
+
+**Risk 2 — Stretching page direct navigation breaks after context param wiring**
+Once the Day Hub buttons pass `?context=pre_workout` to the stretching page and the page locks the session_type based on that param, a user who navigates directly to `/life-hub/workouts/stretching` without params still needs to see the full toggle. Must test both paths (with and without params) before retiring the stretching page.
+
+**Risk 3 — Exercise name string mismatches break PR lookup**
+PRs are queried by `exercise_name` string match against the library. If names differ by even a space or capitalization, PRs won't surface. Need to validate that `exercises` table names and `workout_log_sets.exercise_name` values match exactly. Consider adding `exercise_id` to `workout_log_sets` as a more robust FK join — but this is a larger schema change to defer unless mismatch issues surface.
+
+**Risk 4 — Photo log API cost spike**
+Vision calls with Sonnet cost significantly more than text calls. Rate limit is 10/day via `api_rate_limits`. Must ensure the rate limit check actually blocks at 10 — test this before deploying. Also confirm `imageBase64` is validated for reasonable size server-side (reject anything over 2MB after decoding) to prevent abuse.
+
+**Risk 5 — generate-plan prompt changes break existing plan JSONB reads**
+If the plan generation prompt starts producing `context_note` fields, existing code that reads the plan JSONB is fine (it just ignores unknown fields). But if the prompt changes the structure of the exercises array in any other way, existing plan page logic could break. Scope the prompt change narrowly — only add `context_note` to each exercise object, nothing else.
+
+**Risk 6 — History page performance with all-time data**
+Loading all workout_logs + stretch_logs to group by week could be slow. Implement cursor-based pagination from the start: first load = 8 most recent weeks, "Load 8 more weeks" button triggers next fetch. Do not try to load all-time data in one query.
+
+**Risk 7 — Bedtime stretch context collision**
+A user who does a stretch session late at night directly on the stretching page (without coming from Day Hub) will have `context = null` (or 'standalone'). The Day Hub's bedtime phase won't mark complete. This is acceptable behavior — if you didn't go through the bedtime flow, it doesn't count as a bedtime session. The user can also tap "Start Bedtime Stretches" even after doing stretches independently, which will navigate them to the flow and log a context-tagged session.
+
+**Risk 8 — DV% showing on zero values**
+If a food has `sodium_mg: 0` (logged but zero), showing "0mg · 0% DV" is noise. Only render the DV% component when `value > 0`. This needs to be enforced in every file that adds DV% display, not just one place.
+
+**Risk 9 — Coaching feedback read_at race condition**
+If a user opens the Day Hub on two devices simultaneously, both will see the "NEW" badge and both will fire the PATCH to set `coaching_feedback_read_at`. The second PATCH will overwrite the first with a slightly later timestamp — this is harmless. No locking needed.
+
+**Risk 10 — Monthly Wrap upgrade changes data source mid-history**
+When Monthly Wrap is upgraded to use `weekly_wraps.report_data` as its primary source, any months generated BEFORE that upgrade used raw table queries. The cached `ai_narrative` and `report_data` for those old months are already stored in `monthly_wraps` — so regenerating isn't needed. But the first month generated AFTER the upgrade will use a different data pipeline. This is fine as long as the report_data schema stays consistent (it does — both pipelines produce the same field names).
+
+---
+
+### SECTION 4 — Things Not Yet Discussed That Would Make This App Significantly Better
+
+These are ideas beyond everything discussed so far. Not specced yet — flagged for consideration.
+
+---
+
+**A. Workout Volume Tracking + Overload Alerts**
+
+Currently the app tracks sets and reps but doesn't compute total weekly volume (sets × reps × weight) per muscle group. Progressive overload requires that volume increases over time, but there's no signal when a user is stagnating (same weight/reps for 3+ weeks) or over-reaching (volume spike that precedes injury). A simple volume dashboard on the history page (or within the Exercise Library PR section) showing weekly volume per muscle group over the past 8 weeks as a sparkline would surface this. The coach_memory Edge Function should flag: "Bench press weight hasn't increased in 5 weeks — user may have stalled. Recommend deload or form check."
+
+**B. Meal Timing Intelligence**
+
+The app knows WHEN each food was logged (via `created_at`). It knows when the user works out (via `workout_logs.created_at`). It knows bedtime (`goals_profiles.bedtime`). It knows wake time (`goals_profiles.wake_time`). It currently does nothing with the relationship between meal timing and performance/recovery. Examples of what should be possible:
+- "You consistently eat your last meal within 90 minutes of sleep — your sleep scores average 8 points lower on those nights vs nights with a 2+ hour gap"
+- "On days you have a protein-heavy breakfast before 9am, your afternoon energy check-in averages 0.8 points higher"
+- "You worked out at 6pm today but didn't log any food in the 2-hour post-workout window — that's when muscle protein synthesis is highest"
+This is a coach_memory and Daily Brief feature — the data is already there, just not being connected.
+
+**C. Workout Plan Auto-Progression**
+
+The current plan is static — the same exercises at the same rep ranges every week until the user manually regenerates. Real programming has built-in progression: week 1 = 3×10, week 2 = 3×10 heavier, week 4 = deload. The app could implement a simple linear progression overlay without changing the plan structure: track `workout_log_sets` to detect when the user hits the top of their rep range for 2 consecutive sessions → surface a suggestion to increase weight by 5lbs. Not an automatic change — a chip that says "You've hit 10 reps at 185 twice — consider moving to 190 this week." This can live in the Day Hub Phase 2 card next to each exercise.
+
+**D. Nutrition Periodization (Eat Around Training)**
+
+The app knows which days are training days. A very common and effective nutrition strategy is to eat more calories on training days and fewer on rest days. The current TDEE target is the same every day. Adding a simple training-day / rest-day calorie split would make the nutrition guidance significantly more effective:
+- Training days: TDEE + 100–200 cal (mostly carbs, for fuel and recovery)
+- Rest days: TDEE - 100–200 cal (mostly protein-maintained, lower carbs)
+This could be a toggle in Goals Setup ("Use training-day/rest-day calorie cycling") with the math shown clearly. The nutrition page daily target would then update based on whether today is a planned training day.
+
+**E. Sleep Debt Tracking**
+
+The app has 7+ days of sleep data. It doesn't compute cumulative sleep debt — the gap between total actual sleep and total needed sleep over a rolling 7-day window. A user who sleeps 6h/night for 5 days has built 7.5 hours of sleep debt (assuming 7.5h target). This shows up as impaired performance and mood, but the user may not connect it to sleep. A simple sleep debt indicator on the Health page ("You have ~6h of sleep debt this week — it takes approximately 3 nights of full sleep to fully recover") would be educational and actionable. Feeds into Recovery Score and Daily Brief.
+
+**F. Hydration Timing Intelligence**
+
+The app now has per-entry logged_time on water logs. It computes the hydration timing chart (18 bars, 5am–11pm). It should extend this to note: (a) pre-workout hydration status — were you well-hydrated in the 2 hours before your workout? (b) morning hydration velocity — you lose ~500ml overnight breathing; how quickly do you replace it? (c) bedtime hydration — drinking large amounts within 2 hours of sleep disrupts sleep via nocturia. These are actionable patterns, not just bar chart data.
+
+**G. Goal Progress Velocity**
+
+The weight/measurement tracking is currently retrospective — it shows history. It should project forward: "At your current rate of change (−0.6 lbs/week average over 4 weeks), you'll reach your target of 180 lbs in approximately 11 weeks." This is motivating when on track and a gentle reality check when off track. If weight has stalled for 3+ weeks, a different message: "Weight has been flat for 3 weeks — this is common at this stage. Your options: reduce calories by 100–150, add 30 min of walking, or stay the course if you feel like you're building muscle (measurements can tell the story better than the scale right now)." Already have all the data; just not projecting from it.
+
+**H. Check-In Pattern Analysis**
+
+The check-in system collects energy + mood 1–5 twice daily. After 30+ days, there are patterns: worst energy day of week, time-of-month patterns, correlation with workout days/rest days, correlation with sleep scores. None of this is surfaced. A simple "Your Patterns" card on the Life Hub home page after 30+ days of check-in data: "Your Tuesday energy averages 2.1 — lowest day of the week. Your Friday energy averages 4.3 — highest. This pattern holds regardless of workout schedule." This is the kind of personal insight that makes the app feel like it actually knows you.
+
+**I. Food Logging Streak + Consistency Score**
+
+Study hub has a 30-question/day streak. Life Hub has no equivalent engagement mechanic. A food logging consistency score (percentage of days with ≥ 3 meal slots logged, rolling 7-day) on the Nutrition page would motivate the habit without being punitive. Not a streak (which breaks when you miss a day and feels bad) but a rolling average: "You've logged 6/7 days this week — that's your best consistency in a month." Feeds into coach_memory and Daily Brief framing.
+
+**J. Cross-Feature Correlation Cards**
+
+The app sits on top of an unusually complete personal dataset: sleep, workouts, nutrition, hydration, steps, HR, mood, energy, weight, supplements, stretches. No other app has all of this for one person. The unique value is surfacing correlations across these dimensions that the user would never notice themselves. A "Patterns Discovered" section on the Life Hub home or Overview page — max 2 cards, rotated weekly by the coach_memory Edge Function — showing things like:
+- "On days you hit 8k+ steps, your dinner logged calories are 340 lower on average — you naturally eat less when you're more active."
+- "Your sleep scores are 14 points higher when you log 80g+ protein. This may be related to tryptophan availability for serotonin/melatonin production."
+- "Your highest energy check-ins all occur within 36 hours of a strength workout — your energy pattern is training-response, not sleep-response."
+These are real discoveries from real data. This is the feature that would make a user show this app to everyone they know.
+
+---
+
+### SECTION 5 — Master DB Change Tracker for All Planned Work
+
+| Column/Table | Change | Required By | Migration Timing |
+|---|---|---|---|
+| `stretch_logs.context` | ADD TEXT | Day Hub phase completion | Step 1 — before any Day Hub work |
+| `workout_logs.coaching_feedback_read_at` | ADD TIMESTAMPTZ | Day Hub unread badge | Step 1 — before Day Hub Step 8 |
+| `workout_log_sets.exercise_id` | Possible future ADD | PR robustness | Deferred — only if name mismatch becomes a problem |
+| `push_subscriptions` | NEW TABLE | Phase M (push notifications) | Phase M — separate build |
+| `push_notification_log` | NEW TABLE | Phase M | Phase M |
+
+All other planned features use existing tables and columns. No schema changes beyond what's listed above are required for Steps 2–20.
+
+---
+
+### SECTION 6 — CLAUDE.md Updates Required When Each Step Ships
+
+These are directory structure and feature description updates that must happen in the same commit as each step:
+
+- **Step 2** (dates on plan page): update workout/page.js description to mention date display + Day Hub navigation
+- **Step 4** (Day Hub): add `day/[dayIndex]/page.js` to directory structure under `life-hub/workouts/`
+- **Step 12** (retire stretching page): remove `stretching/page.js` from directory structure; rename `stretching/library/page.js` → `stretches/page.js`
+- **Step 13** (sidebar): update `LifeHubSidebar.js` description to reflect 4-item Workouts dropdown
+- **Step 16** (photo log): add `ai-photo-log/route.js` to directory structure under `api/nutrition/`
+- **Every step**: update relevant page and route descriptions when behavior changes
+
