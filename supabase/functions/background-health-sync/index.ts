@@ -20,7 +20,7 @@ async function syncUser(supabase: any, userId: string, tokenRow: any): Promise<v
   if (!accessToken) throw new Error('Token refresh failed')
 
   const since = tokenRow.last_synced_at
-    ? new Date(new Date(tokenRow.last_synced_at).getTime() - 3600000).toISOString()
+    ? new Date(new Date(tokenRow.last_synced_at).getTime() - 86400000).toISOString()
     : new Date(Date.now() - 30 * 86400000).toISOString()
 
   const [stepsPoints, heartPoints, sleepPoints, restingHRPoints, hrvPoints] = await Promise.all([
