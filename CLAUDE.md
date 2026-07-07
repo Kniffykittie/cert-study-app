@@ -290,6 +290,9 @@ src/
   supabase/
     functions/
       generate-coach-memory/index.ts   Deno Edge Function — runs weekly (Sunday 9pm EST via pg_cron); aggregates 90 days of data per user across 9 tables; one Haiku call returns 5–10 observations; upserts with confidence bumping + stale deactivation
+      background-health-sync/
+        index.ts                         Deno Edge Function — runs every 2 hours via pg_cron (schedule ID 2); queries all google_health_tokens; processes users sequentially; full 5-data-type sync (steps/HR/sleep/resting-HR/HRV) identical to POST /api/health/sync; verify_jwt: false
+        googleHealth.ts                  Deno port of src/lib/googleHealth.js — same 6 exports; Deno.env.get() instead of process.env
     InfoChip.js                        Reusable ℹ️ education chip — grey pill, orange when active, toggles inline callout; props: text, label (default "ℹ️"), style; used at 11 touchpoints across 8 pages for domain-knowledge data points
     BookmarkModal.js                   Bookmark reason + notes modal
     DailyStreak.js                     30q/day streak tracker with 28-day calendar heatmap

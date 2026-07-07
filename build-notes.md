@@ -722,16 +722,166 @@ On page load, fetch yesterday and day-before-yesterday's entries (2 extra API ca
 
 ---
 
+---
+
+#### Phase O — Evening Brief + daily_briefs Migration 📋
+
+**Why before Phase M:** Phase M-B wires push sends into brief generators. Evening brief must exist first. The `daily_briefs` table migration must happen before anything reads the `window` column.
+
+**DB migration (breaking — do carefully):**
+```sql
+-- Step 1: add column with default (safe — no constraint yet)
+ALTER TABLE daily_briefs ADD COLUMN window TEXT DEFAULT 'morning';
+-- Step 2: backfill all existing rows
+UPDATE daily_briefs SET window = 'morning';
+-- Step 3: drop old unique constraint
+ALTER TABLE daily_briefs DROP CONSTRAINT daily_briefs_user_id_date_key;
+-- Step 4: add new unique constraint
+ALTER TABLE daily_briefs ADD CONSTRAINT daily_briefs_user_id_date_window_key UNIQUE (user_id, date, window);
+-- Step 5: add check constraint
+ALTER TABLE daily_briefs ADD CONSTRAINT daily_briefs_window_check CHECK (window IN ('morning', 'afternoon', 'evening'));
+```
+Do all 5 steps in one migration — if you split them, step 4 could fail if step 2 didn't run.
+
+**What to build:**
+1. **`daily-brief/route.js` changes:**
+   - GET: add `?window=` param (default `'morning'`), include it in the `.eq('window', window)` query
+   - POST: accept `window` in request body (default `'morning'`), include in upsert with new `onConflict: 'user_id,date,window'`
+   - All existing morning logic stays identical — just add the `window` field throughout
+2. **Evening brief content** (new POST with `window: 'evening'`):
+   - Queries: today's full food log totals, today's workout (if done), today's steps + water, today's check-in mood/energy, today's stretch log, today's sleep context if available
+   - Tone: retrospective — "here's how today actually went, one thing for tomorrow"
+   - System prompt differs from morning: past-tense framing, forward-looking close ("tomorrow, focus on X")
+   - Max tokens: 200 (slightly shorter than morning — bedtime, keep it concise)
+3. **Afternoon brief:** don't rebuild — the existing `checkin/insight/route.js` already generates a 2-sentence insight on check-in. Just add a step to upsert that text into `daily_briefs` with `window: 'afternoon'` after generating. No new AI call.
+4. **`life-hub/page.js`** — Morning brief fetch adds `?window=morning` param
+5. **Life Hub page: Evening brief display** — add a second brief card below the morning one for evening window. Only shows after ~6pm (client-side time check). If no evening brief yet, show "Evening summary generates at 9pm" placeholder.
+
+**Watch out for:**
+1. **Constraint name matters** — the old constraint `daily_briefs_user_id_date_key` must match exactly. If it was named differently at table creation, the DROP will fail. Check `\d daily_briefs` first or use `IF EXISTS`.
+2. **GET route must default to morning** — all existing callers pass no window param. They must keep getting the morning brief without changes.
+3. **Rate limiting** — evening brief is a new AI call. Add it to the rate limit key: `'life-hub/daily-brief-evening'`, cap at 1/day.
+4. **Evening brief data is today not yesterday** — morning brief looks at yesterday's food/workout. Evening brief looks at TODAY's data. Query `date = today` not `date = yesterday`.
+5. **`is_disabled` check** — same pattern as morning brief, must be present.
+
+---
+
+#### Phase L — Weekly Wrap Page 📋
+
+**Why now:** Fully specced, independent. Build before Phase M so M-B can wire the push send into it.
+
+**What to build:**
+1. DB: `weekly_wraps` table — `user_id`, `week_start DATE` (always Monday), `report_data JSONB`, `ai_narrative TEXT`, `created_at`; UNIQUE on `(user_id, week_start)`; RLS user-scoped.
+2. `GET /api/life-hub/weekly-wrap` — no param → returns list of all `week_start` dates for sidebar. `?week=YYYY-MM-DD` → returns single wrap.
+3. `POST /api/life-hub/weekly-wrap` — body: `{ week: 'YYYY-MM-DD' }`. Validates week is a Monday and is in the past (not current week — 400 if so). Gathers 7 days of data from 8 tables. Calls Sonnet. Caches forever (never regenerates same week). Claude prompt **must** include "Next Week" section as final required paragraph.
+4. `/life-hub/weekly-wrap/page.js` — week picker (← → chips), stat grid (workouts/avg energy/avg mood/avg calories/avg water/weight delta), AI narrative card with "Next Week" section highlighted, history sidebar of past weeks.
+5. `LifeHubSidebar.js` — add "Weekly Wrap" under Overview group alongside "Monthly Wrap".
+
+**Watch out for:**
+1. **Week start = Monday always.** Helper: `const d = new Date(date); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().split('T')[0]`
+2. **Block current week** — API returns 400, UI hides Generate button, shows "Week in progress — check back [next Monday's date]".
+3. **"Next Week" section is required** — add to system prompt: "Your response MUST end with a paragraph starting with 'Next week:' containing exactly one actionable observation tied to this week's data patterns."
+4. **pg_cron auto-generation (Sunday night)** — that's Phase M's job. For now, manual Generate button only.
+
+---
+
 #### Phase M — Push Notifications + Three-Brief System 📋
 
-**Why last:** Complex infrastructure. pg_cron + Edge Functions + VAPID keys + service worker changes. Build after everything else is stable. Follow the 7-step build order documented in the Push Notifications spec above exactly — don't skip steps.
+**Build order within M: M-A → M-B → M-C**
 
-**Key things that are NOT in the spec above that need to be done:**
-1. `daily_briefs` table needs a `window` column added: `alter table daily_briefs add column window text default 'morning' check (window in ('morning', 'afternoon', 'evening'));` — and the UNIQUE constraint changes from `(user_id, date)` to `(user_id, date, window)`. This is a breaking migration — need to handle existing rows (set `window = 'morning'` for all existing rows before adding the constraint).
-2. `goals_profiles.wake_time` and `goals_profiles.bedtime` added in Phase G — confirm they exist before building this phase.
-3. The service worker (`public/sw.js`) already exists for PWA. Add push handler to it — don't replace the file, append to it.
-4. VAPID keys must be generated on your local machine (`npx web-push generate-vapid-keys`), saved to a password manager, and added to BOTH Vercel env vars AND Supabase Edge Function secrets before any code is deployed.
-5. The Edge Function is TypeScript/Deno, not Node.js. Import style is different: `import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'`. Don't try to import from `@/lib/` — those are Next.js paths and don't exist in the Supabase Edge Function runtime.
+##### M-A: Infrastructure
+
+1. **VAPID keys** — generate ONCE locally: `npx web-push generate-vapid-keys`. Store both in password manager. Add `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` to Vercel env vars AND Supabase Edge Function secrets. Never regenerate — changing keys invalidates all subscriptions.
+
+2. **DB migrations:**
+```sql
+-- push_subscriptions
+CREATE TABLE push_subscriptions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  endpoint TEXT NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, endpoint)
+);
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "user_own" ON push_subscriptions USING (user_id = auth.uid());
+
+-- push_notification_log
+CREATE TABLE push_notification_log (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  type TEXT NOT NULL,
+  sent_at TIMESTAMPTZ DEFAULT now(),
+  delivered BOOLEAN DEFAULT true
+);
+ALTER TABLE push_notification_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "user_own" ON push_notification_log USING (user_id = auth.uid());
+```
+
+3. **`public/sw.js`** — check if file exists. If it does, APPEND push handlers (don't replace). If not, create. Add:
+```js
+self.addEventListener('push', event => {
+  const data = event.data?.json() ?? {}
+  event.waitUntil(self.registration.showNotification(data.title ?? 'Life Hub', {
+    body: data.body ?? '', icon: '/icon-192.png',
+    data: { url: data.url ?? '/life-hub' },
+  }))
+})
+self.addEventListener('notificationclick', event => {
+  event.notification.close()
+  event.waitUntil(clients.openWindow(event.notification.data.url))
+})
+```
+
+4. **API routes:**
+   - `POST /api/push/subscribe` — saves PushSubscription to `push_subscriptions`; upsert on `(user_id, endpoint)`
+   - `DELETE /api/push/subscribe` — removes by endpoint
+
+5. **Settings UI** — "🔔 Notifications" section with toggle. On enable: `Notification.requestPermission()` → on 'granted': `registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(NEXT_PUBLIC_VAPID_PUBLIC_KEY) })` → POST to `/api/push/subscribe`. On disable: DELETE. Show current permission state.
+
+6. **`src/lib/webPush.js`** — shared sender utility for Next.js routes:
+```js
+import webpush from 'web-push'
+webpush.setVapidDetails('mailto:...', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
+export async function sendPush(subscription, payload) { ... }
+```
+For Edge Functions (Deno), use `https://esm.sh/web-push`.
+
+**Watch out for M-A:**
+- `applicationServerKey` must be `Uint8Array` (base64url decoded) not a plain string. Client needs `urlBase64ToUint8Array()` helper.
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY` is the ONLY key that goes in `NEXT_PUBLIC_` env — the private key must NEVER be public.
+- Handle `410 Gone` from push service — subscription expired, delete the row.
+- iOS Safari: only works if installed as PWA (Add to Home Screen). Regular Safari visits can't receive push. Document this clearly in the Settings UI.
+- Multiple devices: one user → multiple subscription rows (one per browser/device). Loop all when sending.
+
+##### M-B: Wire Push into Brief/Wrap Generators
+
+After each generator caches its result, add a push send step:
+- Morning brief pg_cron Edge Function → "☀️ Your morning brief is ready"
+- Evening brief pg_cron Edge Function → "🌙 Your evening summary is ready"
+- Afternoon check-in insight route → "🌤️ Your afternoon insight is ready" (only send if user is NOT currently in the app — check `last_seen_at` or skip entirely since they triggered it themselves)
+- Weekly Wrap pg_cron → "📊 Your weekly wrap is ready"
+- Monthly Wrap pg_cron → "📅 Your monthly wrap is ready"
+
+For the morning/evening Edge Functions: query `push_subscriptions` for the user, send via web-push, log to `push_notification_log`.
+
+##### M-C: Nudge Edge Function
+
+New Edge Function: `background-nudge-check/index.ts`
+
+Three pg_cron entries (UTC times for EST targets):
+- `0 19 * * *` (2pm EST) — food nudge: if `food_log_entries` count for today = 0, send "🍽️ Haven't logged food yet today"
+- `0 1 * * *` (8pm EST) — check-in nudge: if no `daily_checkins` row for today, send "How's your energy today? Tap to check in"
+- `0 2 * * *` (9pm EST) — water nudge: if today's water_logs sum < 50% of `water_goal_oz`, send "💧 You're at X oz — try to hit your goal before bed"
+
+Before each send: query `push_notification_log WHERE user_id = X AND type LIKE 'nudge_%' AND sent_at > today midnight` — if count >= 2, skip. Max 2 nudges/day.
+
+**Watch out for M-C:**
+- pg_cron runs UTC — be precise with cron expressions. EST = UTC-5 (winter) or UTC-4 (summer/DST). Using fixed UTC times means nudges shift by 1 hour during DST transitions. Acceptable for now.
+- The 2/day cap means water nudge (last to run) gets suppressed if food + check-in both fired. That's correct behavior.
+- Query `water_goal_oz` from `goals_profiles` — if null, default to 64 oz.
 
 ---
 
@@ -2146,6 +2296,14 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase N — Background Health Sync Edge Function — Complete
+
+- `supabase/functions/background-health-sync/googleHealth.ts` (new): Deno/TypeScript port of `src/lib/googleHealth.js`; `process.env.X` → `Deno.env.get('X')!`; all 6 exports preserved (`estDateStr`, `getEstHour`, `refreshTokenIfNeeded`, `fetchDataType`, `computeSleepMetrics`, `computeSleepScore`)
+- `supabase/functions/background-health-sync/index.ts` (new): service-role Supabase client; queries all `google_health_tokens` rows; processes users **sequentially** with per-user try/catch (isolates failures); full sync logic ported from `POST /api/health/sync/route.js` (steps, intraday HR, 5-min HR, resting HR, HRV, sleep); updates `last_synced_at` after each successful user; returns `{ ok, synced, failed, errors, ts }`
+- Deployed to Supabase Edge Functions with `verify_jwt: false` (required for pg_cron — no JWT available)
+- pg_cron job added: `cron.schedule('background-health-sync', '0 */2 * * *', ...)` — runs every 2 hours; uses `net.http_post` to call Edge Function URL; schedule ID 2
+- **Reminder:** `GOOGLE_HEALTH_CLIENT_ID` and `GOOGLE_HEALTH_CLIENT_SECRET` must be added to Supabase Edge Function secrets (separate from Vercel env vars) for the sync to work
 
 ### Phase 80 — Item 22: ℹ️ InfoChip Touchpoints — Complete
 
