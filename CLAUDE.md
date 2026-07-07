@@ -201,7 +201,7 @@ src/
         stretch-log/route.js           GET ?date= today's stretch logs; POST log session (stretch_ids, session_type, duration_seconds); uses getUser()
         generate-plan/route.js         AI workout plan generator; uses getUser() + is_disabled check; prompt injection protected on limitations + dumbbell_note fields
         exercise-chat/route.js         POST — mid-workout trainer chatbot (Haiku); exercise context in system prompt; user message wrapped in user_input tags; uses getUser() + is_disabled check
-        coaching-response/route.js     POST — post-workout AI coaching (Haiku); rate-limited 1/day (key: coaching-response-YYYY-MM-DD); accepts workout stats + nutrition/hydration/HR context; user note wrapped in user_input tags; caveat injected when data_completeness_pct < 60; uses getUser() + is_disabled check
+        coaching-response/route.js     POST — post-workout AI coaching (Haiku); rate-limited 1/day (key: coaching-response-YYYY-MM-DD); accepts workout stats + nutrition/hydration/HR context; user note wrapped in user_input tags; caveat injected when data_completeness_pct < 60; injects coachMemoryContext; uses getUser() + is_disabled check
       life-hub/
         daily-brief/route.js           GET returns cached brief for today; POST gathers 10+ tables, calls Claude, caches; uses getUser() + is_disabled check
         monthly-wrap/route.js          GET cached wrap for ?month=YYYY-MM; POST generates (6-table gather + Claude narrative), caches forever; uses getUser() + is_disabled check
@@ -281,6 +281,11 @@ src/
     StudyHubSidebar.js                 Nav sidebar with test-in-progress guard
     LifeHubSidebar.js                  Life Hub nav — section color system (overview=purple, health=green, nutrition=orange, workouts=blue, goals=teal); Overview section (Dashboard + Monthly Wrap), Goals dropdown (Overview + Measurements + Setup), Health dropdown (Overview + Step Tracker + Heart Rate + Sleep Tracker), Nutrition dropdown (Food Log + Meal Plan + Encyclopedia + Hydration + Supplements), Workouts dropdown (My Plan + History + Exercise Library + Stretching & Mobility + Stretch Library); Hydration and Supplements live under Nutrition group; auto-opens on active routes; SECTION_COLORS constant defines all section accent colors
     LifeHubClientShell.js              Thin 'use client' wrapper; dynamically imports DailyLogReview (SSR disabled); mounted in life-hub/layout.js
+  lib/
+    coachMemory.js                     `getCoachMemoryContext(supabase, userId)` — fetches top 8 active coach_memory rows ordered by confidence; returns formatted block or '' when empty; imported by daily-brief, coaching-response, exercise-chat, meal-insight routes
+  supabase/
+    functions/
+      generate-coach-memory/index.ts   Deno Edge Function — runs weekly (Sunday 9pm EST via pg_cron); aggregates 90 days of data per user across 9 tables; one Haiku call returns 5–10 observations; upserts with confidence bumping + stale deactivation
     BookmarkModal.js                   Bookmark reason + notes modal
     DailyStreak.js                     30q/day streak tracker with 28-day calendar heatmap
     DomainTrend.js                     Per-domain score trend SVG chart (no library)
@@ -344,6 +349,7 @@ src/
 | `progress_photos` | User progress photo gallery — storage_path TEXT (Supabase Storage key), taken_date DATE, note TEXT; private bucket `progress-photos`; signed URLs (1hr expiry); magic byte validation (JPEG/PNG/WebP) on upload; RLS user-scoped |
 | `monthly_wraps` | Cached monthly AI wrap-up — month TEXT (YYYY-MM), report_data JSONB (aggregated stats), ai_narrative TEXT; generated once per month, never regenerates; UNIQUE on user_id+month; RLS user-scoped |
 | `tdee_suggestions` | TDEE calibration queue — suggested_tdee, current_tdee, implied_tdee, avg_calories_logged, weight_change_lbs, data_days, reason, status (pending/accepted/dismissed); RLS user-scoped |
+| `coach_memory` | Persistent AI observations about the user — category (nutrition/sleep/workout/physical/lifestyle/goal_progress), observation TEXT, confidence SMALLINT (1–5), data_points INT, first_seen_at, last_confirmed_at, is_active BOOLEAN; RLS: SELECT own rows; INSERT/UPDATE service-role only (Edge Function); populated weekly by `generate-coach-memory` Edge Function |
 
 ---
 

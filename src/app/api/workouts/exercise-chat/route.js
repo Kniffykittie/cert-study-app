@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { getCoachMemoryContext } from '@/lib/coachMemory'
 
 const client = new Anthropic()
 
@@ -29,7 +30,10 @@ export async function POST(req) {
     ? `\nUser profile: Experience — ${workoutProfile.experience || 'not specified'}. Goal — ${workoutProfile.goal || 'not specified'}.${workoutProfile.limitations ? ` Limitations/injuries — ${workoutProfile.limitations}.` : ''}`
     : ''
 
+  const coachMemoryContext = await getCoachMemoryContext(supabase, user.id)
+
   const systemPrompt = `You are a knowledgeable personal trainer coaching someone mid-workout. They are asking about a specific exercise they are currently doing.${userContext}
+${coachMemoryContext ? `\n${coachMemoryContext}\n` : ''}
 
 Exercise: ${exercise.name}
 Equipment: ${exercise.equipment || 'bodyweight'}

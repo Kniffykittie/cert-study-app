@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { getCoachMemoryContext } from '@/lib/coachMemory'
 
 const anthropic = new Anthropic()
 
@@ -25,7 +26,10 @@ export async function POST(req) {
     ? `Note: these entries were logged ${backfill_minutes_max}+ minutes after eating (catch-up logging).`
     : ''
 
+  const coachMemoryContext = await getCoachMemoryContext(supabase, user.id)
+
   const prompt = `You are a concise nutrition coach. The user just finished logging a batch of food.
+${coachMemoryContext ? `\n${coachMemoryContext}\n` : ''}
 
 Current time: ${current_time}
 Slots logged this session: ${slots_touched.join(', ')}

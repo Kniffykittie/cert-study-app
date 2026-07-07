@@ -378,7 +378,7 @@ A floating action button (purple circle, `+` icon) fixed at bottom-right of the 
 
 ---
 
-#### Phase F — Item 17: Persistent Coach Memory 💬→📋
+#### Phase F — Item 17: Persistent Coach Memory ✅ Built (Phase 75)
 
 **Why now:** This is the foundation of the intelligence layer. Items 18 and Feature B both inject coach_memory. Must be built before them.
 
@@ -2145,6 +2145,13 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase 75 — Item 17: Persistent Coach Memory — Complete
+
+- DB: `coach_memory` table — `user_id`, `category` (nutrition/sleep/workout/physical/lifestyle/goal_progress), `observation`, `confidence` (1–5), `data_points`, `first_seen_at`, `last_confirmed_at`, `is_active`; RLS: SELECT for own rows only; INSERT/UPDATE service-role only (Edge Function)
+- `supabase/functions/generate-coach-memory/index.ts` (new): Deno Edge Function; fetches 90 days of data across 9 tables per user (food_log_entries, daily_checkins, workout_logs, health_sleep_sessions, body_measurements, supplement_stack, stretch_logs, water_logs, goals_profiles); aggregates key stats; one Haiku call with balance instruction (for every negative pattern, find a positive formula); upserts: matching category+prefix → bump confidence+data_points; new → insert; stale (>60 days) → mark is_active=false
+- `src/lib/coachMemory.js` (new): `getCoachMemoryContext(supabase, userId)` — fetches top 8 active observations ordered by confidence; returns formatted block or empty string (no overhead when table is empty)
+- Injected `getCoachMemoryContext` into 5 routes: `daily-brief/route.js`, `workouts/coaching-response/route.js`, `workouts/exercise-chat/route.js`, `nutrition/meal-insight/route.js` (Phase G's `checkin/insight` will be injected when built)
 
 ### Phase 74 — Feature 15: Workout Logger UX Improvements — Complete
 

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { getCoachMemoryContext } from '@/lib/coachMemory'
 
 const anthropic = new Anthropic()
 
@@ -49,8 +50,10 @@ export async function POST(req) {
     : 'not available'
 
   const safeNote = user_note ? `<user_input>${user_note}</user_input>` : null
+  const coachMemoryContext = await getCoachMemoryContext(supabase, user.id)
 
   const prompt = `You are a personal trainer giving a brief post-workout coaching response. Be specific, warm, and direct. Reference the actual numbers — don't be generic.
+${coachMemoryContext ? `\n${coachMemoryContext}\n` : ''}
 
 ${nutritionCaveat}
 

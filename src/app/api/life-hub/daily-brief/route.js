@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { calcTDEE } from '@/lib/tdee'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { getCoachMemoryContext } from '@/lib/coachMemory'
 
 const client = new Anthropic()
 
@@ -290,7 +291,10 @@ export async function POST(req) {
     return `WORK SCHEDULE: ${summary}. Today (${todayKey}) is a ${SCHED_LABELS[todayType] || todayType}. Factor this when interpreting step counts (active_work steps are occupational, not fitness-driven), HR elevation, and energy context.`
   })()
 
+  const coachMemoryContext = await getCoachMemoryContext(supabase, user.id)
+
   const personalContext = [
+    coachMemoryContext || null,
     motivations.length ? `USER MOTIVATIONS (use to frame tone — don't recite verbatim): ${motivations.join(', ')}` : null,
     obstacles.length ? `KNOWN OBSTACLES: <user_input>${obstacles.join(', ')}</user_input> — acknowledge relevant ones if they're showing up in the data (e.g. time constraint + short workout = still a win)` : null,
     whyText ? `WHY THEY WANT THIS: <user_input>${whyText}</user_input> — reference only if it genuinely connects to what happened today` : null,
