@@ -225,6 +225,9 @@ function GoalsSetupPageInner() {
   const [dietaryPreferencesOther, setDietaryPreferencesOther] = useState('')
   const [sleepHours, setSleepHours] = useState('')
   const [weeklySchedule, setWeeklySchedule] = useState({ mon: 'desk_work', tue: 'desk_work', wed: 'desk_work', thu: 'desk_work', fri: 'desk_work', sat: 'day_off', sun: 'day_off' })
+  // Step 1 sleep schedule
+  const [wakeTime, setWakeTime] = useState('07:00')
+  const [bedtime, setBedtime] = useState('23:00')
 
   useEffect(() => {
     async function checkExisting() {
@@ -257,6 +260,8 @@ function GoalsSetupPageInner() {
         if (data.dietary_preferences_other) setDietaryPreferencesOther(data.dietary_preferences_other)
         if (data.sleep_hours) setSleepHours(String(data.sleep_hours))
         if (data.weekly_schedule) setWeeklySchedule(data.weekly_schedule)
+        if (data.wake_time) setWakeTime(data.wake_time)
+        if (data.bedtime) setBedtime(data.bedtime)
       }
     }
     checkExisting()
@@ -350,6 +355,8 @@ function GoalsSetupPageInner() {
       dietary_preferences_other: dietaryPreferencesOther.trim() || null,
       sleep_hours: sleepHours ? parseFloat(sleepHours) : null,
       weekly_schedule: weeklySchedule,
+      wake_time: wakeTime || '07:00',
+      bedtime: bedtime || '23:00',
       updated_at: new Date().toISOString(),
     }
   }
@@ -501,6 +508,22 @@ function GoalsSetupPageInner() {
                       </button>
                     )
                   })}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '8px' }}>SLEEP SCHEDULE <span style={{ fontWeight: '400' }}>(used for morning/afternoon check-in timing)</span></label>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Wake up</span>
+                    <input type="time" value={wakeTime} onChange={e => setWakeTime(e.target.value)}
+                      style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Bedtime</span>
+                    <input type="time" value={bedtime} onChange={e => setBedtime(e.target.value)}
+                      style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} />
+                  </div>
                 </div>
               </div>
 

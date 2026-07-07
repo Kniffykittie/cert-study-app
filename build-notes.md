@@ -106,13 +106,13 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `health_heart_rate_5min` | Per-5-minute HR — avg/min/max_bpm; minute_bucket 0–1435; UNIQUE on user_id+date+minute_bucket; RLS enabled |
 | `health_sleep_sessions` | Sleep sessions — stages JSONB, timeline JSONB, is_nap; quality columns: onset_minutes, efficiency_pct, awake_count, longest_stretch_min, restlessness TEXT, sleep_score SMALLINT; keyed by Google session_id |
 | `manual_steps_daily` | Manual step count per user per day — user_id, date, steps; fallback when Google Health not connected |
-| `daily_checkins` | Energy (1–5), mood (1–5), sleep_hours NUMERIC, note per day; UNIQUE on user_id+date; RLS enabled |
+| `daily_checkins` | Energy (1–5), mood (1–5), sleep_hours NUMERIC, note per day; afternoon_energy, afternoon_mood, afternoon_note (Phase 76); UNIQUE on user_id+date; RLS enabled |
 | `water_logs` | Plain water intake — user_id, date, amount_oz NUMERIC; one row per tap; RLS enabled |
 
 ### Goals & Body
 | Table | Purpose |
 |-------|---------|
-| `goals_profiles` | Full health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, job_activity, exercise_types, exercise_days_per_week, exercise_duration_min, exercise_consistency, activity_level, activity_level_note, daily_steps, target_weight_lbs, timeline, notes, ai_overview, biggest_obstacles TEXT[], primary_motivations TEXT[], why_goals, dietary_preferences TEXT[], sleep_hours, water_goal_oz, custom_tdee INT; UNIQUE on user_id |
+| `goals_profiles` | Full health goals profile — goals TEXT[], height_inches, weight_lbs, age, sex, body_composition, job_activity, exercise_types, exercise_days_per_week, exercise_duration_min, exercise_consistency, activity_level, activity_level_note, daily_steps, target_weight_lbs, timeline, notes, ai_overview, biggest_obstacles TEXT[], primary_motivations TEXT[], why_goals, dietary_preferences TEXT[], sleep_hours, water_goal_oz, custom_tdee INT, weekly_schedule JSONB, wake_time TIME, bedtime TIME (Phase 76); UNIQUE on user_id |
 | `body_measurements` | Dated measurements — weight_lbs, waist_in, hips_in, chest_in, left/right arm/thigh, neck_in; UNIQUE on user_id+date; RLS enabled |
 | `progress_photos` | Progress photos — storage_path TEXT, taken_date DATE, note TEXT; private bucket `progress-photos`; signed URLs (1hr); magic byte validation on upload; RLS enabled |
 | `tdee_suggestions` | TDEE calibration queue — suggested_tdee, current_tdee, implied_tdee, avg_calories_logged, weight_change_lbs, data_days, reason, status (pending/accepted/dismissed); RLS enabled |
@@ -442,7 +442,7 @@ export async function getCoachMemoryContext(supabase, userId) {
 
 ---
 
-#### Phase G — Item 18 + Feature B: Real-Time Check-In Intelligence 💬→📋
+#### Phase G — Item 18 + Feature B: Real-Time Check-In Intelligence ✅ Built (Phase 76)
 
 **Why now:** Depends on Phase F (coach_memory). Build together — Feature B (the check-in UI) and Item 18 (what the check-in response does with today's plan) are the same feature from two angles.
 
@@ -2145,6 +2145,14 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase 76 — Item 18 + Feature B: Real-Time Check-In Intelligence — Complete
+
+- DB: `afternoon_energy`, `afternoon_mood`, `afternoon_note` columns added to `daily_checkins`; `wake_time` TIME, `bedtime` TIME columns added to `goals_profiles`
+- `src/app/api/checkin/insight/route.js` (new): POST, Haiku, rate-limited 2/day (`checkin-insight-YYYY-MM-DD`); saves check-in to `daily_checkins` (morning or afternoon fields); `SORE_CONFLICT_MAP` checks today's planned exercises for conflicts with sore spots; `coach_memory_context` received from client (context snapshot — NOT re-fetched); user note wrapped in `<user_input>` tags; returns `{ insight: "2 sentences", proposed_actions: [{ type, from_exercise, to_exercise, reason }] }`
+- `src/components/CheckInSheet.js` (new): bottom-sheet with morning (#f59e0b) and afternoon (#a78bfa) accent colors; energy 1–5 + mood 1–5 raters with emoji/label chips; note textarea; `extractSoreSpots(note)` keyword matcher; on save: 8 parallel Supabase queries assemble context (sleep, yesterday workout, food, water, steps, active plan, 7-day energy history, coach memory); calls `/api/checkin/insight`; shows AI insight for 5s then auto-closes; calls `onInsight(proposed_actions, sore_spots)` callback
+- `src/components/LifeHubClientShell.js` updated: fetches `goals_profiles.wake_time` on mount; morning window = within 60min of wake_time (default 7am); afternoon window = wake_time + 7 hours; 30s delay before showing; `hasShownRef` (ref not state — persists across Life Hub navigation); localStorage gate keys `checkin_morning_YYYY-MM-DD` / `checkin_afternoon_YYYY-MM-DD`; dynamically imports CheckInSheet
+- `src/app/life-hub/goals/setup/page.js` Step 1: added Wake up + Bedtime `<input type="time">` fields; defaults 07:00/23:00; loaded from profile + saved with upsert
 
 ### Phase 75 — Item 17: Persistent Coach Memory — Complete
 
