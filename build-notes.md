@@ -605,7 +605,7 @@ Add `why` field to all 38 stretches in `stretches.js` in the same commit.
 
 ---
 
-#### Phase J — Item 21: Micronutrient Daily Awareness 💬→📋
+#### Phase J — Item 21: Micronutrient Daily Awareness ✅ Built (Phase 79)
 
 **Why now:** Independent — no dependency on the intelligence layer. Can be built alongside Phase I.
 
@@ -2146,6 +2146,10 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase 79 — Item 21: Micronutrient Daily Awareness — Complete
+
+- `src/app/life-hub/nutrition/page.js` — added `prevDaysEntries` state (yesterday + day-before entries); load() fetches a 3rd day (`/api/nutrition/log?date=dayBefore`) in parallel; new inline callout block renders between TDEE card and Food Log tab — only when `activeTab === 'log'`, there are entries, and `!viewingDate`; evaluates 10 tracked micros (sodium, vitamin D, iron, omega-3, magnesium, calcium, potassium, vitamin C, zinc, fiber); three trigger types: over 150% DV (red, priority 1), under 20% DV after 3pm (orange, priority 2), absent 3+ consecutive days (purple, priority 3); shows highest-priority 2–3 callouts max; DVs pulled from `calcMicroTargets(age, sex)` with hardcoded fallbacks; no AI call — all copy is static and hardcoded per nutrient; card hidden entirely when no callouts fire
 
 ### Phase 78 — Item 20: Stretch System Overhaul — Complete
 

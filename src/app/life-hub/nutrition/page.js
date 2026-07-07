@@ -98,6 +98,7 @@ function NutritionPageInner() {
   const [insightToast, setInsightToast] = useState(null)
   const [insightLoading, setInsightLoading] = useState(false)
   const [viewingDate, setViewingDate] = useState(null) // null = today
+  const [prevDaysEntries, setPrevDaysEntries] = useState([[], []]) // [yesterday, dayBefore]
 
   const MICRO_LABEL_MAP = {
     fiber_g: { label: 'Fiber', unit: 'g' },
@@ -165,13 +166,15 @@ function NutritionPageInner() {
       }
       setWorkoutCtx({ loggedToday, plannedLabel })
       setChecked(true)
-      const [logRes, foodsRes, yesterdayRes, waterRes] = await Promise.all([
+      const dayBefore = new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0]
+      const [logRes, foodsRes, yesterdayRes, dayBeforeRes, waterRes] = await Promise.all([
         fetch('/api/nutrition/log'),
         fetch('/api/nutrition/my-foods'),
         fetch(`/api/nutrition/log?date=${new Date(Date.now() - 86400000).toISOString().split('T')[0]}`),
+        fetch(`/api/nutrition/log?date=${dayBefore}`),
         fetch('/api/health/manual-steps').catch(() => null),
       ])
-      const [logData, foodsData, yestData] = await Promise.all([logRes.json(), foodsRes.json(), yesterdayRes.json()])
+      const [logData, foodsData, yestData, dayBeforeData] = await Promise.all([logRes.json(), foodsRes.json(), yesterdayRes.json(), dayBeforeRes.json()])
       const loadedEntries = logData.entries || []
       setEntries(loadedEntries)
       setMyFoods(foodsData.foods || [])
@@ -202,6 +205,7 @@ function NutritionPageInner() {
       const yestEntries = yestData.entries || []
       const yestProtein = yestEntries.reduce((s, e) => s + (e.protein_g || 0), 0)
       setYesterdayProtein(Math.round(yestProtein))
+      setPrevDaysEntries([yestEntries, dayBeforeData.entries || []])
 
       // Today's water from water_logs + drink entries
       const supabase2 = createClient()
@@ -706,6 +710,152 @@ function NutritionPageInner() {
           </div>
         </div>
       )}
+
+      {/* Micronutrient Daily Awareness */}
+      {activeTab === 'log' && entries.length > 0 && !viewingDate && (() => {
+        const microTargets = goals?.age && goals?.sex ? calcMicroTargets(goals.age, goals.sex) : null
+        const hour = new Date().getHours()
+
+        const MICRO_CALLOUT_COPY = {
+          sodium_mg: {
+            over: 'Sodium is at {pct}% of your daily target — drink an extra glass of water; sodium draws water out of cells and raises blood pressure temporarily.',
+          },
+          vitamin_d_mcg: {
+            absent: 'Vitamin D hasn\'t appeared in your log in 3+ days — few foods contain it naturally; sunlight or a supplement is usually the only reliable source.',
+            low: 'Vitamin D is at {pct}% by {time} — it\'s fat-soluble, so having it with a fatty meal improves absorption significantly.',
+          },
+          iron_mg: {
+            low: 'Iron is at {pct}% by {time} — pair it with something acidic (lemon, tomato, vitamin C) to roughly double absorption. Avoid coffee or tea within 30 min of iron-rich foods.',
+          },
+          omega3_g: {
+            absent: 'Omega-3 hasn\'t appeared in your log in 3+ days — without fatty fish or supplementation, inflammatory responses and recovery both slow down.',
+          },
+          magnesium_mg: {
+            low: 'Magnesium is at {pct}% by {time} — it\'s involved in muscle relaxation and sleep quality; low magnesium often shows as night cramps or restless sleep.',
+          },
+          calcium_mg: {
+            low: 'Calcium is at {pct}% by {time} — pair dairy or fortified foods with vitamin D for better absorption.',
+          },
+          potassium_mg: {
+            low: 'Potassium is at {pct}% by {time} — it counterbalances sodium for blood pressure and helps prevent muscle cramps.',
+          },
+          vitamin_c_mg: {
+            absent: 'Vitamin C hasn\'t appeared in your log in 3+ days — it\'s water-soluble (not stored), so daily intake from fruits or vegetables matters.',
+          },
+          zinc_mg: {
+            low: 'Zinc is at {pct}% by {time} — it\'s critical for immune function and testosterone production; absorption drops significantly when taken with high-fiber foods.',
+          },
+          fiber_g: {
+            low: 'Fiber is at {pct}% by {time} — the gut microbiome relies on it; most people fall short by 10–15g/day without intentional effort.',
+          },
+        }
+
+        const TRACKED_MICROS = [
+          'sodium_mg','vitamin_d_mcg','iron_mg','omega3_g','magnesium_mg',
+          'calcium_mg','potassium_mg','vitamin_c_mg','zinc_mg','fiber_g',
+        ]
+
+        function sumEntries(entryList, key) {
+          return entryList.reduce((s, e) => s + (e[key] || 0), 0)
+        }
+
+        function getDV(key) {
+          if (!microTargets) return null
+          if (microTargets[key] != null) return microTargets[key]
+          const defaults = {
+            sodium_mg: 2300, vitamin_d_mcg: 20, iron_mg: 18, omega3_g: 1.6,
+            magnesium_mg: 420, calcium_mg: 1000, potassium_mg: 4700,
+            vitamin_c_mg: 90, zinc_mg: 11, fiber_g: 28,
+          }
+          return defaults[key] ?? null
+        }
+
+        const callouts = []
+        const timeStr = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+
+        for (const key of TRACKED_MICROS) {
+          const copy = MICRO_CALLOUT_COPY[key]
+          if (!copy) continue
+          const dv = getDV(key)
+          if (!dv) continue
+          const todayVal = sumEntries(entries, key)
+          const pct = Math.round((todayVal / dv) * 100)
+
+          // Over 150% DV (sodium only flagged high)
+          if (key === 'sodium_mg' && pct > 150 && copy.over) {
+            callouts.push({
+              key,
+              type: 'over',
+              text: copy.over.replace('{pct}', pct).replace('{time}', timeStr),
+              priority: 1,
+              color: 'rgba(239,68,68,0.12)',
+              border: 'rgba(239,68,68,0.3)',
+              icon: '🔴',
+              label: 'High',
+              labelColor: '#ef4444',
+            })
+            continue
+          }
+
+          // Under 20% DV after 3pm
+          if (hour >= 15 && pct < 20 && copy.low) {
+            callouts.push({
+              key,
+              type: 'low',
+              text: copy.low.replace('{pct}', pct).replace('{time}', timeStr),
+              priority: 2,
+              color: 'rgba(251,146,60,0.1)',
+              border: 'rgba(251,146,60,0.3)',
+              icon: '⚠️',
+              label: 'Low by ' + timeStr,
+              labelColor: '#fb923c',
+            })
+            continue
+          }
+
+          // Absent 3+ consecutive days
+          if (copy.absent && todayVal === 0) {
+            const yestVal = sumEntries(prevDaysEntries[0], key)
+            const dayBeforeVal = sumEntries(prevDaysEntries[1], key)
+            if (yestVal === 0 && dayBeforeVal === 0) {
+              callouts.push({
+                key,
+                type: 'absent',
+                text: copy.absent,
+                priority: 3,
+                color: 'rgba(167,139,250,0.1)',
+                border: 'rgba(167,139,250,0.25)',
+                icon: '💜',
+                label: '3+ days absent',
+                labelColor: '#a78bfa',
+              })
+            }
+          }
+        }
+
+        if (callouts.length === 0) return null
+        const shown = callouts.sort((a, b) => a.priority - b.priority).slice(0, 3)
+        const MICRO_NAMES = {
+          sodium_mg: 'Sodium', vitamin_d_mcg: 'Vitamin D', iron_mg: 'Iron',
+          omega3_g: 'Omega-3', magnesium_mg: 'Magnesium', calcium_mg: 'Calcium',
+          potassium_mg: 'Potassium', vitamin_c_mg: 'Vitamin C', zinc_mg: 'Zinc', fiber_g: 'Fiber',
+        }
+
+        return (
+          <div style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {shown.map(c => (
+              <div key={c.key} style={{ backgroundColor: c.color, border: `1px solid ${c.border}`, borderRadius: '10px', padding: '12px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '12px' }}>{c.icon}</span>
+                  <span style={{ fontSize: '11px', fontWeight: '700', color: c.labelColor, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{MICRO_NAMES[c.key]}</span>
+                  <span style={{ fontSize: '11px', color: c.labelColor, opacity: 0.8 }}>· {c.label}</span>
+                </div>
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>{c.text}</p>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* Food Log Tab */}
       {activeTab === 'log' && (
