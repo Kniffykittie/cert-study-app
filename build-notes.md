@@ -1776,16 +1776,29 @@ Fix: when the user opens the Day Hub for a day that has a `workout_logs` entry b
 
 ---
 
+**"Why this today?" generation strategy — decided:**
+Generate at workout plan creation time, not on-demand. When `generate-plan/route.js` calls Claude, the prompt asks for context notes per exercise alongside the sets/reps, stored in the plan JSONB as `context_note` on each exercise object. This is free (same generation call), instantly available in the Day Hub with no extra API call, and can reference the specific split structure ("Romanian deadlifts are on pull day because they share the same hip-hinge motor pattern as your rows — training them together builds that posterior chain as a unit"). Older plans without `context_note` fields show nothing in that slot — no fallback needed, just empty. Users naturally regenerate plans when they change goals or equipment.
+
+**Bedtime phase completion — decided:**
+Do not use a time-of-day heuristic ("logged_at after 8pm"). Instead, add a `context` TEXT field to `stretch_logs` (e.g. `'bedtime'`, `'pre_workout'`, `'post_workout'`, `'standalone'`). The "Start Bedtime Stretches" button on the Day Hub passes `context=bedtime` when navigating to the stretch flow, and the stretch flow sets it on the log row. Then completion detection is exact: `stretch_logs` entry with `context='bedtime'` for today = Phase 4 done. This requires a DB migration (add `context` column to `stretch_logs`) and updating the stretch log POST route and flow entry points.
+
+**PRs move to Exercise Library — decided:**
+The PR section currently on the history page (heaviest working set per exercise ever) moves to the Exercise Library as a per-exercise detail. When a user taps an exercise card in the library, the detail modal shows a "Your PR" section: heaviest working set ever + date it was set. This is a better UX — you look up an exercise, you immediately see your history with it. The history page doesn't need a flat PR list once this is in place; the week-grouped Day Hub view is richer context anyway.
+- Requires: `workout_log_sets` query filtered to `set_type='working'`, grouped by `exercise_name`, returning `MAX(weight_lbs)` + the date of that set
+- No new DB columns needed — all data is in `workout_log_sets` already
+
 **Build order:**
-1. Add dates to plan page + remove inline expand (day card taps navigate to Day Hub URL)
-2. Build Day Hub page — active mode, phases with static content (no "Why this?" AI yet, just layout + completion indicators)
-3. Wire all "Start X" buttons to existing stretch/workout flows with pre-selection params
-4. Add "Why this today?" text to exercise cards (can be hardcoded per exercise in the exercise data, or a simple AI call per workout plan generation that adds context notes to the plan JSONB)
-5. Add AI coaching review panel + unread badge
-6. Build rest day Day Hub variant
-7. Revamp history page to week-grouped Day cards with read-only Day Hub links
-8. Retire standalone stretching page, rename Stretch Library to Stretch Reference, update sidebar
-9. Add weekly completion tracking bar to plan page and history week groups
+1. Add `context` column to `stretch_logs` (DB migration) + update POST route
+2. Add dates to plan page + remove inline expand (day card taps navigate to Day Hub URL)
+3. Build Day Hub page — active mode, phases with static content (no "Why this?" AI yet, just layout + completion indicators using new `context` field)
+4. Wire all "Start X" buttons to existing stretch/workout flows with pre-selection params + context values
+5. Update `generate-plan/route.js` prompt to include `context_note` per exercise; surface in Day Hub Phase 2 cards
+6. Add AI coaching review panel + unread badge (add `coaching_feedback_read_at` column to `workout_logs`)
+7. Build rest day Day Hub variant
+8. Revamp history page to week-grouped Day cards with read-only Day Hub links; remove flat PR section
+9. Move PRs to Exercise Library detail modal (query workout_log_sets for max working set per exercise)
+10. Retire standalone stretching page, rename Stretch Library to Stretch Reference, update sidebar
+11. Add weekly completion tracking bar to plan page and history week groups
 
 ---
 
