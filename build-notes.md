@@ -2673,7 +2673,746 @@ Seven inputs that were collected but never used downstream wired up in the same 
 
 ---
 
-## Future Features — Extended Build Queue (Steps 21–27 + Supporting Specs)
+## Remaining Build Phases — Complete Sequence
+
+**This is the canonical build order. Every phase must be built in this sequence. Do not reorder without reading the dependency map.**
+
+### Final Design Decisions (locked — do not re-litigate)
+| Decision | Choice |
+|----------|--------|
+| Three-brief UI on Life Hub home | All three shown as separate collapsible cards (morning/afternoon/evening); most recent expanded by default |
+| Goals 2.0 | Parked — do not build; Goal Velocity uses current goals_profiles data as-is |
+| My Week scope | Replaces both Meal Plan page AND weekly_schedule UI on Goals; all AI routes that read weekly_schedule updated to read from my_week (with fallback to goals_profiles.weekly_schedule for users with no my_week entry) |
+| Callout card removal timing | All 6 on-page callout cards removed when Phase S (three-brief system) ships — same session |
+| Day Hub vs Push Notifications | Day Hub (Phase R) ships first; push notifications (Phase S) come after |
+| Polish features to build | DV% display only; photo-based food logging and food water content deferred |
+| My Week + weekly_schedule sync | My Week reads goals_profiles.weekly_schedule as a starting default on first creation; saves to my_week table; also updates goals_profiles.weekly_schedule with day_type values so existing AI routes continue working without changes |
+
+### Dependency Map
+```
+Phase P (evening brief migration)
+  └─ Phase S (three-brief system requires daily_briefs.window column)
+
+Phase Q (My Week)
+  ├─ Phase S (daily-brief/route reads my_week for richer context — briefs better with My Week live)
+  └─ Phase Y (coach memory upgrade reads My Week context)
+
+Phase R (Day Hub) — independent; no upstream deps
+  └─ (auto-progression suggestions from Phase U shown in Day Hub Phase 2 cards — can ship placeholder first)
+
+Phase S (push + three-brief + card removal) — requires Phase P; richer if Q is live first
+
+Phase T (sleep debt stat card) — brief content ships in Phase S; stat card is additive standalone
+
+Phase U (workout volume + auto-progression) — independent; ships any time after Phase R is live
+Phase V (food logging streak) — fully independent
+Phase W (goal velocity) — fully independent
+Phase X (DV% display) — fully independent polish pass
+Phase Y (coach memory upgrade) — requires Phase Q (My Week) to be live
+```
+
+### Recommended Session Order
+```
+1. Phase P — Evening Brief + Migration    (short session, critical prerequisite)
+2. Phase Q — My Week                      (medium session, unlocks best brief quality)
+3. Phase R — Workout Day Hub              (large session, 2 subsessions likely)
+4. Phase S — Push + Three-Brief + Cards  (large session)
+5. Phase T — Sleep Debt Stat Card        (short session)
+6. Phase U — Volume + Auto-Progression   (medium session)
+7. Phase V — Food Logging Streak         (short session)
+8. Phase W — Goal Velocity               (short session)
+9. Phase X — DV% Display                 (medium session — many files)
+10. Phase Y — Coach Memory Upgrade        (short session)
+```
+
+---
+
+### Phase P — Evening Brief + daily_briefs Schema Migration
+
+**Prerequisite:** Must ship before Phase S. Nothing in Phase S works without the `window` column.
+
+**The breaking migration (run all 5 steps as one atomic migration):**
+```sql
+ALTER TABLE daily_briefs ADD COLUMN window TEXT DEFAULT 'morning';
+UPDATE daily_briefs SET window = 'morning';
+ALTER TABLE daily_briefs DROP CONSTRAINT IF EXISTS daily_briefs_user_id_date_key;
+ALTER TABLE daily_briefs ADD CONSTRAINT daily_briefs_user_id_date_window_key UNIQUE (user_id, date, window);
+ALTER TABLE daily_briefs ADD CONSTRAINT daily_briefs_window_check CHECK (window IN ('morning', 'afternoon', 'evening'));
+```
+Verify the old constraint name before running: `SELECT constraint_name FROM information_schema.table_constraints WHERE table_name = 'daily_briefs';` — if it was named differently at creation, `DROP CONSTRAINT IF EXISTS` will silently succeed regardless. Safe to run as-is.
+
+**Files to create/modify:**
+
+| File | Change |
+|------|--------|
+| `src/app/api/life-hub/daily-brief/route.js` | GET: add `?window=` param (default `'morning'`), include in `.eq('window', window)`. POST: accept `window` in body (default `'morning'`), include in upsert with `onConflict: 'user_id,date,window'`. All existing morning logic unchanged — just thread `window` through. |
+| `src/app/life-hub/page.js` | Update morning brief fetch to include `?window=morning`. Add fetch for `?window=evening` for the evening brief card (shown after 6pm client-side). |
+| `src/app/api/life-hub/daily-brief/route.js` (evening POST) | New logic when `window === 'evening'`: query TODAY's full food log totals, steps, workout, stretch log, water, check-in. Past-tense framing. Max tokens 250. Rate limit key: `'life-hub/daily-brief-evening'` (1/day). |
+
+**Evening brief data queries (distinct from morning — queries TODAY not yesterday):**
+```js
+// Today's data only
+const today = estDateStr()
+const [foodLog, workout, checkin, steps, water, sleepCtx] = await Promise.all([
+  supabase.from('food_log_entries').select('calories,protein_g,carbs_g,fat_g,water_g').eq('user_id', userId).eq('date', today),
+  supabase.from('workout_logs').select('duration_seconds,post_workout_difficulty,post_workout_energy,post_workout_note,hr_zones').eq('user_id', userId).gte('created_at', `${today}T00:00:00`).maybeSingle(),
+  supabase.from('daily_checkins').select('energy_level,mood_level,afternoon_energy,afternoon_mood,sore_spots').eq('user_id', userId).eq('date', today).maybeSingle(),
+  supabase.from('health_steps_hourly').select('steps').eq('user_id', userId).eq('date', today),
+  supabase.from('water_logs').select('amount_oz').eq('user_id', userId).eq('date', today),
+  supabase.from('health_sleep_sessions').select('sleep_score,total_duration_minutes').eq('user_id', userId).eq('date', today).maybeSingle(),
+])
+```
+
+**Afternoon brief (no new AI call — uses check-in insight):**
+The existing `checkin/insight/route.js` already generates a 2-sentence insight. After generating, upsert that text into `daily_briefs` with `window: 'afternoon'`. Change is in `checkin/insight/route.js` — after the Haiku response, add:
+```js
+await supabase.from('daily_briefs').upsert({ user_id: userId, date: today, window: 'afternoon', brief_text: insight }, { onConflict: 'user_id,date,window' })
+```
+No new AI call, no new rate limit — the check-in insight IS the afternoon brief.
+
+**Security:**
+- `getUser()` + `is_disabled` check on evening POST (same as morning)
+- Rate limit evening to 1/day; morning stays at 1/day; no rate limit on afternoon (it's a side-effect of the check-in, which is already rate-limited at 2/day)
+- No user-supplied free text injected into evening brief (all data is from DB/APIs)
+- `?window=` param: validate against `['morning', 'afternoon', 'evening']` — reject any other value with 400
+
+**Watch out for:**
+1. **Constraint name**: The `DROP CONSTRAINT IF EXISTS` must use the exact name Supabase assigned. Safest to check first via the SQL editor before running in migration. Alternatively, use `IF EXISTS` as written — it will silently no-op if the name doesn't match, but then step 4 will fail on duplicate UNIQUE. Test in a branch environment first if possible.
+2. **Existing callers**: The GET route defaulting to `'morning'` means all existing callers (Life Hub home page, etc.) continue to work with no changes until they explicitly pass `?window=afternoon` or `?window=evening`.
+3. **Evening brief timing**: The brief is generated on-demand (when the user visits Life Hub in the evening) until Phase S ships pg_cron. Use a client-side check: if `Date().getHours() >= 18`, show evening card + trigger POST if not yet generated. Before 6pm: show "Evening summary available after 6pm" placeholder.
+4. **Don't regenerate same-day**: POST handler must check for existing `(user_id, date, window)` row before calling Claude. The `upsert` with `onConflict` handles this — it won't regenerate if row exists. But the client should also check the GET response first before firing POST.
+
+---
+
+### Phase Q — My Week (Unified Weekly Planning Hub)
+
+**Purpose:** Replace the Meal Plan page and the Goals weekly_schedule card with a single, richer weekly planning surface. AI routes that previously read `goals_profiles.weekly_schedule` are updated to read from `my_week` instead.
+
+**DB migration:**
+```sql
+CREATE TABLE my_week (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  week_start DATE NOT NULL,
+  day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+  day_type TEXT CHECK (day_type IN ('active_work', 'desk_work', 'day_off', 'travel')),
+  breakfast_time TIME,
+  lunch_time TIME,
+  dinner_time TIME,
+  snack_times TEXT,
+  workout_time TIME,
+  workout_duration_min SMALLINT,
+  commitments TEXT,
+  day_notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, week_start, day_of_week)
+);
+ALTER TABLE my_week ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "user_own" ON my_week FOR ALL USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+```
+Note: `week_start` must always be a Monday — enforce at API level, not DB level (DB doesn't have day-of-week constraint on date columns without a trigger).
+
+**API routes:**
+- `GET /api/life-hub/my-week?week=YYYY-MM-DD` — returns all 7 rows for that week_start. If no rows exist, returns empty array (not 404 — client shows empty grid that can be filled in).
+- `POST /api/life-hub/my-week` — body: `{ week: 'YYYY-MM-DD', days: [{ day_of_week, day_type, breakfast_time, ... }] }`. Validates week is a Monday. Upserts all 7 rows. Also syncs day_type values back to `goals_profiles.weekly_schedule` (see sync logic below).
+- Both routes: `getUser()` + no `is_disabled` check (no AI call here).
+
+**Sync to goals_profiles.weekly_schedule:**
+When POST saves a My Week entry, also PATCH `goals_profiles.weekly_schedule` with the new day_type values:
+```js
+const scheduleMap = { 0: 'mon', 1: 'tue', 2: 'wed', 3: 'thu', 4: 'fri', 5: 'sat', 6: 'sun' }
+const weekly_schedule = {}
+days.forEach(d => { weekly_schedule[scheduleMap[d.day_of_week]] = d.day_type })
+await supabase.from('goals_profiles').update({ weekly_schedule }).eq('user_id', userId)
+```
+This keeps existing AI routes working without changes. The `goals_profiles.weekly_schedule` becomes the "last saved My Week day types" — a shadow copy for backward compatibility.
+
+**Pre-fill from existing weekly_schedule:**
+When user opens My Week for a week with no existing entries, fetch `goals_profiles.weekly_schedule` and pre-populate the day_type pills. User sees their existing schedule rather than blank fields. Meal times and other fields start empty.
+
+**Page: `/life-hub/my-week/page.js`**
+
+Layout: A horizontal Mon–Sun grid with a date header per column (e.g. "Mon · Jul 7"). Each column has collapsible sections:
+
+```
+MON · Jul 7          TUE · Jul 8          ...
+─────────────────    ─────────────────
+[DAY TYPE PILL]      [DAY TYPE PILL]
+  ○ active_work        ● desk_work
+  ○ desk_work          ...
+  ○ day_off
+  ○ travel
+─────────────────
+⏰ MEALS
+  Breakfast: [07:00]
+  Lunch:     [12:00]
+  Dinner:    [18:30]
+  Snacks:    [text]
+─────────────────
+🏋️ WORKOUT
+  Time:     [18:00]
+  Duration: [60] min
+─────────────────
+📅 COMMITMENTS
+  [text area]
+─────────────────
+📝 NOTES
+  [text area]
+```
+
+On mobile: vertical stack of day cards (Mon → Sun). Each day card is collapsible. Tapping the header expands the sections.
+
+"Copy from last week" button: fills current week grid from previous week's my_week entries. If no previous week entries exist, button is hidden.
+
+Auto-save: each field saves on blur (not a full form submit). Each day row upserts independently on change. No "Save" button needed for the whole page.
+
+**Sidebar changes:**
+- Remove "Meal Plan" from Nutrition dropdown in `LifeHubSidebar.js`
+- Add "My Week" under Overview section (after Dashboard, before Weekly Wrap)
+- Update `overviewActive` condition to include `/life-hub/my-week`
+
+**Goals page changes:**
+- Remove "Weekly Schedule" card + inline edit widget from `src/app/life-hub/goals/page.js`
+- Add a small "Manage your weekly schedule in My Week →" link card in its place pointing to `/life-hub/my-week`
+
+**Retire meal plan page:**
+- Delete `src/app/life-hub/nutrition/meal-plan/page.js`
+- Keep `meal_plans` + `meal_plan_entries` tables and API routes (data preserved, just UI removed)
+- Remove "Meal Plan" reset row from Settings if present
+- Update CLAUDE.md directory structure
+
+**Update AI routes to read from my_week:**
+
+*`daily-brief/route.js`:*
+```js
+// Replace existing goals_profiles.weekly_schedule read with:
+const today = estDateStr()
+const monday = getMonday(today)
+const { data: myWeekRows } = await supabase
+  .from('my_week')
+  .select('*')
+  .eq('user_id', userId)
+  .eq('week_start', monday)
+
+const todayDayOfWeek = (new Date(today).getDay() + 6) % 7 // Mon=0
+const todayMyWeek = myWeekRows?.find(r => r.day_of_week === todayDayOfWeek)
+
+// Build scheduleContext from myWeekRows (if exists) or fall back to goals_profiles.weekly_schedule
+if (todayMyWeek) {
+  scheduleContext = [
+    `Today (${dayLabel}): ${todayMyWeek.day_type}`,
+    todayMyWeek.breakfast_time ? `Breakfast scheduled: ${todayMyWeek.breakfast_time}` : null,
+    todayMyWeek.lunch_time ? `Lunch scheduled: ${todayMyWeek.lunch_time}` : null,
+    todayMyWeek.dinner_time ? `Dinner scheduled: ${todayMyWeek.dinner_time}` : null,
+    todayMyWeek.workout_time ? `Workout scheduled: ${todayMyWeek.workout_time} (${todayMyWeek.workout_duration_min ?? '?'} min)` : null,
+    todayMyWeek.commitments ? `Today's commitments: <user_input>${todayMyWeek.commitments}</user_input>` : null,
+    todayMyWeek.day_notes ? `Notes: <user_input>${todayMyWeek.day_notes}</user_input>` : null,
+  ].filter(Boolean).join('\n')
+} else if (goalsProfile?.weekly_schedule) {
+  // legacy fallback
+  const dayKeys = ['mon','tue','wed','thu','fri','sat','sun']
+  const dayType = goalsProfile.weekly_schedule[dayKeys[todayDayOfWeek]]
+  scheduleContext = dayType ? `Today: ${dayType} (no My Week entry for this week)` : null
+}
+
+// Supplement timing alignment when workout_time is set:
+if (todayMyWeek?.workout_time) {
+  const [h, m] = todayMyWeek.workout_time.split(':').map(Number)
+  const preTime = `${String(h === 0 ? 23 : h - 1).padStart(2,'0')}:${String(m).padStart(2,'0')}`
+  suppContext = supplements.filter(s => s.timing === 'pre_workout').map(s =>
+    `${s.name} (${s.dose}) — take at ${preTime} (45min before ${todayMyWeek.workout_time} workout)`
+  ).join('\n')
+}
+```
+
+*`monthly-wrap/route.js`:*
+```js
+// Replace goals_profiles.weekly_schedule read with my_week aggregate for the month
+const { data: myWeekMonth } = await supabase
+  .from('my_week')
+  .select('day_type, day_of_week')
+  .eq('user_id', userId)
+  .gte('week_start', `${month}-01`)
+  .lte('week_start', monthEnd)
+
+const dayTypeCounts = { active_work: 0, desk_work: 0, day_off: 0, travel: 0 }
+myWeekMonth?.forEach(r => dayTypeCounts[r.day_type]++)
+scheduleMonthlyContext = myWeekMonth?.length > 0
+  ? `Monthly schedule: ${dayTypeCounts.active_work} active_work, ${dayTypeCounts.desk_work} desk_work, ${dayTypeCounts.day_off} day_off, ${dayTypeCounts.travel} travel days`
+  : goalsProfile?.weekly_schedule ? `Default schedule (from goals): ${JSON.stringify(goalsProfile.weekly_schedule)}` : null
+```
+
+*`generate-plan/route.js`:*
+```js
+// Replace goals_profiles.weekly_schedule read with:
+const monday = getMonday(new Date().toISOString().split('T')[0])
+const { data: myWeekRows } = await supabase.from('my_week').select('day_of_week, day_type').eq('user_id', userId).eq('week_start', monday)
+const dayTypeByIndex = {}
+myWeekRows?.forEach(r => { dayTypeByIndex[r.day_of_week] = r.day_type })
+// Falls back to goals_profiles.weekly_schedule if myWeekRows is empty (handled in AI prompt)
+```
+
+**Security:**
+- `commitments` and `day_notes` are user free text → always wrap in `<user_input>` tags in every AI prompt injection (shown above for daily-brief)
+- `week_start` validation: `const d = new Date(week); if (d.getDay() !== 1) return NextResponse.json({ error: 'week_start must be a Monday' }, { status: 400 })` — Monday = day index 1
+- `day_of_week` validation: reject values outside 0–6
+- `day_type` validation: reject values outside the 4 allowed strings (DB CHECK constraint covers this, but also validate at API level before hitting DB for clear error messages)
+- PATCH to `goals_profiles.weekly_schedule` must only update that one column — never re-save full goals_profiles row (risk of overwriting other user data)
+- RLS on `my_week`: `user_id = auth.uid()` — standard pattern
+
+**Watch out for:**
+1. The `getMonday()` function must handle timezone correctly. `new Date('2025-07-08').getDay()` gives UTC day, which could be wrong for EST users. Use a consistent timezone-safe Monday calculation: `const d = new Date(dateStr); d.setUTCHours(0,0,0,0); const day = d.getUTCDay(); d.setUTCDate(d.getUTCDate() - (day === 0 ? 6 : day - 1)); return d.toISOString().split('T')[0]`
+2. Auto-save on blur: if the user fills breakfast time and immediately tabs to lunch without touching anything else, only the breakfast field upserts. The day row may not exist yet — the upsert must INSERT if no row exists for that `(user_id, week_start, day_of_week)` combination.
+3. "Copy from last week": compute last week's Monday as `current Monday - 7 days`. If no data exists, show "No previous week to copy" state.
+4. The Goals page still shows the lifestyle card (activity level, daily steps, timeline) — that's separate from the weekly schedule card being removed. Only the "Weekly Schedule" card with the 7-day grid is removed.
+5. Supplement timing in the brief: `workout_time` is a Postgres TIME column stored as "HH:MM:SS". Parse as `split(':')` → `[h, m]`. The pre-workout time calculation must handle midnight boundary (workout at 00:30 → pre-workout at 23:45 previous day — edge case, just show "take [X] minutes before your workout" without computing a specific time if the result crosses midnight).
+
+---
+
+### Phase R — Workout Day Hub (Full Architecture)
+
+**Prerequisite:** None. Independent build. Auto-progression content (Phase U) can be added to Phase 2 cards after Phase U ships — Day Hub ships with placeholder ("Progression suggestions coming soon") if U isn't done yet.
+
+This phase is fully specced in the Future Features section under "22. Workout Day Hub." This section adds the missing security specs, connection points, and exact file list.
+
+**DB migrations required (in same session):**
+```sql
+-- 1. Add context field to stretch_logs
+ALTER TABLE stretch_logs ADD COLUMN context TEXT CHECK (context IN ('pre_workout', 'post_workout', 'bedtime', 'standalone'));
+
+-- 2. Add coaching_feedback_read_at to workout_logs
+ALTER TABLE workout_logs ADD COLUMN coaching_feedback_read_at TIMESTAMPTZ;
+
+-- 3. No new table needed — Day Hub reads from existing: workout_plans, workout_logs, workout_log_sets, stretch_logs, exercises
+```
+
+**New route:**
+`GET /api/workouts/day-hub?date=YYYY-MM-DD` — returns:
+- Today's plan day (exercises, sets, rep_ranges, context_notes from plan JSONB)
+- workout_logs entry for today (if any) — completion status, HR zones, duration
+- workout_log_sets for today's workout (for "previous session hints" fallback — pull last session for same day_label)
+- stretch_logs for today (session_type + context)
+- coaching response from workout_logs.ai_coaching_response (if exists)
+- `proposed_actions` from localStorage — client-side only (not from this route)
+`getUser()` — no is_disabled check (no AI call in this route itself).
+
+**New page: `/life-hub/workouts/day/[dayIndex]/page.js`**
+URL: `/life-hub/workouts/day/0` = Monday, `/life-hub/workouts/day/4` = Friday.
+Optional `?date=YYYY-MM-DD` for historical read-only mode.
+
+Active vs read-only mode: if `date` param is in the past → read-only. All "Start" buttons hidden. Phase status shown as final state.
+
+**Updates to existing files:**
+- `src/app/life-hub/workouts/page.js` — add date under each day card heading; tap on day card navigates to `/life-hub/workouts/day/[index]` instead of inline expand; add 4-dot phase progress indicator per day card; add weekly completion bar at top of page
+- `src/app/life-hub/workouts/history/page.js` — restructure to week-grouped format; remove PR section; add "View Day →" links to Day Hub read-only mode
+- `src/app/life-hub/workouts/exercises/page.js` — add "Your PR" section to detail modal: query `workout_log_sets` for max working set weight per selected exercise
+- `src/components/LifeHubSidebar.js` — update Workouts dropdown: My Plan / History / Exercise Library / Stretch Reference (4 items, remove "Stretching & Mobility")
+- `src/app/api/workouts/generate-plan/route.js` — add `context_note` per exercise to the generation prompt output format; stored in plan JSONB
+- Retire `src/app/life-hub/workouts/stretching/page.js` (delete)
+- Rename Stretch Library: `src/app/life-hub/workouts/stretching/library/page.js` → `src/app/life-hub/workouts/stretches/page.js`
+
+**Security:**
+- `?date=YYYY-MM-DD` param: validate format with `/^\d{4}-\d{2}-\d{2}$/` before any DB query. Reject malformed dates with 400.
+- Historical Day Hub (read-only): the API route must verify ownership via `getUser()` and only return data for that user — no way to see another user's day by changing the date param
+- `coaching_feedback_read_at`: only the row owner can update — protected by workout_logs RLS (`user_id = auth.uid()`)
+- `context` column on stretch_logs: DB CHECK constraint enforces valid values; API also validates before insert
+- `context_note` in plan JSONB: generated by AI (Claude), not user-supplied. Does NOT need `<user_input>` wrapping. It IS AI-generated content.
+
+**Watch out for:**
+1. Day index → date calculation: Monday of current week + `dayIndex` days. Must handle DST-safe. Use UTC date arithmetic.
+2. `coaching_feedback_read_at` badge: only mark as read when the collapsible panel is opened in expanded state (not just when the page renders). Use an IntersectionObserver or a manual "expand" handler that fires the PATCH.
+3. The "4-dot progress indicator" on the plan page reads from `stretch_logs` + `workout_logs`. This adds 2 extra queries per page load on the plan page. Batch them: single query `SELECT date, session_type, context FROM stretch_logs WHERE user_id = X AND date = today` covers all 4 stretch phases.
+4. Phase 4 (bedtime stretches) completion: `stretch_logs` entry with `context = 'bedtime'` for today. The "Start Bedtime Stretches" button must pass `context=bedtime` as a query param to the stretch flow, and the stretch POST must include `context: 'bedtime'` in the insert.
+5. Rest day Day Hub: the plan has rest days (`exercises: []`). Day Hub in rest-day mode shows a recovery note (static, not AI), light movement suggestion, and Phase 4 (bedtime stretches) only. No Phase 1/2/3.
+6. History page restructure: week-grouping requires fetching all `workout_logs` (could be many rows). Paginate by fetching 8 weeks at a time. "Load more" button for older history.
+7. Retiring the stretching page: any links within the app to `/life-hub/workouts/stretching` must be updated to the new Day Hub Phase 1/3 buttons. Search the codebase before deleting: `grep -r "workouts/stretching" src/`.
+8. PR query in Exercise Library: `SELECT exercise_name, MAX(weight_lbs) as max_weight, MAX(created_at) as set_date FROM workout_log_sets WHERE user_id = X AND set_type = 'working' AND exercise_name = $1 GROUP BY exercise_name`. Weight of 0 (bodyweight) → show "Bodyweight" instead of "0 lbs".
+
+---
+
+### Phase S — Push Notifications + Three-Brief System + Callout Card Removal
+
+**Prerequisites:** Phase P (daily_briefs.window column must exist). Phase Q ideally live first (brief quality).
+
+**The three-brief UI on Life Hub home:**
+Replace the current single brief card with three cards. State: whichever windows have generated today show their content; windows not yet generated show a placeholder.
+
+```jsx
+// Morning card — always show if generated, else show placeholder
+<BriefCard
+  window="morning"
+  brief={briefs.morning}
+  placeholder={`Morning brief generates at ${formatTime(wakeTime)}`}
+  defaultExpanded={mostRecentWindow === 'morning'}
+  accentColor="var(--accent-purple)"
+  icon="☀️"
+/>
+// Afternoon card — show after wake_time + 7hr
+{shouldShowAfternoon && (
+  <BriefCard window="afternoon" brief={briefs.afternoon} ... />
+)}
+// Evening card — show after 6pm client-side
+{currentHour >= 18 && (
+  <BriefCard window="evening" brief={briefs.evening} ... />
+)}
+```
+
+`BriefCard` component: collapsible, left border in window accent color (morning=purple, afternoon=yellow, evening=indigo), shows brief_text when expanded, "generated at X:XX" timestamp in footer, manual "🔄 Refresh" button fires POST on demand (1/day limit per window).
+
+`mostRecentWindow`: determined by which brief was generated most recently (check `created_at` across the three rows). That window starts expanded; others start collapsed.
+
+**Phase M technical spec:** Already fully documented in the "Phase M" section of the Master Build Plan above. Refer to that for VAPID keys, push_subscriptions table, service worker handlers, Edge Function logic, pg_cron schedules, and security design. This section adds only what's missing from that spec.
+
+**Missing spec additions for Phase M:**
+
+*`push_notification_log` table tweak:*
+The existing spec shows `UNIQUE on (user_id, date(sent_at), window)`. Use TEXT date not `date()` function to avoid timezone issues: `UNIQUE(user_id, sent_date TEXT, window TEXT)`. Insert: `{ user_id, sent_date: estDateStr(), window: 'morning' }`.
+
+*Three-brief pg_cron schedule (EST):*
+```sql
+SELECT cron.schedule('morning-brief', '0 13 * * *', $$SELECT net.http_post(...)$$); -- 8am EST (UTC-5 winter)
+-- Afternoon brief: handled by check-in insight route → no pg_cron needed
+SELECT cron.schedule('evening-brief', '0 0 * * *', $$SELECT net.http_post(...)$$);  -- 7pm EST
+```
+The Edge Function checks `goals_profiles.wake_time` and only generates if "now" is within 30 minutes of the user's personal window.
+
+*Personalized timing check in Edge Function:*
+```ts
+const wakeHour = parseInt(wakeTime?.split(':')[0] ?? '7')
+const currentHour = new Date().getUTCHours() - 5  // EST offset (simplified)
+// Morning: generate if currentHour is within 1hr of wakeHour
+// Evening: generate if currentHour is within 1hr of (bedtimeHour - 2)
+```
+
+**Callout cards to remove in this same session:**
+
+| Card | File | Lines (approx) | Replacement |
+|------|------|----------------|-------------|
+| Micronutrient awareness card | `src/app/life-hub/nutrition/page.js` | ~120 lines | Absorbed into morning brief micronutrient section |
+| Pre-workout meal advisor banner | `src/app/life-hub/nutrition/page.js` | ~30 lines | Afternoon brief fuel window section |
+| Post-workout meal advisor banner | `src/app/life-hub/nutrition/page.js` | ~30 lines | Evening brief protein synthesis window section |
+| Fatigue signal callout | `src/app/life-hub/workouts/page.js` | ~20 lines | Morning brief energy + recovery section |
+| Hydration reminder banner | `src/app/life-hub/workouts/log/page.js` | ~25 lines | Afternoon brief hydration step-count section |
+| Drink timing callout | `src/app/life-hub/health/water/page.js` | ~40 lines | Afternoon brief hydration timing section |
+
+When removing: delete the JSX render, delete the associated state variables, delete the logic that computes whether to show them (e.g. `hydrationWarning` state + its fetch logic in `log/page.js`). Do NOT remove the underlying data fetches if the same data is used elsewhere on the page.
+
+**Security (additions to Phase M spec):**
+- Service worker: handle HTTP 410 Gone from push endpoint → DELETE from `push_subscriptions` table via a POST to `/api/push/subscribe` with method DELETE
+- Handle HTTP 429 Too Many Requests from push service → log to `push_notification_log` with `delivered: false`, don't retry
+- VAPID keys: document clearly in env var setup that `NEXT_PUBLIC_VAPID_PUBLIC_KEY` is safe to expose; `VAPID_PRIVATE_KEY` is secret and must be in BOTH Vercel env vars and Supabase Edge Function secrets
+- Brief text generated by Claude for push notification body: truncate to 90 characters max (lock screen display limit). Extract first sentence from `brief_text`.
+- iOS Safari push: only works if installed as PWA ("Add to Home Screen"). Show this explicitly in the Settings notification UI: "On iOS, push notifications require installing the app from Safari → Share → Add to Home Screen."
+- Brief manual refresh: rate limit the manual "🔄 Refresh" to 1/day per window (separate from scheduled generation). Track in `api_rate_limits` with key `'daily-brief-refresh-morning'` / `'daily-brief-refresh-evening'`.
+
+**Watch out for:**
+1. The afternoon brief (check-in insight upserted to daily_briefs) may fire at different times for different days — morning users at 3:30am have their "afternoon" check-in around 10:30am. The brief card must check the `created_at` timestamp, not assume 1pm.
+2. pg_cron + DST: UTC-5 in winter, UTC-4 in summer. Fixed UTC times means morning brief shifts 1 hour. Acceptable — document this. Alternatively, use `AT TIME ZONE 'America/New_York'` in the Edge Function timestamp comparison.
+3. Multiple devices: when a user has 2 subscriptions (phone + tablet), the Edge Function loops both and sends to both. Both will show the notification. This is correct behavior — user gets it on whichever device they have.
+4. Service worker update: if `public/sw.js` already exists (it does — installed as PWA), APPEND the push handlers. Don't replace the file. Read it first, verify no duplicate `push` event listener before adding.
+
+---
+
+### Phase T — Sleep Debt Stat Card
+
+**Prerequisites:** None (brief content for sleep debt is baked into Phase S brief prompts; this phase adds the visual card to the Sleep Tracker page).
+
+**What to build:**
+- Single stat card on `/life-hub/health/sleep/page.js` — add as a 4th stat card alongside "Total Sleep," "Deep Sleep," "REM"
+- Card label: "Sleep Debt" · Value: e.g. "3.5 hrs" · Color: green (0–1hr), yellow (1–3hrs), red (3+hrs)
+- Formula: `SUM(target_sleep_hours - actual_sleep_hours)` for last 7 days, floored at 0. `actual` = `total_duration_minutes / 60` from `health_sleep_sessions`. `target` = `goals_profiles.sleep_hours` (default 8 if null).
+- Fallback for non-Health users: sum `(target - daily_checkins.sleep_hours)` for last 7 days. If both sources null → hide card entirely.
+- ℹ️ chip on the card: "Short-term sleep debt accumulates over 7 days. 2–3 nights of full sleep typically clears most of it — recovery is faster than the debt built up."
+
+**Security:** No AI call, no user-supplied input, no new DB table. Pure read of existing data. Standard `getUser()` at route level (if this becomes a route) or handled client-side (preferred — same Supabase client already initialized on the page).
+
+**Watch out for:**
+- If `health_sleep_sessions` has no data for some days within the 7-day window (user didn't wear watch), those days contribute their full target to the debt calculation — that overstates the debt. Better to only include days where data EXISTS. Formula: `SUM(target - actual) WHERE actual IS NOT NULL`, capped at 7 days.
+- `sleep_hours` from `daily_checkins` is self-reported — less accurate than Health data. Show a footnote "(based on self-reported sleep)" when using the checkin fallback.
+
+---
+
+### Phase U — Workout Volume Tracking + Auto-Progression
+
+**Build together — same `workout_log_sets` data, same session.**
+
+**Volume Tracking:**
+- New function in the Weekly Wrap API (`weekly-wrap/route.js`): compute total volume load per muscle group for the week. Formula: `SUM(weight_lbs × reps) WHERE set_type = 'working'` joined to `exercises` on `exercise_name` for `body_part`. Add to `report_data` JSONB as `volume_by_muscle`.
+- Volume chart on History page (after Day Hub is built): simple grouped bar chart (chest/back/legs/shoulders/arms) showing current week vs 4-week average. Inline in the history page weekly group header.
+- coach_memory Edge Function addition: add volume computation to the 90-day data query. Write observations about persistent imbalances.
+
+**Auto-Progression:**
+
+New helper function in the workout log page or a shared utility: `computeProgressionSuggestions(exerciseName, lastTwoSessions)`
+
+```js
+function computeProgressionSuggestions(exerciseName, sessionA, sessionB) {
+  // sessionA = older, sessionB = more recent
+  const workingSetsA = sessionA.filter(s => s.set_type === 'working' && s.exercise_name === exerciseName)
+  const workingSetsB = sessionB.filter(s => s.set_type === 'working' && s.exercise_name === exerciseName)
+  if (!workingSetsA.length || !workingSetsB.length) return null
+  
+  const weight = workingSetsB[0]?.weight_lbs
+  const repRangeParts = (workingSetsB[0]?.rep_range ?? '').split('-')
+  const topOfRange = parseInt(repRangeParts[1] ?? repRangeParts[0])
+  if (isNaN(topOfRange)) return null
+  
+  const cleanB = workingSetsB.every(s => s.reps >= topOfRange)
+  const cleanA = workingSetsA.every(s => s.reps >= topOfRange) && workingSetsA[0].weight_lbs === weight
+  
+  if (!cleanA || !cleanB) return null
+  
+  const increment = ['legs', 'glutes', 'hamstrings'].includes(bodyPart) ? 10 : 5
+  return { exerciseName, currentWeight: weight, suggestedWeight: weight + increment, readySince: sessionA.date }
+}
+```
+
+**Where suggestions surface:**
+1. Day Hub Phase 2 (workout phase) — each exercise card shows a small "↑ Try [X]lbs" chip if a progression suggestion exists. Chip is tappable to see explanation.
+2. Morning brief on training days — coach_memory includes the progression observation (generated by weekly Edge Function); brief cites it.
+3. Post-workout completion screen — if any exercise was progression-ready AND the user matched or exceeded the suggested weight, note it: "Barbell rows at 190lbs — that's your first session at the new weight."
+
+**Data fetch for suggestions:**
+On Day Hub load, fetch the last 2 `workout_logs` entries for the same `day_label` (e.g. last 2 "Pull Day" sessions). Join with `workout_log_sets` for both sessions. Run `computeProgressionSuggestions` for each exercise in today's plan. Store results in component state.
+
+**Security:**
+- Rep range string parsing: `split('-')`, `parseInt()` — both must handle null/undefined gracefully with `?? ''` and `isNaN()` guards
+- Progression suggestions never write to `workout_plans` — component state only
+- Volume computation in Weekly Wrap: bodyweight exercises (`weight_lbs = 0`) tracked separately as rep count, not included in lbs-based volume total
+
+**Watch out for:**
+1. "2 consecutive sessions for the SAME exercise" — not 2 calendar sessions. Must filter `workout_log_sets` by `exercise_name` AND by the `day_label` that includes that exercise. A user who trains Push twice a week needs 2 Push sessions, not just any 2 sessions.
+2. Weight comparison between sessionA and sessionB: sessions only count as "consecutive at the same weight" if `workingSetsA[0].weight_lbs === workingSetsB[0].weight_lbs`. A user who already went up in weight between the two sessions doesn't need another nudge.
+3. Volume chart must handle exercises with no matching `exercises` table entry (custom exercises added mid-workout). Group these as "Other" in the volume breakdown rather than crashing.
+
+---
+
+### Phase V — Food Logging Streak
+
+**Independent. Short build — no new DB table, no AI.**
+
+**Implementation:**
+- On nutrition page load, client fetches `SELECT DISTINCT date FROM food_log_entries WHERE user_id = X ORDER BY date DESC LIMIT 60` via existing Supabase client
+- Walk backward from today counting consecutive days where log appears (existence check — any entry that day counts)
+- "Logged" definition: `date appears in the result set`. Simple — no calorie threshold needed (even logging one coffee counts as "active day"). This avoids punishing users who had a light day.
+- Display: small "🔥 [N] day streak" chip in the nutrition page header, next to the date picker
+- Personal best: `localStorage.getItem('food_log_streak_best')`. Compare on load. If current > stored, update + show a one-time toast: "🏆 New record — [N] days straight"
+- If streak = 0 or 1: don't show the chip (no need to call attention to no streak)
+- If streak ≥ 3: show the chip
+
+**Brief/coach_memory integration:**
+The weekly coach_memory Edge Function already reads `food_log_entries`. Add: count distinct logging days per week, split weekday vs weekend. Write observation if pattern is clear (e.g. "Logs consistently Mon–Fri but rarely Sat–Sun — weekend data is likely incomplete").
+
+**Security:** No user input, no AI call, no new DB writes. Client-side `localStorage` for personal best — not sensitive. Standard `getUser()` at page level already applies.
+
+**Watch out for:**
+- "Today" must be EST date, not UTC. Use the existing `estDateStr()` pattern.
+- The DISTINCT date query should include a date range filter (last 60 days) to prevent O(n) scans on large `food_log_entries` tables.
+- Don't show "streak broken" text. Simply show the current streak number. Absence is neutral.
+
+---
+
+### Phase W — Goal Velocity
+
+**Independent. Does not require Goals 2.0 — uses existing goals_profiles data.**
+
+**What to build:**
+New card on `/life-hub/goals/measurements/page.js` below the weight chart, titled "📈 Weight Trajectory."
+
+**Data required:**
+- `body_measurements`: `weight_lbs` + `date`, last 90 days, ordered by date ASC
+- `goals_profiles`: `target_weight_lbs`, `goals[]` (to check if weight goal applies)
+
+**Display logic:**
+```
+≤ 3 data points: "Log your weight a few more times to see your trajectory"
+No target_weight_lbs set: "Set a target weight in Goals Setup to see your trajectory"
+goals[] doesn't include weight-related goal: don't show this card
+```
+
+**Trajectory calculation (linear regression):**
+```js
+function linearRegression(points) { // points = [{ x: dayIndex, y: weight }]
+  const n = points.length
+  const sumX = points.reduce((s, p) => s + p.x, 0)
+  const sumY = points.reduce((s, p) => s + p.y, 0)
+  const sumXY = points.reduce((s, p) => s + p.x * p.y, 0)
+  const sumXX = points.reduce((s, p) => s + p.x * p.x, 0)
+  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX)  // lbs/day
+  const intercept = (sumY - slope * sumX) / n
+  return { slope, intercept }
+}
+
+const lbsPerWeek = slope * 7
+const currentWeight = latestMeasurement.weight_lbs
+const weeksToGoal = Math.abs(currentWeight - targetWeight) / Math.abs(lbsPerWeek)
+const estimatedDate = new Date(Date.now() + weeksToGoal * 7 * 24 * 60 * 60 * 1000)
+```
+
+**Card content:**
+- Current pace: "[+/-]X.Xlbs/week over the last [N] weeks"
+- Projection: "At this pace, you'll reach [targetWeight]lbs by approximately [Month Year]"
+- If pace going wrong direction: "Your weight is trending in the opposite direction of your goal. Recent data is [X measurements] — if this is accurate, reviewing your nutrition targets may help."
+- Never say "you're behind" — reframe as "the trend tells us you'll get there in [N] weeks at current pace"
+- If `lbsPerWeek` near 0 (< 0.1 abs): "Your weight has been stable over the last [N] weeks — recomposition may be happening (muscle gain offsetting fat loss). Check your measurements for more signal."
+
+**Security:**
+- Weight data is personal health data — never log to console
+- Linear regression is client-side math — no AI call, no DB write
+- Minimum data guard: `if (weights.length < 4) return <placeholder />` — prevents meaningless projections from 1–2 data points
+
+**Watch out for:**
+1. Outlier measurements (e.g. 195lbs one day, 165lbs next from a typo) massively distort linear regression. Apply a simple outlier filter: exclude any measurement more than 10 lbs from the 7-day rolling average before regressing. Or just use median-based smoothing.
+2. The projection breaks when `lbsPerWeek` is near 0 (division by near-zero). Guard: if `Math.abs(lbsPerWeek) < 0.05`, show the "weight stable" message instead of projecting.
+3. Weight goals: check `goals_profiles.goals` array for values like `'lose_weight'`, `'gain_weight'`, `'maintain'`. The card is irrelevant for `'maintain'` (no target to project toward) — hide it.
+4. Recomp signal: if waist measurement is trending down AND weight is flat → show "Recomposition signal: your waist is shrinking while weight holds. This is the goal working — muscle is replacing fat." This is higher value than a velocity projection in this case.
+
+---
+
+### Phase X — DV% Display Next to Nutrient Values
+
+**Status:** Polish pass. Touch many files in one session. No new tables, no AI calls.
+
+**DV source:** `DV` constant in `src/lib/nutritionUtils.js`. `calcMicroTargets(age, sex)` from `src/lib/tdee.js` for personalized targets.
+
+**Display format:** `100mg · 25% DV` — the amount in its original unit, then a faint `· XX% DV` in `var(--text-secondary)` at ~11px. Cap display at 999%. Show `—` if no DV for that nutrient (caffeine, water_g). Don't show DV% for calories.
+
+**Surfaces to update (in priority order):**
+1. Food log entry expanded view (tap-to-expand in nutrition page) — per-item macro + micro breakdown
+2. AddFoodModal Favorites tab: food card micronutrient chips
+3. SearchModal manual entry result preview
+4. EditFoodModal nutrient rows
+5. Nutrition page micronutrient panel (NutrientBars component and the micro row display)
+
+**Implementation approach:** Create a shared helper:
+```js
+// src/lib/nutritionUtils.js — add to existing exports
+export function formatNutrientWithDV(key, value, age, sex) {
+  if (value == null || value === 0) return null
+  const target = calcMicroTargets(age, sex)[key] ?? DV[key]
+  if (!target) return `${value}${NUTRIENT_UNITS[key] ?? ''}`
+  const pct = Math.min(999, Math.round((value / target) * 100))
+  return { amount: `${value}${NUTRIENT_UNITS[key] ?? ''}`, pct }
+}
+```
+Then each component renders `{amount} · {pct}% DV` with split styling.
+
+**Add `NUTRIENT_UNITS` to `nutritionUtils.js`:**
+```js
+export const NUTRIENT_UNITS = {
+  calories: 'kcal', protein_g: 'g', carbs_g: 'g', fat_g: 'g',
+  fiber_g: 'g', sugar_g: 'g', sodium_mg: 'mg', potassium_mg: 'mg',
+  calcium_mg: 'mg', iron_mg: 'mg', magnesium_mg: 'mg',
+  vitamin_d_mcg: 'mcg', vitamin_b12_mcg: 'mcg', vitamin_c_mg: 'mg',
+  zinc_mg: 'mg', phosphorus_mg: 'mg', selenium_mcg: 'mcg',
+  omega3_g: 'g', vitamin_k_mcg: 'mcg', choline_mg: 'mg',
+  caffeine_mg: 'mg', water_g: 'g',
+  // add remaining as needed
+}
+```
+
+**Security:** No user input, no AI, no DB writes. Pure display utility. The `age` and `sex` values come from `goals_profiles` which is already fetched on these pages.
+
+**Watch out for:**
+1. Components that display nutrients don't always have `age`/`sex` in scope. For components that don't, fall back to `DV` (non-personalized) rather than making a new DB fetch.
+2. Very high DV% values (sodium at 200%) should still display as "200% DV" not as a red alert. The micronutrient awareness card (removed in Phase S) was the alert surface. DV% display is neutral information only.
+3. Layout: the "· XX% DV" suffix must not break to a new line. Use `white-space: nowrap` on the DV portion, or use `display: inline-flex`.
+
+---
+
+### Phase Y — Coach Memory Edge Function Upgrade
+
+**Prerequisite:** Phase Q (My Week) must be live before this phase. My Week data is meaningless to inject before Phase Q exists.
+
+**What to add to `supabase/functions/generate-coach-memory/index.ts`:**
+
+*1. My Week context injection:*
+```ts
+// Read current week's my_week entries
+const { data: myWeekRows } = await supabase
+  .from('my_week')
+  .select('day_of_week, day_type, workout_time, commitments')
+  .eq('user_id', userId)
+  .eq('week_start', currentMonday)
+
+const myWeekSummary = myWeekRows?.length > 0
+  ? `User's current week schedule: ${myWeekRows.map(r => `${DAY_NAMES[r.day_of_week]}: ${r.day_type}${r.workout_time ? `, workout at ${r.workout_time}` : ''}`).join('; ')}`
+  : null
+// Inject into Haiku prompt data summary when non-null
+```
+
+*2. Brief pattern analysis:*
+```ts
+// Read last 28 daily_briefs for patterns
+const { data: recentBriefs } = await supabase
+  .from('daily_briefs')
+  .select('brief_text, date, window')
+  .eq('user_id', userId)
+  .gte('date', thirtyDaysAgo)
+  .order('date', { ascending: false })
+  .limit(60)  // up to 60 (2 windows/day × 30 days)
+
+const briefSummary = recentBriefs?.length > 0
+  ? `Recent brief themes (last 28 days): summarize recurring topics from these ${recentBriefs.length} briefs`
+  : null
+// Note: don't re-send full brief text to Haiku — just count patterns.
+// Better: extract key phrases and count occurrences before sending.
+```
+
+For the brief pattern injection, don't send raw brief text to Haiku (too many tokens). Instead, extract a simple tally:
+```ts
+const proteinMentions = recentBriefs.filter(b => b.brief_text.toLowerCase().includes('protein')).length
+const sleepMentions = recentBriefs.filter(b => b.brief_text.toLowerCase().includes('sleep debt') || b.brief_text.toLowerCase().includes('sleep score')).length
+// Inject counts as: "The last 28 days of briefs mention: protein target gap (18/28 days), sleep quality concern (12/28 days)"
+```
+
+*3. The prompt addition for brief patterns:*
+Append to the Haiku generation prompt: "BRIEF PATTERNS (recurring topics in this user's AI coaching over 28 days): [briefPatternSummary]. If a topic appears in 12+ of 28 briefs, it is a persistent pattern — write a coach_memory observation about it."
+
+**Security:**
+- `my_week.commitments` is user free text → when injecting into Haiku prompt for coach_memory generation, wrap in `<user_input>` tags
+- The Edge Function uses service role — verify userId iteration is isolated per user (no cross-contamination between users in the loop)
+- Brief text is AI-generated content, not user-supplied → does NOT need `<user_input>` wrapping when used for pattern analysis
+
+**Watch out for:**
+1. The brief pattern analysis query returns up to 60 rows (2 windows × 30 days). Token-efficient approach: count keyword matches in TypeScript, then send counts only (not full text) to Haiku. Sending all 60 briefs to Haiku would be expensive and slow.
+2. My Week query must use the same `getMonday()` helper as the rest of the codebase. Deno doesn't have the Next.js app utility functions — reimplement `getMonday()` in the Edge Function file.
+3. My Week data is week-specific but the Edge Function runs weekly. It should read the CURRENT week's my_week (the one that just ended at the time the function runs, Sunday night). That week_start = `getMonday(today)`.
+
+---
+
+### Cross-Phase Security Audit
+
+Items that apply across ALL remaining phases:
+
+| Rule | Applied to |
+|------|-----------|
+| `getUser()` not `getSession()` on all routes | Phase P (evening brief), Phase Q (my-week API), Phase R (day-hub API), Phase S (push/subscribe) |
+| `is_disabled` check before any AI call | Phase P (evening brief POST), Phase S (brief Edge Functions — check before generating) |
+| User free text in `<user_input>` tags | Phase Q (commitments, day_notes in all brief injections), Phase Y (my_week commitments in Edge Function) |
+| New DB table = RLS in same migration | Phase Q (my_week), Phase S (push_subscriptions, push_notification_log) |
+| Rate limit on all AI routes | Phase P (1/day per window), Phase S (1/day per window for manual refresh) |
+| No `SELECT *` in production queries | Phase R (day-hub route), Phase U (workout_log_sets query) — select only needed columns |
+| Validate URL params before DB use | Phase R (`?date=` param), Phase Q (`?week=` param) |
+| Never log health data to console | All phases — no `console.log(weight, steps, sleep_score, hrv)` |
+
+### Post-Build: CLAUDE.md and build-notes.md Updates Required Per Phase
+
+Each phase must update both files in the same commit:
+
+| Phase | CLAUDE.md changes | build-notes.md changes |
+|-------|------------------|----------------------|
+| P | Update `daily-brief/route.js` description (add window param) | Move Phase O spec to Phase Log |
+| Q | Add `my_week` table to DB Tables section; add `/life-hub/my-week/page.js` to directory; remove meal-plan/page.js; update sidebar description; remove weekly_schedule UI from goals/page.js note | Add `my_week` to Database Tables; move My Week spec to Phase Log; update Future Features (remove Meal Plan references) |
+| R | Update workouts section (Day Hub page, stretches URL, sidebar 4 items); mark stretching/page.js as retired | Move Day Hub spec to Phase Log; update workout_logs table (coaching_feedback_read_at); update stretch_logs table (context column) |
+| S | Add push_subscriptions + push_notification_log to DB Tables; add daily-push Edge Function; update daily_briefs table description (window column) | Move Phase M spec to Phase Log; update daily_briefs table description; update Security Status table (add push notification security rows) |
+| T | Update sleep/page.js description | Phase Log entry |
+| U | Update weekly-wrap/route.js description; update history/page.js description | Phase Log entry |
+| V | Update nutrition/page.js description (streak chip) | Phase Log entry |
+| W | Update measurements/page.js description (trajectory card) | Phase Log entry |
+| X | Update nutritionUtils.js exports (NUTRIENT_UNITS, formatNutrientWithDV) | Phase Log entry |
+| Y | Update generate-coach-memory Edge Function description | Phase Log entry |
 
 **Standing Rule (enforced every session):** Before finalizing any new feature spec, scan ALL existing Future Features items and the extended queue below. If a new idea correlates with, conflicts with, duplicates, or depends on anything already specced → STOP. Ask the user before writing anything new. This prevents designing features in isolation that later fight each other or unknowingly duplicate work.
 
