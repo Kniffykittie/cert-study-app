@@ -150,13 +150,22 @@ ${(() => {
   const obs = [...(goalsProfile.biggest_obstacles ?? []), ...(goalsProfile.biggest_obstacles_other ? [goalsProfile.biggest_obstacles_other] : [])]
   return obs.length ? `- Biggest obstacles the client has flagged: ${obs.join(', ')} — factor these into exercise selection and recovery planning (e.g. chronic pain/injuries affect exercise choice; time constraints affect session length)` : ''
 })()}
-${(() => {
+${await (async () => {
+  const getMonday = (d) => { const dt = new Date(d); dt.setUTCHours(0,0,0,0); const dw = dt.getUTCDay(); dt.setUTCDate(dt.getUTCDate() - (dw === 0 ? 6 : dw - 1)); return dt.toISOString().split('T')[0] }
+  const monday = getMonday(new Date().toISOString().split('T')[0])
+  const { data: myWeekRows } = await supabase.from('my_week').select('day_of_week, day_type').eq('user_id', user.id).eq('week_start', monday)
+  const SCHED_LABELS = { active_work: 'active/physical job (high baseline steps)', desk_work: 'desk/sedentary job (low baseline steps)', day_off: 'day off (full recovery available)', travel: 'travel day (schedule disrupted)' }
+  if (myWeekRows?.length > 0) {
+    const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+    const summary = myWeekRows.map(r => `${dayNames[r.day_of_week]}: ${SCHED_LABELS[r.day_type] || r.day_type}`).join(', ')
+    const activeDays = myWeekRows.filter(r => r.day_type === 'active_work').length
+    return `- Weekly work/life schedule (from My Week): ${summary}. ${activeDays > 0 ? `Has ${activeDays} physically active work day(s) — schedule harder training on desk/off days.` : 'Primarily sedentary — cardio recommendations especially important.'}`
+  }
   const sched = goalsProfile.weekly_schedule
   if (!sched) return ''
-  const SCHED_LABELS = { active_work: 'active/physical job (high baseline steps)', desk_work: 'desk/sedentary job (low baseline steps)', day_off: 'day off (full recovery available)', travel: 'travel day (schedule disrupted)' }
   const summary = Object.entries(sched).map(([d, t]) => `${d}: ${SCHED_LABELS[t] || t}`).join(', ')
   const activeDays = Object.values(sched).filter(t => t === 'active_work').length
-  return `- Weekly work/life schedule: ${summary}. ${activeDays > 0 ? `Has ${activeDays} physically active work day(s) — already accumulating significant baseline movement; schedule harder training sessions on desk/off days where possible.` : 'Primarily sedentary work schedule — cardio recommendations are especially important.'}`
+  return `- Weekly work/life schedule: ${summary}. ${activeDays > 0 ? `Has ${activeDays} physically active work day(s) — schedule harder training on desk/off days.` : 'Primarily sedentary — cardio recommendations especially important.'}`
 })()}
 Use this context to fine-tune volume, intensity, and cardio recommendations.` : ''
 

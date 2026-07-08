@@ -2518,6 +2518,18 @@ ALTER TABLE daily_briefs ADD CONSTRAINT daily_briefs_window_check CHECK (window 
 - `src/app/api/checkin/insight/route.js` — after generating check-in insight, upserts `brief_text` into `daily_briefs` with `window: 'afternoon'` as a side effect. No new AI call — the check-in insight IS the afternoon brief.
 - `src/app/life-hub/page.js` — brief state changed from single `brief` to `briefs: { morning, afternoon, evening }` object. `briefExpanded` is now per-window. Loading logic fetches all three windows in sequence; evening only fetches/generates after 6pm (client-side hour check). JSX: single brief card replaced with mapped `BRIEF_CONFIG` array (morning=purple, afternoon=yellow #f59e0b, evening=indigo #818cf8); each card collapsible; afternoon shows only if text exists; evening shows if text exists OR currentHour >= 18; morning always shows.
 
+### Phase Q — My Week (Unified Weekly Planning Hub) — Complete
+
+- `src/app/api/life-hub/my-week/route.js` (new): GET `?week=YYYY-MM-DD` returns all rows for that week_start; POST `{ week, day }` upserts one day row (validates day_of_week 0–6, day_type against 4 valid values), syncs day_type back to `goals_profiles.weekly_schedule`; `getMonday()` UTC-safe
+- `src/app/life-hub/my-week/page.js` (new): Mon–Sun collapsible day cards; day type pills (active_work=green, desk_work=blue, day_off=purple, travel=orange); expanded detail: meal times (breakfast/lunch/dinner/snacks), workout time+duration, commitments textarea, notes textarea; auto-saves on blur per field via POST; week nav prev/next; "Copy from last week" prefills all fields from prior week's saved data; today highlighted in purple with TODAY badge; quick summary (workout time + breakfast) visible in collapsed state
+- `src/components/LifeHubSidebar.js`: "My Week" added under Overview (between Dashboard and Weekly Wrap); "Meal Plan" removed from Nutrition dropdown; `overviewActive` now includes `/life-hub/my-week`
+- `src/app/life-hub/goals/page.js`: Weekly Schedule inline edit card replaced with a link card pointing to `/life-hub/my-week`; `scheduleEdit`, `scheduleValue`, `scheduleSaving` state removed; `handleScheduleSave` removed; `GoalsSchedulePicker` component removed
+- `src/app/life-hub/nutrition/meal-plan/page.js`: deleted (meal plan UI retired; DB tables and API routes preserved)
+- `src/app/api/life-hub/daily-brief/route.js`: `scheduleContext` block now reads `my_week` for today first (falls back to `goals_profiles.weekly_schedule`); injects meal times, workout time, commitments, day_notes into Claude prompt; supplement timing alignment: when `workout_time` is set, computes pre-workout time (−45min) and injects pre-workout supplement timing note
+- `src/app/api/life-hub/monthly-wrap/route.js`: fetches `my_week` rows for the month; `scheduleMonthlyContext` uses actual per-day counts from `my_week` when available, falls back to `goals_profiles.weekly_schedule`
+- `src/app/api/workouts/generate-plan/route.js`: `async` IIFE reads `my_week` for current week; injects per-day schedule into workout plan prompt; falls back to `goals_profiles.weekly_schedule`
+- DB: `my_week` table created with RLS via Supabase MCP tool
+
 ### Phase L — Weekly Wrap Page — Complete
 
 - `src/app/api/life-hub/weekly-wrap/route.js` (new): GET returns list of past `week_start` dates or single wrap; POST validates Monday + completed week, gathers 9 tables (checkins, workouts, measurements, goals, water, food, sleep sessions, HR daily, steps hourly), computes 11 summary stats, calls `claude-sonnet-4-6` (max_tokens 350) with required "Next week:" paragraph, upserts to `weekly_wraps`; blocks current week with 400 + `next_monday`; `getUser()` + `is_disabled` check; free text wrapped in `<user_input>` tags

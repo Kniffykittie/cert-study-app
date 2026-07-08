@@ -353,16 +353,48 @@ export async function POST(req) {
   const dietaryPrefs = [...(goals.dietary_preferences ?? []), ...(goals.dietary_preferences_other ? [goals.dietary_preferences_other] : [])]
   const calorieHistoryNote = goals.calorie_history_note?.trim() || null
 
+  // Read my_week for today — fall back to goals_profiles.weekly_schedule
+  const todayDayOfWeek = (new Date(today).getUTCDay() + 6) % 7 // Mon=0
+  const getMonday = (d) => { const dt = new Date(d); dt.setUTCHours(0,0,0,0); const dw = dt.getUTCDay(); dt.setUTCDate(dt.getUTCDate() - (dw === 0 ? 6 : dw - 1)); return dt.toISOString().split('T')[0] }
+  const monday = getMonday(today)
+  const { data: myWeekRows } = await supabase.from('my_week').select('*').eq('user_id', user.id).eq('week_start', monday)
+  const todayMyWeek = myWeekRows?.find(r => r.day_of_week === todayDayOfWeek)
+
+  const SCHED_LABELS = { active_work: 'active work day (on feet all day — occupational steps, not exercise)', desk_work: 'desk/sedentary work day', day_off: 'day off', travel: 'travel day (disrupted routine)' }
   const scheduleContext = (() => {
+    if (todayMyWeek) {
+      const dayLabel = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][todayDayOfWeek]
+      return [
+        `WORK SCHEDULE: Today (${dayLabel}) is a ${SCHED_LABELS[todayMyWeek.day_type] || todayMyWeek.day_type || 'day'}.`,
+        todayMyWeek.breakfast_time ? `Breakfast scheduled: ${todayMyWeek.breakfast_time.slice(0,5)}` : null,
+        todayMyWeek.lunch_time ? `Lunch scheduled: ${todayMyWeek.lunch_time.slice(0,5)}` : null,
+        todayMyWeek.dinner_time ? `Dinner scheduled: ${todayMyWeek.dinner_time.slice(0,5)}` : null,
+        todayMyWeek.workout_time ? `Workout scheduled: ${todayMyWeek.workout_time.slice(0,5)}${todayMyWeek.workout_duration_min ? ` (${todayMyWeek.workout_duration_min} min)` : ''}` : null,
+        todayMyWeek.commitments ? `Today's commitments: <user_input>${todayMyWeek.commitments}</user_input>` : null,
+        todayMyWeek.day_notes ? `Notes: <user_input>${todayMyWeek.day_notes}</user_input>` : null,
+        `Factor active_work day types when interpreting step counts (occupational steps, not fitness-driven), HR elevation, and energy context.`,
+      ].filter(Boolean).join('\n')
+    }
     const sched = goals.weekly_schedule
     if (!sched) return null
     const dow = ['sun','mon','tue','wed','thu','fri','sat']
     const todayKey = dow[new Date().getDay()]
     const todayType = sched[todayKey]
-    const SCHED_LABELS = { active_work: 'active work day (on feet all day — occupational steps, not exercise)', desk_work: 'desk/sedentary work day', day_off: 'day off', travel: 'travel day (disrupted routine)' }
     const summary = Object.entries(sched).map(([d, t]) => `${d}=${t}`).join(', ')
     return `WORK SCHEDULE: ${summary}. Today (${todayKey}) is a ${SCHED_LABELS[todayType] || todayType}. Factor this when interpreting step counts (active_work steps are occupational, not fitness-driven), HR elevation, and energy context.`
   })()
+
+  // Supplement timing alignment from my_week workout_time
+  let suppTimingContext = null
+  if (todayMyWeek?.workout_time && (supplements || []).some(s => s.timing === 'pre_workout')) {
+    const [h, m] = todayMyWeek.workout_time.slice(0,5).split(':').map(Number)
+    const preH = h === 0 ? 23 : h - 1
+    if (!(h === 0 && m < 45)) {
+      const preTime = `${String(preH).padStart(2,'0')}:${String(m).padStart(2,'0')}`
+      const preSupps = (supplements || []).filter(s => s.timing === 'pre_workout').map(s => `${s.name} (${s.dose})`).join(', ')
+      suppTimingContext = `PRE-WORKOUT TIMING: Take ${preSupps} at ~${preTime} (45min before ${todayMyWeek.workout_time.slice(0,5)} workout)`
+    }
+  }
 
   const coachMemoryContext = await getCoachMemoryContext(supabase, user.id)
 
@@ -375,6 +407,7 @@ export async function POST(req) {
     dietaryPrefs.length ? `DIETARY PREFERENCES: ${dietaryPrefs.join(', ')} — factor into any nutrition commentary (e.g. if vegan and protein is low, suggest plant-based sources; if dairy-free, skip dairy suggestions)` : null,
     calorieHistoryNote ? `CALORIE HISTORY (user's lived experience — treat as ground truth over formula estimates): <user_input>${calorieHistoryNote}</user_input>` : null,
     scheduleContext,
+    suppTimingContext,
   ].filter(Boolean).join('\n')
 
   const dataSummary = [lines.join('\n'), personalContext].filter(Boolean).join('\n\n')

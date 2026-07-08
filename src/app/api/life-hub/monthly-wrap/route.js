@@ -224,7 +224,25 @@ Avg daily hydration: ${avgWater ? avgWater + ' oz (water + beverages)' : 'not tr
 Avg daily calories: ${avgCalories ? avgCalories + ' cal' : 'not tracked'} (logged ${foodDates.length}/${daysInMonth} days)${avgProtein ? ` | Avg protein: ${avgProtein}g/day` : ''}
 Goals: ${(goals?.goals || []).join(', ') || 'not set'}${sleepTarget && avgSleepHours ? ` | Sleep target: ${sleepTarget}h/night, actual avg: ${avgSleepHours}h` : ''}`
 
+  // Read my_week for the month — fall back to goals_profiles.weekly_schedule
+  const { data: myWeekMonth } = await supabase
+    .from('my_week')
+    .select('day_type, day_of_week')
+    .eq('user_id', user.id)
+    .gte('week_start', start)
+    .lte('week_start', end)
+
   const scheduleMonthlyContext = (() => {
+    if (myWeekMonth?.length > 0) {
+      const counts = { active_work: 0, desk_work: 0, day_off: 0, travel: 0 }
+      for (const r of myWeekMonth) if (r.day_type) counts[r.day_type]++
+      const parts = []
+      if (counts.active_work) parts.push(`${counts.active_work} active work day entries (occupational steps)`)
+      if (counts.desk_work) parts.push(`${counts.desk_work} desk day entries`)
+      if (counts.day_off) parts.push(`${counts.day_off} days off`)
+      if (counts.travel) parts.push(`${counts.travel} travel day entries`)
+      return parts.length ? `MONTHLY SCHEDULE (from My Week): ${parts.join(', ')} — factor when interpreting step counts and activity patterns` : null
+    }
     const sched = goals?.weekly_schedule
     if (!sched) return null
     const activeDays = Object.values(sched).filter(v => v === 'active_work').length
@@ -234,7 +252,7 @@ Goals: ${(goals?.goals || []).join(', ') || 'not set'}${sleepTarget && avgSleepH
     if (activeDays) parts.push(`${activeDays} active work day${activeDays > 1 ? 's' : ''}/week (occupational steps)`)
     if (deskDays) parts.push(`${deskDays} desk day${deskDays > 1 ? 's' : ''}/week (sedentary baseline)`)
     if (offDays) parts.push(`${offDays} day${offDays > 1 ? 's' : ''} off/week`)
-    return parts.length ? `WEEKLY SCHEDULE: ${parts.join(', ')} — factor this when interpreting monthly step counts and activity patterns` : null
+    return parts.length ? `WEEKLY SCHEDULE (default): ${parts.join(', ')} — factor when interpreting monthly step counts and activity patterns` : null
   })()
 
   const personalContextLines = [

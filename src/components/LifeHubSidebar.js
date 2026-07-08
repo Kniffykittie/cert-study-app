@@ -146,7 +146,7 @@ export default function LifeHubSidebar() {
     </div>
   )
 
-  const overviewActive = pathname === '/life-hub' || pathname === '/life-hub/monthly-wrap' || pathname === '/life-hub/weekly-wrap'
+  const overviewActive = pathname === '/life-hub' || pathname === '/life-hub/monthly-wrap' || pathname === '/life-hub/weekly-wrap' || pathname === '/life-hub/my-week'
   const healthActive = pathname.startsWith('/life-hub/health') && pathname !== '/life-hub/health/water'
   const nutritionActive = pathname.startsWith('/life-hub/nutrition') || pathname === '/life-hub/goals/supplements' || pathname === '/life-hub/health/water'
   const workoutsActive = pathname.startsWith('/life-hub/workouts')
@@ -169,6 +169,7 @@ export default function LifeHubSidebar() {
 
       {sectionHeader('Overview', SECTION_COLORS.overview)}
       {navLink('Dashboard', '/life-hub', SECTION_COLORS.overview)}
+      {navLink('My Week', '/life-hub/my-week', SECTION_COLORS.overview)}
       {navLink('Weekly Wrap', '/life-hub/weekly-wrap', SECTION_COLORS.overview)}
       {navLink('Monthly Wrap', '/life-hub/monthly-wrap', SECTION_COLORS.overview)}
 
@@ -198,7 +199,6 @@ export default function LifeHubSidebar() {
       {nutritionOpen && (
         <div style={{ paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
           {navLink('Food Log', '/life-hub/nutrition', SECTION_COLORS.nutrition)}
-          {navLink('Meal Plan', '/life-hub/nutrition/meal-plan', SECTION_COLORS.nutrition)}
           {navLink('Encyclopedia', '/life-hub/nutrition/encyclopedia', SECTION_COLORS.nutrition)}
           {navLink('Hydration', '/life-hub/health/water', SECTION_COLORS.nutrition)}
           {navLink('Supplements', '/life-hub/goals/supplements', SECTION_COLORS.nutrition)}

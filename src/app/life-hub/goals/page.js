@@ -47,9 +47,6 @@ export default function GoalsPage() {
   const [regenerating, setRegenerating] = useState(false)
   const [regenMsg, setRegenMsg] = useState('')
   const [showWhy, setShowWhy] = useState(false)
-  const [scheduleEdit, setScheduleEdit] = useState(false)
-  const [scheduleValue, setScheduleValue] = useState(null)
-  const [scheduleSaving, setScheduleSaving] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -89,19 +86,6 @@ export default function GoalsPage() {
     }
     setRegenerating(false)
     setTimeout(() => setRegenMsg(''), 4000)
-  }
-
-  async function handleScheduleSave() {
-    if (!scheduleValue) return
-    setScheduleSaving(true)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      await supabase.from('goals_profiles').update({ weekly_schedule: scheduleValue }).eq('user_id', user.id)
-      setProfile(prev => ({ ...prev, weekly_schedule: scheduleValue }))
-    }
-    setScheduleSaving(false)
-    setScheduleEdit(false)
   }
 
   if (loading) return <div style={{ padding: '40px', color: 'var(--text-secondary)' }}>Loading...</div>
@@ -220,48 +204,18 @@ export default function GoalsPage() {
           </div>
         </div>
 
-        {/* Weekly Schedule */}
-        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em' }}>📅 Weekly Schedule</div>
-            {!scheduleEdit && (
-              <button onClick={() => { setScheduleValue(profile.weekly_schedule || { mon: 'desk_work', tue: 'desk_work', wed: 'desk_work', thu: 'desk_work', fri: 'desk_work', sat: 'day_off', sun: 'day_off' }); setScheduleEdit(true) }}
-                style={{ background: 'none', border: '1px solid #06b6d430', borderRadius: '6px', padding: '3px 10px', fontSize: '11px', color: '#06b6d4', cursor: 'pointer' }}>
-                Edit
-              </button>
-            )}
-          </div>
-          {scheduleEdit ? (
+        {/* My Week link */}
+        <Link href="/life-hub/my-week" style={{ textDecoration: 'none' }}>
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'background-color 0.15s', cursor: 'pointer' }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#06b6d410'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--surface)'}>
             <div>
-              <GoalsSchedulePicker value={scheduleValue} onChange={setScheduleValue} />
-              <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
-                <button onClick={handleScheduleSave} disabled={scheduleSaving}
-                  style={{ padding: '8px 20px', borderRadius: '8px', border: 'none', backgroundColor: '#06b6d4', color: '#000', fontSize: '13px', fontWeight: '700', cursor: scheduleSaving ? 'wait' : 'pointer' }}>
-                  {scheduleSaving ? 'Saving…' : 'Save'}
-                </button>
-                <button onClick={() => setScheduleEdit(false)}
-                  style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'transparent', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>
-                  Cancel
-                </button>
-              </div>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>📅 Weekly Schedule</div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Manage your weekly schedule, meal times, and workout plan in My Week →</p>
             </div>
-          ) : profile.weekly_schedule ? (
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {['mon','tue','wed','thu','fri','sat','sun'].map(day => {
-                const val = profile.weekly_schedule[day] || 'desk_work'
-                const label = { active_work: 'Active', desk_work: 'Desk', day_off: 'Off', travel: 'Travel' }[val]
-                return (
-                  <div key={day} style={{ textAlign: 'center', padding: '6px 10px', borderRadius: '8px', backgroundColor: 'var(--background)', minWidth: '44px' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: '600' }}>{day.charAt(0).toUpperCase() + day.slice(1)}</div>
-                    <div style={{ fontSize: '11px', color: val === 'day_off' ? 'var(--text-secondary)' : '#06b6d4', fontWeight: '700', marginTop: '2px' }}>{label}</div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Not set — helps the AI interpret your step count and energy levels.</p>
-          )}
-        </div>
+            <span style={{ fontSize: '20px', color: '#06b6d4', flexShrink: 0 }}>→</span>
+          </div>
+        </Link>
 
         {/* Notes */}
         {profile.notes && (
