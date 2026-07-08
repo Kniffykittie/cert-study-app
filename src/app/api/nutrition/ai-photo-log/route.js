@@ -28,6 +28,25 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Unsupported image type' }, { status: 400 })
   }
 
+  // Server-side payload size cap (~1.5MB base64 ≈ ~1.1MB raw — well above any legitimate 800px JPEG)
+  if (image_base64.length > 2_000_000) {
+    return NextResponse.json({ error: 'Image too large — please use a smaller photo.' }, { status: 400 })
+  }
+
+  // Magic byte validation — decode first 4 bytes and check against known image signatures
+  try {
+    const header = Buffer.from(image_base64.slice(0, 12), 'base64')
+    const isJpeg = header[0] === 0xFF && header[1] === 0xD8 && header[2] === 0xFF
+    const isPng = header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47
+    const isWebp = header[8] === 0x57 && header[9] === 0x45 && header[10] === 0x42 && header[11] === 0x50
+    const isGif = header[0] === 0x47 && header[1] === 0x49 && header[2] === 0x46
+    if (!isJpeg && !isPng && !isWebp && !isGif) {
+      return NextResponse.json({ error: 'File does not appear to be a valid image.' }, { status: 400 })
+    }
+  } catch {
+    return NextResponse.json({ error: 'Could not validate image.' }, { status: 400 })
+  }
+
   const userHint = description?.trim()
     ? `\n\nThe user also says: <user_input>${description.trim()}</user_input>`
     : ''

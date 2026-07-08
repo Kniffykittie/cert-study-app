@@ -2456,6 +2456,7 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 - "← Try a different photo" button resets state
 - `handleConfirmOtherLog` extended with `photo` branch (logs directly, no save-to-library)
 - `src/lib/rateLimit.js` updated with `'nutrition/ai-photo-log': 10`
+- Server-side guards: 2MB base64 payload cap + magic byte validation (JPEG/PNG/WebP/GIF signatures checked before sending to Anthropic); client-supplied `media_type` is validated but not trusted alone
 
 ### Phase Y — Coach Memory Edge Function Upgrade — Complete
 
