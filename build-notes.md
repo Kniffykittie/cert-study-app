@@ -2671,6 +2671,464 @@ Seven inputs that were collected but never used downstream wired up in the same 
 ### Fix — Edit Favorite category not saving — Complete
 - `my-foods/route.js` PUT handler was missing `is_drink`, `is_ingredient`, `is_snack` fields in the update object; category changes were silently ignored on save
 
+---
+
+## Future Features — Extended Build Queue (Steps 21–27 + Supporting Specs)
+
+**Standing Rule (enforced every session):** Before finalizing any new feature spec, scan ALL existing Future Features items and the extended queue below. If a new idea correlates with, conflicts with, duplicates, or depends on anything already specced → STOP. Ask the user before writing anything new. This prevents designing features in isolation that later fight each other or unknowingly duplicate work.
+
+---
+
+### Step 21 — Goal Progress Velocity (G)
+
+**Status:** 💬 Discussed — Design session required before building. See design notes below.
+
+**The core value:** Right now, goals are labels ("lose weight"). The user picks a goal, sees a TDEE number, and has no visibility into whether they're on pace, off pace, or pointed at the wrong target entirely. Goal velocity turns that label into a live trajectory: "At your current rate, you'll reach your target weight in 19 weeks. You're 3 weeks ahead of schedule."
+
+**The problem that must be solved first — Goals 2.0:**
+Current goals setup captures labels, not computational targets. "Lose weight" with a target weight of 180lbs set 6 months ago may no longer reflect what the user actually wants. Before projecting velocity toward a goal, the goal itself must be well-defined, understood by the user, and confirmed by the AI.
+
+**Why a separate design session is required before building:**
+- Users often set a goal without understanding what it implies (1lb/week loss = 500 cal deficit/day permanently)
+- Users who don't have tracking tools (food scale, tape measure, smart watch) may have goals that require data they can't produce
+- AI-assisted goal confirmation is the right UX but needs careful design — see Goals 2.0 notes below
+
+**What Goal Velocity includes (once Goals 2.0 is ready):**
+1. **Weight trajectory card** on the Goals/Measurements page: plot actual weight measurements against a projected trend line toward target weight. Show weeks ahead/behind. If no weight data for 14+ days, show "Update your weight to see your trajectory" prompt.
+2. **Pace signal in Daily Brief:** "You're averaging -0.6lbs/week over the last 4 weeks. Your target is -1.0lbs/week. Closing the gap is a protein + deficit alignment issue — you're hitting your calorie target but protein often falls short, which affects muscle retention during loss."
+3. **Recomp signal:** If waist is trending down AND arms are trending up AND weight is flat → "You're in active recomposition. Don't chase the scale right now — this is the goal working."
+4. **Velocity formula:** Use last 28 days of weight measurements (minimum 4 data points). Linear regression gives lbs/week rate. `weeksToGoal = (currentWeight - targetWeight) / rate`. Show as range (min/max based on variance in the trend).
+
+**Watch out for:**
+- Negative velocity framing: never show "you're 8 weeks behind" without context. Always explain why (data gap, plateau, diet adherence pattern) and what one action closes the gap.
+- Missing data: if user has 0–3 weight measurements, don't project — show "log weight a few more times to see your trajectory."
+- Users not on a weight goal: velocity doesn't apply to "build strength" or "run a 5k" goals — skip the weight trajectory card entirely for those users. Show a strength velocity metric instead (PR progression rate for main lifts).
+
+---
+
+### Goals 2.0 Design Notes (prerequisite to Step 21 + long-term foundation)
+
+**Status:** 💬 Design discussion required. Do not build Goal Velocity until this is resolved.
+
+**The problem with current goals setup:**
+- User picks "lose weight" + enters a target weight → system computes TDEE − deficit → done
+- No confirmation that the user understands what that deficit means in practice
+- No account for users who don't have the tools to track progress accurately
+- No clarifying questions — user says "lose weight" and AI accepts it as a complete goal
+- Goals can be set once and become stale (target set 6 months ago at a different weight)
+
+**What Goals 2.0 must solve:**
+
+*1. AI-assisted goal clarification (chat interface):*
+Instead of dropdowns → user types a free-form goal statement in a text field: "I want to lose belly fat and get stronger."
+AI responds with clarifying questions:
+- "When you say lose belly fat, are you focused on the scale going down, or more on your waist measurement shrinking? These are related but the best strategy differs slightly."
+- "You mentioned getting stronger — are you currently lifting weights, or would you be starting from scratch?"
+User answers each question conversationally. AI synthesizes answers into computational targets before saving.
+Before saving, AI shows a confirmation card: "Based on what you told me: [exact strategy]. Does this match what you're going for?"
+User confirms → goals_profiles updated. User corrects → AI asks one more follow-up.
+
+*2. Equipment/access awareness:*
+AI must ask: "Do you have a food scale to weigh portions?" → If no → calorie targets are estimates; logging accuracy will be lower; AI must caveat nutrition commentary accordingly and not make precise statements about deficits.
+"Do you have a tape measure?" → If no → body measurement goals can't be tracked; AI must note this and suggest proxy measures (how clothes fit, photos).
+"Do you have a bathroom scale?" → If no → weight trajectory (Step 21) is impossible; AI must route around it.
+Store these as boolean fields on `goals_profiles`: `has_food_scale`, `has_tape_measure`, `has_bathroom_scale`. All three default to `true` for existing users (assume they have the basics). AI commentary adjusts based on these flags throughout the app.
+
+*3. Regular goal re-confirmation:*
+Once per month (or triggered by significant weight change), the Daily Brief (or a separate prompt) should ask: "You set your goal 6 weeks ago to reach 175lbs by April. You're at 181lbs now — do you want to update your target or timeline?"
+This is a brief-level check-in, not a full setup re-run. One question, one answer, one DB update.
+
+*4. Concern documented — users not understanding implications:*
+When a user says "I want to lose 20lbs in 3 months," AI must be honest: "That's about 1.7lbs/week, which requires a ~850 calorie/day deficit. Most people find that difficult to sustain without hitting hunger. A more comfortable pace is 0.5–1.0lbs/week — would you prefer a longer timeline at a less aggressive deficit?" Let user decide but make the math visible.
+
+**Not building yet.** Before Goals 2.0 is built, plan a dedicated design session covering the exact conversation flow, the data model changes, and how it integrates with the existing 5-step setup page.
+
+---
+
+### Step 22 — Sleep Debt Tracking (E)
+
+**Status:** 📋 Specced, ready to build after Phase O (evening brief + daily_briefs migration)
+
+**What it does:**
+Accumulates a running "sleep debt" balance based on actual sleep vs the user's target (`goals_profiles.sleep_hours`). Displays it in the morning brief and optionally on the Sleep Tracker page.
+
+**Formula:**
+```
+sleepDebtTonight = target_sleep_hours - actual_sleep_hours (last night)
+rollingDebt7Day = sum of (target - actual) for last 7 days, floored at 0
+```
+A debt of 0 means the user is caught up or ahead. A debt of 5 hours means they've averaged 42 minutes short per night this week.
+
+**Data source:** `health_sleep_sessions` for users with Google Health connected. `goals_profiles.sleep_hours` as the target. For users without Google Health: use the `sleep_hours` field from `daily_checkins` (manual entry). If both are null, skip sleep debt calculation entirely.
+
+**Where it surfaces:**
+
+*Morning brief:*
+- Debt < 1 hour: mention briefly if relevant to low energy check-in. "Your sleep has been on target this week."
+- Debt 1–3 hours: "You're carrying about [X] hours of sleep debt from the past week. This tends to compound — energy and focus dip more each day it accumulates."
+- Debt > 3 hours: leads the morning section. "You're carrying [X] hours of sleep debt from this week. That's the main driver of how you're likely feeling right now. One night of good sleep recovers about 25–30% of short-term debt — tonight matters more than usual."
+
+*Missing check-in data (no morning energy rating):*
+If it's past noon and no morning check-in was logged AND sleep debt > 2 hours, the afternoon brief should note: "I noticed you didn't do a morning check-in — if today has felt off, that's likely the sleep debt talking."
+**Do not show a prompt asking for the missed morning check-in.** That's annoying. Just acknowledge it in the afternoon brief naturally.
+
+*Sleep Tracker page:*
+Add a "Sleep Debt" stat card showing `rollingDebt7Day` with a color indicator: green (0–1hr), yellow (1–3hrs), red (3+hrs). Include a one-line ℹ explanation: "Short-term sleep debt (accumulated over 7 days) affects reaction time, hunger hormones, and recovery. It recovers faster than chronic debt — 2–3 nights of full sleep typically clears it."
+
+**Watch out for:**
+- `sleep_hours` from `daily_checkins` is the user's self-reported actual sleep — it's already in hours (NUMERIC 4,1). `health_sleep_sessions` stores total_duration_minutes. Convert: `actual_hours = total_duration_minutes / 60`.
+- Don't inject sleep debt into every AI route — it only belongs in the morning brief, afternoon brief (debt > 2 hours), and evening brief (debt > 3 hours, because tonight matters). Don't inject into nutrition commentary, workout coaching, etc.
+- HRV is bonus data for sleep quality context but sleep debt calculation uses duration only. HRV can accompany the callout but is not part of the debt formula.
+
+---
+
+### Step 23 — Workout Volume Tracking (A)
+
+**Status:** 📋 Specced, ready to build after Day Hub (Step 22 in existing queue)
+
+**The problem:** Current workout history shows sessions and PRs but has no concept of volume over time. A user training harder this month than last month has no visibility into that — the data is there but unread.
+
+**What it adds:**
+1. **Weekly volume metric:** Total sets × weight × reps (volume load) per muscle group per week. Stored in coach_memory as a baseline ("User's baseline weekly back volume is ~12,000 lbs — current week is 14,200 lbs, tracking 18% above baseline").
+2. **Volume trend in Weekly Wrap:** "Your total training volume this week was 42,000 lbs across all exercises — up 15% from your 4-week average. That's a meaningful increase; watch recovery signals this week." Requires `workout_log_sets` data already collected.
+3. **Volume-by-muscle-group chart on history page:** Simple bar chart — chest/back/legs/shoulders/arms per week, 4-week comparison. Shows if the user is consistently under-training a group.
+4. **Coach Memory integration:** The weekly Edge Function reads `workout_log_sets` and computes per-muscle-group volume. Writes observations like "Leg volume (12,000 lbs avg) is consistently 40% lower than push volume (20,000 lbs avg) — potential imbalance building." This feeds into Daily Brief and weekly wrap commentary.
+
+**Data already collected:** `workout_log_sets` has `exercise_name`, `weight_lbs`, `reps`, `set_type`. Volume formula: `SUM(weight_lbs × reps) WHERE set_type = 'working'` per muscle group per week. Muscle group can be derived from joining to `exercises` table on `exercise_name`.
+
+**Watch out for:**
+- Bodyweight exercises have `weight_lbs = 0`. Volume for push-ups = 0 × reps = meaningless. Use rep count as a proxy for bodyweight exercises: track reps only, don't mix with weighted volume in the same chart.
+- Exercise names in `workout_log_sets` are denormalized strings. The join to `exercises` table must handle name mismatches (mid-workout added exercises, custom names). Best approach: fuzzy match or just skip unmatched exercises rather than crash.
+
+---
+
+### Step 24 — Workout Plan Auto-Progression (C)
+
+**Status:** 📋 Specced, ready to build in same session as Step 23 (they share data patterns)
+
+**Design principle:** Auto-progression must be a suggestion, never automatic. The user controls their plan. The AI notices when progression may be appropriate and presents it on the Day Hub completion screen or in the morning brief.
+
+**Rep consistency signal (the correct readiness indicator):**
+- Do NOT use post-workout difficulty rating to judge individual exercise readiness. Difficulty is workout-level (how the whole session felt), not exercise-level.
+- Instead: track completion rate per exercise across the last 2 sessions.
+- "Clean completion" = user hit the TOP of the rep range on ALL working sets for that exercise in that session.
+- "Near completion" = hit the top on 2/3 or more working sets.
+
+**Progression rules:**
+```
+2 consecutive clean completions at current weight → suggest adding weight (5lbs for upper body, 10lbs for lower body as defaults)
+2 consecutive clean completions + post-workout difficulty was 5/5 (max effort) → suggest progression but note "you know it's possible — hold one more session to confirm it's repeatable, not a peak day"
+Rep count declined across sets within a session (e.g. 12 → 10 → 8) → not ready; hold current weight
+Rep count inconsistent across sessions → not ready; hold
+```
+
+**Where the suggestion surfaces:**
+1. **Morning brief (training day):** "Yesterday's bench press — you hit 12 reps on all 3 sets at 135lbs. That's two consecutive clean completions. You may be ready to move to 140lbs."
+2. **Day Hub workout phase:** Each exercise card shows "Suggested: ↑ to 140lbs" chip next to the exercise name on progression-ready exercises. This is the primary surface — it's right where the user plans their sets.
+3. **Post-workout completion screen:** "You hit 12/12 on all bench sets again. Moving to 140lbs next session looks right."
+
+**The suggestion is the deliverable — not an auto-update.** Suggestions live in component state. If the user wants to apply it permanently, they use the existing "Edit Plan" flow or regenerate a plan section. The suggestion does NOT write to `workout_plans`.
+
+**Data needed:**
+- `workout_log_sets`: last 2 sessions per exercise, set_type='working', weight_lbs, reps, rep_range
+- Parse `rep_range` (stored as "8-12" format) to get `topOfRange`
+- Clean completion: all working sets have `reps >= topOfRange`
+
+**Coach Memory integration:**
+When a progression suggestion is generated, the weekly Edge Function writes it to coach_memory: "User has hit clean completions on barbell rows at 185lbs for 2 sessions. Progression to 190lbs is recommended." This way the morning brief can reference it without recomputing from raw set data each time.
+
+**Watch out for:**
+- Rep range parsing: "8-12" → `parseInt('12')`. Handle edge cases ("8" single number, "AMRAP", null).
+- "2 consecutive sessions" means 2 training days for that specific exercise — not 2 calendar days. An exercise trained once/week needs 2 training weeks.
+- Deload weeks: if coach_memory notes user is fatigued or sleep debt is > 3 hours, suppress progression suggestions for that day even if the rep data says ready.
+
+---
+
+### Step 25 — Food Logging Streak (I)
+
+**Status:** 📋 Specced, low complexity, high motivation value
+
+**The problem:** There's no positive feedback loop for consistent logging. Users who log 5 days straight have no visibility into that consistency, and no gentle signal when the streak breaks.
+
+**What it adds:**
+1. **Logging streak counter** on the Nutrition page (near the page header or under the calorie ring): "🔥 7-day logging streak." Definition: "logged" = 3+ food entries OR 1,200+ calories logged for that day. Not punitive — one missed day breaks the streak but doesn't erase history.
+2. **Personal best badge:** "🏆 New record — 21 days straight" when user beats their previous longest streak. Shown once per new record as a brief toast.
+3. **Streak context in coach_memory:** The weekly Edge Function notes logging consistency patterns. "User logs consistently on weekdays (87% of days) but drops to 23% on weekends. Weekend log gaps mean weekend nutrition data is unreliable." This gets injected into Daily Brief and Monthly Wrap automatically.
+4. **Daily Brief nudge (when streak at risk):** If it's 7pm and no food logged today AND user has a 5+ day streak, the evening brief includes: "You haven't logged yet today — worth a quick backfill if you're tracking. Your [N]-day streak is still active until midnight."
+
+**Implementation:**
+- Streak computed client-side from `food_log_entries` query on nutrition page load: `SELECT DISTINCT date FROM food_log_entries WHERE user_id = X ORDER BY date DESC`. Walk backwards from today counting consecutive days where `entries.length >= 3 OR total_calories >= 1200`.
+- Personal best: store in `localStorage` as `food_log_streak_best` (an integer). On each load, compare current streak to stored best. If current > stored best → update localStorage + show toast.
+- No new DB table needed. Streak is computed from existing data.
+
+**Watch out for:**
+- Timezone: `date` in `food_log_entries` is the user's local date (EST stored as text). Comparing "today" to the most recent logged date must use the same timezone reference.
+- Don't show "streak broken" as a negative message. Simply reset the counter. The streak is a positive signal; its absence is just neutral.
+
+---
+
+### Step 26 — Phase M: Push Notifications + Three-Brief System
+
+**Status:** 📋 Fully Specced (see Master Build Plan Phase M above for complete technical spec)
+
+**Prerequisites before building:**
+1. Phase O must be built first — `daily_briefs` UNIQUE constraint migration from `(user_id, date)` to `(user_id, date, window)`. This is a breaking change.
+2. Evening brief route and content must exist before M-B wires push into it.
+
+**Phase M-0 — daily_briefs schema migration (prerequisite):**
+
+```sql
+-- Step 1: add column with default (safe — no constraint yet)
+ALTER TABLE daily_briefs ADD COLUMN window TEXT DEFAULT 'morning';
+
+-- Step 2: backfill all existing rows
+UPDATE daily_briefs SET window = 'morning';
+
+-- Step 3: drop old unique constraint
+ALTER TABLE daily_briefs DROP CONSTRAINT IF EXISTS daily_briefs_user_id_date_key;
+
+-- Step 4: add new unique constraint
+ALTER TABLE daily_briefs ADD CONSTRAINT daily_briefs_user_id_date_window_key UNIQUE (user_id, date, window);
+
+-- Step 5: add check constraint
+ALTER TABLE daily_briefs ADD CONSTRAINT daily_briefs_window_check CHECK (window IN ('morning', 'afternoon', 'evening'));
+```
+
+All 5 steps in ONE migration — never split them (step 4 fails if step 2 didn't run first).
+
+**Files that touch `daily_briefs` and must be updated in the same migration commit:**
+- `src/app/api/life-hub/daily-brief/route.js` — GET: add `?window=` param (default 'morning'); POST: accept `window` in body, include in upsert with new `onConflict: 'user_id,date,window'`
+- `src/app/life-hub/page.js` — add `?window=morning` to brief fetch
+- Any future evening/afternoon brief generators inherit the new schema automatically
+
+**Summary of remaining Phase M work:** See the full Phase M spec in the Master Build Plan section above. It covers M-A (VAPID keys, push_subscriptions table, subscribe route, Settings UI, service worker), M-B (wiring push sends into brief generators), and M-C (nudge Edge Function). All of that spec stands — the Phase M-0 migration documented here is the additional prerequisite discovered when designing the three-brief system.
+
+---
+
+### Step 27 — Coach Memory Edge Function Upgrade
+
+**Status:** 💬 Discussed, spec in progress
+
+**Current state:** The `generate-coach-memory` Edge Function runs weekly and generates 5–10 observations. It works but doesn't yet benefit from My Week data (Step 28) or the extended brief system (Step 26).
+
+**What this step adds:**
+
+*A. My Week context injection:*
+Once My Week (Step 28 below) is built, the Edge Function should read the user's My Week entry for the current week and inject it as additional context. This allows observations like: "User's My Week shows they have commuting commitments on Tuesday and Thursday — their workout logging gaps on those days are schedule-driven, not motivation gaps."
+
+*B. Brief pattern analysis:*
+After 4+ weeks of morning briefs existing, the Edge Function should analyze patterns in what the brief has been noting repeatedly. If the morning brief has mentioned "protein under target" 12 of the last 14 days, that's a persistent pattern worth a coach_memory observation. The Edge Function currently doesn't read `daily_briefs` — add it to the 90-day data pull.
+
+*C. Conversation signal integration:*
+When the Keep Talking chat feature (Phase H) has accumulated conversation data, the Edge Function should read any signals stored from those conversations (applied suggestions, push-backs, body part mentions). This bridges ephemeral conversations into long-term memory. Requires a `conversation_signals` table or similar — defer this part until Phase H has been live for a few weeks.
+
+---
+
+### Step 28 — My Week Page (replaces existing Meal Plan page)
+
+**Status:** 💬 Discussed, design complete, ready to spec for building
+
+**Decision:** The existing `/life-hub/nutrition/meal-plan` page (food-only weekly planning grid) is retired entirely and replaced by "My Week" — a broader weekly context hub that becomes the primary input for all brief windows. This is not an upgrade to meal plan; it is a different feature with a different purpose.
+
+**What My Week is:**
+A place where the user tells the AI what their week looks like BEFORE it happens. Not after-the-fact logging — forward-looking context. The AI uses this as the primary context lens for all three brief windows throughout the week.
+
+**What users enter in My Week:**
+
+```
+For each day of the week:
+  - Estimated meal times (breakfast: 7am, lunch: 12pm, dinner: 6:30pm)
+  - Workout time (if workout day): specific time + duration estimate
+  - Work schedule: which activity type (from existing weekly_schedule field — pulls in automatically)
+  - Other commitments: short text field ("dentist at 2pm", "kids' soccer at 5pm", "long commute Tuesdays")
+  - Notes/context: anything else the AI should know ("planning to eat out for dinner Wednesday", "might be traveling Friday")
+```
+
+**Why this matters for AI quality:**
+Without My Week:
+- Morning brief: "You have a workout today."
+- With My Week: "Your workout is at 6pm today. You have a dentist at 2pm and dinner planned out. That means your pre-workout fuel window is 3:30–4:30pm — you want 30–40g carbs in that window. Your dental appointment is before that, so eat before 1pm."
+
+The specificity difference is the difference between a generic AI response and a genuine personal assistant.
+
+**How briefs use My Week data:**
+My Week entry for the day is fetched alongside all other brief context. Every brief window gets:
+- `scheduled_meal_times` (breakfast/lunch/dinner as HH:MM strings)
+- `workout_scheduled_at` (HH:MM or null)
+- `commitments` (free text)
+- `day_notes` (free text)
+
+These are injected into the brief system prompt as: "TODAY'S SCHEDULE (user-provided): [formatted schedule block]"
+
+**UI design:**
+- Week view (Mon–Sun columns) with date headers
+- Each day column has expandable sections: ⏰ Meal Times, 🏋️ Workout, 📅 Commitments, 📝 Notes
+- Quick-fill patterns: "Same as last week" button copies previous week's entry
+- Workout time auto-populates from today if a workout was logged at that time last week (learning pattern)
+- Overview card at the top of Life Hub home: "This week at a glance" — shows committed times and any notes for today
+
+**DB:**
+```sql
+CREATE TABLE my_week (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  week_start DATE NOT NULL,  -- always Monday
+  day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),  -- 0=Mon
+  breakfast_time TIME,
+  lunch_time TIME,
+  dinner_time TIME,
+  workout_time TIME,
+  workout_duration_min SMALLINT,
+  commitments TEXT,
+  day_notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, week_start, day_of_week)
+);
+ALTER TABLE my_week ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "user_own" ON my_week USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+```
+
+**Sidebar placement:** Under Overview section (alongside Dashboard, Weekly Wrap, Monthly Wrap). Remove "Meal Plan" from Nutrition dropdown entirely (the page is retired).
+
+**Existing meal_plans + meal_plan_entries tables:** Keep them for now (don't drop). The food-level meal planning that was on that page is not being migrated anywhere — it's just retired. If users want food planning, they use the Nutrition → Food Log. The meal plan data remains in the DB but the UI is removed.
+
+**Watch out for:**
+- `week_start` must always be Monday. Use the same `getMonday()` helper already in the weekly-wrap route.
+- My Week data becomes stale quickly (what you planned Monday may change by Wednesday). The brief should read it but never present it as "what happened" — always frame it as "what you had planned." Distinguish: "You had dinner scheduled for 6:30pm — if you ate around then, that timing is solid for muscle protein synthesis overnight."
+- The food-level meal plan grid (the part being retired) will break if anything still imports from `meal_plans` or `meal_plan_entries`. Audit before removing the page.
+- `commitments` and `day_notes` are user-supplied free text → wrap in `<user_input>` tags in all AI prompts.
+
+---
+
+### Brief Format Spec — Extended Depth Guidelines
+
+**Status:** 📋 Design approved. Apply when building Phase M (three-brief system) and any brief content upgrades.
+
+**Approved length targets:**
+- Morning brief: ~500–700 words (substantially longer than the current single-paragraph format)
+- Afternoon brief: ~400–500 words
+- Evening brief: ~400–500 words
+
+The existing brief is too conservative — the AI has access to rich data but underuses it. The goal is a brief that feels like reading a note from a coach who actually studied your week, not a quick summary card.
+
+**What each window must include:**
+
+**Morning brief — required sections (in this order):**
+
+1. *Sleep + recovery opening:* Sleep score, resting HR, HRV if available. Translate these into plain English: "Last night was a 68 — your body got solid deep sleep (72 minutes) which is above your average. HRV held at 44ms, which is in your normal range. Recovery looks good."
+2. *Sleep debt context (if accumulated):* Reference Step 22. "You've had a tough sleep week — cumulative debt around 3.5 hours since Monday. Today will likely feel better than yesterday but not your sharpest."
+3. *Work schedule context:* Read `weekly_schedule` for today's day. "You've got desk work today — your occupational steps will be low. That means your intentional movement matters more today than on your active work days."
+4. *Today's nutrition plan:* Estimated calorie target, protein target, meal timing from My Week if set. "Your eating window looks like breakfast at 7am, lunch at noon, dinner at 6:30. With that schedule, hitting 160g protein means roughly 40g at each meal plus a mid-afternoon snack."
+5. *Yesterday's nutrition close-out (brief):* "Yesterday you landed at 1,850 calories and 112g protein — 48g under target on protein. That gap is worth closing today."
+6. *Hydration target:* Personalized based on day type and step forecast. "Desk day at normal activity — 80oz is your baseline. If you hit the gym this afternoon as planned, add another 16oz."
+7. *Step-count-based hydration adjustment (key new spec):* When step patterns suggest higher activity, brief must call it out specifically. Example: "I can see from yesterday's intraday data that you gained 6,000 steps between 9am and 11am — that kind of occupational activity at work warrants being at 60oz of water by noon. Today looks similar based on your schedule, so front-load water in the morning."
+8. *Supplement timing:* When My Week has a workout time set, supplement pre_workout timing aligns to that window. "Your workout is at 6pm. Pre-workout supplements (creatine, caffeine if you use it) are best taken 30–45 minutes before — so around 5:15pm."
+9. *Workout context + auto-progression suggestion (if applicable):* What's on the plan today, any progression suggestions from Step 24. "You have a push day today — bench, overhead press, lateral raises. From your last two sessions, your bench press has hit 12 reps on all 3 sets at 135lbs. That's two clean completions. Today might be the day to try 140lbs on your first set and see how it feels."
+10. *Stretch recommendations:* What dynamic stretches are recommended pre-workout and why. "Before starting, 10 minutes of dynamic upper body — chest openers, shoulder circles, scapular wall slides. Your shoulders are the primary joint in today's push movements — opening them reduces impingement risk."
+11. *Forward-looking close:* One thing to watch today. "Today's main priority: close the protein gap from yesterday. If lunch and dinner each hit 50g, you're there."
+
+**Afternoon brief — required sections:**
+
+1. *Pace check:* Where are calories, protein, and water right now vs target. "You're at 1,100 calories and 68g protein by 1pm. Pace is slightly behind on protein but manageable — dinner can close it."
+2. *Step-count hydration adjustment:* Current step count + hydration recommendation. "You're at 7,200 steps by 1pm — that's more movement than your desk-work days usually show at this time. Bump your water target to 96oz today and aim to be at 64oz by now."
+3. *Work context (if active_work day):* "Those 7,200 steps have mostly been occupational — warehouse work, on your feet since 8am. That's real exertion. Your body is burning more than your TDEE formula assumes. If you feel hungrier than usual, that's accurate — you've earned extra fuel today."
+4. *Pre-workout fuel window (if workout scheduled today):* What to eat, when, how much. Specific — not generic. "Your workout is at 6pm. Your fuel window is 3:30–4:30pm. You want 30–40g carbs (a banana + rice cake, or Greek yogurt + granola) and 20–30g protein. Don't eat anything heavy after 4:30pm — digestion competes with workout performance."
+5. *Energy check-in context:* If morning check-in was logged, reference it. "You were at a 3/5 this morning — that typically means an energy dip around 2–3pm for you. A small carb snack before that window helps bridge it."
+6. *One actionable close:* The single most important thing to do in the next 2 hours.
+
+**Evening brief — required sections:**
+
+1. *Day close-out:* Final calorie + protein count, water total, steps total. Tone: neutral-positive, never scolding. "Today came in at 2,180 calories and 138g protein — 22g short on protein. Steps at 9,400 — solid for a desk day."
+2. *Workout close-out (if workout happened):* Quick summary of what was logged, coaching note if available. "Push day done — 52 minutes, you hit all your main sets. Coaching feedback suggests [X]."
+3. *Sleep debt context (if relevant):* "You've got about 2 hours of sleep debt from this week. Tonight is important. Aim for 8 hours if you can."
+4. *Recovery setup:* Specific evening actions. "Magnesium at 9pm — it takes 45 minutes to work. If you had a heavy leg day, L-theanine also helps with sleep onset. No caffeine after 2pm was a good call today based on what you logged."
+5. *Bedtime stretch reminder:* "10 minutes of static stretching before bed — hip flexors and thoracic spine especially if you were at a desk all day. That'll activate your parasympathetic system and shorten your sleep onset."
+6. *Tomorrow's preview (one sentence):* "Tomorrow is a rest day — your brief will focus on recovery signals and preparation for Thursday's leg day."
+
+**Key voice principles for all windows:**
+- Name real numbers. "You logged 68g protein" not "you had some protein today."
+- Name real foods when available. "The chicken at lunch" not "your meal."
+- Acknowledge work activity when step data shows occupational spikes. "I can see you've been on your feet at work — those 8,000 steps by 10am aren't gym steps, they're workday steps, and they count for hydration and energy needs."
+- Never say anything is "great" generically. Either cite why it's great or skip the adjective.
+- The supplement timing must align to My Week workout time, not a generic "pre-workout window."
+- Always include a stretch section in morning (pre-workout recommendations) and evening (bedtime routine).
+
+---
+
+### Callout Card Consolidation Plan
+
+**Status:** 📋 Design approved. Implement as part of the three-brief system build (Phase M + Step 26).
+
+**Cards to MOVE to briefs (remove from pages):**
+These cards currently appear on-page as floating callouts. They create visual clutter and duplicate information that should live in the AI coach's voice. Move their logic into the brief generation system and remove the on-page cards.
+
+| Card | Current Location | Move to |
+|------|-----------------|---------|
+| Micronutrient awareness card (over 150% DV, under 20% by 3pm, absent 3+ days) | `src/app/life-hub/nutrition/page.js` | Morning brief (persistent patterns) + Afternoon brief (time-sensitive) |
+| Pre-workout meal advisor banner | `src/app/life-hub/nutrition/page.js` | Afternoon brief (fuel window timing) |
+| Post-workout meal advisor banner | `src/app/life-hub/nutrition/page.js` | Evening brief (protein synthesis window) |
+| Fatigue signal callout | `src/app/life-hub/workouts/page.js` | Morning brief (energy check-in context) |
+| Hydration reminder banner | `src/app/life-hub/workouts/log/page.js` | Afternoon brief (step-count hydration adjustment) |
+| Drink timing callout | `src/app/life-hub/health/water/page.js` | Afternoon brief (hydration timing) |
+
+**Cards to KEEP on-page (these require direct user action and don't belong in briefs):**
+
+| Card | Location | Why it stays |
+|------|----------|-------------|
+| TDEE calibration card | Nutrition page | Requires user to Accept or Dismiss — an action that can't happen in a brief |
+| Dietary warning chips | Food search/log | Must appear inline with food choices at decision time |
+| Monthly Wrap "available" notification | Life Hub sidebar/home | Navigation link — not a coaching insight |
+| Recovery Score widget | Life Hub home | Primary data display, always-on |
+| Post-workout coaching card (completion screen) | Workout log page | Tied to the post-workout moment; brief is too late |
+| Check-in insight toast | Check-in sheet | Fires at check-in time, not brief time |
+| Stack Interactions card | Supplements page | Reference content, user-controlled |
+| DailyLogReview popup | Morning (layout) | Interactive retrospective with action buttons — can't be a brief |
+
+**Implementation note:** When removing on-page callout cards, don't delete the data computation logic — move it to the brief generation route where it belongs. The computations are correct; just the display surface changes.
+
+---
+
+### HRV Treatment Policy
+
+**Status:** Established fact — all new features must follow this.
+
+**The situation:** HRV infrastructure in the app is correct. `sync/route.js` fetches `daily-heart-rate-variability` from Google Health API and writes `hrv_rmssd` to `health_heart_rate_daily`. The issue is device-level: Pixel Watch and most Wear OS devices do not expose HRV to the Google Health API even if the watch's own app shows it. This is a Google/OEM limitation, not a code bug.
+
+**Policy for all new features:**
+1. Always null-handle HRV. `hrv_rmssd` may be null for any user at any time — never assume it has a value.
+2. When HRV is null, show `—` in the UI (not 0, not "N/A" — just a dash).
+3. When HRV is null in AI context, omit it from the prompt entirely rather than injecting "HRV: null" which confuses AI output.
+4. When HRV is available (non-null), use it as bonus context — it's high signal but not required signal.
+5. Never build a feature where HRV is a required input. It must always be optional.
+6. Inform users with a subtle label: "HRV requires a compatible smartwatch." Do not imply HRV absence is a setup error.
+
+---
+
+### Supplement Timing Alignment (My Week Integration)
+
+When My Week (Step 28) is built and includes `workout_time` per day, supplement timing in briefs must align to that specific time rather than a generic pre-workout window.
+
+**Rule:** When `my_week.workout_time` is set for today, calculate:
+- `pre_workout_window = workout_time - 45 minutes`
+- Supplements with `timing = 'pre_workout'` → "Take creatine at [pre_workout_window]"
+- Supplements with `timing = 'morning'` → "Take in the morning with breakfast"
+- Supplements with `timing = 'with_meals'` → Match to scheduled meal times from My Week
+
+This is a brief-generation rule, not a separate feature. It applies automatically once both My Week data and supplement stack data are available in the brief route.
+
+**Injection pattern in daily-brief/route.js:**
+```js
+const suppTimingBlock = supplements.map(s => {
+  if (s.timing === 'pre_workout' && workoutTimeToday) {
+    const preTime = subtractMinutes(workoutTimeToday, 45)
+    return `${s.name} (${s.dose}) — take at ${preTime} (45min before workout)`
+  }
+  if (s.timing === 'morning') return `${s.name} (${s.dose}) — with breakfast`
+  return `${s.name} (${s.dose}) — ${s.timing}`
+}).join('\n')
+```
+
 ### Phase 67c — Audit cleanup — Complete
 - `water/page.js`: Removed dead `quickLogSavedDrink` function (direct-log bypass left over from before Phase 67; never called — all drink logging now goes through LogConfirmModal)
 
