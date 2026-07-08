@@ -212,8 +212,7 @@ export default function LifeHubSidebar() {
           {navLink('My Plan', '/life-hub/workouts', SECTION_COLORS.workouts)}
           {navLink('Workout History', '/life-hub/workouts/history', SECTION_COLORS.workouts)}
           {navLink('Exercise Library', '/life-hub/workouts/exercises', SECTION_COLORS.workouts)}
-          {navLink('Stretching & Mobility', '/life-hub/workouts/stretching', SECTION_COLORS.workouts)}
-          {navLink('Stretch Library', '/life-hub/workouts/stretching/library', SECTION_COLORS.workouts)}
+          {navLink('Stretch Reference', '/life-hub/workouts/stretches', SECTION_COLORS.workouts)}
         </div>
       )}
 

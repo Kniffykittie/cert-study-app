@@ -1624,7 +1624,7 @@ This exists in the stretch library but never surfaces in recommendation context.
 
 ---
 
-**22. Workout Day Hub — Full Architecture** — 💬 Discussed
+**22. Workout Day Hub — Full Architecture** — ✅ Built (Phase R)
 
 **The architectural shift:** The Day Hub collapses four current pages (plan day expand, standalone stretching page, workout logger entry, coaching completion screen) into one coherent owner for the full training day. It is the single entry point for starting any workout or stretch session. The standalone Stretching & Mobility page (`/life-hub/workouts/stretching`) is retired — that flow lives exclusively inside the Day Hub. The Stretch Library stays but becomes reference documentation under the Workouts section, not a flow destination.
 
@@ -2517,6 +2517,19 @@ ALTER TABLE daily_briefs ADD CONSTRAINT daily_briefs_window_check CHECK (window 
 - `src/app/api/life-hub/daily-brief/route.js` — GET: accepts `?window=` param (validated against `['morning','afternoon','evening']`, default `'morning'`), includes `window` in the `.eq()` query. POST: reads `window` from JSON body (default `'morning'`), routes to separate rate-limit key per window (`life-hub/daily-brief-evening` etc.), handles evening window with a dedicated today-data path (food log totals, steps, water, workout, check-in, sleep score → past-tense 3–4 sentence summary, max_tokens 250). All upserts now include `window` and use `onConflict: 'user_id,date,window'`. `VALID_WINDOWS` constant validates all window inputs.
 - `src/app/api/checkin/insight/route.js` — after generating check-in insight, upserts `brief_text` into `daily_briefs` with `window: 'afternoon'` as a side effect. No new AI call — the check-in insight IS the afternoon brief.
 - `src/app/life-hub/page.js` — brief state changed from single `brief` to `briefs: { morning, afternoon, evening }` object. `briefExpanded` is now per-window. Loading logic fetches all three windows in sequence; evening only fetches/generates after 6pm (client-side hour check). JSX: single brief card replaced with mapped `BRIEF_CONFIG` array (morning=purple, afternoon=yellow #f59e0b, evening=indigo #818cf8); each card collapsible; afternoon shows only if text exists; evening shows if text exists OR currentHour >= 18; morning always shows.
+
+### Phase R — Workout Day Hub — Complete
+
+- **DB migrations:** `stretch_logs.context TEXT CHECK IN ('pre_workout','post_workout','bedtime','standalone')`; `workout_logs.coaching_feedback_read_at TIMESTAMPTZ`
+- `src/app/api/workouts/day-hub/route.js` (new): GET `?date=YYYY-MM-DD` — validates date regex, returns `plan_day`, `workout_log`, `workout_sets`, `stretch_logs` (with context), `prev_session` (last same-day-label working sets for hints); `getUser()` only
+- `src/app/api/workouts/stretch-log/route.js`: added `context` field to POST insert; validated against `VALID_CONTEXTS` list before insert
+- `src/app/life-hub/workouts/day/[dayIndex]/page.js` (new): 4-phase journey (Pre-Stretch → Workout → Post-Stretch → Bedtime); rest day mode; prev session weight hints per exercise; coach feedback card with unread badge + marks read on expand; read-only for past dates; adjacent day prev/next nav; `?date=` param for historical deep links from history page
+- `src/app/life-hub/workouts/page.js`: weekly completion bar (X/Y workouts); day cards now show "Open →" link to Day Hub (by sorted dow index); stretching link updated to `/life-hub/workouts/stretches`
+- `src/app/life-hub/workouts/history/page.js`: rewritten — week-grouped format (8 weeks/page, Load More); PR section removed; each session row shows "View Day →" linking to Day Hub read-only mode
+- `src/app/life-hub/workouts/exercises/page.js`: PR chip in detail modal — `fetchPR(exerciseName)` queries `workout_log_sets` for max working weight; shows "No sets logged yet" when empty
+- `src/app/life-hub/workouts/stretches/page.js` (new): moved from `stretching/library/page.js`
+- `src/app/life-hub/workouts/stretching/page.js`: deleted (superseded by Day Hub phases)
+- `src/components/LifeHubSidebar.js`: removed "Stretching & Mobility" nav item; renamed "Stretch Library" → "Stretch Reference" at new `/life-hub/workouts/stretches` URL
 
 ### Phase Q — My Week (Unified Weekly Planning Hub) — Complete
 

@@ -280,6 +280,9 @@ export default function WorkoutsPage() {
     ? [...plan.plan].sort((a, b) => DAYS_OF_WEEK.indexOf(a.day_of_week) - DAYS_OF_WEEK.indexOf(b.day_of_week))
     : []
 
+  const weekCompletionCount = sortedDays.filter(d => completedTodayDays.has(d.day_of_week)).length
+  const weekWorkoutDays = sortedDays.filter(d => d.exercises?.length > 0).length
+
   if (loading) return <div style={{ color: 'var(--text-secondary)', padding: '48px', textAlign: 'center' }}>Loading...</div>
 
   if (goalsGated) return <GoalsGate redirect="/life-hub/workouts" />
@@ -325,6 +328,20 @@ export default function WorkoutsPage() {
             </div>
           )}
 
+          {weekWorkoutDays > 0 && (
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>This Week</div>
+                <div style={{ fontSize: '12px', color: weekCompletionCount === weekWorkoutDays ? 'var(--success)' : '#3b82f6', fontWeight: '700' }}>
+                  {weekCompletionCount}/{weekWorkoutDays} workouts
+                </div>
+              </div>
+              <div style={{ height: 6, backgroundColor: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${weekWorkoutDays > 0 ? (weekCompletionCount / weekWorkoutDays) * 100 : 0}%`, backgroundColor: weekCompletionCount === weekWorkoutDays ? 'var(--success)' : '#3b82f6', borderRadius: 3, transition: 'width 0.4s ease' }} />
+              </div>
+            </div>
+          )}
+
           {todayEnergy !== null && todayEnergy <= 2 && (
             <div style={{ backgroundColor: 'rgba(241,196,15,0.08)', border: '1px solid rgba(241,196,15,0.3)', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
               <span style={{ fontSize: '18px', lineHeight: 1 }}>⚡</span>
@@ -344,19 +361,24 @@ export default function WorkoutsPage() {
               const color = focusColor(day.focus)
               const cardKey = day.day_of_week ?? day.day_number ?? sortedIndex
               const isToday = day.day_of_week === todayDowName
+              const sortedDowIndex = DAYS_OF_WEEK.indexOf(day.day_of_week)
               const todaySuggestions = isToday && !isRest
                 ? suggestions.filter(s => day.exercises?.some(ex => ex.exercise_name?.toLowerCase() === s.from_exercise?.toLowerCase()))
                 : []
               const hasPendingSuggestions = todaySuggestions.some(s => !appliedOverrides[s.from_exercise?.toLowerCase()])
+              const workoutComplete = completedTodayDays.has(day.day_of_week)
               return (
                 <div key={cardKey} style={{ backgroundColor: 'var(--surface)', border: `1px solid ${isToday ? '#f97316' : 'var(--border)'}`, borderRadius: '12px', overflow: 'hidden' }}>
                   <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                     <div style={{ flex: 1 }}>
-                      <select value={day.day_of_week} onChange={e => { moveDay(dayIndex, e.target.value); setTimeout(saveDayChanges, 300) }}
-                        style={{ backgroundColor: 'transparent', border: 'none', color: 'var(--accent-purple)', fontSize: '15px', fontWeight: '700', cursor: 'pointer', outline: 'none', padding: 0, width: '100%' }}>
-                        {DAYS_OF_WEEK.map(d => <option key={d} value={d} style={{ backgroundColor: '#1A1A1A' }}>{d}</option>)}
-                      </select>
-                      <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', marginTop: '1px' }}>{day.day_name}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                        <select value={day.day_of_week} onChange={e => { moveDay(dayIndex, e.target.value); setTimeout(saveDayChanges, 300) }}
+                          style={{ backgroundColor: 'transparent', border: 'none', color: 'var(--accent-purple)', fontSize: '15px', fontWeight: '700', cursor: 'pointer', outline: 'none', padding: 0 }}>
+                          {DAYS_OF_WEEK.map(d => <option key={d} value={d} style={{ backgroundColor: '#1A1A1A' }}>{d}</option>)}
+                        </select>
+                        <Link href={`/life-hub/workouts/day/${sortedDowIndex}`} style={{ fontSize: 11, color: '#3b82f6', textDecoration: 'none', fontWeight: 600, flexShrink: 0 }}>Open →</Link>
+                      </div>
+                      <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{day.day_name}</div>
                     </div>
                     <span style={{ fontSize: '11px', color: isRest ? 'var(--text-secondary)' : color, backgroundColor: `${color}18`, border: `1px solid ${color}28`, borderRadius: '6px', padding: '3px 8px', fontWeight: '600', whiteSpace: 'nowrap' }}>
                       {day.focus}
@@ -458,7 +480,7 @@ export default function WorkoutsPage() {
             <div style={{ marginTop: '20px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderLeft: '3px solid #3b82f6', borderRadius: '10px', padding: '16px 18px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>🧘 Stretches for Today</div>
-                <Link href="/life-hub/workouts/stretching" style={{ fontSize: '12px', color: '#3b82f6', textDecoration: 'none', fontWeight: '600' }}>Open →</Link>
+                <Link href="/life-hub/workouts/stretches" style={{ fontSize: '12px', color: '#3b82f6', textDecoration: 'none', fontWeight: '600' }}>Open →</Link>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {todayStretches.map(s => (

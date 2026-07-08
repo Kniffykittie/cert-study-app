@@ -25,8 +25,11 @@ export async function POST(req) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { stretch_ids, session_type, duration_seconds, date } = body
+  const { stretch_ids, session_type, context, duration_seconds, date } = body
   if (!stretch_ids?.length) return NextResponse.json({ error: 'stretch_ids required' }, { status: 400 })
+
+  const VALID_CONTEXTS = ['pre_workout', 'post_workout', 'bedtime', 'standalone']
+  const logContext = VALID_CONTEXTS.includes(context) ? context : null
 
   const logDate = date || new Date().toISOString().slice(0, 10)
 
@@ -35,6 +38,7 @@ export async function POST(req) {
     date: logDate,
     stretch_ids,
     session_type: session_type || 'standalone',
+    context: logContext,
     duration_seconds: duration_seconds || null,
     logged_at: new Date().toISOString(),
   }).select().single()

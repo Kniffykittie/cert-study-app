@@ -2,6 +2,21 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
+async function fetchPR(exerciseName) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const { data } = await supabase
+    .from('workout_log_sets')
+    .select('weight_lbs,created_at')
+    .eq('user_id', user.id)
+    .eq('exercise_name', exerciseName)
+    .eq('set_type', 'working')
+    .order('weight_lbs', { ascending: false })
+    .limit(1)
+  return data?.[0] ?? null
+}
+
 const MUSCLE_GROUPS = [
   { label: 'Arms', parts: ['upper arms', 'lower arms', 'forearms'] },
   { label: 'Back', parts: ['back'] },
@@ -18,6 +33,7 @@ export default function ExerciseLibraryPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
+  const [selectedPR, setSelectedPR] = useState(null)
   const [activeGroup, setActiveGroup] = useState('Arms')
   const sectionRefs = useRef({})
 
@@ -106,7 +122,7 @@ export default function ExerciseLibraryPage() {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
                   {group.exercises.map(ex => (
-                    <button key={ex.id} onClick={() => setSelected(ex)}
+                    <button key={ex.id} onClick={() => { setSelected(ex); setSelectedPR(undefined); fetchPR(ex.name).then(pr => setSelectedPR(pr ?? null)) }}
                       style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', textAlign: 'left', cursor: 'pointer', transition: 'border-color 0.15s', overflow: 'hidden', padding: 0 }}
                       onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-blue)'}
                       onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
@@ -132,7 +148,7 @@ export default function ExerciseLibraryPage() {
 
       {/* Detail modal */}
       {selected && (
-        <div onClick={() => setSelected(null)}
+        <div onClick={() => { setSelected(null); setSelectedPR(undefined) }}
           style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div onClick={e => e.stopPropagation()}
             style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -142,7 +158,7 @@ export default function ExerciseLibraryPage() {
             }
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px 12px' }}>
               <h2 style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700', textTransform: 'capitalize' }}>{selected.name}</h2>
-              <button onClick={() => setSelected(null)}
+              <button onClick={() => { setSelected(null); setSelectedPR(undefined) }}
                 style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>✕</button>
             </div>
             <div style={{ padding: '0 20px 20px' }}>
@@ -163,6 +179,28 @@ export default function ExerciseLibraryPage() {
                       <span key={m} style={{ fontSize: '11px', color: 'var(--text-secondary)', backgroundColor: 'var(--background)', borderRadius: '4px', padding: '2px 8px', textTransform: 'capitalize' }}>{m}</span>
                     ))}
                   </div>
+                </div>
+              )}
+              {selectedPR !== undefined && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px' }}>Your PR (working set)</div>
+                  {selectedPR === null ? (
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', fontStyle: 'italic' }}>No sets logged yet</div>
+                  ) : selectedPR === undefined ? (
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Loading...</div>
+                  ) : (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, backgroundColor: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '6px 12px' }}>
+                      <span style={{ fontSize: 20 }}>🏆</span>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent-blue)' }}>
+                        {selectedPR.weight_lbs > 0 ? `${selectedPR.weight_lbs} lbs` : 'Bodyweight'}
+                      </span>
+                      {selectedPR.created_at && (
+                        <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                          {new Date(selectedPR.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               {selected.instructions?.length > 0 && (() => {
