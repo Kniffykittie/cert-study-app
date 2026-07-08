@@ -57,6 +57,7 @@ export default function WorkoutsPage() {
   const [appliedOverrides, setAppliedOverrides] = useState({}) // original_exercise -> override_exercise
   const [applyingOverride, setApplyingOverride] = useState(null)
   const [todaySoreSpots, setTodaySoreSpots] = useState([])
+  const [progressionHints, setProgressionHints] = useState([]) // [{name, currentWeight, reps, repRangeTop, sessions}]
 
   useEffect(() => { load() }, [])
 
@@ -120,6 +121,56 @@ export default function WorkoutsPage() {
     const { data: cardio } = await supabase.from('exercises').select('id,name,body_part').eq('body_part', 'cardio').order('name')
     setCardioExercises(cardio ?? [])
     setLoading(false)
+
+    // Auto-progression: find exercises where last 2+ sessions hit top of rep range on working sets
+    const cutoff = new Date(Date.now() - 28 * 86400000).toLocaleDateString('en-CA')
+    const { data: recentLogs } = await supabase.from('workout_logs')
+      .select('id, date').eq('user_id', session.user.id).eq('is_partial', false)
+      .gte('date', cutoff).order('date', { ascending: false }).limit(20)
+    if (recentLogs?.length >= 2) {
+      const logIds = recentLogs.map(l => l.id)
+      const { data: sets } = await supabase.from('workout_log_sets')
+        .select('log_id, exercise_name, weight_lbs, reps, rep_range, set_type')
+        .eq('user_id', session.user.id).eq('set_type', 'working')
+        .in('log_id', logIds).not('weight_lbs', 'is', null).not('reps', 'is', null)
+      if (sets?.length) {
+        // Group by exercise, then by session (log_id), ordered by date descending
+        const byExercise = {}
+        for (const s of sets) {
+          const name = s.exercise_name
+          if (!byExercise[name]) byExercise[name] = {}
+          if (!byExercise[name][s.log_id]) byExercise[name][s.log_id] = []
+          byExercise[name][s.log_id].push(s)
+        }
+        const hints = []
+        for (const [name, sessions] of Object.entries(byExercise)) {
+          // Sort sessions by date desc (recentLogs is already sorted desc)
+          const sessionIds = recentLogs.map(l => l.id).filter(id => sessions[id])
+          if (sessionIds.length < 2) continue
+          // Check last 2 sessions: did user hit ≥ top of rep range in each?
+          let qualifyingCount = 0
+          let lastWeight = null
+          let lastReps = null
+          let repRangeTop = null
+          for (const logId of sessionIds.slice(0, 3)) {
+            const sessionSets = sessions[logId]
+            if (!sessionSets) continue
+            const repRange = sessionSets[0]?.rep_range
+            if (repRange?.includes('-')) {
+              repRangeTop = parseInt(repRange.split('-')[1])
+            }
+            const maxReps = Math.max(...sessionSets.map(s => s.reps ?? 0))
+            const maxWeight = Math.max(...sessionSets.map(s => s.weight_lbs ?? 0))
+            if (repRangeTop && maxReps >= repRangeTop) qualifyingCount++
+            if (logId === sessionIds[0]) { lastWeight = maxWeight; lastReps = maxReps }
+          }
+          if (qualifyingCount >= 2 && repRangeTop && lastWeight) {
+            hints.push({ name, currentWeight: lastWeight, reps: lastReps, repRangeTop, sessions: qualifyingCount })
+          }
+        }
+        setProgressionHints(hints)
+      }
+    }
 
     if (!prof) router.push('/life-hub/workouts/setup')
 
@@ -461,6 +512,38 @@ export default function WorkoutsPage() {
             <div style={{ backgroundColor: 'rgba(46,204,113,0.06)', border: '1px solid rgba(46,204,113,0.2)', borderRadius: '10px', padding: '14px 18px' }}>
               <div style={{ color: 'var(--success)', fontSize: '11px', fontWeight: '600', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px' }}>Progression</div>
               <p style={{ color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6', margin: 0 }}>{plan.progression_notes}</p>
+            </div>
+          )}
+
+          {progressionHints.length > 0 && (
+            <div style={{ marginTop: '20px', backgroundColor: 'rgba(46,204,113,0.06)', border: '1px solid rgba(46,204,113,0.3)', borderRadius: '10px', padding: '16px 18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <span style={{ fontSize: '16px' }}>📈</span>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Ready to Progress — {progressionHints.length} exercise{progressionHints.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {progressionHints.map(h => (
+                  <div key={h.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: 'var(--background)', borderRadius: '8px', gap: '12px', flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{h.name}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        Hit {h.reps} reps @ {h.currentWeight} lbs (top of {h.repRangeTop}-rep range) for {h.sessions}+ sessions
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--success)' }}>
+                        Try {h.currentWeight + 5} lbs
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>+5 lb bump</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: '10px', fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                Progressive overload: when you consistently hit the top of your rep range, add weight and drop back to the low end of the range.
+              </div>
             </div>
           )}
 

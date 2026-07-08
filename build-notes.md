@@ -2505,6 +2505,25 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Phase U — Workout Auto-Progression — Complete
+
+**What was built:**
+- Auto-progression logic in `src/app/life-hub/workouts/page.js` `load()` — queries last 20 workout sessions' working sets, groups by exercise, detects when user hit ≥ top of rep range in 2+ of last 3 sessions
+- "Ready to Progress" card rendered on My Workout Plan page (below Progression Notes) listing qualifying exercises with current weight, rep context, and suggested +5 lb bump
+- Card hidden when no exercises qualify; footnote explains the progressive overload principle
+
+### Phase W — Goal Velocity Card — Complete
+
+**What was built:**
+- Goal Velocity card on Goals page — queries last 28 days of `body_measurements`, computes actual lb/week change, shows on-track status (green/yellow), lbs remaining to goal, and ETA at current pace
+- Hidden when fewer than 2 measurements exist or no target weight set
+
+### Phase V — Food Logging Streak — Complete
+
+**What was built:**
+- Streak computed in Nutrition page `load()` from `food_log_entries` created_at over last 60 days
+- 🔥 N-day streak chip shown in page header when streak > 0; hidden when no consecutive days logged
+
 ### Phase T — Sleep Debt Stat Card — Complete
 
 **What was built:**
