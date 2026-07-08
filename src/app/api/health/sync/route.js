@@ -372,5 +372,8 @@ export async function POST(req) {
     intradayHours: Object.values(hrHourBucket).reduce((n, h) => n + Object.keys(h).length, 0),
     restingHRPoints: restingHRPoints.length,
     hrvPoints: hrvPoints.length,
+    // Debug: raw first point so we can confirm field names against actual API response
+    _debugRestingHR: restingHRPoints[0] ?? null,
+    _debugHRV: hrvPoints[0] ?? null,
   })
 }

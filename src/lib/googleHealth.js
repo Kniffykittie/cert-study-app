@@ -39,10 +39,11 @@ export async function refreshTokenIfNeeded(supabase, userId, tokenRow) {
 export async function fetchDataType(accessToken, dataType, since) {
   let allPoints = []
   let pageToken = null
+  const sinceParam = since ? `startTime=${encodeURIComponent(since)}` : ''
   do {
     const url = pageToken
-      ? `${BASE}/users/me/dataTypes/${dataType}/dataPoints?pageToken=${encodeURIComponent(pageToken)}`
-      : `${BASE}/users/me/dataTypes/${dataType}/dataPoints`
+      ? `${BASE}/users/me/dataTypes/${dataType}/dataPoints?pageToken=${encodeURIComponent(pageToken)}${sinceParam ? `&${sinceParam}` : ''}`
+      : `${BASE}/users/me/dataTypes/${dataType}/dataPoints${sinceParam ? `?${sinceParam}` : ''}`
     const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
     if (!res.ok) break
     const json = await res.json()
