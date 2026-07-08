@@ -12,10 +12,16 @@ function dateStr(daysBack = 0) {
   return d.toISOString().split('T')[0]
 }
 
+const VALID_WINDOWS = ['morning', 'afternoon', 'evening']
+
 export async function GET(req) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { searchParams } = new URL(req.url)
+  const window = searchParams.get('window') || 'morning'
+  if (!VALID_WINDOWS.includes(window)) return NextResponse.json({ error: 'Invalid window' }, { status: 400 })
 
   const today = dateStr()
   const { data: brief } = await supabase
@@ -23,6 +29,7 @@ export async function GET(req) {
     .select('brief_text, data_snapshot, created_at')
     .eq('user_id', user.id)
     .eq('date', today)
+    .eq('window', window)
     .single()
 
   return NextResponse.json({ brief: brief?.brief_text || null, snapshot: brief?.data_snapshot || null, cached: !!brief })
@@ -36,10 +43,76 @@ export async function POST(req) {
   const { data: profile } = await supabase.from('profiles').select('is_disabled').eq('id', user.id).single()
   if (profile?.is_disabled) return NextResponse.json({ error: 'Account disabled' }, { status: 403 })
 
-  const { allowed } = await checkRateLimit(supabase, user.id, 'life-hub/daily-brief')
+  const body = await req.json().catch(() => ({}))
+  const window = body.window || 'morning'
+  if (!VALID_WINDOWS.includes(window)) return NextResponse.json({ error: 'Invalid window' }, { status: 400 })
+
+  const rateLimitKey = window === 'morning' ? 'life-hub/daily-brief' : `life-hub/daily-brief-${window}`
+  const { allowed } = await checkRateLimit(supabase, user.id, rateLimitKey)
   if (!allowed) return NextResponse.json({ error: 'Rate limit reached — try again next hour.' }, { status: 429 })
 
   const today = dateStr()
+
+  // Evening brief — past-tense summary of today
+  if (window === 'evening') {
+    const [
+      { data: foodLog },
+      { data: workoutLog },
+      { data: checkin },
+      { data: stepsData },
+      { data: waterData },
+      { data: sleepSession },
+      { data: goals },
+    ] = await Promise.all([
+      supabase.from('food_log_entries').select('calories, protein_g, carbs_g, fat_g, water_g').eq('user_id', user.id).eq('date', today),
+      supabase.from('workout_logs').select('duration_seconds, post_workout_difficulty, post_workout_energy, post_workout_note, hr_zones, day_label').eq('user_id', user.id).gte('created_at', `${today}T00:00:00`).maybeSingle(),
+      supabase.from('daily_checkins').select('energy_level, mood_level, afternoon_energy, afternoon_mood, sore_spots').eq('user_id', user.id).eq('date', today).maybeSingle(),
+      supabase.from('health_steps_hourly').select('steps').eq('user_id', user.id).eq('date', today),
+      supabase.from('water_logs').select('amount_oz').eq('user_id', user.id).gte('created_at', `${today}T00:00:00`),
+      supabase.from('health_sleep_sessions').select('sleep_score, sleep_minutes').eq('user_id', user.id).eq('date', today).maybeSingle(),
+      supabase.from('goals_profiles').select('weight_lbs, target_weight_lbs, water_goal_oz').eq('user_id', user.id).single(),
+    ])
+
+    const todayCal = Math.round((foodLog || []).reduce((s, r) => s + (r.calories || 0), 0))
+    const todayProtein = Math.round((foodLog || []).reduce((s, r) => s + (r.protein_g || 0), 0))
+    const todayWaterOz = Math.round((waterData || []).reduce((s, r) => s + parseFloat(r.amount_oz), 0))
+    const drinkWaterOz = Math.round((foodLog || []).reduce((s, r) => s + (r.water_g ? r.water_g * 0.0338 : 0), 0))
+    const totalWaterOz = todayWaterOz + drinkWaterOz
+    const todaySteps = (stepsData || []).reduce((s, r) => s + (r.steps || 0), 0)
+
+    const eveningLines = [
+      `Today's summary (${today}):`,
+      todayCal > 0 ? `Calories logged: ${todayCal}${goals?.weight_lbs ? '' : ''}` : 'No food logged today.',
+      todayProtein > 0 ? `Protein: ${todayProtein}g` : null,
+      totalWaterOz > 0 ? `Hydration: ${totalWaterOz} oz${goals?.water_goal_oz ? ` of ${goals.water_goal_oz} oz goal` : ''}` : 'No water logged today.',
+      todaySteps > 0 ? `Steps: ${todaySteps.toLocaleString()}` : null,
+      workoutLog ? `Workout: ${workoutLog.day_label || 'session'} — ${Math.round((workoutLog.duration_seconds || 0) / 60)} min${workoutLog.post_workout_difficulty ? `, difficulty ${workoutLog.post_workout_difficulty}/5` : ''}` : 'No workout logged today.',
+      checkin?.energy_level ? `Morning energy: ${checkin.energy_level}/5` : null,
+      checkin?.afternoon_energy ? `Afternoon energy: ${checkin.afternoon_energy}/5` : null,
+      checkin?.sore_spots?.length ? `Sore spots: ${checkin.sore_spots.join(', ')}` : null,
+      sleepSession?.sleep_score ? `Last night's sleep score: ${sleepSession.sleep_score}/100` : null,
+    ].filter(Boolean).join('\n')
+
+    const eveningMsg = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 250,
+      system: `You write a concise end-of-day summary for a personal health dashboard. Rules:
+- 3–4 sentences, past tense, no bullet points.
+- Cite specific numbers from the data.
+- Acknowledge what went well and one thing to carry into tomorrow.
+- Sound like a knowledgeable friend — direct, no corporate wellness language, no hollow praise.
+- End with exactly one specific actionable thing for tonight or tomorrow morning.`,
+      messages: [{ role: 'user', content: `Write my evening brief.\n\n${eveningLines}` }],
+    })
+
+    const eveningText = eveningMsg.content[0]?.text?.trim() || "Log your food and workouts throughout the day to get a personalized evening summary."
+    await supabase.from('daily_briefs').upsert(
+      { user_id: user.id, date: today, window: 'evening', brief_text: eveningText },
+      { onConflict: 'user_id,date,window' }
+    )
+    return NextResponse.json({ brief: eveningText, cached: false })
+  }
+
   const yesterday = dateStr(1)
   const sevenAgo = dateStr(7)
   const fourteenAgo = dateStr(14)
@@ -84,7 +157,7 @@ export async function POST(req) {
   // No goals → generic nudge
   if (!goals) {
     const text = "Set up your goals profile to start getting a personalized daily brief — your food log, workouts, sleep, and weight data all feed into it."
-    await supabase.from('daily_briefs').upsert({ user_id: user.id, date: today, brief_text: text }, { onConflict: 'user_id,date' })
+    await supabase.from('daily_briefs').upsert({ user_id: user.id, date: today, window: 'morning', brief_text: text }, { onConflict: 'user_id,date,window' })
     return NextResponse.json({ brief: text, cached: false })
   }
 
@@ -336,8 +409,8 @@ export async function POST(req) {
 
   const snapshot = { loggedDays, avgCal, avgProtein, workoutsThisWeek, sleepHours, latestWeight, weightDelta, tdeeCalibration }
   await supabase.from('daily_briefs').upsert(
-    { user_id: user.id, date: today, brief_text: briefText, data_snapshot: snapshot },
-    { onConflict: 'user_id,date' }
+    { user_id: user.id, date: today, window: 'morning', brief_text: briefText, data_snapshot: snapshot },
+    { onConflict: 'user_id,date,window' }
   )
 
   return NextResponse.json({ brief: briefText, snapshot, cached: false })

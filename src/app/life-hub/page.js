@@ -99,10 +99,9 @@ export default function LifeHubPage() {
   const [recoveryScore, setRecoveryScore] = useState(null)
   const [sectionData, setSectionData] = useState(null)
 
-  const [brief, setBrief] = useState(null)
+  const [briefs, setBriefs] = useState({ morning: null, afternoon: null, evening: null })
   const [briefLoading, setBriefLoading] = useState(false)
-  const [briefGeneratedAt, setBriefGeneratedAt] = useState(null)
-  const [briefExpanded, setBriefExpanded] = useState(false)
+  const [briefExpanded, setBriefExpanded] = useState({ morning: false, afternoon: false, evening: false })
   const [recoveryExpanded, setRecoveryExpanded] = useState(false)
   const [checkinWhyOpen, setCheckinWhyOpen] = useState(false)
 
@@ -268,18 +267,37 @@ export default function LifeHubPage() {
 
       if (!briefTriggered.current) {
         briefTriggered.current = true
-        const res = await fetch('/api/life-hub/daily-brief')
-        const json = await res.json()
-        if (json.brief) {
-          setBrief(json.brief)
-          setBriefGeneratedAt(new Date())
+        const currentHour = new Date().getHours()
+
+        // Morning brief
+        const morningRes = await fetch('/api/life-hub/daily-brief?window=morning')
+        const morningJson = await morningRes.json()
+        if (morningJson.brief) {
+          setBriefs(prev => ({ ...prev, morning: morningJson.brief }))
         } else {
           setBriefLoading(true)
-          const genRes = await fetch('/api/life-hub/daily-brief', { method: 'POST' })
+          const genRes = await fetch('/api/life-hub/daily-brief', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ window: 'morning' }) })
           const genJson = await genRes.json()
-          setBrief(genJson.brief)
-          setBriefGeneratedAt(new Date())
+          if (genJson.brief) setBriefs(prev => ({ ...prev, morning: genJson.brief }))
           setBriefLoading(false)
+        }
+
+        // Afternoon brief — check if exists (generated as side effect of check-in)
+        const afternoonRes = await fetch('/api/life-hub/daily-brief?window=afternoon')
+        const afternoonJson = await afternoonRes.json()
+        if (afternoonJson.brief) setBriefs(prev => ({ ...prev, afternoon: afternoonJson.brief }))
+
+        // Evening brief — only fetch/generate after 6pm
+        if (currentHour >= 18) {
+          const eveningRes = await fetch('/api/life-hub/daily-brief?window=evening')
+          const eveningJson = await eveningRes.json()
+          if (eveningJson.brief) {
+            setBriefs(prev => ({ ...prev, evening: eveningJson.brief }))
+          } else {
+            const genRes = await fetch('/api/life-hub/daily-brief', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ window: 'evening' }) })
+            const genJson = await genRes.json()
+            if (genJson.brief) setBriefs(prev => ({ ...prev, evening: genJson.brief }))
+          }
         }
       }
     }
@@ -450,43 +468,66 @@ export default function LifeHubPage() {
         </div>
       )}
 
-      {/* Zone 2 — Daily Brief */}
-      <div style={{ backgroundColor: 'var(--surface)', borderTop: `1px solid ${brief ? `${SC.overview}44` : 'var(--border)'}`, borderRight: `1px solid ${brief ? `${SC.overview}44` : 'var(--border)'}`, borderBottom: `1px solid ${brief ? `${SC.overview}44` : 'var(--border)'}`, borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: brief ? '12px' : '0' }}>
-          <span style={{ fontSize: '18px' }}>🤖</span>
-          <div>
-            <div style={{ color: SC.overview, fontSize: '13px', fontWeight: '700' }}>Your Daily Brief</div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-              {briefLoading ? 'Analyzing your data...' : briefGeneratedAt ? new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'Generating...'}
-            </div>
+      {/* Zone 2 — Daily Briefs */}
+      {(() => {
+        const currentHour = new Date().getHours()
+        const BRIEF_CONFIG = [
+          { key: 'morning', icon: '☀️', label: 'Morning Brief', color: SC.overview, alwaysShow: true },
+          { key: 'afternoon', icon: '🌤️', label: 'Afternoon Check-In', color: '#f59e0b', alwaysShow: false },
+          { key: 'evening', icon: '🌙', label: 'Evening Summary', color: '#818cf8', alwaysShow: false, minHour: 18 },
+        ]
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+            {BRIEF_CONFIG.map(cfg => {
+              const text = briefs[cfg.key]
+              const show = cfg.alwaysShow || text || (cfg.minHour != null && currentHour >= cfg.minHour)
+              if (!show) return null
+              const isExpanded = briefExpanded[cfg.key]
+              return (
+                <div key={cfg.key} style={{ backgroundColor: 'var(--surface)', borderTop: `1px solid ${text ? `${cfg.color}44` : 'var(--border)'}`, borderRight: `1px solid ${text ? `${cfg.color}44` : 'var(--border)'}`, borderBottom: `1px solid ${text ? `${cfg.color}44` : 'var(--border)'}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: '12px', padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: text ? '10px' : '0', cursor: text ? 'pointer' : 'default' }}
+                    onClick={() => text && setBriefExpanded(prev => ({ ...prev, [cfg.key]: !prev[cfg.key] }))}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '16px' }}>{cfg.icon}</span>
+                      <div style={{ color: cfg.color, fontSize: '13px', fontWeight: '700' }}>{cfg.label}</div>
+                    </div>
+                    {text && <div style={{ color: 'var(--text-secondary)', fontSize: '16px', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>▾</div>}
+                  </div>
+                  {cfg.key === 'morning' && briefLoading && !text && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {[100, 85, 60].map((w, i) => (
+                        <div key={i} style={{ height: '13px', borderRadius: '4px', backgroundColor: 'var(--border)', width: `${w}%`, opacity: 0.5 }} />
+                      ))}
+                    </div>
+                  )}
+                  {cfg.key === 'morning' && !text && !briefLoading && (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Complete your goals setup and start logging to get a personalized daily brief.</p>
+                  )}
+                  {cfg.key === 'afternoon' && !text && (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Complete your morning or afternoon check-in to see your midday insight here.</p>
+                  )}
+                  {cfg.key === 'evening' && !text && (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Generating your end-of-day summary…</p>
+                  )}
+                  {text && (
+                    <div>
+                      <p style={{ color: 'var(--text-primary)', fontSize: '14px', lineHeight: '1.7', margin: 0, display: isExpanded ? 'block' : '-webkit-box', WebkitLineClamp: isExpanded ? 'unset' : 3, WebkitBoxOrient: 'vertical', overflow: isExpanded ? 'visible' : 'hidden' }}>
+                        {text}
+                      </p>
+                      {text.length > 200 && (
+                        <button onClick={e => { e.stopPropagation(); setBriefExpanded(prev => ({ ...prev, [cfg.key]: !prev[cfg.key] })) }}
+                          style={{ background: 'none', border: 'none', color: cfg.color, fontSize: '12px', cursor: 'pointer', marginTop: '4px', padding: 0 }}>
+                          {isExpanded ? 'Show less' : 'Read more'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
-        </div>
-        {briefLoading && !brief && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {[100, 85, 60].map((w, i) => (
-              <div key={i} style={{ height: '14px', borderRadius: '4px', backgroundColor: 'var(--border)', width: `${w}%`, opacity: 0.5 }} />
-            ))}
-          </div>
-        )}
-        {brief && (
-          <div>
-            <p style={{ color: 'var(--text-primary)', fontSize: '14px', lineHeight: '1.7', margin: 0, display: briefExpanded ? 'block' : '-webkit-box', WebkitLineClamp: briefExpanded ? 'unset' : 3, WebkitBoxOrient: 'vertical', overflow: briefExpanded ? 'visible' : 'hidden' }}>
-              {brief}
-            </p>
-            {brief.length > 220 && (
-              <button onClick={() => setBriefExpanded(e => !e)}
-                style={{ background: 'none', border: 'none', color: SC.overview, fontSize: '12px', cursor: 'pointer', marginTop: '4px', padding: 0 }}>
-                {briefExpanded ? 'Show less' : 'Read more'}
-              </button>
-            )}
-          </div>
-        )}
-        {!brief && !briefLoading && (
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>
-            Complete your goals setup and start logging to get a personalized daily brief.
-          </p>
-        )}
-      </div>
+        )
+      })()}
 
       {/* Recovery Score — prominent banner above section cards */}
       {recoveryScore && (() => {

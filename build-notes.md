@@ -2503,6 +2503,21 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Phase P — Evening Brief + daily_briefs Schema Migration — Complete
+
+**DB Migration (run in Supabase SQL editor — MCP tool lacked permission):**
+```sql
+ALTER TABLE daily_briefs ADD COLUMN IF NOT EXISTS window TEXT DEFAULT 'morning';
+UPDATE daily_briefs SET window = 'morning' WHERE window IS NULL;
+ALTER TABLE daily_briefs DROP CONSTRAINT IF EXISTS daily_briefs_user_id_date_key;
+ALTER TABLE daily_briefs ADD CONSTRAINT daily_briefs_user_id_date_window_key UNIQUE (user_id, date, window);
+ALTER TABLE daily_briefs ADD CONSTRAINT daily_briefs_window_check CHECK (window IN ('morning', 'afternoon', 'evening'));
+```
+
+- `src/app/api/life-hub/daily-brief/route.js` — GET: accepts `?window=` param (validated against `['morning','afternoon','evening']`, default `'morning'`), includes `window` in the `.eq()` query. POST: reads `window` from JSON body (default `'morning'`), routes to separate rate-limit key per window (`life-hub/daily-brief-evening` etc.), handles evening window with a dedicated today-data path (food log totals, steps, water, workout, check-in, sleep score → past-tense 3–4 sentence summary, max_tokens 250). All upserts now include `window` and use `onConflict: 'user_id,date,window'`. `VALID_WINDOWS` constant validates all window inputs.
+- `src/app/api/checkin/insight/route.js` — after generating check-in insight, upserts `brief_text` into `daily_briefs` with `window: 'afternoon'` as a side effect. No new AI call — the check-in insight IS the afternoon brief.
+- `src/app/life-hub/page.js` — brief state changed from single `brief` to `briefs: { morning, afternoon, evening }` object. `briefExpanded` is now per-window. Loading logic fetches all three windows in sequence; evening only fetches/generates after 6pm (client-side hour check). JSX: single brief card replaced with mapped `BRIEF_CONFIG` array (morning=purple, afternoon=yellow #f59e0b, evening=indigo #818cf8); each card collapsible; afternoon shows only if text exists; evening shows if text exists OR currentHour >= 18; morning always shows.
+
 ### Phase L — Weekly Wrap Page — Complete
 
 - `src/app/api/life-hub/weekly-wrap/route.js` (new): GET returns list of past `week_start` dates or single wrap; POST validates Monday + completed week, gathers 9 tables (checkins, workouts, measurements, goals, water, food, sleep sessions, HR daily, steps hourly), computes 11 summary stats, calls `claude-sonnet-4-6` (max_tokens 350) with required "Next week:" paragraph, upserts to `weekly_wraps`; blocks current week with 400 + `next_monday`; `getUser()` + `is_disabled` check; free text wrapped in `<user_input>` tags

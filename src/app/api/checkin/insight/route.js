@@ -121,5 +121,12 @@ Respond with JSON only:
     insight = text.slice(0, 300)
   }
 
+  if (insight) {
+    await supabase.from('daily_briefs').upsert(
+      { user_id: user.id, date: today, window: 'afternoon', brief_text: insight },
+      { onConflict: 'user_id,date,window' }
+    )
+  }
+
   return Response.json({ insight, proposed_actions })
 }
