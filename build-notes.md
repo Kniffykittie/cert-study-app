@@ -1043,18 +1043,6 @@ Distinct from coach_memory. This is the check-in note "tired, right shoulder sor
 
 ### 🍎 Nutrition
 
-**DV% Display Next to Nutrient Values** — 💬 Discussed
-
-Every place in the app that shows a nutrient amount (mg, g, mcg) should also show the % Daily Value in a smaller, faint color right next to it — e.g. `100mg · 25% DV` where the percentage is `var(--text-secondary)` at ~11px. This removes the need for the user to mentally convert numbers into meaning.
-
-**Surfaces to update (all in one pass):**
-- Food detail modal / food log entry expanded view (wherever macros + micros are listed per item)
-- Nutrition page micronutrient panel (the per-nutrient rows already show amounts)
-- Any food card in AddFoodModal, SearchModal, EditFoodModal that shows a nutrient breakdown
-
-**Implementation:** `DV` constant already exists in `src/lib/nutritionUtils.js` with values for all tracked nutrients. Formula: `Math.round((amount / DV[key]) * 100)`. Show `—` if the nutrient has no DV (e.g. water_g, caffeine_mg). Don't show DV% for calories (not how FDA formats it — it uses a 2000 cal reference separately). Show "(no DV)" or omit the chip entirely for nutrients without an established DV.
-
-**Watch out for:** very high values (e.g. sodium 3200mg = 139% DV) — show as `139%` not `1.39×`. Cap display at 999% to avoid layout breaks.
 
 **Photo-Based Food Logging** — 💬 Discussed
 
@@ -2505,6 +2493,23 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Phase Y — Coach Memory Edge Function Upgrade — Complete
+
+**What was built:**
+- Added `getMonday()` helper to `supabase/functions/generate-coach-memory/index.ts` for Deno-compatible week start computation
+- Added `my_week` query for current week's schedule — injects day type + workout times as `WEEKLY SCHEDULE:` block in Haiku prompt when rows exist
+- Added `daily_briefs` query (last 30 days, up to 60 rows) — keyword-counts 8 topics (protein, sleep debt, sleep score, hydration, streak, recovery, fatigue, calorie); topics with ≥4 mentions injected as `RECURRING COACHING THEMES:` counts (not raw text — token-efficient); Haiku instructed to write a dedicated observation when a topic appears
+- `my_week.commitments` field selected but not injected into prompt (user free text — excluded per security rule)
+- Deployed as version 3
+
+### Phase X — DV% Display Next to Nutrient Values — Complete
+
+**What was built:**
+- Added `DV` to import in `src/app/life-hub/nutrition/page.js`
+- Added inline `% DV` in faint text next to each micronutrient value in the viewEntry food detail modal — only shown when `DV[k] != null` and value > 0; capped at 999%
+- `NutrientBars` component already displayed `totalPct%` — no change needed there
+- Food modal components (AddFoodModal, SearchModal, EditFoodModal) handle nutrient entry forms (input side) not read-only display, so no DV% needed there
+
 ### Phase U — Workout Auto-Progression — Complete
 
 **What was built:**
@@ -3360,116 +3365,6 @@ const estimatedDate = new Date(Date.now() + weeksToGoal * 7 * 24 * 60 * 60 * 100
 4. Recomp signal: if waist measurement is trending down AND weight is flat → show "Recomposition signal: your waist is shrinking while weight holds. This is the goal working — muscle is replacing fat." This is higher value than a velocity projection in this case.
 
 ---
-
-### Phase X — DV% Display Next to Nutrient Values
-
-**Status:** Polish pass. Touch many files in one session. No new tables, no AI calls.
-
-**DV source:** `DV` constant in `src/lib/nutritionUtils.js`. `calcMicroTargets(age, sex)` from `src/lib/tdee.js` for personalized targets.
-
-**Display format:** `100mg · 25% DV` — the amount in its original unit, then a faint `· XX% DV` in `var(--text-secondary)` at ~11px. Cap display at 999%. Show `—` if no DV for that nutrient (caffeine, water_g). Don't show DV% for calories.
-
-**Surfaces to update (in priority order):**
-1. Food log entry expanded view (tap-to-expand in nutrition page) — per-item macro + micro breakdown
-2. AddFoodModal Favorites tab: food card micronutrient chips
-3. SearchModal manual entry result preview
-4. EditFoodModal nutrient rows
-5. Nutrition page micronutrient panel (NutrientBars component and the micro row display)
-
-**Implementation approach:** Create a shared helper:
-```js
-// src/lib/nutritionUtils.js — add to existing exports
-export function formatNutrientWithDV(key, value, age, sex) {
-  if (value == null || value === 0) return null
-  const target = calcMicroTargets(age, sex)[key] ?? DV[key]
-  if (!target) return `${value}${NUTRIENT_UNITS[key] ?? ''}`
-  const pct = Math.min(999, Math.round((value / target) * 100))
-  return { amount: `${value}${NUTRIENT_UNITS[key] ?? ''}`, pct }
-}
-```
-Then each component renders `{amount} · {pct}% DV` with split styling.
-
-**Add `NUTRIENT_UNITS` to `nutritionUtils.js`:**
-```js
-export const NUTRIENT_UNITS = {
-  calories: 'kcal', protein_g: 'g', carbs_g: 'g', fat_g: 'g',
-  fiber_g: 'g', sugar_g: 'g', sodium_mg: 'mg', potassium_mg: 'mg',
-  calcium_mg: 'mg', iron_mg: 'mg', magnesium_mg: 'mg',
-  vitamin_d_mcg: 'mcg', vitamin_b12_mcg: 'mcg', vitamin_c_mg: 'mg',
-  zinc_mg: 'mg', phosphorus_mg: 'mg', selenium_mcg: 'mcg',
-  omega3_g: 'g', vitamin_k_mcg: 'mcg', choline_mg: 'mg',
-  caffeine_mg: 'mg', water_g: 'g',
-  // add remaining as needed
-}
-```
-
-**Security:** No user input, no AI, no DB writes. Pure display utility. The `age` and `sex` values come from `goals_profiles` which is already fetched on these pages.
-
-**Watch out for:**
-1. Components that display nutrients don't always have `age`/`sex` in scope. For components that don't, fall back to `DV` (non-personalized) rather than making a new DB fetch.
-2. Very high DV% values (sodium at 200%) should still display as "200% DV" not as a red alert. The micronutrient awareness card (removed in Phase S) was the alert surface. DV% display is neutral information only.
-3. Layout: the "· XX% DV" suffix must not break to a new line. Use `white-space: nowrap` on the DV portion, or use `display: inline-flex`.
-
----
-
-### Phase Y — Coach Memory Edge Function Upgrade
-
-**Prerequisite:** Phase Q (My Week) must be live before this phase. My Week data is meaningless to inject before Phase Q exists.
-
-**What to add to `supabase/functions/generate-coach-memory/index.ts`:**
-
-*1. My Week context injection:*
-```ts
-// Read current week's my_week entries
-const { data: myWeekRows } = await supabase
-  .from('my_week')
-  .select('day_of_week, day_type, workout_time, commitments')
-  .eq('user_id', userId)
-  .eq('week_start', currentMonday)
-
-const myWeekSummary = myWeekRows?.length > 0
-  ? `User's current week schedule: ${myWeekRows.map(r => `${DAY_NAMES[r.day_of_week]}: ${r.day_type}${r.workout_time ? `, workout at ${r.workout_time}` : ''}`).join('; ')}`
-  : null
-// Inject into Haiku prompt data summary when non-null
-```
-
-*2. Brief pattern analysis:*
-```ts
-// Read last 28 daily_briefs for patterns
-const { data: recentBriefs } = await supabase
-  .from('daily_briefs')
-  .select('brief_text, date, window')
-  .eq('user_id', userId)
-  .gte('date', thirtyDaysAgo)
-  .order('date', { ascending: false })
-  .limit(60)  // up to 60 (2 windows/day × 30 days)
-
-const briefSummary = recentBriefs?.length > 0
-  ? `Recent brief themes (last 28 days): summarize recurring topics from these ${recentBriefs.length} briefs`
-  : null
-// Note: don't re-send full brief text to Haiku — just count patterns.
-// Better: extract key phrases and count occurrences before sending.
-```
-
-For the brief pattern injection, don't send raw brief text to Haiku (too many tokens). Instead, extract a simple tally:
-```ts
-const proteinMentions = recentBriefs.filter(b => b.brief_text.toLowerCase().includes('protein')).length
-const sleepMentions = recentBriefs.filter(b => b.brief_text.toLowerCase().includes('sleep debt') || b.brief_text.toLowerCase().includes('sleep score')).length
-// Inject counts as: "The last 28 days of briefs mention: protein target gap (18/28 days), sleep quality concern (12/28 days)"
-```
-
-*3. The prompt addition for brief patterns:*
-Append to the Haiku generation prompt: "BRIEF PATTERNS (recurring topics in this user's AI coaching over 28 days): [briefPatternSummary]. If a topic appears in 12+ of 28 briefs, it is a persistent pattern — write a coach_memory observation about it."
-
-**Security:**
-- `my_week.commitments` is user free text → when injecting into Haiku prompt for coach_memory generation, wrap in `<user_input>` tags
-- The Edge Function uses service role — verify userId iteration is isolated per user (no cross-contamination between users in the loop)
-- Brief text is AI-generated content, not user-supplied → does NOT need `<user_input>` wrapping when used for pattern analysis
-
-**Watch out for:**
-1. The brief pattern analysis query returns up to 60 rows (2 windows × 30 days). Token-efficient approach: count keyword matches in TypeScript, then send counts only (not full text) to Haiku. Sending all 60 briefs to Haiku would be expensive and slow.
-2. My Week query must use the same `getMonday()` helper as the rest of the codebase. Deno doesn't have the Next.js app utility functions — reimplement `getMonday()` in the Edge Function file.
-3. My Week data is week-specific but the Edge Function runs weekly. It should read the CURRENT week's my_week (the one that just ended at the time the function runs, Sunday night). That week_start = `getMonday(today)`.
 
 ---
 

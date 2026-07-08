@@ -6,6 +6,16 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+function getMonday(date: Date): string {
+  const d = new Date(date)
+  const day = d.getUTCDay()
+  const diff = (day === 0 ? -6 : 1 - day)
+  d.setUTCDate(d.getUTCDate() + diff)
+  return d.toISOString().slice(0, 10)
+}
+
 interface Observation {
   category: string
   observation: string
@@ -15,6 +25,8 @@ interface Observation {
 
 async function generateMemoryForUser(userId: string): Promise<void> {
   const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const currentMonday = getMonday(new Date())
 
   const [
     { data: foodLogs },
@@ -26,6 +38,8 @@ async function generateMemoryForUser(userId: string): Promise<void> {
     { data: stretchLogs },
     { data: waterLogs },
     { data: goalsProfile },
+    { data: myWeekRows },
+    { data: recentBriefs },
   ] = await Promise.all([
     supabase.from('food_log_entries').select('date,calories,protein_g,carbs_g,fat_g,created_at').eq('user_id', userId).gte('date', cutoff.slice(0, 10)).order('date'),
     supabase.from('daily_checkins').select('date,energy_level,mood_level,note,sore_spots').eq('user_id', userId).gte('date', cutoff.slice(0, 10)).order('date'),
@@ -36,6 +50,8 @@ async function generateMemoryForUser(userId: string): Promise<void> {
     supabase.from('stretch_logs').select('date,session_type,duration_seconds').eq('user_id', userId).gte('date', cutoff.slice(0, 10)).order('date'),
     supabase.from('water_logs').select('amount_oz,created_at').eq('user_id', userId).gte('created_at', cutoff),
     supabase.from('goals_profiles').select('goals,weight_lbs,target_weight_lbs,activity_level,dietary_preferences,sleep_hours,custom_tdee').eq('user_id', userId).single(),
+    supabase.from('my_week').select('day_of_week,day_type,workout_time,commitments').eq('user_id', userId).eq('week_start', currentMonday),
+    supabase.from('daily_briefs').select('brief_text,date,window').eq('user_id', userId).gte('date', thirtyDaysAgo).order('date', { ascending: false }).limit(60),
   ])
 
   // Aggregate food logs by date
@@ -86,6 +102,39 @@ async function generateMemoryForUser(userId: string): Promise<void> {
 
   const supplementList = (supplements ?? []).map(s => `${s.name} (${s.dose}, ${s.timing})`).join(', ') || 'none'
   const stretchCount = stretchLogs?.length ?? 0
+
+  // My Week context
+  const myWeekSummary = (myWeekRows ?? []).length > 0
+    ? `Current week schedule: ${myWeekRows!.map(r => {
+        const base = `${DAY_NAMES[r.day_of_week]}: ${r.day_type}${r.workout_time ? `, workout at ${r.workout_time}` : ''}`
+        return base
+      }).join('; ')}`
+    : null
+
+  // Brief pattern analysis — count keyword occurrences, send tallies not full text
+  const briefs = recentBriefs ?? []
+  const briefTotal = briefs.length
+  const countMentions = (kw: string) => briefs.filter(b => b.brief_text?.toLowerCase().includes(kw)).length
+  const briefPatterns: string[] = []
+  if (briefTotal > 0) {
+    const checks: [string, string][] = [
+      ['protein', 'protein target gap'],
+      ['sleep debt', 'sleep debt concern'],
+      ['sleep score', 'sleep quality concern'],
+      ['hydration', 'hydration concern'],
+      ['streak', 'logging streak'],
+      ['recovery', 'recovery theme'],
+      ['fatigue', 'fatigue/low energy pattern'],
+      ['calorie', 'calorie tracking pattern'],
+    ]
+    for (const [kw, label] of checks) {
+      const n = countMentions(kw)
+      if (n >= 4) briefPatterns.push(`${label} (${n}/${briefTotal} briefs)`)
+    }
+  }
+  const briefPatternSummary = briefPatterns.length > 0
+    ? `Recurring coaching topics over last 30 days: ${briefPatterns.join(', ')}`
+    : null
 
   // Stretch-sleep correlation
   const stretchDates = new Set((stretchLogs ?? []).map(s => s.date))
@@ -138,11 +187,15 @@ ENERGY CHECK-INS (${energyReadings.length} readings):
 SUPPLEMENTS: ${supplementList}
 STRETCH SESSIONS: ${stretchCount} in 90 days
 STRETCH-SLEEP CORRELATION: ${stretchSleepNote}
+${myWeekSummary ? `\nWEEKLY SCHEDULE: ${myWeekSummary}` : ''}
+${briefPatternSummary ? `\nRECURRING COACHING THEMES: ${briefPatternSummary}` : ''}
 `.trim()
 
   const prompt = `You are a personal coach analyzing 90 days of a user's health and fitness data. Generate 5–10 observations about this specific user's patterns.
 
 ${dataSummary}
+
+RECURRING COACHING THEMES: If a topic appears under "RECURRING COACHING THEMES" in the data, it represents a persistent pattern worth a dedicated coach_memory observation — write one even if the raw data is borderline.
 
 CRITICAL INSTRUCTION: For every gap or negative pattern you find, also identify at least one POSITIVE pattern — something the user does that reliably produces a good outcome. State positive patterns as a reproducible formula: "When [condition A] + [condition B], [outcome C] consistently follows." Without this balance, only deficits are noticed. The most useful coaching observations are positive formulas the user can intentionally recreate.
 

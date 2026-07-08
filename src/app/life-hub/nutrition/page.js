@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { calcTDEE as calcTDEEShared, calcMacros as calcMacrosShared, calcGoalAdjustment, calcMicroTargets } from '@/lib/tdee'
 import { NUTRIENTS, matchSuppToNutrient, parseSuppAmount } from '@/data/nutrients'
-import { MEAL_SLOTS } from '@/lib/nutritionUtils'
+import { MEAL_SLOTS, DV } from '@/lib/nutritionUtils'
 import SearchModal from '@/components/nutrition/SearchModal'
 import AddFoodModal from '@/components/nutrition/AddFoodModal'
 import MealBuilderModal from '@/components/nutrition/MealBuilderModal'
@@ -510,7 +510,10 @@ function NutritionPageInner() {
                   {Object.entries(MICRO_LABEL_MAP).filter(([k]) => viewEntry[k] != null && viewEntry[k] !== 0).map(([k, meta]) => (
                     <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
                       <span style={{ color: 'var(--text-secondary)' }}>{meta.label}</span>
-                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{Math.round(viewEntry[k] * 10) / 10} {meta.unit}</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                        {Math.round(viewEntry[k] * 10) / 10} {meta.unit}
+                        {DV[k] != null && <span style={{ color: 'var(--text-secondary)', fontSize: 10, marginLeft: 4 }}>{Math.min(999, Math.round((viewEntry[k] / DV[k]) * 100))}% DV</span>}
+                      </span>
                     </div>
                   ))}
                 </div>
