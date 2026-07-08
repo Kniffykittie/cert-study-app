@@ -12,6 +12,7 @@ export async function POST(req) {
 
   const { userId } = await req.json()
   if (!userId) return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+  if (userId === user.id) return NextResponse.json({ error: 'Use the settings page to manage your own PIN' }, { status: 400 })
 
   const { error } = await supabase.from('profiles').update({ settings_pin_hash: null }).eq('id', userId)
   if (error) return NextResponse.json({ error: 'Failed to clear PIN' }, { status: 500 })

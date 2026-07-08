@@ -212,7 +212,7 @@ export async function PATCH(req) {
 
   if (updateErr) return NextResponse.json({ error: 'Failed to update log' }, { status: 500 })
 
-  await supabase.from('workout_log_sets').delete().eq('log_id', log_id)
+  await supabase.from('workout_log_sets').delete().eq('log_id', log_id).eq('user_id', user.id)
   if (sets?.length) {
     const rows = sets.map(s => ({ ...s, log_id, user_id: user.id }))
     await supabase.from('workout_log_sets').insert(rows)

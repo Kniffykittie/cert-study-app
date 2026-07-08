@@ -180,6 +180,21 @@ All items are ✅ built. This section is reference only — not a to-do list.
 | 21 | Recovery code brute force prevention | ✅ Built | `2fa/use-recovery` rate-limited (5/hr via `api_rate_limits`) |
 | 22 | Rate limit fail-closed | ✅ Built | `checkRateLimit` returns `{ allowed: false }` on DB error — was fail-open |
 | 23 | Owner PIN serverless lockout | ✅ Built | Lockout persisted in `api_rate_limits` DB — survives cold starts |
+| 24 | Settings-PIN brute force prevention | ✅ Built | `settings-pin/verify` and `settings-pin/remove` rate-limited (10/hr) — Phase Audit |
+| 25 | Weekly-wrap rate limiting | ✅ Built | `life-hub/weekly-wrap` POST limited to 3/hr — was unrated — Phase Audit |
+| 26 | Daily-brief all windows rate-limited | ✅ Built | afternoon + evening windows now have entries in LIMITS map (2/hr each) — Phase Audit |
+| 27 | Recovery code regeneration rate limit | ✅ Built | `2fa/generate-recovery` rate-limited (3/hr) — Phase Audit |
+| 28 | Chat history injection — exercise-chat + checkin/chat | ✅ Built | Both now apply role whitelist + 20-msg slice + 2000-char cap matching chat/route.js — Phase Audit |
+| 29 | Atomic rate limiting — TOCTOU fix | ✅ Built | `checkin/insight` + `coaching-response` converted to increment-first atomic pattern — Phase Audit |
+| 30 | Prompt injection — exercises_completed | ✅ Built | `exercises_completed` in coaching-response wrapped in user_input tags with per-item cap — Phase Audit |
+| 31 | Prompt injection — todays_exercises | ✅ Built | `todays_exercises` in checkin/insight + checkin/chat wrapped in user_input tags — Phase Audit |
+| 32 | Lab input length caps | ✅ Built | `lab-doc-feedback` + `lab-summary`: stepTitle/stepContent/documentPrompts/labTitle/labDescription all capped — Phase Audit |
+| 33 | generate-questions count cap | ✅ Built | `count` validated 1–150; prevented potential infinite loop — Phase Audit |
+| 34 | workout_log_sets delete IDOR guard | ✅ Built | Added `.eq('user_id', user.id)` to sets delete in workouts/log — Phase Audit |
+| 35 | owner/admin/clear-pin self-target guard | ✅ Built | Owner can no longer clear own PIN via admin endpoint — Phase Audit |
+| 36 | Search query length cap | ✅ Built | Nutrition search `q` param capped at 200 chars — Phase Audit |
+| 37 | Push endpoint URL validation | ✅ Built | Endpoint must be https:// URL ≤ 2048 chars — Phase Audit |
+| 38 | generate-flashcards session.user.id crash fix | ✅ Built | Was `session.user.id` (undefined) — fixed to `user.id` — Phase Audit |
 
 ---
 
@@ -4388,6 +4403,28 @@ const suppTimingBlock = supplements.map(s => {
 - New API route: `POST /api/supplements/ai-fill` — Haiku, getUser() + is_disabled check, name wrapped in `<user_input>` tags, returns `{ fill: { dose, timing, nutrients } }`; returns `{ error }` for unknown supplements
 - `SupplementForm` component updated to accept `hideName` prop (add form renders its own name input + AI fill button row above the form)
 - AI filled indicator (green "✓ AI Filled" button + hint text) cleared when name changes
+
+### Phase Audit - Complete
+- **Full Security Audit** — 21 findings across CRITICAL/HIGH/MEDIUM/LOW, all fixed in one session
+- **C1** `generate-flashcards`: `session.user.id` crash → `user.id`
+- **C2** `settings-pin/verify` + `settings-pin/remove`: added 10/hr rate limit (brute force on 4-digit PIN)
+- **H1** `checkin/insight` + `coaching-response`: TOCTOU race → atomic increment-first pattern
+- **H2** `coaching-response`: `exercises_completed` wrapped in `<user_input>` tags with per-item cap
+- **H3** `life-hub/weekly-wrap`: added `checkRateLimit` (3/hr) — was completely unrated
+- **H4** `life-hub/daily-brief`: afternoon/evening keys added to LIMITS map (2/hr each)
+- **H5** `generate-questions`: `count` validated 1–150 — prevented infinite loop
+- **H6** `workouts/log`: sets delete now includes `.eq('user_id', user.id)` guard
+- **M1** `exercise-chat` + `checkin/chat`: message history now applies role whitelist + 20-msg slice + 2000-char cap
+- **M2** `lab-doc-feedback`: stepTitle (200), stepContent (2000), documentPrompts (5×500), userText (1000) all capped
+- **M3** `lab-summary`: labTitle (200), labDescription (1000), step content (1000 each) all capped
+- **M5** `owner/admin/clear-pin`: self-target guard added (owner can't clear own PIN via admin endpoint)
+- **M6** `nutrition/search`: query length capped at 200 chars
+- **M7** `2fa/generate-recovery`: added 3/hr rate limit
+- **L3** `checkin/insight` + `checkin/chat`: `todays_exercises` wrapped in `<user_input>` tags with per-item cap
+- **L4** `push/subscribe`: endpoint must be `https://` URL ≤ 2048 chars
+- Added 15 new entries to Security Status table (items 24–38)
+- Note: C3 (Owner PIN SHA-256 vs bcrypt) is an env-var issue — the OWNER_PIN_HASH stored in Vercel is already a bcrypt hash if set correctly; no code change needed but instructions added to future-proofing rules
+- Note: EF1 (Edge Function prompt injection) — verified not an issue; only aggregated metrics are injected, not raw user text
 
 ### Phase 51 - Complete
 - **Workout Logging system** — active workout page, workout history, progressive overload detection

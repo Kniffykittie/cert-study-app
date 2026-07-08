@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 const client = new Anthropic()
 
@@ -54,6 +55,9 @@ export async function POST(req) {
 
   const { data: profile } = await supabase.from('profiles').select('is_disabled').eq('id', user.id).single()
   if (profile?.is_disabled) return NextResponse.json({ error: 'Account disabled' }, { status: 403 })
+
+  const { allowed } = await checkRateLimit(supabase, user.id, 'life-hub/weekly-wrap')
+  if (!allowed) return NextResponse.json({ error: 'Rate limit reached — try again next hour.' }, { status: 429 })
 
   const { week } = await req.json()
   if (!week) return NextResponse.json({ error: 'week required' }, { status: 400 })

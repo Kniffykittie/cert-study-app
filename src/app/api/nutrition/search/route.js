@@ -79,6 +79,7 @@ export async function GET(req) {
 
   if (rawBarcode && !barcode) return NextResponse.json({ error: 'Invalid barcode format' }, { status: 400 })
   if (!query && !barcode) return NextResponse.json({ results: [] })
+  if (query && query.length > 200) return NextResponse.json({ error: 'Search query too long' }, { status: 400 })
 
   // 1. Check Supabase cache first
   if (barcode) {

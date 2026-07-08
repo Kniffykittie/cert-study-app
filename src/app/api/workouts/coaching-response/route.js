@@ -12,13 +12,11 @@ export async function POST(req) {
   const { data: profile } = await supabase.from('profiles').select('is_disabled').eq('id', user.id).single()
   if (profile?.is_disabled) return Response.json({ error: 'Account disabled' }, { status: 403 })
 
-  // Rate limit: one coaching response per day
+  // Rate limit: one coaching response per day (atomic increment-first — no race condition)
   const today = new Date().toISOString().slice(0, 10)
   const rateLimitKey = `coaching-response-${today}`
-  const { data: rateRow } = await supabase.from('api_rate_limits').select('count').eq('user_id', user.id).eq('route', rateLimitKey).single()
-  if (rateRow && rateRow.count >= 1) return Response.json({ error: 'Rate limit reached' }, { status: 429 })
-
-  await supabase.rpc('increment_rate_limit', { p_user_id: user.id, p_route: rateLimitKey })
+  const { data: newCount } = await supabase.rpc('increment_rate_limit', { p_user_id: user.id, p_route: rateLimitKey })
+  if (newCount > 1) return Response.json({ error: 'Rate limit reached' }, { status: 429 })
 
   const body = await req.json()
   const {
@@ -59,7 +57,7 @@ ${nutritionCaveat}
 
 WORKOUT DATA:
 - Duration: ${durationMin} minutes
-- Exercises: ${(exercises_completed || []).join(', ') || 'not provided'}
+- Exercises: <user_input>${(exercises_completed || []).slice(0, 30).map(e => String(e).slice(0, 100)).join(', ') || 'not provided'}</user_input>
 - Sets completed: ${sets_completed ?? 'unknown'}${sets_skipped > 0 ? `, skipped: ${sets_skipped}` : ''}
 - Difficulty (self-rated): ${difficulty ?? 'not rated'}/5
 - Energy after (self-rated): ${energy_after ?? 'not rated'}/5

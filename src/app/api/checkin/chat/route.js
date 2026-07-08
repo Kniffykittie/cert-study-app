@@ -47,7 +47,7 @@ CONTEXT SNAPSHOT (frozen at check-in time — do not re-fetch or ask about data)
 - Energy: ${energy_rating ?? 'not rated'}/5, Mood: ${mood_rating ?? 'not rated'}/5
 - Note: ${safeNote ?? '(none)'}
 - Sore spots: ${sore_spots.join(', ') || 'none'}
-- Today's exercises: ${todays_exercises.join(', ') || 'none planned'}
+- Today's exercises: <user_input>${todays_exercises.slice(0, 20).map(e => String(e).slice(0, 100)).join(', ') || 'none planned'}</user_input>
 - Sleep score: ${sleep_score ?? 'N/A'}/100${deep_sleep_min != null ? ` (deep: ${deep_sleep_min}min, REM: ${rem_sleep_min}min)` : ''}
 - Yesterday workout: ${yesterday_workout ? 'yes' : 'no'}
 - Calories today: ${today_calories_so_far ?? 'not logged'}, Caffeine: ${today_caffeine_mg != null ? `${today_caffeine_mg}mg` : 'not tracked'}
@@ -68,7 +68,10 @@ Respond with JSON only:
 }`
 
   const apiMessages = [
-    ...(messages || []).map(m => ({ role: m.role, content: m.content })),
+    ...(messages || [])
+      .filter(m => ['user', 'assistant'].includes(m.role) && typeof m.content === 'string')
+      .slice(-20)
+      .map(m => ({ role: m.role, content: m.content.slice(0, 2000) })),
   ]
 
   const response = await anthropic.messages.create({

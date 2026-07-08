@@ -48,7 +48,10 @@ Tailor your advice to their experience level and goal. Answer questions about fo
     max_tokens: 350,
     system: systemPrompt,
     messages: [
-      ...(messages || []).map(m => ({ role: m.role, content: m.content })),
+      ...(messages || [])
+        .filter(m => ['user', 'assistant'].includes(m.role) && typeof m.content === 'string')
+        .slice(-20)
+        .map(m => ({ role: m.role, content: m.content.slice(0, 2000) })),
       { role: 'user', content: `<user_input>${userMessage}</user_input>` },
     ],
   })

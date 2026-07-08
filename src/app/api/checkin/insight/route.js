@@ -18,12 +18,11 @@ export async function POST(req) {
   const { data: profile } = await supabase.from('profiles').select('is_disabled').eq('id', user.id).single()
   if (profile?.is_disabled) return Response.json({ error: 'Account disabled' }, { status: 403 })
 
-  // Rate limit: 2/day total (one per window)
+  // Rate limit: 2/day total (atomic increment-first — no race condition)
   const today = new Date().toISOString().slice(0, 10)
   const rateLimitKey = `checkin-insight-${today}`
-  const { data: rateRow } = await supabase.from('api_rate_limits').select('count').eq('user_id', user.id).eq('route', rateLimitKey).single()
-  if (rateRow && rateRow.count >= 2) return Response.json({ error: 'Rate limit reached' }, { status: 429 })
-  await supabase.rpc('increment_rate_limit', { p_user_id: user.id, p_route: rateLimitKey })
+  const { data: newCount } = await supabase.rpc('increment_rate_limit', { p_user_id: user.id, p_route: rateLimitKey })
+  if (newCount > 2) return Response.json({ error: 'Rate limit reached' }, { status: 429 })
 
   const body = await req.json()
   const {
@@ -77,7 +76,7 @@ CHECK-IN DATA (${checkInWindow} window):
 - Note: ${safeNote ?? '(none)'}
 - Sore spots: ${sore_spots.join(', ') || 'none'}
 
-TODAY'S WORKOUT EXERCISES: ${todays_exercises.join(', ') || 'none planned'}
+TODAY'S WORKOUT EXERCISES: <user_input>${todays_exercises.slice(0, 20).map(e => String(e).slice(0, 100)).join(', ') || 'none planned'}</user_input>
 ${conflicts.length ? `\nEXERCISE CONFLICTS DETECTED: ${conflicts.map(c => `${c.exercise} (conflicts with sore ${c.sore_spot})`).join(', ')}` : ''}
 
 CONTEXT:

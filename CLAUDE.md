@@ -53,6 +53,42 @@ Workouts    #3b82f6   (blue)
 - **All user-supplied free text injected into AI prompts must be wrapped in `<user_input>` tags** with a note telling Claude to treat it as data only
 - **Every new loggable feature ships with a reset row in Settings** in the same build session
 
+## Security Rules (Enforced — Do Not Skip)
+These rules were established after a full top-to-bottom security audit and must be applied to every new route and every new feature.
+
+### Rate Limiting
+- **Every new route that triggers an AI call must be added to `src/lib/rateLimit.js` LIMITS map** — no exceptions
+- **Every route with multiple AI-window variants** (e.g. morning/afternoon/evening) must have a separate LIMITS entry for each variant key the code generates
+- **Sensitive non-AI actions must also be rate-limited:** PIN verify/remove (10/hr), recovery code generation (3/hr), any "reset all X" action (5/hr)
+- **Use the atomic increment-first pattern for all custom rate limiting** (don't read-then-check-then-increment — use `rpc('increment_rate_limit')` first and check the returned count)
+
+### Prompt Injection
+- **Arrays of user-controlled strings injected into AI prompts must be sanitized:** `.slice(0, MAX_ITEMS).map(s => String(s).slice(0, MAX_CHARS)).join(', ')` then wrap the whole value in `<user_input>` tags
+- **This includes: exercise names, food names, sore spots, supplement names, tag arrays** — anything the user can write or rename
+- **Fields that come from static server-side data (e.g. exercise IDs, template text) do NOT need user_input tags** — only user-editable fields do
+- **`<user_input>` tags never nest** — if a block is already wrapped, don't wrap sub-fields again inside it
+
+### Input Validation
+- **All string inputs from the client must have length caps** before being used in DB queries, AI prompts, or passed to external APIs
+- **Suggested caps:** user-facing names → 200 chars; descriptions/notes → 1000–2000 chars; arrays → 20–30 items max; each item in array → 100 chars
+- **Any client-supplied numeric `count` that controls a loop must be validated** (min 1, max reasonable ceiling) — unbounded counts can cause infinite loops or runaway DB queries
+- **URL-type fields (webhooks, push endpoints) must be validated:** must be `https://`, max 2048 chars
+
+### IDOR / Ownership Guards
+- **Every DELETE and PATCH in a Supabase query must include `.eq('user_id', user.id)`** — even if RLS covers it, defense in depth
+- **When deleting child rows by a parent ID (e.g. sets by log_id), always add `.eq('user_id', user.id)` to the child delete as well**
+- **Owner admin routes that accept a `userId` param must check `if (userId === user.id) return 400`** before operating on self (except routes that are explicitly self-management)
+
+### Message History Sanitization
+- **Any route that accepts client-supplied message history and forwards it to the Anthropic API must apply:**
+  1. Role whitelist: `.filter(m => ['user', 'assistant'].includes(m.role) && typeof m.content === 'string')`
+  2. History cap: `.slice(-20)`
+  3. Content cap: `.map(m => ({ ...m, content: m.content.slice(0, 2000) }))`
+- The reference implementation is `src/app/api/chat/route.js` — always match it
+
+### Variable References
+- **Never reference a variable that hasn't been defined** in the same function scope — e.g., `session.user.id` when only `user` was destructured from `getUser()`. Always trace the auth flow from the top of each new route.
+
 ---
 
 ## Parallel Implementations — Must Stay in Sync

@@ -54,6 +54,9 @@ export async function POST(request) {
   const { cert, count, topics, difficulty = 'hard' } = await request.json()
 
   if (!DOMAINS[cert]) return Response.json({ error: 'Invalid cert' }, { status: 400 })
+  if (!count || typeof count !== 'number' || count < 1 || count > 150) {
+    return Response.json({ error: 'count must be between 1 and 150' }, { status: 400 })
+  }
 
   const allDomains = DOMAINS[cert]
 

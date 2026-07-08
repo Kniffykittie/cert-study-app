@@ -81,7 +81,7 @@ Rules:
 
   // Insert new cards into the shared deck (user_id = owner for traceability)
   const rows = cards.map(c => ({
-    user_id: session.user.id,
+    user_id: user.id,
     cert,
     front: c.front,
     back: c.back,

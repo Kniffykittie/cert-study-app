@@ -11,6 +11,9 @@ export async function POST(req) {
   if (!endpoint || !keys?.p256dh || !keys?.auth) {
     return NextResponse.json({ error: 'Invalid subscription object' }, { status: 400 })
   }
+  if (typeof endpoint !== 'string' || endpoint.length > 2048 || !/^https:\/\//.test(endpoint)) {
+    return NextResponse.json({ error: 'Invalid endpoint URL' }, { status: 400 })
+  }
 
   const { error } = await supabase.from('push_subscriptions').upsert({
     user_id: user.id,
