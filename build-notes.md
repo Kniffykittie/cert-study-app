@@ -2505,6 +2505,12 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ## Phase Log
 
+### Phase T — Sleep Debt Stat Card — Complete
+
+**What was built:**
+- Added `computeSleepDebt()` to `/life-hub/health/sleep/page.js` — queries last 7 days of `health_sleep_sessions` (sums stages JSONB, computes deficit vs `goals_profiles.sleep_hours` target, default 8h), falls back to `daily_checkins.sleep_hours` when no watch data
+- Added Sleep Debt card below stage summary cards — color-coded (green <1hr, yellow 1–3hrs, red 3+hrs), includes InfoChip, shows "(based on self-reported sleep)" footnote when using checkin fallback, hidden entirely when no data available
+
 ### Phase P — Evening Brief + daily_briefs Schema Migration — Complete
 
 **DB Migration (run in Supabase SQL editor — MCP tool lacked permission):**

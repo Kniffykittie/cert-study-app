@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import InfoChip from '@/components/InfoChip'
+import { createClient } from '@/lib/supabase/client'
 
 const STAGE_COLORS = {
   'Deep': 'var(--accent-blue)',
@@ -109,6 +110,8 @@ export default function SleepTrackerPage() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
   const [showWhy, setShowWhy] = useState(false)
   const [expandedStage, setExpandedStage] = useState(null)
+  const [sleepDebt, setSleepDebt] = useState(null) // hours, null = no data
+  const [sleepDebtSource, setSleepDebtSource] = useState(null) // 'health' | 'checkin'
 
   const handleMouseMove = useCallback((e) => setMousePos({ x: e.clientX, y: e.clientY }), [])
 
@@ -142,7 +145,65 @@ export default function SleepTrackerPage() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    computeSleepDebt()
+  }, [])
+
+  async function computeSleepDebt() {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    const cutoff = sevenDaysAgo.toISOString().slice(0, 10)
+
+    const { data: goals } = await supabase.from('goals_profiles').select('sleep_hours').eq('user_id', user.id).maybeSingle()
+    const targetHours = goals?.sleep_hours ?? 8
+
+    // Try Health sessions first
+    const { data: sessions } = await supabase
+      .from('health_sleep_sessions')
+      .select('start_time, stages')
+      .eq('user_id', user.id)
+      .eq('is_nap', false)
+      .gte('start_time', `${cutoff}T00:00:00`)
+      .order('start_time', { ascending: false })
+      .limit(7)
+
+    if (sessions && sessions.length > 0) {
+      let totalDebt = 0
+      for (const s of sessions) {
+        const stages = s.stages ?? {}
+        const totalMins = Object.values(stages).reduce((a: number, b: unknown) => a + (b as number), 0)
+        const actualHours = totalMins / 60
+        const deficit = targetHours - actualHours
+        if (deficit > 0) totalDebt += deficit
+      }
+      setSleepDebt(Math.round(totalDebt * 10) / 10)
+      setSleepDebtSource('health')
+      return
+    }
+
+    // Fallback: daily_checkins.sleep_hours
+    const { data: checkins } = await supabase
+      .from('daily_checkins')
+      .select('date, sleep_hours')
+      .eq('user_id', user.id)
+      .gte('date', cutoff)
+      .not('sleep_hours', 'is', null)
+
+    if (checkins && checkins.length > 0) {
+      let totalDebt = 0
+      for (const c of checkins) {
+        const deficit = targetHours - (c.sleep_hours ?? 0)
+        if (deficit > 0) totalDebt += deficit
+      }
+      setSleepDebt(Math.round(totalDebt * 10) / 10)
+      setSleepDebtSource('checkin')
+    }
+  }
 
   async function handleSync() {
     setSyncing(true)
@@ -294,6 +355,36 @@ export default function SleepTrackerPage() {
               </div>
             ))}
           </div>
+
+          {/* Sleep Debt card */}
+          {sleepDebt !== null && (() => {
+            const debtColor = sleepDebt < 1 ? 'var(--success)' : sleepDebt < 3 ? 'var(--warning)' : 'var(--error)'
+            return (
+              <div style={{ backgroundColor: 'var(--surface)', border: `1px solid ${debtColor}44`, borderRadius: '10px', padding: '16px 20px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+                <div style={{ flex: '0 0 auto' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px' }}>
+                    7-Day Sleep Debt
+                    <InfoChip label="ℹ️" text="Short-term sleep debt accumulates over 7 days. 2–3 nights of full sleep typically clears most of it — recovery is faster than the debt built up." />
+                  </div>
+                  <div style={{ color: debtColor, fontSize: '28px', fontWeight: '700', lineHeight: 1 }}>
+                    {sleepDebt === 0 ? '0 hrs' : `${sleepDebt} hrs`}
+                  </div>
+                  {sleepDebtSource === 'checkin' && (
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '4px', fontStyle: 'italic' }}>based on self-reported sleep</div>
+                  )}
+                </div>
+                <div style={{ flex: 1, color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5' }}>
+                  {sleepDebt === 0
+                    ? 'No sleep debt in the last 7 days. You\'re fully recovered.'
+                    : sleepDebt < 1
+                    ? 'Minimal sleep debt. A solid night or two and you\'re even.'
+                    : sleepDebt < 3
+                    ? 'Moderate sleep debt. Prioritize 8+ hours for the next few nights.'
+                    : 'Significant sleep debt. Aim to add 1–2 extra hours per night this week.'}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Stage breakdown bar */}
           {Object.keys(sleepStages).length > 0 && (
