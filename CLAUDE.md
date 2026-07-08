@@ -180,6 +180,7 @@ src/
         ai-fill/route.js               POST { name } — Haiku estimates dose, timing, and nutrients for a supplement name; used by "🤖 AI Fill" button in the add form on supplements page; no cache; uses getUser() + is_disabled check; name wrapped in user_input tags
       nutrition/
         search/route.js                GET ?q= or ?barcode= — checks food_cache + my_foods first; falls back to Open Food Facts API; caches OFF results permanently (ODbL allows); uses getUser()
+        ai-photo-log/route.js          POST { image_base64, media_type, description? } — Sonnet vision; returns { status, confidence, confidence_note, retake_reason, items[] }; 10/hr rate limit; image never stored; uses getUser() + is_disabled check
         ai-food-fill/route.js          POST { name } — Haiku estimates nutrition per typical serving; returns fill JSONB (name, serving_size_label, macros + subset of micros + servings_per_container); no cache (user reviews before saving); uses getUser() + is_disabled check
         ai-drink-fill/route.js         POST { name } — Haiku estimates drink-specific nutrition (calories, caffeine_mg, water_oz, macros, sodium, potassium, vitamin_c); used by "🤖 AI Fill" button on Add to My Drinks modal (water/hydration page); uses getUser() + is_disabled check; name wrapped in user_input tags
         ai-micro-fill/route.js         POST { name, brand, calories, protein_g, carbs_g, fat_g } — Haiku estimates 15 micronutrient fields for an OFFs result with sparse micro data; no cache; uses getUser() + is_disabled check

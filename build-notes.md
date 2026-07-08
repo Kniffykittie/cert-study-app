@@ -1044,55 +1044,7 @@ Distinct from coach_memory. This is the check-in note "tired, right shoulder sor
 ### 🍎 Nutrition
 
 
-**Photo-Based Food Logging** — 💬 Discussed
-
-Allow the user to take or upload a photo of food and have Claude identify the dish, estimate portions, and return a structured nutrition estimate that flows into the existing log-manual flow.
-
-**Use case:** food truck stops, restaurant meals, home-cooked dishes with no barcode — anywhere the user doesn't know exact weights or ingredients. A rough estimate beats a gap in the log. Even a rough estimate is better than a missing entry.
-
-**UX Flow — single shot with inline confidence + clarification:**
-
-1. Camera button added as a 4th tab in AddFoodModal (📷 Photo) alongside ⭐ Favorites, ✏️ Manual, 🔍 Search
-2. User taps "Take Photo" (camera) or "Upload" (camera roll) — browser `<input type="file" accept="image/*" capture="environment">`
-3. Client resizes image to max ~800px on longest side before sending (keeps payload under 600KB; Canvas API for resize)
-4. `POST /api/nutrition/ai-photo-log` — sends base64 image + optional user_description field
-5. Claude returns structured JSON with confidence tier and either results or a retake reason
-
-**API response structure:**
-```json
-{
-  "status": "identified" | "low_confidence" | "needs_retake",
-  "confidence": "high" | "medium" | "low",
-  "confidence_note": "I can see grilled chicken and rice with a dark glaze — this looks like a teriyaki bowl.",
-  "retake_reason": null,   // or: "The plate is cut off — please retake with the full plate in frame"
-  "items": [
-    { "name": "Teriyaki Chicken Bowl", "serving_size_label": "1 bowl (~400g)", "calories": 520, "protein_g": 38, "carbs_g": 58, "fat_g": 9 }
-  ]
-}
-```
-
-**UI states after photo is sent:**
-
-*High confidence:*
-Green chip "I'm pretty confident about this one" + Claude's description sentence + pre-filled form fields. User reviews and taps Log.
-
-*Medium confidence:*
-Yellow chip "Best estimate — I'm not certain" + description + pre-filled fields. A "Help me guess better" text field appears below: user types e.g. "it's a shawarma wrap with garlic sauce" and taps "Re-analyze" — same photo + description re-sent, Claude almost always corrects to high confidence on second pass.
-
-*Low confidence / needs retake:*
-Red chip + specific retake instruction shown as a card:
-> "Please retake with the full plate in frame" 
-> "Better lighting would help — try moving to a brighter spot"
-> "I can't identify this dish — can you describe what's in it?"
-Last option opens the text description field directly so user can skip retake entirely and just type "dal makhani with rice and naan."
-
-**Prompt design:**
-- Claude should break a multi-item plate into separate components where visible (rice + chicken + sauce = 3 entries OR 1 combined "Chicken Teriyaki Bowl" entry — prefer combined for unknown dishes, separate for clearly distinct items)
-- Portion cues in prompt: estimate from visual references (plate size, hand comparison, item count), note the estimate in `confidence_note`
-- Never fabricate a confident answer — returning `low_confidence` with a helpful note is better than a wild guess presented as fact
-- System prompt must state: "This user will review and adjust before logging. Your job is to give the best honest estimate. If you're uncertain, say so and explain why."
-
-**API route guards:** `getUser()` + `is_disabled` check. No caching (each photo is unique). Rate-limit to 10/day via `api_rate_limits` (vision calls cost more than text). Image is never stored — base64 is processed in-memory only.
+**Photo-Based Food Logging** — ✅ Built (Phase Z)
 
 **5. Pre/Post Workout Meal Advisor** — ✅ Built (Phase 51)
 
@@ -2492,6 +2444,18 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 ---
 
 ## Phase Log
+
+### Phase Z — Photo-Based Food Logging — Complete
+
+- New API route `src/app/api/nutrition/ai-photo-log/route.js` — `getUser()` + `is_disabled` check; 10/hr rate limit; accepts `image_base64` + `media_type` + optional `description`; calls claude-sonnet-4-6 with vision; returns `{ status, confidence, confidence_note, retake_reason, items[] }`; image never stored
+- Client-side image resizer (`resizeImage()`) in `AddFoodModal.js` — Canvas API, max 800px, outputs JPEG at 85% quality; runs before upload to keep payloads under ~600KB
+- New 📷 Photo tab in `AddFoodModal.js` — 4 states: idle (Take Photo / Upload buttons), uploading (thumbnail + spinner text), result (photo thumbnail + confidence chip + item cards + Re-analyze hint field), error (message + Try Again)
+- Confidence chip colors: green (high) / yellow (medium) / red (low); `confidence_note` shown as explanation sentence
+- Each result item has a "+ Log this" button → flows into existing `LogConfirmModal` via `confirmOtherType = 'photo'`
+- Re-analyze field shown when confidence is medium or low — user can type a description hint and re-submit the same photo
+- "← Try a different photo" button resets state
+- `handleConfirmOtherLog` extended with `photo` branch (logs directly, no save-to-library)
+- `src/lib/rateLimit.js` updated with `'nutrition/ai-photo-log': 10`
 
 ### Phase Y — Coach Memory Edge Function Upgrade — Complete
 

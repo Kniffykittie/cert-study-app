@@ -8,6 +8,7 @@ const LIMITS = {
   'workouts/exercise-chat': 20,
   'supplements/ai-fill': 10,
   'supplements/generate-profile': 10,
+  'nutrition/ai-photo-log': 10,
   'nutrition/ai-food-fill': 20,
   'nutrition/ai-food-intel': 20,
   'nutrition/ai-drink-fill': 10,

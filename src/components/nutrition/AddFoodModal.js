@@ -63,6 +63,31 @@ const BLANK_MANUAL = {
   vitamin_d_mcg: '', vitamin_b12_mcg: '', vitamin_b6_mg: '', folate_mcg: '',
 }
 
+function resizeImage(file, maxPx) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const ratio = Math.min(1, maxPx / Math.max(img.width, img.height))
+      const w = Math.round(img.width * ratio)
+      const h = Math.round(img.height * ratio)
+      const canvas = document.createElement('canvas')
+      canvas.width = w; canvas.height = h
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+      URL.revokeObjectURL(url)
+      canvas.toBlob(blob => {
+        if (!blob) { reject(new Error('resize failed')); return }
+        const reader = new FileReader()
+        reader.onload = e => resolve({ data: e.target.result.split(',')[1], type: 'image/jpeg' })
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      }, 'image/jpeg', 0.85)
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image load failed')) }
+    img.src = url
+  })
+}
+
 function FoodRow({ food, selected, onSelect, isSaved, onSave, savingId, dietaryWarnings }) {
   const cal = food.calories ? Math.round(food.calories) : '?'
   const p = food.protein_g ? `${Math.round(food.protein_g)}g P` : null
@@ -131,12 +156,76 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
   const [searchGramInput, setSearchGramInput] = useState('')
   const [dvMode, setDvMode] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
+  const [photoState, setPhotoState] = useState('idle') // idle | uploading | result | error
+  const [photoResult, setPhotoResult] = useState(null)
+  const [photoDescription, setPhotoDescription] = useState('')
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null)
+  const [photoError, setPhotoError] = useState(null)
+  const photoInputRef = useRef(null)
   const debounceRef = useRef(null)
   const searchInputRef = useRef(null)
 
   function parseGramWeight(label) {
     const m = label?.match(/\((\d+(?:\.\d+)?)\s*g\)/i)
     return m ? parseFloat(m[1]) : null
+  }
+
+  async function handlePhotoUpload(file) {
+    if (!file) return
+    setPhotoError(null)
+    setPhotoResult(null)
+    setPhotoPreviewUrl(URL.createObjectURL(file))
+    setPhotoState('uploading')
+
+    try {
+      const resized = await resizeImage(file, 800)
+      const base64 = resized.data
+      const media_type = resized.type
+
+      const res = await fetch('/api/nutrition/ai-photo-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: base64, media_type, description: photoDescription }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setPhotoError(json.error || 'Failed to analyze photo'); setPhotoState('error'); return }
+      setPhotoResult(json)
+      setPhotoState('result')
+    } catch {
+      setPhotoError('Failed to send photo — check your connection.')
+      setPhotoState('error')
+    }
+  }
+
+  async function reanalyzeWithHint() {
+    if (!photoPreviewUrl) return
+    setPhotoError(null)
+    setPhotoState('uploading')
+    try {
+      const res = await fetch(photoPreviewUrl)
+      const blob = await res.blob()
+      const file = new File([blob], 'photo.jpg', { type: blob.type })
+      const resized = await resizeImage(file, 800)
+      const apiRes = await fetch('/api/nutrition/ai-photo-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: resized.data, media_type: resized.type, description: photoDescription }),
+      })
+      const json = await apiRes.json()
+      if (!apiRes.ok) { setPhotoError(json.error || 'Failed to re-analyze'); setPhotoState('error'); return }
+      setPhotoResult(json)
+      setPhotoState('result')
+    } catch {
+      setPhotoError('Re-analysis failed.'); setPhotoState('error')
+    }
+  }
+
+  function resetPhoto() {
+    setPhotoState('idle')
+    setPhotoResult(null)
+    setPhotoPreviewUrl(null)
+    setPhotoDescription('')
+    setPhotoError(null)
   }
 
   function addManualNutrient(key) {
@@ -311,6 +400,8 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
     } else if (confirmOtherType === 'ai') {
       if (manualSaveToLib) await onSaveFood({ ...aiPreview, is_ingredient: false, is_snack: false })
       await onAdd(entry)
+    } else if (confirmOtherType === 'photo') {
+      await onAdd(entry)
     }
     setSavingConfirmOther(false)
     setConfirmOtherFood(null)
@@ -379,6 +470,7 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
           <button onClick={() => setTab('favorites')} style={tabBtn('favorites')}>⭐ My Favorites</button>
           <button onClick={() => setTab('manual')} style={tabBtn('manual')}>✏️ Enter Manually</button>
           <button onClick={() => setTab('search')} style={tabBtn('search')}>🔍 Search Database</button>
+          <button onClick={() => { setTab('photo'); resetPhoto() }} style={tabBtn('photo')}>📷 Photo</button>
         </div>
 
         {tab === 'favorites' && (
@@ -714,6 +806,136 @@ export default function AddFoodModal({ slot, onClose, onAdd, myFoods, onSaveFood
               <label htmlFor="searchsavelib" style={{ color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>⭐ Save to My Favorites when I log this</label>
             </div>
           </>
+        )}
+
+        {tab === 'photo' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <input ref={photoInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f) }} />
+
+            {photoState === 'idle' && (
+              <>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '8px 0 4px' }}>
+                  Take or upload a photo of your meal and Claude will estimate the nutrition.
+                </p>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => photoInputRef.current?.click()}
+                    style={{ flex: 1, backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                    📷 Take Photo
+                  </button>
+                  <button onClick={() => { const i = document.createElement('input'); i.type='file'; i.accept='image/*'; i.onchange = e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f) }; i.click() }}
+                    style={{ flex: 1, backgroundColor: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                    🖼️ Upload
+                  </button>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '11px', margin: 0, opacity: 0.7 }}>
+                  10 photo logs per hour · You review before logging
+                </p>
+              </>
+            )}
+
+            {photoState === 'uploading' && (
+              <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                {photoPreviewUrl && <img src={photoPreviewUrl} alt="" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px', marginBottom: '16px' }} />}
+                <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>🤖 Analyzing your photo...</div>
+              </div>
+            )}
+
+            {photoState === 'error' && (
+              <div>
+                {photoPreviewUrl && <img src={photoPreviewUrl} alt="" style={{ width: '100%', maxHeight: '160px', objectFit: 'cover', borderRadius: '8px', marginBottom: '12px' }} />}
+                <div style={{ backgroundColor: 'rgba(204,0,0,0.1)', border: '1px solid rgba(204,0,0,0.3)', borderRadius: '8px', padding: '12px', color: 'var(--error)', fontSize: '13px', marginBottom: '12px' }}>{photoError}</div>
+                <button onClick={resetPhoto} style={{ width: '100%', background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>Try Again</button>
+              </div>
+            )}
+
+            {photoState === 'result' && photoResult && (() => {
+              const { status, confidence, confidence_note, retake_reason, items } = photoResult
+              const confidenceColor = confidence === 'high' ? 'var(--success)' : confidence === 'medium' ? 'var(--warning)' : 'var(--error)'
+              const confidenceBg = confidence === 'high' ? 'rgba(46,204,113,0.1)' : confidence === 'medium' ? 'rgba(241,196,15,0.1)' : 'rgba(204,0,0,0.1)'
+              const confidenceBorder = confidence === 'high' ? 'rgba(46,204,113,0.3)' : confidence === 'medium' ? 'rgba(241,196,15,0.3)' : 'rgba(204,0,0,0.3)'
+
+              return (
+                <>
+                  {photoPreviewUrl && <img src={photoPreviewUrl} alt="" style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', borderRadius: '8px' }} />}
+
+                  <div style={{ backgroundColor: confidenceBg, border: `1px solid ${confidenceBorder}`, borderRadius: '8px', padding: '10px 12px' }}>
+                    <div style={{ color: confidenceColor, fontSize: '12px', fontWeight: '700', marginBottom: '3px' }}>
+                      {confidence === 'high' ? '✓ High confidence' : confidence === 'medium' ? '~ Medium confidence' : '⚠ Low confidence'}
+                    </div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{confidence_note}</div>
+                  </div>
+
+                  {status === 'needs_retake' && retake_reason && (
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '13px', backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 12px' }}>
+                      📸 {retake_reason}
+                    </div>
+                  )}
+
+                  {items?.length > 0 && items.map((item, idx) => (
+                    <div key={idx} style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                        <div>
+                          <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>{item.name}</div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{item.serving_size_label}</div>
+                        </div>
+                        <div style={{ color: 'var(--accent-blue)', fontSize: '16px', fontWeight: '700', flexShrink: 0, marginLeft: '8px' }}>
+                          {item.calories != null ? `${Math.round(item.calories)} kcal` : '? kcal'}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                        {item.protein_g != null && <span>P {Math.round(item.protein_g)}g</span>}
+                        {item.carbs_g != null && <span>C {Math.round(item.carbs_g)}g</span>}
+                        {item.fat_g != null && <span>F {Math.round(item.fat_g)}g</span>}
+                        {item.fiber_g != null && <span>Fiber {Math.round(item.fiber_g)}g</span>}
+                      </div>
+                      <button onClick={() => {
+                        const food = {
+                          name: item.name,
+                          serving_size_label: item.serving_size_label || '1 serving',
+                          calories: item.calories,
+                          protein_g: item.protein_g,
+                          carbs_g: item.carbs_g,
+                          fat_g: item.fat_g,
+                          fiber_g: item.fiber_g,
+                          sugar_g: item.sugar_g,
+                          sodium_mg: item.sodium_mg,
+                          saturated_fat_g: item.saturated_fat_g,
+                          cholesterol_mg: item.cholesterol_mg,
+                          source: 'ai_photo',
+                        }
+                        setConfirmOtherType('photo')
+                        setConfirmOtherInitServings('1')
+                        setConfirmOtherFood(food)
+                      }}
+                        style={{ width: '100%', backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                        + Log this
+                      </button>
+                    </div>
+                  ))}
+
+                  {(confidence === 'medium' || confidence === 'low') && (
+                    <div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px' }}>Help Claude guess better:</div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input value={photoDescription} onChange={e => setPhotoDescription(e.target.value)}
+                          placeholder='e.g. "shawarma wrap with garlic sauce"'
+                          style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px' }} />
+                        <button onClick={reanalyzeWithHint}
+                          style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          Re-analyze
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <button onClick={resetPhoto} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', padding: 0, textAlign: 'center', width: '100%' }}>
+                    ← Try a different photo
+                  </button>
+                </>
+              )
+            })()}
+          </div>
         )}
 
       </div>
