@@ -176,7 +176,7 @@ export default function SleepTrackerPage() {
       let totalDebt = 0
       for (const s of sessions) {
         const stages = s.stages ?? {}
-        const totalMins = Object.values(stages).reduce((a: number, b: unknown) => a + (b as number), 0)
+        const totalMins = Object.values(stages).reduce((a, b) => a + (b ?? 0), 0)
         const actualHours = totalMins / 60
         const deficit = targetHours - actualHours
         if (deficit > 0) totalDebt += deficit
