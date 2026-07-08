@@ -17,10 +17,34 @@ const CERTS = [
 
 const TABS = [
   { key: 'account', label: 'Account' },
+  { key: 'notifications', label: '🔔 Notifications' },
   { key: 'study', label: 'Study' },
   { key: 'data', label: 'Data & Reset' },
   { key: 'security', label: 'Security' },
   { key: 'danger', label: '⚠ Danger Zone' },
+]
+
+const NOTIF_TYPES = [
+  {
+    group: 'DAILY BRIEFS',
+    items: [
+      { key: 'morning_brief', emoji: '🌅', label: 'Morning Brief', desc: 'Fires at your wake time from Goals setup' },
+      { key: 'midday_checkin', emoji: '☀️', label: 'Midday Check-in', desc: 'Fires 6 hours after your wake time' },
+      { key: 'evening_wrap', emoji: '🌙', label: 'Evening Wrap', desc: 'Fires 1 hour before your bedtime' },
+    ],
+  },
+  {
+    group: 'SMART NUDGES',
+    items: [
+      { key: 'workout_reminder', emoji: '💪', label: 'Workout Reminder', desc: 'On workout days, 1 hour before your planned time' },
+      { key: 'hydration_nudge', emoji: '💧', label: 'Hydration Nudge', desc: 'Midday if you\'re under 50% of your water goal' },
+      { key: 'study_streak', emoji: '📚', label: 'Study Streak Alert', desc: 'Evening if your daily question goal isn\'t hit' },
+      { key: 'supplement_reminder', emoji: '💊', label: 'Supplement Reminder', desc: 'Morning and evening based on your stack\'s timing' },
+      { key: 'weigh_in_reminder', emoji: '⚖️', label: 'Weigh-in Reminder', desc: 'Morning if no weight logged in 3+ days' },
+      { key: 'body_measurement_reminder', emoji: '📏', label: 'Body Measurements', desc: 'Morning if no measurements logged in 7+ days' },
+      { key: 'wrap_ready', emoji: '📅', label: 'Wrap Ready', desc: 'Saturday evening (weekly) and 1st of month (monthly)' },
+    ],
+  },
 ]
 
 function SettingsPageInner() {
@@ -47,6 +71,13 @@ function SettingsPageInner() {
   const [notifSubscribed, setNotifSubscribed] = useState(false)
   const [notifLoading, setNotifLoading] = useState(false)
   const [notifMsg, setNotifMsg] = useState('')
+  const [notifPrefs, setNotifPrefs] = useState({
+    morning_brief: true, midday_checkin: true, evening_wrap: true,
+    workout_reminder: false, hydration_nudge: false, study_streak: false,
+    supplement_reminder: false, weigh_in_reminder: false,
+    body_measurement_reminder: false, wrap_ready: false,
+  })
+  const [prefsSaving, setPrefsSaving] = useState(false)
 
   const [resetConfirm, setResetConfirm] = useState(null)
   const [resetting, setResetting] = useState(false)
@@ -122,12 +153,13 @@ function SettingsPageInner() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       setEmail(user.email)
-      const { data } = await supabase.from('profiles').select('display_name, exam_dates, daily_goal, default_cert, settings_pin_hash, authenticator_name').eq('id', user.id).single()
+      const { data } = await supabase.from('profiles').select('display_name, exam_dates, daily_goal, default_cert, settings_pin_hash, authenticator_name, notification_preferences').eq('id', user.id).single()
       if (data) {
         if (data.display_name) { setDisplayName(data.display_name); setSavedName(data.display_name) }
         if (data.exam_dates) setExamDates({ ccna: '', 'network-plus': '', 'security-plus': '', ...data.exam_dates })
         if (data.daily_goal) setDailyGoal(data.daily_goal)
         if (data.default_cert) setDefaultCert(data.default_cert)
+        if (data.notification_preferences) setNotifPrefs(p => ({ ...p, ...data.notification_preferences }))
 
         // Privacy PIN gate
         if (data.authenticator_name) setSavedAuthName(data.authenticator_name)
@@ -226,6 +258,16 @@ function SettingsPageInner() {
       setNotifMsg('Failed to enable notifications.')
     }
     setNotifLoading(false)
+  }
+
+  async function handleTogglePref(key) {
+    const updated = { ...notifPrefs, [key]: !notifPrefs[key] }
+    setNotifPrefs(updated)
+    setPrefsSaving(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) await supabase.from('profiles').update({ notification_preferences: updated }).eq('id', user.id)
+    setPrefsSaving(false)
   }
 
   async function handleDisableNotifications() {
@@ -668,32 +710,82 @@ function SettingsPageInner() {
               </div>
             </div>
 
-            {typeof Notification !== 'undefined' && (
-              <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-                <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>🔔 Notifications</h2>
-                {notifPermission === 'denied' ? (
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Notifications blocked in browser — tap the lock icon in your address bar to re-enable.</p>
-                ) : notifSubscribed ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--success)', fontSize: '13px', fontWeight: '600' }}>Notifications enabled ✓</span>
-                    <button onClick={handleDisableNotifications} disabled={notifLoading}
-                      style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 16px', color: 'var(--text-secondary)', fontSize: '13px', cursor: notifLoading ? 'not-allowed' : 'pointer', opacity: notifLoading ? 0.6 : 1 }}>
-                      {notifLoading ? 'Disabling...' : 'Disable'}
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Get daily check-in reminders and brief alerts.</span>
-                    <button onClick={handleEnableNotifications} disabled={notifLoading}
-                      style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: notifLoading ? 'not-allowed' : 'pointer', opacity: notifLoading ? 0.6 : 1 }}>
-                      {notifLoading ? 'Enabling...' : 'Enable Notifications'}
-                    </button>
-                  </div>
-                )}
-                {notifMsg && <p style={{ color: 'var(--success)', fontSize: '12px', marginTop: '8px' }}>{notifMsg}</p>}
+
+          </div>
+        )}
+
+        {/* Notifications tab */}
+        {activeTab === 'notifications' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+            {/* Enable / disable push */}
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+              <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Push Notifications</h2>
+              {typeof Notification === 'undefined' ? (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Push notifications are not supported in this browser.</p>
+              ) : notifPermission === 'denied' ? (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Notifications blocked — tap the lock icon in your address bar to re-enable.</p>
+              ) : notifSubscribed ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--success)', fontSize: '13px', fontWeight: '600' }}>Notifications enabled ✓</span>
+                  <button onClick={handleDisableNotifications} disabled={notifLoading}
+                    style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 16px', color: 'var(--text-secondary)', fontSize: '13px', cursor: notifLoading ? 'not-allowed' : 'pointer', opacity: notifLoading ? 0.6 : 1 }}>
+                    {notifLoading ? 'Disabling...' : 'Disable'}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Enable to receive briefs, reminders, and smart nudges on this device.</span>
+                  <button onClick={handleEnableNotifications} disabled={notifLoading}
+                    style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: notifLoading ? 'not-allowed' : 'pointer', opacity: notifLoading ? 0.6 : 1, flexShrink: 0 }}>
+                    {notifLoading ? 'Enabling...' : 'Enable'}
+                  </button>
+                </div>
+              )}
+              {notifMsg && <p style={{ color: 'var(--success)', fontSize: '12px', marginTop: '8px' }}>{notifMsg}</p>}
+              {notifSubscribed && (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '10px' }}>
+                  Timing is based on your wake time and bedtime from Goals setup. Toggles below control what gets sent.
+                  {prefsSaving && <span style={{ marginLeft: 8, color: 'var(--accent-blue)' }}>Saving…</span>}
+                </p>
+              )}
+            </div>
+
+            {/* Preference toggles — only shown when subscribed */}
+            {notifSubscribed && NOTIF_TYPES.map(group => (
+              <div key={group.group} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '700', letterSpacing: '0.08em', marginBottom: '14px' }}>{group.group}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                  {group.items.map((item, idx) => {
+                    const on = notifPrefs[item.key]
+                    return (
+                      <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 0', borderBottom: idx < group.items.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: '18px', lineHeight: 1 }}>{item.emoji}</span>
+                          <div>
+                            <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{item.label}</div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: 2 }}>{item.desc}</div>
+                          </div>
+                        </div>
+                        {/* Toggle switch */}
+                        <button
+                          onClick={() => handleTogglePref(item.key)}
+                          style={{ width: 44, height: 24, borderRadius: 12, backgroundColor: on ? 'var(--accent-blue)' : 'var(--border)', border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0, transition: 'background-color 0.2s' }}
+                        >
+                          <span style={{ position: 'absolute', top: 3, left: on ? 23 : 3, width: 18, height: 18, borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s', display: 'block' }} />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+
+            {!notifSubscribed && (
+              <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                Enable push notifications above to configure which alerts you receive.
               </div>
             )}
-
           </div>
         )}
 

@@ -90,7 +90,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 ### User & Auth
 | Table | Purpose |
 |-------|---------|
-| `profiles` | User display name, exam_dates JSONB, daily_goal INT, default_cert TEXT, is_disabled BOOLEAN, settings_pin_hash TEXT (bcrypt), authenticator_name TEXT |
+| `profiles` | User display name, exam_dates JSONB, daily_goal INT, default_cert TEXT, is_disabled BOOLEAN, settings_pin_hash TEXT (bcrypt), authenticator_name TEXT, notification_preferences JSONB (10 boolean keys; briefs default true, nudges default false) |
 | `invite_codes` | Single-use signup codes — code TEXT UNIQUE, created_by, used_by, used_at TIMESTAMPTZ; null = unused |
 | `join_attempts` | IP brute force tracking for /join — ip TEXT, attempted_at, success BOOLEAN; `check_join_rate_limit(ip)` Postgres function |
 | `recovery_codes` | 2FA recovery codes — user_id, code_hash TEXT (bcrypt), used_at TIMESTAMPTZ (null = unused); RLS user-scoped |
@@ -2519,6 +2519,13 @@ ALTER TABLE daily_briefs ADD CONSTRAINT daily_briefs_window_check CHECK (window 
 - `src/app/api/life-hub/daily-brief/route.js` — GET: accepts `?window=` param (validated against `['morning','afternoon','evening']`, default `'morning'`), includes `window` in the `.eq()` query. POST: reads `window` from JSON body (default `'morning'`), routes to separate rate-limit key per window (`life-hub/daily-brief-evening` etc.), handles evening window with a dedicated today-data path (food log totals, steps, water, workout, check-in, sleep score → past-tense 3–4 sentence summary, max_tokens 250). All upserts now include `window` and use `onConflict: 'user_id,date,window'`. `VALID_WINDOWS` constant validates all window inputs.
 - `src/app/api/checkin/insight/route.js` — after generating check-in insight, upserts `brief_text` into `daily_briefs` with `window: 'afternoon'` as a side effect. No new AI call — the check-in insight IS the afternoon brief.
 - `src/app/life-hub/page.js` — brief state changed from single `brief` to `briefs: { morning, afternoon, evening }` object. `briefExpanded` is now per-window. Loading logic fetches all three windows in sequence; evening only fetches/generates after 6pm (client-side hour check). JSX: single brief card replaced with mapped `BRIEF_CONFIG` array (morning=purple, afternoon=yellow #f59e0b, evening=indigo #818cf8); each card collapsible; afternoon shows only if text exists; evening shows if text exists OR currentHour >= 18; morning always shows.
+
+### Phase S2 — Notification Preferences + Per-User Timing — Complete
+
+- DB: `notification_preferences` JSONB column added to `profiles` (default: briefs ON, nudges OFF); migration applied
+- pg_cron: removed 3 fixed-time jobs; added `daily-push-check` running every 30 minutes (`*/30 * * * *`)
+- `supabase/functions/daily-push/index.ts` (rewritten): per-user window computation from `goals_profiles.wake_time` + `bedtime` (morning=wake_time, midday=wake_time+6h, evening=bedtime−1h; fallbacks 08:00/23:00); checks `notification_preferences` before each send; 10 notification types each with unique window key for dedup; nudge condition checks: hydration (water_logs vs goal), study streak (question_answers count vs daily_goal), workout (my_week lookup + workout_logs check), supplement (stack timing + supplement_logs), weigh-in (body_measurements last date), body measurement (last non-weight measurement), wrap ready (Saturday weekly + 1st-of-month monthly); each user can receive multiple pushes per window (brief + nudge = separate window keys); per-user errors isolated with try/catch
+- `src/app/settings/page.js`: new `🔔 Notifications` tab added between Account and Study tabs; `NOTIF_TYPES` constant defines 2 groups (Daily Briefs + Smart Nudges) with 10 items; push enable/disable card moved from Account tab to Notifications tab; preference toggles (pill-style) shown only when subscribed; `handleTogglePref()` immediately PATCHes `profiles.notification_preferences` on each flip; `prefsSaving` indicator; wake_time/bedtime context note shown when subscribed
 
 ### Phase S — Push Notifications + Callout Card Removal — Complete
 

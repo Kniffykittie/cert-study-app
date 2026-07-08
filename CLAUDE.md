@@ -301,7 +301,7 @@ src/
         index.ts                         Deno Edge Function — runs every 2 hours via pg_cron (schedule ID 2); queries all google_health_tokens; processes users sequentially; full 5-data-type sync (steps/HR/sleep/resting-HR/HRV) identical to POST /api/health/sync; verify_jwt: false
         googleHealth.ts                  Deno port of src/lib/googleHealth.js — same 6 exports; Deno.env.get() instead of process.env
       daily-push/
-        index.ts                         Deno Edge Function — verify_jwt: false; pg_cron runs 3×/day (12 UTC morning, 17 UTC midday, 23 UTC evening); determines window from UTC hour; loads all push_subscriptions via service role; deduplicates via push_notification_log UNIQUE(user_id,sent_date,window); builds VAPID JWT via Web Crypto; fetches to each endpoint; handles 410/404 (expires sub); NEXT_PUBLIC_VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY + VAPID_SUBJECT from Supabase secrets
+        index.ts                         Deno Edge Function — verify_jwt: false; pg_cron runs every 30 minutes; per-user window computed from goals_profiles.wake_time + bedtime (morning=wake_time, midday=wake_time+6h, evening=bedtime-1h); checks profiles.notification_preferences before each send; 10 notification types (3 briefs + 7 nudges); each type has its own window key for dedup; builds VAPID JWT via Web Crypto; handles 410/404 (expires sub)
         config.toml                      verify_jwt = false
     InfoChip.js                        Reusable ℹ️ education chip — grey pill, orange when active, toggles inline callout; props: text, label (default "ℹ️"), style; used at 11 touchpoints across 8 pages for domain-knowledge data points
     BookmarkModal.js                   Bookmark reason + notes modal
@@ -327,7 +327,7 @@ src/
 | `question_templates` | Template library with variable_sets and is_retired flag |
 | `bookmarked_questions` | Bookmarks with reason, notes, and full question snapshot |
 | `flagged_questions` | User-reported question issues |
-| `profiles` | User display name, exam_dates JSONB, daily_goal INT, default_cert TEXT, is_disabled BOOLEAN (owner ban flag, checked in every AI route), settings_pin_hash TEXT (bcrypt hash for Settings page Privacy PIN), authenticator_name TEXT (e.g. "Google Authenticator" — shown on 2FA login screen) |
+| `profiles` | User display name, exam_dates JSONB, daily_goal INT, default_cert TEXT, is_disabled BOOLEAN (owner ban flag, checked in every AI route), settings_pin_hash TEXT (bcrypt hash for Settings page Privacy PIN), authenticator_name TEXT (e.g. "Google Authenticator" — shown on 2FA login screen), notification_preferences JSONB (10 boolean keys: morning_brief/midday_checkin/evening_wrap/workout_reminder/hydration_nudge/study_streak/supplement_reminder/weigh_in_reminder/body_measurement_reminder/wrap_ready; briefs default true, nudges default false) |
 | `lab_progress` | Completed lab steps per user (user_id, lab_set_id, lab_id, step_id, completed_at) |
 | `lab_notes` | Per-lab freeform notes per user (user_id, lab_set_id, lab_id, notes, updated_at) |
 | `lab_timers` | Per-lab timer state — elapsed_seconds, is_running, last_started_at; unique per user+lab |
@@ -347,7 +347,7 @@ src/
 | `daily_checkins` | Energy + mood check-ins per day — energy_level SMALLINT(1–5), mood_level SMALLINT(1–5), sleep_hours NUMERIC(4,1) (manual fallback for Recovery Score when Google Health not connected), note TEXT; afternoon_energy SMALLINT, afternoon_mood SMALLINT, afternoon_note TEXT (Phase 76); sore_spots TEXT[]; UNIQUE on user_id + date; RLS enabled |
 | `api_rate_limits` | Per-user per-route per-hour call counts; incremented atomically via `increment_rate_limit` Postgres function |
 | `push_subscriptions` | Web Push subscriptions — user_id, endpoint, p256dh, auth_key, user_agent; UNIQUE on user_id+endpoint; RLS: user manages own |
-| `push_notification_log` | Delivery dedup log — user_id, sent_date TEXT, `"window"` TEXT (morning/midday/evening), title, body, delivered BOOLEAN; UNIQUE on user_id+sent_date+window; RLS: user SELECT only |
+| `push_notification_log` | Delivery dedup log — user_id, sent_date TEXT, `"window"` TEXT (morning/midday/evening + nudge variants), title, body, delivered BOOLEAN; UNIQUE on user_id+sent_date+window; RLS: user SELECT only |
 | `recovery_codes` | 2FA recovery codes — user_id, code_hash TEXT (bcrypt), used_at TIMESTAMPTZ (null = unused); generated on 2FA enrollment, displayed once; RLS: user SELECT/UPDATE own rows |
 | `invite_codes` | Owner-generated one-time signup codes — code (unique), created_by, used_by (nullable), used_at; RLS: SELECT=public, INSERT=owner, UPDATE=authenticated |
 | `join_attempts` | IP-based brute force tracking for /join — ip TEXT, attempted_at, success BOOLEAN; `check_join_rate_limit(ip)` Postgres function counts fails in last hour |
