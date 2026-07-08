@@ -100,6 +100,7 @@ function NutritionPageInner() {
   const [insightLoading, setInsightLoading] = useState(false)
   const [viewingDate, setViewingDate] = useState(null) // null = today
   const [prevDaysEntries, setPrevDaysEntries] = useState([[], []]) // [yesterday, dayBefore]
+  const [logStreak, setLogStreak] = useState(null)
 
   const MICRO_LABEL_MAP = {
     fiber_g: { label: 'Fiber', unit: 'g' },
@@ -215,6 +216,24 @@ function NutritionPageInner() {
       const waterFromDrinks = (logData.entries || []).filter(e => e.meal_slot === 'drink').reduce((s, e) => s + (e.water_g ? e.water_g / 29.5735 : 0), 0)
       const waterTotal = (waterLogs || []).reduce((s, w) => s + (w.amount_oz || 0), 0) + waterFromDrinks
       setTodayWaterOz(Math.round(waterTotal))
+
+      // Food log streak — count consecutive days ending today with ≥1 entry
+      const streakCutoff = new Date(Date.now() - 60 * 86400000).toISOString().split('T')[0]
+      const { data: streakRows } = await supabase.from('food_log_entries')
+        .select('created_at').eq('user_id', user.id).gte('created_at', `${streakCutoff}T00:00:00`)
+        .order('created_at', { ascending: false })
+      if (streakRows) {
+        const loggedDays = new Set(streakRows.map(r => r.created_at.slice(0, 10)))
+        let streak = 0
+        const d = new Date()
+        // Start from today; if today has no entries yet, start from yesterday
+        if (!loggedDays.has(d.toISOString().split('T')[0])) d.setDate(d.getDate() - 1)
+        while (loggedDays.has(d.toISOString().split('T')[0])) {
+          streak++
+          d.setDate(d.getDate() - 1)
+        }
+        setLogStreak(streak)
+      }
 
       fetch('/api/nutrition/tdee-check').then(r => r.json()).then(d => {
         if (d.suggestion) setTdeeSuggestion(d.suggestion)
@@ -529,6 +548,11 @@ function NutritionPageInner() {
           <h1 style={{ color: '#f97316', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Nutrition</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Track meals, macros, and every nutrient that matters.</p>
+            {logStreak > 0 && (
+              <span style={{ backgroundColor: '#f9731620', border: '1px solid #f9731650', borderRadius: '20px', padding: '2px 10px', fontSize: '12px', fontWeight: '700', color: '#f97316' }}>
+                🔥 {logStreak}-day streak
+              </span>
+            )}
             <button onClick={() => setShowWhy(o => !o)}
               style={{ background: 'none', border: '1px solid #f9731644', borderRadius: '20px', color: '#f97316', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
               ℹ️ Why track this?

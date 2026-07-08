@@ -47,6 +47,7 @@ export default function GoalsPage() {
   const [regenerating, setRegenerating] = useState(false)
   const [regenMsg, setRegenMsg] = useState('')
   const [showWhy, setShowWhy] = useState(false)
+  const [velocity, setVelocity] = useState(null) // { actual, target, direction, weeksOfData }
 
   useEffect(() => {
     async function load() {
@@ -60,6 +61,33 @@ export default function GoalsPage() {
       }
       setProfile(data)
       setLoading(false)
+
+      // Goal Velocity — need target weight + weight measurements
+      if (data.target_weight_lbs && data.weight_lbs) {
+        const cutoff = new Date(Date.now() - 28 * 86400000).toISOString().split('T')[0]
+        const { data: measurements } = await supabase
+          .from('body_measurements').select('date, weight_lbs')
+          .eq('user_id', user.id).not('weight_lbs', 'is', null)
+          .gte('date', cutoff).order('date', { ascending: true })
+        if (measurements && measurements.length >= 2) {
+          const first = measurements[0]
+          const last = measurements[measurements.length - 1]
+          const daysDiff = (new Date(last.date) - new Date(first.date)) / 86400000
+          const weeksDiff = daysDiff / 7
+          if (weeksDiff >= 0.5) {
+            const actualPerWeek = (last.weight_lbs - first.weight_lbs) / weeksDiff
+            const isLosing = data.target_weight_lbs < data.weight_lbs
+            const isGaining = data.target_weight_lbs > data.weight_lbs
+            setVelocity({
+              actual: Math.round(actualPerWeek * 10) / 10,
+              isLosing,
+              isGaining,
+              weeksOfData: Math.round(weeksDiff * 10) / 10,
+              currentWeight: last.weight_lbs,
+            })
+          }
+        }
+      }
     }
     load()
   }, [router])
@@ -193,6 +221,44 @@ export default function GoalsPage() {
             {profile.sex && <MetricRow label="Sex" value={profile.sex} />}
           </div>
         </div>
+
+        {/* Goal Velocity */}
+        {velocity && (velocity.isLosing || velocity.isGaining) && (() => {
+          const { actual, isLosing, isGaining, weeksOfData, currentWeight } = velocity
+          const target = profile.target_weight_lbs
+          const lbsLeft = Math.abs(currentWeight - target)
+          // Expected pace: healthy default 0.5–1 lb/week
+          const expectedPace = isLosing ? -0.75 : 0.5
+          const onTrack = isLosing ? actual <= -0.2 : actual >= 0.2
+          const color = onTrack ? 'var(--success)' : 'var(--warning)'
+          const weeksToGoal = actual !== 0 ? Math.abs(lbsLeft / actual) : null
+          return (
+            <div style={{ backgroundColor: 'var(--surface)', border: `1px solid ${color}44`, borderRadius: '12px', padding: '20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>📈 Goal Velocity</div>
+              <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '4px' }}>Last {weeksOfData}w avg</div>
+                  <div style={{ color, fontSize: '24px', fontWeight: '700', lineHeight: 1 }}>
+                    {actual > 0 ? '+' : ''}{actual} lb/wk
+                  </div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color, fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
+                    {onTrack
+                      ? isLosing ? '✓ On track to lose' : '✓ On track to gain'
+                      : isLosing ? actual > 0 ? '↑ Trending up — review your deficit' : '→ Very slow progress' : '→ Very slow progress'}
+                  </div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.5' }}>
+                    {lbsLeft.toFixed(1)} lbs to goal ({target} lbs)
+                    {weeksToGoal && actual !== 0 && Math.abs(actual) > 0.05
+                      ? ` · ~${Math.round(weeksToGoal)} weeks at current pace`
+                      : ''}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Lifestyle */}
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
