@@ -95,6 +95,8 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 | `join_attempts` | IP brute force tracking for /join — ip TEXT, attempted_at, success BOOLEAN; `check_join_rate_limit(ip)` Postgres function |
 | `recovery_codes` | 2FA recovery codes — user_id, code_hash TEXT (bcrypt), used_at TIMESTAMPTZ (null = unused); RLS user-scoped |
 | `api_rate_limits` | Per-user per-route per-hour call counts; incremented atomically via `increment_rate_limit` Postgres function |
+| `push_subscriptions` | Web Push subscriptions — user_id, endpoint, p256dh, auth_key, user_agent; UNIQUE on user_id+endpoint; RLS: user manages own |
+| `push_notification_log` | Delivery dedup log — user_id, sent_date TEXT, `"window"` TEXT (morning/midday/evening), title, body, delivered BOOLEAN; UNIQUE on user_id+sent_date+window; RLS: user SELECT only |
 
 ### Health & Wearables
 | Table | Purpose |
@@ -2517,6 +2519,23 @@ ALTER TABLE daily_briefs ADD CONSTRAINT daily_briefs_window_check CHECK (window 
 - `src/app/api/life-hub/daily-brief/route.js` — GET: accepts `?window=` param (validated against `['morning','afternoon','evening']`, default `'morning'`), includes `window` in the `.eq()` query. POST: reads `window` from JSON body (default `'morning'`), routes to separate rate-limit key per window (`life-hub/daily-brief-evening` etc.), handles evening window with a dedicated today-data path (food log totals, steps, water, workout, check-in, sleep score → past-tense 3–4 sentence summary, max_tokens 250). All upserts now include `window` and use `onConflict: 'user_id,date,window'`. `VALID_WINDOWS` constant validates all window inputs.
 - `src/app/api/checkin/insight/route.js` — after generating check-in insight, upserts `brief_text` into `daily_briefs` with `window: 'afternoon'` as a side effect. No new AI call — the check-in insight IS the afternoon brief.
 - `src/app/life-hub/page.js` — brief state changed from single `brief` to `briefs: { morning, afternoon, evening }` object. `briefExpanded` is now per-window. Loading logic fetches all three windows in sequence; evening only fetches/generates after 6pm (client-side hour check). JSX: single brief card replaced with mapped `BRIEF_CONFIG` array (morning=purple, afternoon=yellow #f59e0b, evening=indigo #818cf8); each card collapsible; afternoon shows only if text exists; evening shows if text exists OR currentHour >= 18; morning always shows.
+
+### Phase S — Push Notifications + Callout Card Removal — Complete
+
+- DB: `push_subscriptions` table (user_id, endpoint, p256dh, auth_key, user_agent; UNIQUE on user_id+endpoint; RLS: user manages own) + `push_notification_log` table (user_id, sent_date TEXT, `"window"` TEXT quoted, title, body, delivered BOOLEAN; UNIQUE on user_id+sent_date+window; RLS: user SELECT only) — both created via Supabase MCP
+- `src/app/api/push/subscribe/route.js` (new): POST upserts to `push_subscriptions` (onConflict: user_id,endpoint); DELETE removes by user_id+endpoint; `getUser()` on both; no AI, no is_disabled
+- `public/sw.js`: appended `push` event handler (shows notification via `self.registration.showNotification`) + `notificationclick` handler (focuses existing window or opens new one to `event.notification.data.url`)
+- `src/app/settings/page.js`: added `🔔 Notifications` card to Account tab — checks `Notification.permission` on mount, shows Enable/Disable/Blocked states; enable calls `requestPermission()` + `pushManager.subscribe()` + POST to subscribe route; disable calls DELETE + `pushManager.unsubscribe()`; VAPID public key from `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
+- `supabase/functions/daily-push/index.ts` (new): Deno Edge Function; `verify_jwt: false`; determines window from UTC hour (12=morning, 17=midday, 23=evening); loads all push_subscriptions via service role; checks `push_notification_log` dedup before each send; builds VAPID JWT using Web Crypto; sends push via fetch to each endpoint; handles 410/404 (expired — deletes subscription); logs result to `push_notification_log`
+- pg_cron: 3 jobs added — `daily-push-morning` (0 12 UTC), `daily-push-midday` (0 17 UTC), `daily-push-evening` (0 23 UTC) — all use `net.http_post` with no Authorization header (verify_jwt: false)
+- **VAPID keys generated:** public key stored as `NEXT_PUBLIC_VAPID_PUBLIC_KEY` in Vercel; private key as `VAPID_PRIVATE_KEY` in Vercel + Supabase Edge Function secrets; subject as `VAPID_SUBJECT`; keys never committed to code
+- **Callout cards removed (6 total):**
+  - Micronutrient Daily Awareness card — `src/app/life-hub/nutrition/page.js` (suppressed with `false &&`)
+  - Post-workout meal window banner — `src/app/life-hub/nutrition/page.js` (block removed)
+  - Pre-workout meal reminder banner — `src/app/life-hub/nutrition/page.js` (block removed)
+  - Low Energy Today fatigue signal — `src/app/life-hub/workouts/page.js` (block removed)
+  - Hydration warning banner — `src/app/life-hub/workouts/log/page.js` (state + JSX removed)
+  - Drink timing callout text — `src/app/life-hub/health/water/page.js` (callout message removed; chart kept)
 
 ### Phase R — Workout Day Hub — Complete
 

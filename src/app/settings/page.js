@@ -42,6 +42,12 @@ function SettingsPageInner() {
   const [healthDisconnecting, setHealthDisconnecting] = useState(false)
   const [showHealthSection, setShowHealthSection] = useState(false)
 
+  // Push notification state
+  const [notifPermission, setNotifPermission] = useState('default')
+  const [notifSubscribed, setNotifSubscribed] = useState(false)
+  const [notifLoading, setNotifLoading] = useState(false)
+  const [notifMsg, setNotifMsg] = useState('')
+
   const [resetConfirm, setResetConfirm] = useState(null)
   const [resetting, setResetting] = useState(false)
   const [resetMsg, setResetMsg] = useState('')
@@ -156,6 +162,17 @@ function SettingsPageInner() {
       if (status.connectedAt) setHealthConnectedAt(new Date(status.connectedAt).toLocaleDateString())
     }
     fetchProfile()
+
+    if (typeof Notification !== 'undefined') {
+      setNotifPermission(Notification.permission)
+      if (Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(reg => {
+          reg.pushManager.getSubscription().then(sub => {
+            setNotifSubscribed(!!sub)
+          })
+        })
+      }
+    }
   }, [])
 
   async function handleSaveName() {
@@ -182,6 +199,56 @@ function SettingsPageInner() {
     })
     if (error) { setPrefSaveMsg('Failed to save.') } else { setPrefSaveMsg('Saved!'); setTimeout(() => setPrefSaveMsg(''), 2000) }
     setPrefSaving(false)
+  }
+
+  async function handleEnableNotifications() {
+    setNotifLoading(true)
+    setNotifMsg('')
+    try {
+      const permission = await Notification.requestPermission()
+      setNotifPermission(permission)
+      if (permission !== 'granted') { setNotifLoading(false); return }
+      const reg = await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      })
+      const j = sub.toJSON()
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: j.endpoint, keys: j.keys, userAgent: navigator.userAgent }),
+      })
+      setNotifSubscribed(true)
+      setNotifMsg('Notifications enabled!')
+      setTimeout(() => setNotifMsg(''), 3000)
+    } catch {
+      setNotifMsg('Failed to enable notifications.')
+    }
+    setNotifLoading(false)
+  }
+
+  async function handleDisableNotifications() {
+    setNotifLoading(true)
+    setNotifMsg('')
+    try {
+      const reg = await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.getSubscription()
+      if (sub) {
+        await fetch('/api/push/subscribe', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        })
+        await sub.unsubscribe()
+      }
+      setNotifSubscribed(false)
+      setNotifMsg('Notifications disabled.')
+      setTimeout(() => setNotifMsg(''), 3000)
+    } catch {
+      setNotifMsg('Failed to disable notifications.')
+    }
+    setNotifLoading(false)
   }
 
   async function handleDisconnectHealth() {
@@ -600,6 +667,32 @@ function SettingsPageInner() {
                 <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '6px' }}>This name appears in your greeting on the home screen.</p>
               </div>
             </div>
+
+            {typeof Notification !== 'undefined' && (
+              <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+                <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>🔔 Notifications</h2>
+                {notifPermission === 'denied' ? (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Notifications blocked in browser — tap the lock icon in your address bar to re-enable.</p>
+                ) : notifSubscribed ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--success)', fontSize: '13px', fontWeight: '600' }}>Notifications enabled ✓</span>
+                    <button onClick={handleDisableNotifications} disabled={notifLoading}
+                      style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 16px', color: 'var(--text-secondary)', fontSize: '13px', cursor: notifLoading ? 'not-allowed' : 'pointer', opacity: notifLoading ? 0.6 : 1 }}>
+                      {notifLoading ? 'Disabling...' : 'Disable'}
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Get daily check-in reminders and brief alerts.</span>
+                    <button onClick={handleEnableNotifications} disabled={notifLoading}
+                      style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: notifLoading ? 'not-allowed' : 'pointer', opacity: notifLoading ? 0.6 : 1 }}>
+                      {notifLoading ? 'Enabling...' : 'Enable Notifications'}
+                    </button>
+                  </div>
+                )}
+                {notifMsg && <p style={{ color: 'var(--success)', fontSize: '12px', marginTop: '8px' }}>{notifMsg}</p>}
+              </div>
+            )}
 
           </div>
         )}

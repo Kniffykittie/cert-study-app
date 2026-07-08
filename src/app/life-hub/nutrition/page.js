@@ -712,8 +712,7 @@ function NutritionPageInner() {
         </div>
       )}
 
-      {/* Micronutrient Daily Awareness */}
-      {activeTab === 'log' && entries.length > 0 && !viewingDate && (() => {
+      {false && activeTab === 'log' && entries.length > 0 && !viewingDate && (() => {
         const microTargets = goals?.age && goals?.sex ? calcMicroTargets(goals.age, goals.sex) : null
         const hour = new Date().getHours()
 
@@ -968,45 +967,6 @@ function NutritionPageInner() {
                     </div>
                   </div>
                   <button onClick={() => setDismissedBanners(s => new Set([...s, 'protein']))} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
-                </div>
-              )
-            }
-
-            // Post-workout window: completed workout < 2 hours ago
-            if (workoutFinishedAt && !dismissedBanners.has('post_workout')) {
-              const minsAgo = Math.round((now - workoutFinishedAt) / 60000)
-              if (minsAgo <= 120) {
-                const postProtein = proteinTarget ? Math.round(proteinTarget * 0.3) : 30
-                banners.push(
-                  <div key="post_workout" style={{ backgroundColor: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.4)', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '16px' }}>🏋️</span>
-                      <div>
-                        <span style={{ color: '#3b82f6', fontSize: '13px', fontWeight: '700' }}>Post-workout window — {minsAgo < 60 ? `${minsAgo} min` : `${Math.round(minsAgo/60*10)/10} hr`} ago</span>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block' }}>Eat {postProtein}g+ protein + 30–50g fast carbs now to maximize muscle recovery.</span>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                      <button onClick={() => { window.location.href = '/life-hub/nutrition/add-food?slot=snack' }} style={{ backgroundColor: '#3b82f6', border: 'none', color: '#fff', borderRadius: '7px', padding: '6px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Log Snack</button>
-                      <button onClick={() => setDismissedBanners(s => new Set([...s, 'post_workout']))} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
-                    </div>
-                  </div>
-                )
-              }
-            }
-
-            // Pre-workout reminder: workout planned but not logged yet
-            if (workoutCtx.plannedLabel && !workoutFinishedAt && !dismissedBanners.has('pre_workout')) {
-              banners.push(
-                <div key="pre_workout" style={{ backgroundColor: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '16px' }}>⚡</span>
-                    <div>
-                      <span style={{ color: '#3b82f6', fontSize: '13px', fontWeight: '700' }}>{workoutCtx.plannedLabel} planned today</span>
-                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block' }}>1–2 hrs before: fast carbs + moderate protein. Avoid heavy fat/fiber right before lifting.</span>
-                    </div>
-                  </div>
-                  <button onClick={() => setDismissedBanners(s => new Set([...s, 'pre_workout']))} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
                 </div>
               )
             }

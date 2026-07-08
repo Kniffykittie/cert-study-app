@@ -342,19 +342,7 @@ export default function WorkoutsPage() {
             </div>
           )}
 
-          {todayEnergy !== null && todayEnergy <= 2 && (
-            <div style={{ backgroundColor: 'rgba(241,196,15,0.08)', border: '1px solid rgba(241,196,15,0.3)', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-              <span style={{ fontSize: '18px', lineHeight: 1 }}>⚡</span>
-              <div>
-                <div style={{ color: 'var(--warning)', fontSize: '13px', fontWeight: '700', marginBottom: '3px' }}>Low Energy Today</div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0, lineHeight: 1.5 }}>
-                  Your check-in shows low energy. Consider a lighter session — reduce working weight 10–20%, skip drop sets, or swap a strength day for a walk or mobility work. Rest is part of the plan.
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px', marginBottom: '24px' }}>
             {sortedDays.map((day, sortedIndex) => {
               const dayIndex = plan.plan.indexOf(day)
               const isRest = !day.exercises?.length

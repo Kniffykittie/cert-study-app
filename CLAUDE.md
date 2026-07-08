@@ -163,6 +163,8 @@ src/
         redeem/route.js                POST — authenticated; rate-limited (10/hr); unified error message to prevent code enumeration; marks invite code used_by + used_at
       lab-summary/route.js             AI lab completion summary (3 sections); uses getUser() + is_disabled check; prompt injection protected
       delete-account/route.js          POST — full cascade delete across all tables + supabase admin auth user removal; uses getUser()
+      push/
+        subscribe/route.js             POST upserts to push_subscriptions (onConflict user_id,endpoint); DELETE removes by user_id+endpoint; getUser() on both; no AI
       2fa/
         generate-recovery/route.js    POST — generates 10 bcrypt-hashed recovery codes, stores in recovery_codes table, returns plain codes once; uses getUser()
         use-recovery/route.js         POST — verifies recovery code against hashes, marks used, unenrolls all TOTP factors via admin client; uses getUser()
@@ -298,6 +300,9 @@ src/
       background-health-sync/
         index.ts                         Deno Edge Function — runs every 2 hours via pg_cron (schedule ID 2); queries all google_health_tokens; processes users sequentially; full 5-data-type sync (steps/HR/sleep/resting-HR/HRV) identical to POST /api/health/sync; verify_jwt: false
         googleHealth.ts                  Deno port of src/lib/googleHealth.js — same 6 exports; Deno.env.get() instead of process.env
+      daily-push/
+        index.ts                         Deno Edge Function — verify_jwt: false; pg_cron runs 3×/day (12 UTC morning, 17 UTC midday, 23 UTC evening); determines window from UTC hour; loads all push_subscriptions via service role; deduplicates via push_notification_log UNIQUE(user_id,sent_date,window); builds VAPID JWT via Web Crypto; fetches to each endpoint; handles 410/404 (expires sub); NEXT_PUBLIC_VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY + VAPID_SUBJECT from Supabase secrets
+        config.toml                      verify_jwt = false
     InfoChip.js                        Reusable ℹ️ education chip — grey pill, orange when active, toggles inline callout; props: text, label (default "ℹ️"), style; used at 11 touchpoints across 8 pages for domain-knowledge data points
     BookmarkModal.js                   Bookmark reason + notes modal
     DailyStreak.js                     30q/day streak tracker with 28-day calendar heatmap
@@ -341,6 +346,8 @@ src/
 | `body_measurements` | Per-user dated body measurements — weight_lbs, waist_in, hips_in, chest_in, left/right arm/thigh, neck_in; UNIQUE on user_id + date; RLS enabled |
 | `daily_checkins` | Energy + mood check-ins per day — energy_level SMALLINT(1–5), mood_level SMALLINT(1–5), sleep_hours NUMERIC(4,1) (manual fallback for Recovery Score when Google Health not connected), note TEXT; afternoon_energy SMALLINT, afternoon_mood SMALLINT, afternoon_note TEXT (Phase 76); sore_spots TEXT[]; UNIQUE on user_id + date; RLS enabled |
 | `api_rate_limits` | Per-user per-route per-hour call counts; incremented atomically via `increment_rate_limit` Postgres function |
+| `push_subscriptions` | Web Push subscriptions — user_id, endpoint, p256dh, auth_key, user_agent; UNIQUE on user_id+endpoint; RLS: user manages own |
+| `push_notification_log` | Delivery dedup log — user_id, sent_date TEXT, `"window"` TEXT (morning/midday/evening), title, body, delivered BOOLEAN; UNIQUE on user_id+sent_date+window; RLS: user SELECT only |
 | `recovery_codes` | 2FA recovery codes — user_id, code_hash TEXT (bcrypt), used_at TIMESTAMPTZ (null = unused); generated on 2FA enrollment, displayed once; RLS: user SELECT/UPDATE own rows |
 | `invite_codes` | Owner-generated one-time signup codes — code (unique), created_by, used_by (nullable), used_at; RLS: SELECT=public, INSERT=owner, UPDATE=authenticated |
 | `join_attempts` | IP-based brute force tracking for /join — ip TEXT, attempted_at, success BOOLEAN; `check_join_rate_limit(ip)` Postgres function counts fails in last hour |

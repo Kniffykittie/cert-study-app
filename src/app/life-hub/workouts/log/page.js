@@ -820,17 +820,8 @@ function LogWorkoutPageInner() {
         </div>
       </div>
 
-      {hydrationWarning && (
-        <div style={{ background: 'rgba(0,128,255,0.08)', border: '1px solid rgba(0,128,255,0.25)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 16 }}>💧</span>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>You're under 50% of your water goal. Drink before you start.</span>
-          </div>
-          <button onClick={() => setHydrationWarning(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1 }}>✕</button>
-        </div>
-      )}
 
-      {/* Exercise cards */}
+{/* Exercise cards */}
       {exercises.map((ex, exIdx) => {
         const prevSummary = prevData[ex.exercise_name]
         const exDetail = exDetailMap[(ex.exercise_name || '').toLowerCase()]

@@ -998,11 +998,6 @@ export default function DrinksHydrationPage() {
                 )
               })}
             </div>
-            {callout && (
-              <div style={{ marginTop: 10, fontSize: 12, color: callout.startsWith('Good') ? 'var(--success)' : 'var(--warning)', background: callout.startsWith('Good') ? 'rgba(46,204,113,0.06)' : 'rgba(241,196,15,0.06)', border: `1px solid ${callout.startsWith('Good') ? 'rgba(46,204,113,0.2)' : 'rgba(241,196,15,0.2)'}`, borderRadius: 8, padding: '8px 12px' }}>
-                {callout}
-              </div>
-            )}
           </div>
         )
       })()}
