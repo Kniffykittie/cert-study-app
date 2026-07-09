@@ -35,6 +35,22 @@ export default function Home() {
   const [dailyGoal, setDailyGoal] = useState(30)
 
   useEffect(() => {
+    // Mark this session as having passed through the hub
+    document.cookie = 'hub_gate=1; path=/; SameSite=Lax'
+
+    // Fire health sync in background so data is fresh before entering Life Hub
+    fetch('/api/health/status').then(r => r.json()).then(s => {
+      if (s.connected) {
+        const lastForcedSync = parseInt(localStorage.getItem('health_force_sync_at') || '0')
+        if (Date.now() - lastForcedSync > 2 * 60 * 1000) {
+          localStorage.setItem('health_force_sync_at', String(Date.now()))
+          fetch('/api/health/sync', { method: 'POST' }).catch(() => {})
+        }
+      }
+    }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
     async function load() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()

@@ -108,6 +108,22 @@ export default function LifeHubPage() {
   const briefTriggered = useRef(false)
 
   useEffect(() => {
+    // Sync health data on Life Hub entry so dashboards here are fresh
+    fetch('/api/health/status').then(r => r.json()).then(s => {
+      if (s.connected) {
+        const lastForcedSync = parseInt(localStorage.getItem('health_force_sync_at') || '0')
+        if (Date.now() - lastForcedSync > 2 * 60 * 1000) {
+          localStorage.setItem('health_force_sync_at', String(Date.now()))
+          window.dispatchEvent(new CustomEvent('health-sync-start'))
+          fetch('/api/health/sync', { method: 'POST' })
+            .then(() => window.dispatchEvent(new CustomEvent('health-sync-end')))
+            .catch(() => window.dispatchEvent(new CustomEvent('health-sync-end')))
+        }
+      }
+    }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
     async function load() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
