@@ -2848,6 +2848,132 @@ These are genuine differentiators — don't lose them in any redesign:
 
 ---
 
+#### Test Page Mobile — Header Row Overflow (CONFIRMED BUG)
+
+**Problem:** The test page header row (`src/app/study-hub/test/page.js`) contains: cert label + template progress bar + question navigation dots + timer + Pause button — all in a single flex row. On mobile (375px), this row collapses to unreadable. The question nav dots (`maxWidth: 220px` flex-wrap) spill over other content. The Pause button gets pushed off screen. The timer overlaps with the cert label.
+
+**Fix:**
+- Mobile: stack header into two rows
+  - Row 1: cert label (left) + timer (center) + Pause button (right)
+  - Row 2: question nav dots in a horizontally scrollable strip (`overflow-x: auto`)
+- Template progress bar only shows on desktop; remove from mobile entirely (redundant with question count chip)
+- Nav dots on mobile: smaller (12px × 12px), more spacing-efficient, scroll horizontally rather than wrapping
+
+**Files:** `src/app/study-hub/test/page.js`
+
+**Status: 📋 Specced**
+
+---
+
+#### Test Page — Trainer Chat Panel Mobile Width (CONFIRMED BUG)
+
+**Problem:** The `ChatPanel` component in `src/app/study-hub/test/page.js` is `width: 320px, minWidth: 320px`. On an iPhone (375px viewport), this panel takes up 85% of the screen width, covering the question and answer choices behind it. There's no way to see the question text while the chat is open.
+
+**Fix:**
+- On mobile (≤768px): render ChatPanel as a bottom sheet instead of a side panel
+- Bottom sheet: `position: fixed; bottom: 0; left: 0; right: 0; height: 60vh; border-radius: 14px 14px 0 0; z-index: 900`
+- A drag handle at the top allows expanding to full height
+- The 💬 button that opens it stays where it is (bottom-right)
+- Desktop keeps the current side panel behavior unchanged
+
+**Files:** `src/app/study-hub/test/page.js` — `ChatPanel` component
+
+**Status: 📋 Specced**
+
+---
+
+#### Cert Guide — Tab Navigation Overflow on Mobile
+
+**Problem:** `src/app/study-hub/cert-guide/page.js` renders 5 tabs: `['Overview', 'Overlap', 'Exam Details', 'Career & Value', 'Study Roadmap']`. These are displayed as a flex row with no overflow behavior. On mobile the tabs are likely wrapping to two rows (awkward) or getting clipped. "Career & Value" and "Study Roadmap" are long labels.
+
+**Fix:**
+- Wrap tab container in `overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch`
+- Each tab: `display: inline-block` or `flex-shrink: 0` to prevent collapsing
+- Shorter labels on mobile: "Overview" / "Overlap" / "Exam" / "Career" / "Roadmap"
+- Alternatively: on mobile collapse into a `<select>` dropdown (simpler but less polished)
+- A fade-out gradient on the right edge signals that the row is scrollable
+
+**Files:** `src/app/study-hub/cert-guide/page.js`
+
+**Status: 📋 Specced**
+
+---
+
+#### Study Hub Overview — Grid Layouts Break on Mobile
+
+**Problem:** `src/app/study-hub/page.js` uses `display: grid; gridTemplateColumns: repeat(3, 1fr)` for the cert readiness cards and `repeat(4, 1fr)` for the stats row. On mobile these become three 110px columns or four 80px columns — far too narrow to be readable. No `@media` queries exist for mobile reflow.
+
+**Fix:**
+- Cert cards: `repeat(3, 1fr)` on desktop → `repeat(1, 1fr)` (single column) on ≤480px, or `repeat(2, 1fr)` on ≤768px with the third card full-width below
+- Stats row: `repeat(4, 1fr)` on desktop → `repeat(2, 1fr)` on ≤600px
+- Can be done with CSS variables or `@media` inside the inline `style` object, but since we use inline styles only, use the `isMobile` state pattern already established in `LifeHubSidebar.js`
+
+**Files:** `src/app/study-hub/page.js`
+
+**Status: 📋 Specced**
+
+---
+
+#### Settings Page — Tab Row Overflow on Mobile
+
+**Problem:** `src/app/settings/page.js` has 6 tabs: `['Account', 'Notifications', 'Study', 'Data & Reset', 'Security', '⚠ Danger Zone']`. On mobile these almost certainly wrap to a second row, pushing all content down. 6 tabs is too many for a mobile tab row anyway.
+
+**Fix (option A — horizontal scroll):** Same as Cert Guide fix — `overflow-x: auto; white-space: nowrap` on the tab container. Each tab becomes a scrollable pill.
+
+**Fix (option B — dropdown on mobile):** Replace the 6-tab row with a `<select>` dropdown on ≤640px. The dropdown shows the active section name and a chevron. More compact but less discoverable.
+
+**Recommendation:** Option A (scrolling pills) — more consistent with the rest of the app's visual language.
+
+**Files:** `src/app/settings/page.js`
+
+**Status: 📋 Specced**
+
+---
+
+#### Workout Log — Post-Workout Check-in Buttons (SMALL BUG)
+
+**Problem:** The post-workout check-in modal (`PostWorkoutModal` in `src/app/life-hub/workouts/log/page.js`) shows difficulty and energy rating buttons at `flex: 1` each, five in a row. At 375px wide with `gap: 6px` and `padding: 28px 24px` on the container, each button is approximately 51px wide. The sublabels inside each button (`font-size: 9px`) are illegible — "Very Easy", "Exhausted" etc. at 9px on a 51px button is below any readable threshold.
+
+**Fix:** Same as the check-in rating button fix — move the active label ABOVE the button row, show only the number inside each button, update the label dynamically on tap. The `DIFF_LABELS` and `ENERGY_LABELS` arrays are already defined per-value — just elevate the display to a row above.
+
+**Files:** `src/app/life-hub/workouts/log/page.js` — `PostWorkoutModal` component (lines ~153–209)
+
+**Status: 📋 Specced**
+
+---
+
+#### Workout Exercise Detail Modal — Trainer Chat on Small Screens
+
+**Problem:** The exercise detail modal in `src/app/life-hub/workouts/log/page.js` (the `ExerciseModal` component) includes a trainer chat section at the bottom with a `maxHeight: 180px` scrollable history area. On mobile, the modal itself has no `max-height` constraint and contains: an image (220px) + exercise name + tag chips + instructions (variable) + green feel box + red do-not box + chat history + chat input. This can easily require 700-900px of scroll inside a modal that has `alignItems: center` centering it in the viewport. The result is a modal that's taller than the screen, the chat is unreachable without scrolling inside the modal.
+
+**Fix:**
+- Modal container: `maxHeight: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch`
+- On mobile (≤640px): collapse the instructions by default behind a "Show instructions" toggle — most users open this to ask the trainer a question, not to read 8 steps
+- Chat input should be sticky inside the modal at the bottom (`position: sticky; bottom: 0; background: var(--surface); padding: 10px 0`)
+
+**Files:** `src/app/life-hub/workouts/log/page.js` — `ExerciseModal` component (lines ~60–151)
+
+**Status: 📋 Specced**
+
+---
+
+#### Nutrition Page — Micronutrient Panel Hidden by Default
+
+**Problem:** The micronutrient panel on `src/app/life-hub/nutrition/page.js` is collapsed by default (`microOpen` state starts `false`). This is a 38-field panel covering vitamins, minerals, and tracked micros — arguably the most valuable unique feature of our nutrition tracking. It's buried below the food log, collapsed, with a small toggle chip. Users who never discover it miss the entire encyclopedia integration, the gap report, and the DV% bars.
+
+**Comparison:** Cronometer (our closest competitor on micronutrient depth) shows a prominent "Nutrition Targets" panel that's always visible as a sidebar. MyFitnessPal shows the micronutrient breakdown as the first card after macros.
+
+**Fix options:**
+- Open the panel by default (just change `useState(false)` → `useState(true)`)  — but this makes the page very long
+- Better: move a "micronutrient snapshot" above the food log — a compact 3-column grid showing the 6 most important nutrients (Vitamin D, Iron, Calcium, Magnesium, Fiber, Protein) as colored bar chips. Clicking any chip jumps to the full micronutrient panel (or encyclopedia page for that nutrient).
+- The full 38-field panel stays collapsed but now there's a visible summary above the fold
+
+**Files:** `src/app/life-hub/nutrition/page.js`
+
+**Status: 💬 Discussed — needs design decision on approach**
+
+---
+
 #### Build Order for UI/UX Overhaul
 
 Priority order based on impact and user-reported severity:
@@ -2857,6 +2983,11 @@ PHASE A (bugs — do first):
   1. Sidebar bottom scroll bug (100vh → 100dvh) — both sidebars
   2. Real Exam crash investigation + fix
   3. Study Hub mobile text/layout pass (most-used pages first: test, cert guide)
+     a. Test page header row stacking on mobile
+     b. ChatPanel → bottom sheet on mobile
+     c. Cert Guide tabs → horizontal scroll
+     d. Study Hub page grid → responsive reflow
+     e. Settings page tabs → horizontal scroll
 
 PHASE B (Life Hub home restructure):
   4. Recovery Score ring redesign
@@ -2868,10 +2999,12 @@ PHASE C (navigation):
   8. Breadcrumbs on all sub-pages
 
 PHASE D (polish):
-  9. Check-in button tap targets on mobile
+  9. Check-in button tap targets on mobile (Life Hub + workout log PostWorkoutModal)
   10. Typography + spacing pass
   11. Left-border card pattern diversification
   12. Study Hub overview page with recommended action + cert scores
+  13. Workout exercise modal — sticky chat input + collapsible instructions on mobile
+  14. Nutrition micronutrient snapshot above the fold
 ```
 
 ---
