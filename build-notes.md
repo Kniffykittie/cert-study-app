@@ -2458,6 +2458,124 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ---
 
+---
+
+### 📱 Health Sync & Wearable Parity Plan 💬 Discussed
+
+**Session context (2026-07-09):** Discussed closing the gap between our health tracking and what Google Health / Bevel do natively. The fundamental constraint is that we use the Google Health REST API (server-to-server), not native Health Connect (Android OS) or HealthKit (iOS). This means we can never fully match real-time reads, but we can get very close on freshness and we can surpass them on insight depth since we have nutrition, workouts, sleep, and study data together in one place.
+
+**The seven gaps and fixes, in priority order:**
+
+---
+
+**Gap 1 — Resting HR and HRV always show dashes (BROKEN, fix first)**
+- Root cause: the field names we guess at in `sync/route.js` and `background-health-sync/index.ts` when parsing Google's API response for `daily-resting-heart-rate` and `daily-heart-rate-variability` data types have never matched the actual response structure
+- Debug output `_debugRestingHR` and `_debugHRV` was added to the POST `/api/health/sync` response — need user to hit Refresh on Health page, open network tab, find the POST response, and share the raw `_debugRestingHR` and `_debugHRV` fields
+- Once actual field names are confirmed, fix the parsing in both `src/app/api/health/sync/route.js` AND `supabase/functions/background-health-sync/index.ts` in the same commit (they must stay in sync)
+- Status: ⏳ Blocked on user sharing debug response
+
+---
+
+**Gap 2 — Steps overwrite bug (causes count regression)**
+- Root cause: `health_steps_hourly` upsert uses `onConflict: 'user_id,date,hour'` which blindly replaces existing step counts with whatever the current sync returns. If a sync has partial data for an hour (e.g., Edge Function's 3-hour lookback catches a partially-complete hour, or pagination cuts off early), the lower incoming value overwrites the correct higher value already in the DB.
+- Real example: User had ~12k steps correctly stored. Background sync ran with a 3-hour window and returned partial data for some hours. Upsert replaced good values with lower ones. Total dropped to 8,761.
+- Fix: Replace the upsert logic with a Postgres function `upsert_steps_hourly(user_id, date, hour, steps)` that uses `INSERT ... ON CONFLICT DO UPDATE SET steps = GREATEST(EXCLUDED.steps, health_steps_hourly.steps)` — always keeps the higher value
+- Must fix in both `src/app/api/health/sync/route.js` AND `supabase/functions/background-health-sync/index.ts`
+- DB migration needed: create the `upsert_steps_hourly` RPC function
+- Status: 📋 Fully Specced
+
+---
+
+**Gap 3 — Sync lag (2 hours background, 15 min on health page open)**
+- Already improved this session: health pages now force sync on open (2-min cooldown), hub page fires background sync before user reaches Life Hub
+- Remaining gap: background cron still runs every 2 hours. Changing to every 15 min is free (2,880 invocations/month vs 500k free tier limit) and would mean data is never more than 15 min stale even without opening the app
+- Fix: update pg_cron schedule from `0 */2 * * *` to `*/15 * * * *`
+- Status: 💬 Discussed, not yet built
+
+---
+
+**Gap 4 — "Last synced X min ago" transparency indicator**
+- Health pages currently show a small "Last synced HH:MM" timestamp but it's easy to miss
+- Better: a subtle chip on each health card reading "Synced 4 min ago" or "Synced 23 min ago" in green/yellow/red based on staleness (< 5min = green, 5–30min = yellow, > 30min = red)
+- This makes staleness feel intentional rather than broken — users know what they're looking at
+- Status: 💬 Discussed
+
+---
+
+**Gap 5 — Depth: 7-day and 30-day trends (currently only show today)**
+- We already have weeks of data in `health_heart_rate_daily` and `health_sleep_sessions` — we just don't show it
+- What to add:
+  - HR page: 30-day resting HR trend line (already partially there — extend to 30 days, add annotation for 7-day avg)
+  - Sleep page: 14-day sleep duration bar chart + bedtime consistency scatter (how variable your sleep/wake times are — Bevel charges for this)
+  - Steps page: 30-day daily total bars alongside the existing 7-day view
+- Status: 💬 Discussed
+
+---
+
+**Gap 6 — Sleep consistency score**
+- Bevel's most-talked-about feature: measures how consistent your bedtime and wake time are over 14 days, separate from sleep duration or quality
+- Formula: take stddev of bedtime minutes and stddev of wake minutes across 14 days; low stddev = high consistency score
+- Display as a 0–100 score alongside Sleep Score on the Sleep page, with a "what this means" InfoChip
+- Data source: `health_sleep_sessions.start_time` and `end_time` — we already have this
+- No new table needed, computed on the fly
+- Status: 💬 Discussed
+
+---
+
+**Gap 7 — Weekly AI health insight (where we beat both apps)**
+- Neither Google Health nor Bevel connects your health metrics to your nutrition, workouts, and life context. We can.
+- Once or twice a week, Claude looks at: HRV trend (improving/declining), sleep quality trend, workout load (sets × reps volume), calorie vs target consistency, hydration, and stress signals (check-in energy scores) and returns a 3-sentence "what your body is telling you this week" paragraph
+- Displayed as a card on the Health Overview page — similar to the Daily Brief card but health-specific and weekly-refreshing
+- Rate limited: 2/week. Cached in a new `health_insights` table (user_id, week_start, insight_text, generated_at)
+- This is our genuine differentiator — no standalone health app has your food logs, supplement stack, workout sets, and study schedule to cross-reference
+- Status: 💬 Discussed
+
+---
+
+**Native app consideration (discussed same session):**
+- Converting to a native app (Expo/React Native) would close all sync gaps permanently via Health Connect/HealthKit direct reads
+- Cost delta vs current: only new cost is Apple Developer Program ($99/yr) + optional Expo EAS ($29/mo). Backend (Supabase + Anthropic) unchanged
+- Security changes: XSS eliminated (no DOM), but new risks: app binary reverse engineering, deep link hijacking (use expo-secure-store + proper scheme handling), unencrypted AsyncStorage (use expo-secure-store for tokens)
+- Build effort estimate: 4–8 weeks — backend is done, it's purely UI port + native bridge work
+- Decision: not now, but the architecture already supports it cleanly when ready
+
+---
+
+**Build order for the health parity plan:**
+1. Fix resting HR/HRV field names (blocked on debug data from user) 
+2. Fix steps overwrite bug (GREATEST upsert via RPC)
+3. Drop background cron to 15 min
+4. Add staleness chips to health cards
+5. Add 30-day trend views
+6. Add sleep consistency score
+7. Add weekly AI health insight
+
+---
+
+### 🔔 Push Notifications — Status
+
+**Infrastructure:** Fully built and active
+- `daily-push` Edge Function deployed, cron runs every 30 min (`*/30 * * * *`), active ✅
+- `background-health-sync` Edge Function deployed, cron runs every 2 hours, active ✅
+- `generate-coach-memory` Edge Function deployed, cron runs Monday 2am, active ✅
+- Settings page has "Enable Notifications" button that requests browser permission and saves subscription
+
+**Why user hasn't received any notifications:**
+- `push_subscriptions` table is empty — the browser permission + subscription registration flow has never been completed
+- **To fix:** Go to Settings → Notifications section → click "Enable Notifications" → allow browser prompt → subscription saves to DB → Edge Function will find it on next 30-min cron run
+
+---
+
+### 🚪 Hub Gate + Force Sync on App Open (Built 2026-07-09)
+
+- Next.js middleware at `src/middleware.js` intercepts all deep links and redirects to `/` (hub picker) if session cookie `hub_gate` is missing
+- Hub page (`/`) sets `hub_gate` cookie on mount and fires background health sync
+- Life Hub landing (`/life-hub`) also fires sync on mount with progress bar events
+- All three health sub-pages (Overview, Steps, Sleep) force sync on open with shared 2-min cooldown key `health_force_sync_at` in localStorage
+- `HealthSyncBar` component at top of screen shows sync progress across all Life Hub pages
+
+---
+
 ## Phase Log
 
 ### Phase Z — Photo-Based Food Logging — Complete
