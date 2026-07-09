@@ -49,11 +49,10 @@ export async function fetchDataType(
 ): Promise<any[]> {
   let allPoints: any[] = []
   let pageToken: string | null = null
-  const sinceParam = since ? `&startTime=${encodeURIComponent(since)}` : ''
   do {
     const url = pageToken
-      ? `${BASE}/users/me/dataTypes/${dataType}/dataPoints?pageToken=${encodeURIComponent(pageToken)}${sinceParam}`
-      : `${BASE}/users/me/dataTypes/${dataType}/dataPoints?${sinceParam ? sinceParam.slice(1) : ''}`
+      ? `${BASE}/users/me/dataTypes/${dataType}/dataPoints?pageToken=${encodeURIComponent(pageToken)}`
+      : `${BASE}/users/me/dataTypes/${dataType}/dataPoints`
     const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
     if (!res.ok) break
     const json = await res.json()
