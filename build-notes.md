@@ -2552,6 +2552,330 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 ---
 
+### 🎨 UI/UX Overhaul — Full Audit (2026-07-09)
+
+Full top-to-bottom audit comparing against Apple Health, Google Health, Fitbit, and Bevel. Every item below is a confirmed finding. Items are grouped by area and ranked within each group by impact. Status tags apply to each item independently.
+
+---
+
+#### Life Hub Landing — Restructure (HIGH PRIORITY)
+
+**Problem:** The Life Hub home has 6 distinct stacked zones before the user reaches anything interactive. Current order: status pills → 3 Daily Brief cards → Recovery Score → 2×2 section cards → Check-in. The check-in — the most interactive element, the thing that feeds all other data — is buried at the bottom after ~800px of content. The Recovery Score, arguably the most valuable number we generate, is a collapsed card buried after three brief cards.
+
+Every competitor anchors their home to one visual hero: Apple = activity rings, Fitbit = ring + calorie ring, Google = three big data cards, Bevel = recovery score ring. You see the most important thing within 2 seconds. We make you scroll to find anything interactive.
+
+**Duplication issue:** The status pills (top) and the 2×2 section cards (middle) show the same four data points — calories, workout, steps/health, water/weight — twice before the user reaches the check-in.
+
+**Proposed new order:**
+```
+1. Recovery Score RING — hero, full-width, centered, colored by score
+   Three component chips below it: Sleep / Hydration / Protein (the top 3 by weight)
+   "Expand breakdown" link opens the current detailed view
+
+2. Check-in (energy + mood) — immediately below the ring
+   These belong together: the ring is the output, the check-in is the input.
+   Compact form: two rating rows + optional note + Save button, no heatmap visible yet
+
+3. Today's Quick Stats — one slim row: Calories · Steps · Water · Workout
+   Each is a tappable chip linking to the relevant sub-page
+   Replaces BOTH the current status pills and the 2×2 section cards
+
+4. Daily Brief — ONE card with three tabs (☀️ Morning / 🌤️ Afternoon / 🌙 Evening)
+   Active window tab highlighted, inactive tabs visible but muted
+   Content loads in place when tab is tapped — no separate cards, no stacked headers
+   Collapsed by default (shows first 2 lines), expand to read full
+
+5. 28-Day Heatmap — below the brief, collapsible
+   Shows check-in history at a glance
+
+6. Section nav cards — at the very bottom, for navigation only
+   Simplified: just label + section color + arrow, no duplicate data
+```
+
+This mirrors the Bevel mental model: *here's your score* → *here's the input that affects it* → *here's the rest of your day*.
+
+**Status: 📋 Fully Specced**
+
+---
+
+#### Recovery Score — Visual Redesign (HIGH PRIORITY)
+
+**Problem:** The current presentation is a 42px number left-aligned, mini 28px bar charts right-aligned, everything in one cramped row. The collapsed state doesn't communicate the importance of the score. Users who never expand it are missing the most valuable output the app generates.
+
+**Bevel comparison:** Full-width colored ring with score centered inside. Single sentence label below ("Well Recovered / Low Recovery"). Component chips in a row below that. The ring IS the visual anchor of their entire home screen.
+
+**Proposed redesign:**
+- SVG circle progress ring, full-width card (~200px diameter)
+- Score number centered inside ring (56px, bold), colored by health tier
+- Tier label below score inside ring ("Well Recovered")
+- Four component chips in a 2×2 grid below the ring: Sleep (X/25) · Hydration (X/20) · Protein (X/20) · Energy (X/15)
+- HRV and Stretching chips appear below if data exists
+- Each chip: icon + label + pts + small progress bar
+- "What's driving this?" expand button at bottom → opens the current detailed breakdown (that content is already excellent, just hidden)
+- The collapsed state (ring + chips) replaces the current cramped number+bars header
+- Card color: ring stroke color bleeds into card background at 5% opacity, making the entire card feel colored by your health status
+
+**Status: 📋 Fully Specced**
+
+---
+
+#### Daily Brief — Tab-Based Single Card (HIGH PRIORITY)
+
+**Problem:** Three separate collapsible cards (Morning, Afternoon, Evening) are always visible simultaneously as card headers. This means three stacked card header rows before the user sees a data point. The morning card is always present even when empty (shows placeholder text). When all three have content, there are three "Read more" chevrons before anything else on the page.
+
+**Fix:** One card. Three tabs at the top of the card: `☀️ Morning` | `🌤️ Afternoon` | `🌙 Evening`. Active tab is highlighted with the brief's color (purple/yellow/indigo). Inactive tabs that have content show a green dot. Tapping a tab swaps the content in place.
+
+- Morning tab always visible and active by default (existing behavior)
+- Afternoon tab shown grayed if no check-in done yet; tapping shows "Complete a check-in to generate your afternoon insight"
+- Evening tab shown grayed before 6pm; after 6pm shows "Generating..." state then content
+- If a tab has no content and isn't the current window, it's dimmed but still tappable
+- Card is collapsed by default — shows first 2 lines of text + "Read more"
+- One card, one design, no stacked headers
+
+**Status: 📋 Fully Specced**
+
+---
+
+#### Mobile Bottom Tab Bar (HIGH PRIORITY)
+
+**Problem:** On mobile, the sidebar is a slide-out from a hamburger button fixed at top-left. The top-left corner is the hardest-to-reach part of a phone screen for right-handed users. Every major health app (Apple Health, Google Health, Fitbit, Bevel) uses a bottom tab bar on mobile because thumbs reach the bottom, not the top-left.
+
+Additionally: the Life Hub sidebar currently has ALL navigation nested inside dropdowns. On mobile, opening the hamburger, finding the right dropdown, tapping it open, then tapping a link is 4 interactions. A bottom tab bar + drill-down is always 2: tap section → tap sub-page.
+
+**Proposed bottom tab bar (mobile only, ≤768px):**
+```
+[ Overview ] [ Health ] [ Nutrition ] [ Workouts ] [ Goals ]
+```
+- 5 tabs, each with section color when active, `var(--text-secondary)` when inactive
+- Icon above label (use simple emoji or SVG)
+- Active tab has color fill underline or pill
+- Tapping a tab navigates to the section root page
+- Sub-pages still exist via links within each section
+- Desktop keeps the current sidebar — this is mobile-only
+- The hamburger button is removed on mobile entirely
+
+**Files affected:** `src/components/LifeHubSidebar.js` (new MobileBottomNav component), `src/app/life-hub/layout.js` (conditionally render bottom nav instead of sidebar on mobile)
+
+**Status: 📋 Fully Specced**
+
+---
+
+#### Sidebar Bottom Scroll Bug (CONFIRMED USER-REPORTED BUG)
+
+**Problem:** On both Study Hub and Life Hub sidebars, items near the bottom (Settings link, account avatar) are cut off and can't be clicked. The sidebar hits the bottom of the viewport and the user can't scroll it further.
+
+**Root cause:** The sidebar `aside` has `min-height: 100vh` and `overflowY: auto`. On short screens (or when the browser's address bar is expanded on mobile), `100vh` is taller than the visible area, causing the bottom items to render below the visible fold. The `auto` overflow means the sidebar should scroll — but on mobile Safari and some Chrome configurations, the scroll container doesn't get focus and the user can't scroll it.
+
+**Fix:**
+- Change sidebar height from `min-height: 100vh` to `height: 100dvh` (dynamic viewport height — adjusts for mobile browser chrome automatically)
+- Add `overflow-y: auto` and `-webkit-overflow-scrolling: touch` for iOS Safari
+- Test at iPhone SE viewport (375×667) and with browser address bar visible
+
+**Affects:** `src/components/LifeHubSidebar.js` and `src/components/StudyHubSidebar.js`
+
+**Status: 📋 Fully Specced**
+
+---
+
+#### Study Hub Mobile — Everything Too Small (CONFIRMED USER-REPORTED BUG)
+
+**Problem:** On mobile, the Study Hub pages (cert guide, test taking, study mode, etc.) render at desktop scale. Text is tiny, buttons are hard to tap, layouts don't reflow. Specifically:
+- Test questions: question text wraps but answer choices become very narrow
+- Cert Guide: 5-tab navigation doesn't fit on mobile; tabs wrap or overflow
+- Domain Trend charts: SVG charts render at desktop width compressed into mobile screen
+- Reference sheets: tables with 4+ columns become unreadable
+- The floating reference panel and floating chat bubble compete with content on small screens
+
+**What needs to happen:**
+- All test-taking pages need a mobile-first pass: larger tap targets (min 44px height), question text at 15-16px minimum, answer options full-width with more padding
+- Cert Guide tabs need to scroll horizontally on mobile (`overflow-x: auto`, `white-space: nowrap`)
+- SVG charts (DomainTrend, ScoreChart) need `viewBox` + `width: 100%` responsive treatment
+- Reference sheet tables need `overflow-x: auto` wrapper with horizontal scroll
+- FloatingChat and FloatingReferencePanel need mobile-specific positioning (avoid overlapping content)
+- Bottom padding on test pages to prevent fixed buttons overlapping last answer choice
+
+**Status: 💬 Discussed, needs full mobile audit pass per page**
+
+---
+
+#### Study Hub Overview — Too Sparse (HIGH PRIORITY)
+
+**Problem:** The Study Hub overview page shows only the `DailyStreak` component (a 30-question streak tracker and 28-day heatmap). That's it. There's no answer to "what should I study today?" — the user has to already know where to go.
+
+Compare to Bevel's training home: your last session, your next recommended session, your current streak. Three things. You immediately know what to do.
+
+**Proposed Study Hub overview page layout:**
+```
+1. Greeting + recommended action (dynamic)
+   "Your CCNA domain 4 accuracy is 48% — weakest area. Practice it today?"
+   [→ Practice Domain 4] button
+
+2. Cert predicted scores — all 3 certs in one row
+   CCNA: 74% | Net+: 68% | Sec+: —
+   Progress bars colored by cert. Same data currently shown on hub picker page.
+
+3. Daily Streak + heatmap (existing DailyStreak component, keep as-is)
+
+4. Quick actions row
+   [Take a Test] [Study Mode] [Review Wrong Answers] [Flashcards]
+   Four buttons, 2×2 grid on mobile
+
+5. Recent activity (last 3 test sessions)
+   Score + cert + mode + date. Quick sense of momentum.
+```
+
+**Status: 📋 Fully Specced**
+
+---
+
+#### Breadcrumb Navigation on Sub-Pages (MEDIUM PRIORITY)
+
+**Problem:** On sub-pages like `/life-hub/health/steps`, `/life-hub/workouts/history`, `/life-hub/nutrition/encyclopedia`, there is no breadcrumb or back link. The only way to navigate back to the section root is to open the sidebar and find the link. This adds 2-3 extra interactions for every back-navigation on mobile.
+
+**Fix:** Add a breadcrumb row at the top of every sub-page, above the page H1. Format: `← Health Overview` or `Health / Step Tracker`. This is a 2-line change per page (import Link, add one div above the h1).
+
+**Pattern:**
+```jsx
+<div style={{ marginBottom: '12px' }}>
+  <Link href="/life-hub/health" style={{ fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none' }}>
+    ← Health Overview
+  </Link>
+</div>
+```
+
+**Pages that need this:**
+- `/life-hub/health/steps`, `/life-hub/health/heart-rate`, `/life-hub/health/sleep`
+- `/life-hub/workouts/history`, `/life-hub/workouts/exercises`, `/life-hub/workouts/stretches`, `/life-hub/workouts/day/[dayIndex]`
+- `/life-hub/nutrition/add-food`, `/life-hub/nutrition/log-manual`, `/life-hub/nutrition/encyclopedia`, `/life-hub/nutrition/meal-plan`
+- `/life-hub/goals/measurements`, `/life-hub/goals/supplements`, `/life-hub/goals/setup`
+- `/study-hub/ccna`, `/study-hub/network-plus`, `/study-hub/security-plus` (→ back to Study Hub)
+- `/study-hub/labs/[setId]/[labId]` (→ back to lab set)
+
+**Status: 📋 Fully Specced**
+
+---
+
+#### Check-In Rating Buttons — Mobile Tap Targets (MEDIUM PRIORITY)
+
+**Problem:** The energy/mood rating row renders 5 buttons at `flex: 1` width. On mobile (375px wide) each button is ~62px wide with a sublabel inside at `font-size: 10px`. The sublabels ("Exhausted", "Energized") are unreadable and the tap targets are borderline — Apple's minimum recommended tap target is 44×44px.
+
+**Fix:**
+- Move the active sublabel ABOVE the rating row, not inside each button
+- The label updates as the user taps (shows the label for the selected value)
+- Each button becomes just a number with color background on select — no text inside
+- On desktop this stays the same; on mobile the sublabel row disappears and the dynamic label above replaces it
+
+**Pattern (mobile):**
+```
+Energy — [Energized ✓]   ← dynamic label updates on tap
+[1] [2] [3] [4] [5]      ← larger, number-only buttons
+```
+
+**Status: 📋 Fully Specced**
+
+---
+
+#### Left-Border Card Pattern — Visual Monotony (MEDIUM PRIORITY)
+
+**Problem:** Every single card in Life Hub uses `borderLeft: 3px solid ${color}`. Status pills, section cards, brief cards, recovery score, check-in card — identical pattern. When everything uses the same visual language, nothing stands out. The eye has no anchor.
+
+**Bevel/Apple approach:** Differentiation through card TYPE:
+- Hero cards: filled background tint, large typography
+- Data cards: clean white/surface, no borders, subtle shadow
+- Action cards: filled color button-like appearance
+- Info cards: plain text panel, minimal border
+
+**Proposed card hierarchy:**
+- Recovery Score: filled ring card (hero — breaks the pattern entirely)
+- Check-in: inset background (slightly different from surface), input-like feeling
+- Daily Brief: plain text card, thin full border (not just left), feels like a document
+- Status pills: keep left-border, these are navigation elements not data displays
+- Section summary cards: remove, replaced by quick stats row
+
+**Status: 💬 Discussed — can be implemented progressively per component**
+
+---
+
+#### Real Exam Crash — Test Generation (CONFIRMED USER-REPORTED BUG)
+
+**Problem:** User attempted to generate a Real Exam for CCNA and it crashed during generation. Real Exam mode requires 120 questions (matches actual CCNA exam count). This is the same class of issue as the template batch crash — large question counts cause the Anthropic API response to truncate or time out before completing.
+
+**Investigation needed:**
+- Check `/api/generate-questions/route.js` — does it have a timeout?
+- Real Exam generates questions in one API call or multiple? If one call, 120 questions is almost certainly too large for a single response
+- Check if the crash is a timeout, a JSON parse error (truncated response), or a 504 from Vercel (10s default serverless timeout)
+- The fix pattern from templates: break into batches of 5, use parallel calls, merge results
+
+**Fix approach (after investigation):**
+- For Real Exam mode, generate questions in parallel batches (e.g., 6 batches of 20)
+- Each batch targets specific domains proportional to exam weight
+- Merge + shuffle after all batches resolve
+- If any batch fails, retry that batch before surfacing an error
+- Add a loading state on the test page that shows progress: "Generating questions... (60/120)"
+
+**Status: 💬 Discussed, needs investigation before spec**
+
+---
+
+#### Visual Hierarchy — Typography and Spacing (LOWER PRIORITY)
+
+**Problem:** Our cards have `padding: 16-24px` with `gap: 10-14px` between cards — tightly packed. Bevel uses 32px+ gaps between sections. The breathing room is what makes their UI feel premium.
+
+**Typography contrast gap:** Hero numbers should be significantly larger than secondary text. Current biggest type is Recovery Score at 42px but it's surrounded by 11-20px text — the contrast ratio isn't dramatic enough. Apple/Bevel use 56-72px for hero numbers.
+
+**Specific fixes:**
+- Section gaps on Life Hub landing: increase from `marginBottom: 20px` to `marginBottom: 32px`
+- Recovery Score number in ring: 56px
+- Section card hero text: increase from 22px to 28px
+- Status pill values: increase from 20px to 24px
+- Increase sidebar link padding from `7px 12px` to `9px 12px` for better tap targets
+
+**Status: 💬 Discussed — low-risk, can apply during any other page touch**
+
+---
+
+#### Things We Do Better Than All Four Competitors (Keep These)
+
+These are genuine differentiators — don't lose them in any redesign:
+
+1. **AI coaching context depth** — Daily Brief reads 10+ tables before writing. Bevel's AI is generic. Google/Apple have no AI prose.
+2. **Cross-domain correlation** — "Low energy followed a calorie deficit" is unique to us. No competitor surfaces this.
+3. **Check-in context awareness** — Adapting energy/mood labels after leg day, calorie deficit, or low sleep is more sophisticated than anything in Bevel or Google Health.
+4. **Recovery Score breakdown** — The expanded breakdown with per-component tips is more educational than Bevel. They show the score; we explain it.
+5. **Nutrition depth** — 38 micronutrients, AI encyclopedia, dietary warnings, TDEE calibration. Fitbit nutrition is a calorie counter. Apple shows macros.
+6. **Study integration** — Unique. No health app has this. The correlation between study performance and health habits is a genuine product moat.
+7. **The micro-insight after check-in** — "Your last 3 low-energy days all followed a calorie deficit" — this is a feature no competitor has.
+
+---
+
+#### Build Order for UI/UX Overhaul
+
+Priority order based on impact and user-reported severity:
+
+```
+PHASE A (bugs — do first):
+  1. Sidebar bottom scroll bug (100vh → 100dvh) — both sidebars
+  2. Real Exam crash investigation + fix
+  3. Study Hub mobile text/layout pass (most-used pages first: test, cert guide)
+
+PHASE B (Life Hub home restructure):
+  4. Recovery Score ring redesign
+  5. Daily Brief → single tabbed card
+  6. Life Hub landing zone reorder (ring → check-in → stats → brief → heatmap → section nav)
+
+PHASE C (navigation):
+  7. Mobile bottom tab bar (Life Hub)
+  8. Breadcrumbs on all sub-pages
+
+PHASE D (polish):
+  9. Check-in button tap targets on mobile
+  10. Typography + spacing pass
+  11. Left-border card pattern diversification
+  12. Study Hub overview page with recommended action + cert scores
+```
+
+---
+
 ### 🔔 Push Notifications — Status
 
 **Infrastructure:** Fully built and active
