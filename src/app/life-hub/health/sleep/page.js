@@ -131,7 +131,10 @@ export default function SleepTrackerPage() {
       setLoading(false)
       localStorage.setItem('health_sleep', JSON.stringify(json))
     }
-    if (!json.error && (json.neverSynced || !json.lastSyncedAt || Date.now() - new Date(json.lastSyncedAt).getTime() > 15 * 60 * 1000)) {
+    const lastForcedSync = parseInt(localStorage.getItem('health_force_sync_at') || '0')
+    const syncCooldownOk = Date.now() - lastForcedSync > 2 * 60 * 1000
+    if (!json.error && syncCooldownOk) {
+      localStorage.setItem('health_force_sync_at', String(Date.now()))
       fetch('/api/health/sync', { method: 'POST' })
         .then(() => fetch('/api/health/sync'))
         .then(r => r.json())
