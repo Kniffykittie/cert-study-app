@@ -67,6 +67,7 @@ export default function HealthPage() {
       const syncCooldownOk = Date.now() - lastForcedSync > 2 * 60 * 1000
       if (!syncData.error && syncCooldownOk) {
         localStorage.setItem('health_force_sync_at', String(Date.now()))
+        window.dispatchEvent(new CustomEvent('health-sync-start'))
         fetch('/api/health/sync', { method: 'POST' })
           .then(r => { if (!r.ok) throw new Error('sync_failed') ; return r })
           .then(() => Promise.all([fetch('/api/health/sync'), fetch('/api/health/heart-rate')]))
@@ -74,8 +75,9 @@ export default function HealthPage() {
           .then(([fresh, freshHr]) => {
             if (!fresh.error) { setData(fresh); setSyncError(false); localStorage.setItem('health_overview', JSON.stringify(fresh)) }
             if (!freshHr.error) setHrData(freshHr)
+            window.dispatchEvent(new CustomEvent('health-sync-end'))
           })
-          .catch(() => setSyncError(true))
+          .catch(() => { setSyncError(true); window.dispatchEvent(new CustomEvent('health-sync-end')) })
       }
     }
     load()

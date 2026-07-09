@@ -44,6 +44,7 @@ export default function StepTrackerPage() {
     const syncCooldownOk = Date.now() - lastForcedSync > 2 * 60 * 1000
     if (!json.error && syncCooldownOk) {
       localStorage.setItem('health_force_sync_at', String(Date.now()))
+      window.dispatchEvent(new CustomEvent('health-sync-start'))
       fetch('/api/health/sync', { method: 'POST' })
         .then(() => fetch(`/api/health/sync?range=${r}`))
         .then(r2 => r2.json())
@@ -52,8 +53,9 @@ export default function StepTrackerPage() {
             setData(fresh)
             localStorage.setItem(cacheKey(r), JSON.stringify(fresh))
           }
+          window.dispatchEvent(new CustomEvent('health-sync-end'))
         })
-        .catch(() => {})
+        .catch(() => { window.dispatchEvent(new CustomEvent('health-sync-end')) })
     }
   }
 

@@ -1,5 +1,6 @@
 import LifeHubSidebar from '@/components/LifeHubSidebar'
 import LifeHubClientShell from '@/components/LifeHubClientShell'
+import HealthSyncBar from '@/components/HealthSyncBar'
 
 export default function LifeHubLayout({ children }) {
   return (
@@ -16,6 +17,7 @@ export default function LifeHubLayout({ children }) {
         </main>
       </div>
       <LifeHubClientShell />
+      <HealthSyncBar />
     </>
   )
 }

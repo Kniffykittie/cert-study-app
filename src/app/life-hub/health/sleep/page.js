@@ -135,6 +135,7 @@ export default function SleepTrackerPage() {
     const syncCooldownOk = Date.now() - lastForcedSync > 2 * 60 * 1000
     if (!json.error && syncCooldownOk) {
       localStorage.setItem('health_force_sync_at', String(Date.now()))
+      window.dispatchEvent(new CustomEvent('health-sync-start'))
       fetch('/api/health/sync', { method: 'POST' })
         .then(() => fetch('/api/health/sync'))
         .then(r => r.json())
@@ -143,8 +144,9 @@ export default function SleepTrackerPage() {
             setData(fresh)
             localStorage.setItem('health_sleep', JSON.stringify(fresh))
           }
+          window.dispatchEvent(new CustomEvent('health-sync-end'))
         })
-        .catch(() => {})
+        .catch(() => { window.dispatchEvent(new CustomEvent('health-sync-end')) })
     }
   }
 
