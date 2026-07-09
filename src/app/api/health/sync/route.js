@@ -175,11 +175,14 @@ export async function POST(req) {
     stepsBucket[key] = (stepsBucket[key] ?? 0) + parseInt(p.steps?.count ?? 0)
   })
   if (Object.keys(stepsBucket).length > 0) {
-    const stepsRows = Object.entries(stepsBucket).map(([key, steps]) => {
-      const [date, hour] = key.split('|')
-      return { user_id: user.id, date, hour: parseInt(hour), steps, synced_at: new Date().toISOString() }
-    })
-    await supabase.from('health_steps_hourly').upsert(stepsRows, { onConflict: 'user_id,date,hour' })
+    await Promise.all(
+      Object.entries(stepsBucket).map(([key, steps]) => {
+        const [date, hour] = key.split('|')
+        return supabase.rpc('upsert_steps_hourly', {
+          p_user_id: user.id, p_date: date, p_hour: parseInt(hour), p_steps: steps,
+        })
+      })
+    )
   }
 
   // ── Write heart rate — daily, intraday, and 5-minute ──

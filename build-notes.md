@@ -2482,7 +2482,7 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 - Fix: Replace the upsert logic with a Postgres function `upsert_steps_hourly(user_id, date, hour, steps)` that uses `INSERT ... ON CONFLICT DO UPDATE SET steps = GREATEST(EXCLUDED.steps, health_steps_hourly.steps)` — always keeps the higher value
 - Must fix in both `src/app/api/health/sync/route.js` AND `supabase/functions/background-health-sync/index.ts`
 - DB migration needed: create the `upsert_steps_hourly` RPC function
-- Status: 📋 Fully Specced
+- Status: ✅ Built — migration `upsert_steps_hourly_greatest` applied; both sync routes now use RPC with GREATEST
 
 ---
 
@@ -2543,7 +2543,7 @@ These are the precise, line-level fixes for every issue found in the Phase 57 pe
 
 **Build order for the health parity plan:**
 1. Fix resting HR/HRV field names (blocked on debug data from user) 
-2. Fix steps overwrite bug (GREATEST upsert via RPC)
+2. ✅ Fix steps overwrite bug (GREATEST upsert via RPC)
 3. Drop background cron to 15 min
 4. Add staleness chips to health cards
 5. Add 30-day trend views
