@@ -7,7 +7,7 @@ export default function DailyLogReview() {
 
   useEffect(() => {
     const hour = new Date().getHours()
-    if (hour < 5 || hour >= 12) return
+    if (hour < 5) return
 
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
     const lsKey = `log_review_${yesterday}`

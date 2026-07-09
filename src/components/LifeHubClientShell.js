@@ -37,11 +37,10 @@ export default function LifeHubClientShell() {
       const wakeMinutes = wakeH * 60 + wakeM
       const nowMinutes = now.getHours() * 60 + now.getMinutes()
 
-      const morningWindowEnd = wakeMinutes + 60
       const afternoonWindowStart = wakeMinutes + 7 * 60
 
       let window = null
-      if (nowMinutes >= wakeMinutes && nowMinutes < morningWindowEnd) {
+      if (nowMinutes < 13 * 60) {
         if (!localStorage.getItem(morningKey)) window = 'morning'
       } else if (nowMinutes >= afternoonWindowStart) {
         if (!localStorage.getItem(afternoonKey)) window = 'afternoon'

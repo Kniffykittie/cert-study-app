@@ -407,15 +407,14 @@ export default function WorkoutsPage() {
               const hasPendingSuggestions = todaySuggestions.some(s => !appliedOverrides[s.from_exercise?.toLowerCase()])
               const workoutComplete = completedTodayDays.has(day.day_of_week)
               return (
-                <div key={cardKey} style={{ backgroundColor: 'var(--surface)', border: `1px solid ${isToday ? '#f97316' : 'var(--border)'}`, borderRadius: '12px', overflow: 'hidden' }}>
+                <div key={cardKey} onClick={() => router.push(`/life-hub/workouts/day/${sortedDowIndex}`)} style={{ backgroundColor: 'var(--surface)', border: `1px solid ${isToday ? '#f97316' : 'var(--border)'}`, borderRadius: '12px', overflow: 'hidden', cursor: 'pointer' }}>
                   <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                        <select value={day.day_of_week} onChange={e => { moveDay(dayIndex, e.target.value); setTimeout(saveDayChanges, 300) }}
+                        <select value={day.day_of_week} onChange={e => { moveDay(dayIndex, e.target.value); setTimeout(saveDayChanges, 300) }} onClick={e => e.stopPropagation()}
                           style={{ backgroundColor: 'transparent', border: 'none', color: 'var(--accent-purple)', fontSize: '15px', fontWeight: '700', cursor: 'pointer', outline: 'none', padding: 0 }}>
                           {DAYS_OF_WEEK.map(d => <option key={d} value={d} style={{ backgroundColor: '#1A1A1A' }}>{d}</option>)}
                         </select>
-                        <Link href={`/life-hub/workouts/day/${sortedDowIndex}`} style={{ fontSize: 11, color: '#3b82f6', textDecoration: 'none', fontWeight: 600, flexShrink: 0 }}>Open →</Link>
                       </div>
                       <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{day.day_name}</div>
                     </div>
@@ -423,7 +422,7 @@ export default function WorkoutsPage() {
                       {day.focus}
                     </span>
                     {isToday && todaySuggestions.length > 0 && (
-                      <button onClick={() => setSuggestionsSheet(true)}
+                      <button onClick={e => { e.stopPropagation(); setSuggestionsSheet(true) }}
                         style={{ position: 'relative', background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 11, flexShrink: 0 }}>
                         💡 Suggestions
                         {hasPendingSuggestions && <span style={{ position: 'absolute', top: -4, right: -4, width: 8, height: 8, borderRadius: '50%', backgroundColor: '#f97316' }} />}
@@ -439,7 +438,7 @@ export default function WorkoutsPage() {
                           <span style={{ color: 'var(--success)', fontWeight: '600' }}>🏃 Cardio: </span>{day.cardio}
                         </div>
                       )}
-                      <button onClick={() => setCardioModal(dayIndex)}
+                      <button onClick={e => { e.stopPropagation(); setCardioModal(dayIndex) }}
                         style={{ width: '100%', backgroundColor: 'var(--background)', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '8px', fontSize: '12px', cursor: 'pointer' }}>
                         {day.cardio ? '🔄 Change Cardio' : '+ Add Cardio'}
                       </button>
@@ -465,7 +464,7 @@ export default function WorkoutsPage() {
                               )}
                             </div>
                             <div style={{ color: 'var(--text-secondary)', fontSize: '12px', whiteSpace: 'nowrap' }}>{ex.sets}×{ex.reps}</div>
-                            <button onClick={() => openRemoveExercise(dayIndex, i)} title="Remove exercise"
+                            <button onClick={e => { e.stopPropagation(); openRemoveExercise(dayIndex, i) }} title="Remove exercise"
                               style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}
                               onMouseEnter={e => e.currentTarget.style.color = 'var(--error)'}
                               onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}>
@@ -481,7 +480,7 @@ export default function WorkoutsPage() {
                         </div>
                       )}
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button onClick={() => openAddExercise(dayIndex)}
+                        <button onClick={e => { e.stopPropagation(); openAddExercise(dayIndex) }}
                           style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '8px', fontSize: '12px', cursor: 'pointer' }}>
                           + Add Exercise
                         </button>
@@ -490,12 +489,12 @@ export default function WorkoutsPage() {
                             ✓ Done Today
                           </div>
                         ) : pausedWorkout?.day === day.day_of_week ? (
-                          <Link href={`/life-hub/workouts/log?day=${encodeURIComponent(day.day_of_week)}`}
+                          <Link href={`/life-hub/workouts/log?day=${encodeURIComponent(day.day_of_week)}`} onClick={e => e.stopPropagation()}
                             style={{ flex: 2, display: 'block', textAlign: 'center', backgroundColor: 'rgba(167,139,250,0.15)', border: '1px solid var(--accent-purple)', color: 'var(--accent-purple)', borderRadius: '8px', padding: '8px', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>
                             ▶ Resume Workout
                           </Link>
                         ) : (
-                          <Link href={`/life-hub/workouts/log?day=${encodeURIComponent(day.day_of_week)}`}
+                          <Link href={`/life-hub/workouts/log?day=${encodeURIComponent(day.day_of_week)}`} onClick={e => e.stopPropagation()}
                             style={{ flex: 2, display: 'block', textAlign: 'center', backgroundColor: 'var(--accent-purple)', color: '#fff', borderRadius: '8px', padding: '8px', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>
                             Start Workout
                           </Link>

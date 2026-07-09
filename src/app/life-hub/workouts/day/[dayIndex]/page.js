@@ -131,18 +131,21 @@ function DayHubInner({ params }) {
     setsByExercise[key].push(s)
   }
 
-  // Recommend stretches for the plan day
-  const bodyParts = []
+  // Recommend stretches for the plan day — derive body parts from label keywords AND actual exercises
+  const bodyPartsSet = new Set()
   if (plan_day?.day_label) {
     const label = plan_day.day_label.toLowerCase()
-    if (label.includes('chest') || label.includes('push')) bodyParts.push('chest', 'shoulders')
-    if (label.includes('back') || label.includes('pull')) bodyParts.push('back')
-    if (label.includes('leg') || label.includes('lower')) bodyParts.push('legs', 'glutes', 'hamstrings')
-    if (label.includes('shoulder')) bodyParts.push('shoulders')
-    if (label.includes('arm')) bodyParts.push('arms')
-    if (label.includes('core') || label.includes('abs')) bodyParts.push('core')
+    if (label.includes('chest') || label.includes('push')) { bodyPartsSet.add('chest'); bodyPartsSet.add('shoulders') }
+    if (label.includes('back') || label.includes('pull')) bodyPartsSet.add('back')
+    if (label.includes('leg') || label.includes('lower')) { bodyPartsSet.add('legs'); bodyPartsSet.add('glutes'); bodyPartsSet.add('hamstrings') }
+    if (label.includes('shoulder')) bodyPartsSet.add('shoulders')
+    if (label.includes('arm')) bodyPartsSet.add('arms')
+    if (label.includes('core') || label.includes('abs')) bodyPartsSet.add('core')
   }
-  const { dynamic: dynStretches, static: staStretches } = getRecommendedStretches(bodyParts, [])
+  for (const ex of plan_day?.exercises ?? []) {
+    if (ex.body_part) bodyPartsSet.add(ex.body_part.toLowerCase())
+  }
+  const { dynamic: dynStretches, static: staStretches } = getRecommendedStretches([...bodyPartsSet], [])
 
   const hasCoach = !!workout_log?.ai_coaching_response
   const coachUnread = hasCoach && !workout_log.coaching_feedback_read_at
