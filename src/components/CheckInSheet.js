@@ -193,8 +193,8 @@ export default function CheckInSheet({ checkInWindow, wakeTime, onClose, onInsig
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 9990 }}>
-      <div style={{ backgroundColor: 'var(--surface)', border: `1px solid ${accentColor}`, borderTop: `3px solid ${accentColor}`, borderRadius: '16px 16px 0 0', width: '100%', maxWidth: 520, padding: '20px 20px 32px', maxHeight: chatOpen ? '85vh' : '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 9990 }}>
+      <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: `1px solid ${accentColor}`, borderTop: `3px solid ${accentColor}`, borderRadius: '16px 16px 0 0', width: '100%', maxWidth: 520, padding: '20px 20px 32px', maxHeight: chatOpen ? '85vh' : '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
 
         {insight ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>

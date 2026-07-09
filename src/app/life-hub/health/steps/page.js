@@ -63,6 +63,7 @@ export default function StepTrackerPage() {
 
   async function handleRefresh() {
     setSyncing(true)
+    window.dispatchEvent(new CustomEvent('health-sync-start'))
     await fetch('/api/health/sync', { method: 'POST' })
     const res = await fetch(`/api/health/sync?range=${range}`)
     const json = await res.json()
@@ -71,6 +72,7 @@ export default function StepTrackerPage() {
       localStorage.setItem(cacheKey(range), JSON.stringify(json))
     }
     setSyncing(false)
+    window.dispatchEvent(new CustomEvent('health-sync-end'))
   }
 
   function handleRangeChange(r) {

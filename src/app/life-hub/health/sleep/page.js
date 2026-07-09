@@ -212,6 +212,7 @@ export default function SleepTrackerPage() {
 
   async function handleSync() {
     setSyncing(true)
+    window.dispatchEvent(new CustomEvent('health-sync-start'))
     await fetch('/api/health/sync', { method: 'POST' })
     const res = await fetch('/api/health/sync')
     const json = await res.json()
@@ -220,6 +221,7 @@ export default function SleepTrackerPage() {
       localStorage.setItem('health_sleep', JSON.stringify(json))
     }
     setSyncing(false)
+    window.dispatchEvent(new CustomEvent('health-sync-end'))
   }
 
   if (loading) return <div style={{ color: 'var(--text-secondary)', padding: '32px', textAlign: 'center' }}>Loading...</div>

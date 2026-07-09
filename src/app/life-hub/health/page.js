@@ -86,13 +86,19 @@ export default function HealthPage() {
   async function handleSync() {
     setSyncing(true)
     setSyncError(false)
+    window.dispatchEvent(new CustomEvent('health-sync-start'))
     const postRes = await fetch('/api/health/sync', { method: 'POST' })
-    if (!postRes.ok) { setSyncError(true); setSyncing(false); return }
+    if (!postRes.ok) {
+      setSyncError(true); setSyncing(false)
+      window.dispatchEvent(new CustomEvent('health-sync-end'))
+      return
+    }
     const [r1, r2] = await Promise.all([fetch('/api/health/sync'), fetch('/api/health/heart-rate')])
     const [syncData, hrJson] = await Promise.all([r1.json(), r2.json()])
     if (!syncData.error) { setData(syncData); localStorage.setItem('health_overview', JSON.stringify(syncData)) }
     if (!hrJson.error) setHrData(hrJson)
     setSyncing(false)
+    window.dispatchEvent(new CustomEvent('health-sync-end'))
   }
 
   if (loading) return (
