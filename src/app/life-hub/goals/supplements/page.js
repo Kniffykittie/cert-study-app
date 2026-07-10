@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 const NUTRIENT_GROUPS = [
@@ -590,6 +591,7 @@ export default function SupplementsPage() {
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '24px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
         <div>
+          <Link href="/life-hub/nutrition" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Nutrition</Link>
           <h1 style={{ color: '#f97316', fontSize: 22, fontWeight: 700, margin: 0 }}>💊 My Supplement Stack</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: 0 }}>

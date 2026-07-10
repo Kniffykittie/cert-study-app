@@ -506,6 +506,7 @@ export default function MeasurementsPage() {
       )}
 
       <div style={{ marginBottom: '28px' }}>
+        <Link href="/life-hub/goals" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Goals</Link>
         <h1 style={{ color: '#06b6d4', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Body Measurements</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>Track your measurements over time to see real progress beyond the scale.</p>
