@@ -209,6 +209,13 @@ Remove items once tested and confirmed working.
 - Edit existing supplement → nutrients pre-populated from structured format; save → correct keys/values stored
 - Encyclopedia page → supplement coverage aggregates correctly from new numeric format
 
+### Phase 92 Bug Fixes — Timezone, Stretch Pre-filter, Notification UX
+- **Bug (critical):** Nutrition page used `new Date().toISOString().split('T')[0]` for `today` — this is UTC date, causing food logged at 10PM EST to show as next day. Fixed all date vars in `nutrition/page.js` to use `toLocaleDateString('en-CA')`. Fixed `add-food/page.js` to always include a local date in the POST body. Fixed yesterday/dayBefore date arithmetic to use local `setDate()` not millisecond offsets.
+- **DB correction:** Moved 5 misplaced food entries from `date='2026-07-10'` → `date='2026-07-09'` (their `created_at` confirmed they were logged July 9 local time but stored under the wrong date).
+- **Bug:** Stretching page showed all 38 stretches after tapping "Start Stretches" from Day Hub — confusing. Day Hub now passes `ids=` URL param with the exact recommended stretch IDs. Stretching page reads `ids`, shows only those stretches in order, pre-checks all of them (uncheck to indicate skipped), and hides the type/muscle-group filters.
+- **Bug:** Push notification failure showed in green (should be red). Fixed error message color to use `var(--error)` when message starts with "Failed". Improved error message to include the actual JS error for diagnosis. Added VAPID key guard so the failure reason is explicit.
+- Files changed: `src/app/life-hub/nutrition/page.js`, `src/app/life-hub/nutrition/add-food/page.js`, `src/app/life-hub/workouts/day/[dayIndex]/page.js`, `src/app/life-hub/workouts/stretches/page.js`, `src/app/settings/page.js`
+
 ### Phase 52 & 53 — Active Workout Logger + Trainer Chatbot + Rest Timer
 - `?` button on exercise during workout → detail modal opens instantly
 - Cycle set type to "Drop Set" → purple info box appears below that row

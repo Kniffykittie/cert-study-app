@@ -240,6 +240,7 @@ function SettingsPageInner() {
       const permission = await Notification.requestPermission()
       setNotifPermission(permission)
       if (permission !== 'granted') { setNotifLoading(false); return }
+      if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) throw new Error('VAPID key not configured')
       const reg = await navigator.serviceWorker.ready
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
@@ -254,8 +255,8 @@ function SettingsPageInner() {
       setNotifSubscribed(true)
       setNotifMsg('Notifications enabled!')
       setTimeout(() => setNotifMsg(''), 3000)
-    } catch {
-      setNotifMsg('Failed to enable notifications.')
+    } catch (err) {
+      setNotifMsg(`Failed to enable notifications: ${err?.message || 'unknown error'}`)
     }
     setNotifLoading(false)
   }
@@ -742,7 +743,7 @@ function SettingsPageInner() {
                   </button>
                 </div>
               )}
-              {notifMsg && <p style={{ color: 'var(--success)', fontSize: '12px', marginTop: '8px' }}>{notifMsg}</p>}
+              {notifMsg && <p style={{ color: notifMsg.startsWith('Failed') ? 'var(--error)' : 'var(--success)', fontSize: '12px', marginTop: '8px' }}>{notifMsg}</p>}
               {notifSubscribed && (
                 <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '10px' }}>
                   Timing is based on your wake time and bedtime from Goals setup. Toggles below control what gets sent.

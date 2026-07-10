@@ -57,7 +57,7 @@ function AddFoodPageInner() {
 
   async function logEntry(entry) {
     setLogging(true)
-    const payload = dateParam ? { ...entry, date: dateParam } : entry
+    const payload = { ...entry, date: dateParam || new Date().toLocaleDateString('en-CA') }
     await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     window.location.href = '/life-hub/nutrition'
   }

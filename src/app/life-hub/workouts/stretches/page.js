@@ -15,24 +15,28 @@ function StretchesInner() {
   const router = useRouter()
   const context = searchParams.get('context')
   const from = searchParams.get('from')
+  const idsParam = searchParams.get('ids')
+  const pinnedIds = idsParam ? idsParam.split(',').filter(Boolean) : null
 
   const config = CONTEXT_CONFIG[context] ?? null
 
   const [activeGroup, setActiveGroup] = useState('All')
   const [activeType, setActiveType] = useState(config?.type ?? 'all')
   const [expanded, setExpanded] = useState(null)
-  const [checked, setChecked] = useState(new Set())
+  const [checked, setChecked] = useState(() => pinnedIds ? new Set(pinnedIds) : new Set())
   const [logging, setLogging] = useState(false)
   const [logged, setLogged] = useState(false)
   const startTime = useRef(Date.now())
 
   const groups = ['All', ...STRETCH_MUSCLE_GROUPS]
 
-  const filtered = STRETCHES.filter(s => {
-    const groupMatch = activeGroup === 'All' || s.muscle_group === activeGroup
-    const typeMatch = activeType === 'all' || s.stretch_type === activeType || s.stretch_type === 'both'
-    return groupMatch && typeMatch
-  })
+  const filtered = pinnedIds
+    ? pinnedIds.map(id => STRETCHES.find(s => s.id === id)).filter(Boolean)
+    : STRETCHES.filter(s => {
+        const groupMatch = activeGroup === 'All' || s.muscle_group === activeGroup
+        const typeMatch = activeType === 'all' || s.stretch_type === activeType || s.stretch_type === 'both'
+        return groupMatch && typeMatch
+      })
 
   function toggleCheck(id) {
     setChecked(prev => {
@@ -75,7 +79,7 @@ function StretchesInner() {
         </h1>
         {config ? (
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
-            Tap each stretch to mark it done, then log your session.
+            {pinnedIds ? `${pinnedIds.length} stretches selected for you. All pre-checked — uncheck any you skip, then log.` : 'Tap each stretch to mark it done, then log your session.'}
           </p>
         ) : (
           <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: 14 }}>
@@ -84,7 +88,7 @@ function StretchesInner() {
         )}
       </div>
 
-      {!config && (
+      {!config && !pinnedIds && (
         <>
           <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
             {[['all', '⚡🧘 All'], ['dynamic', '⚡ Dynamic (Pre-Workout)'], ['static', '🧘 Static (Post-Workout)']].map(([val, label]) => (

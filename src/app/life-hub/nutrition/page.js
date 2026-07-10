@@ -139,8 +139,8 @@ function NutritionPageInner() {
     riboflavin_mg: { label: 'Riboflavin', unit: 'mg' },
   }
 
-  const today = new Date().toISOString().split('T')[0]
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+  const today = new Date().toLocaleDateString('en-CA')
+  const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toLocaleDateString('en-CA') })()
 
   useEffect(() => {
     async function load() {
@@ -168,11 +168,11 @@ function NutritionPageInner() {
       }
       setWorkoutCtx({ loggedToday, plannedLabel })
       setChecked(true)
-      const dayBefore = new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0]
+      const dayBefore = (() => { const d = new Date(); d.setDate(d.getDate() - 2); return d.toLocaleDateString('en-CA') })()
       const [logRes, foodsRes, yesterdayRes, dayBeforeRes, waterRes] = await Promise.all([
-        fetch('/api/nutrition/log'),
+        fetch(`/api/nutrition/log?date=${today}`),
         fetch('/api/nutrition/my-foods'),
-        fetch(`/api/nutrition/log?date=${new Date(Date.now() - 86400000).toISOString().split('T')[0]}`),
+        fetch(`/api/nutrition/log?date=${yesterday}`),
         fetch(`/api/nutrition/log?date=${dayBefore}`),
         fetch('/api/health/manual-steps').catch(() => null),
       ])
@@ -211,7 +211,7 @@ function NutritionPageInner() {
 
       // Today's water from water_logs + drink entries
       const supabase2 = createClient()
-      const todayStr = new Date().toISOString().split('T')[0]
+      const todayStr = today
       const { data: waterLogs } = await supabase2.from('water_logs').select('amount_oz').eq('user_id', user.id).eq('date', todayStr)
       const waterFromDrinks = (logData.entries || []).filter(e => e.meal_slot === 'drink').reduce((s, e) => s + (e.water_g ? e.water_g / 29.5735 : 0), 0)
       const waterTotal = (waterLogs || []).reduce((s, w) => s + (w.amount_oz || 0), 0) + waterFromDrinks
@@ -243,7 +243,7 @@ function NutritionPageInner() {
   }, [])
 
   async function handleAddEntry(entry) {
-    const res = await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry) })
+    const res = await fetch('/api/nutrition/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...entry, date: viewingDate || today }) })
     const data = await res.json()
     if (data.entry) {
       setEntries(prev => [...prev, data.entry])
@@ -899,7 +899,7 @@ function NutritionPageInner() {
             for (let i = 0; i < 7; i++) {
               const d = new Date()
               d.setDate(d.getDate() - i)
-              const dateStr = d.toISOString().split('T')[0]
+              const dateStr = d.toLocaleDateString('en-CA')
               const label = i === 0 ? 'Today' : i === 1 ? 'Yesterday' : d.toLocaleDateString([], { weekday: 'short' })
               const isActive = i === 0 ? viewingDate === null : viewingDate === dateStr
               chips.push(

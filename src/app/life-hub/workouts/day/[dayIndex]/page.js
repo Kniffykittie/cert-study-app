@@ -266,7 +266,7 @@ function DayHubInner({ params }) {
                     ))}
                   </div>
                 )}
-                <Link href={`/life-hub/workouts/stretches?context=pre_workout&from=/life-hub/workouts/day/${dayIndex}`}
+                <Link href={`/life-hub/workouts/stretches?context=pre_workout&from=/life-hub/workouts/day/${dayIndex}&ids=${dynStretches.slice(0, 5).map(s => s.id).join(',')}`}
                   style={{ display: 'inline-block', padding: '9px 16px', backgroundColor: '#22c55e', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
                   Start Pre-Workout Stretches →
                 </Link>
@@ -375,7 +375,7 @@ function DayHubInner({ params }) {
                   ))}
                 </div>
               )}
-              <Link href={`/life-hub/workouts/stretches?context=post_workout&from=/life-hub/workouts/day/${dayIndex}`}
+              <Link href={`/life-hub/workouts/stretches?context=post_workout&from=/life-hub/workouts/day/${dayIndex}&ids=${staStretches.slice(0, 5).map(s => s.id).join(',')}`}
                 style={{ display: 'inline-block', padding: '9px 16px', backgroundColor: '#f97316', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
                 Start Post-Workout Stretches →
               </Link>
@@ -420,7 +420,7 @@ function DayHubInner({ params }) {
                 ))}
               </div>
             )}
-            <Link href={`/life-hub/workouts/stretches?context=bedtime&from=/life-hub/workouts/day/${dayIndex}`}
+            <Link href={`/life-hub/workouts/stretches?context=bedtime&from=/life-hub/workouts/day/${dayIndex}&ids=${bedtimeStretches.map(s => s.id).join(',')}`}
               style={{ display: 'inline-block', padding: '9px 16px', backgroundColor: '#a78bfa', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
               Start Bedtime Stretches →
             </Link>
