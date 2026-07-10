@@ -96,7 +96,7 @@ export default function StudyHubSidebar() {
   }
 
   const sidebarContent = (
-    <aside style={{ width: '220px', minHeight: '100vh', backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '16px 12px', gap: '4px', flexShrink: 0 }}>
+    <aside style={{ width: '220px', height: '100dvh', backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '16px 12px', gap: '4px', flexShrink: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
       {/* Mobile close button */}
       <button
         className="sidebar-close-btn"
@@ -213,7 +213,7 @@ export default function StudyHubSidebar() {
             position: fixed;
             top: 0;
             left: 0;
-            height: 100vh;
+            height: 100dvh;
             z-index: 300;
             transform: translateX(-100%);
             transition: transform 0.25s ease;

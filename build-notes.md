@@ -65,7 +65,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 ---
 
 ## Active Branch
-`claude/adoring-shannon-sTxW8`
+`claude/sleepy-keller-rqiv6h`
 
 ---
 
@@ -3020,6 +3020,16 @@ PHASE D (polish):
 ---
 
 ## Phase Log
+
+### Phase 80 — Mobile UI Fixes — Complete
+
+- **Bug 1 (sidebar cutoff):** Both `LifeHubSidebar.js` and `StudyHubSidebar.js` changed from `minHeight: 100vh` to `height: 100dvh` so sidebar fills exact visible viewport height on mobile; added `overflowY: 'auto'` + `WebkitOverflowScrolling: 'touch'`; mobile overlay divs also changed to `100dvh`
+- **Bug 2 (Real Exam crash):** Empty question pool guard added in `test/page.js` — throws descriptive error before attempting to render `questions[0]` when template pool is empty
+- **2c (Cert Guide tabs):** Tab container now has `overflowX: 'auto'` + `WebkitOverflowScrolling: 'touch'` + `scrollbarWidth: 'none'`; each tab has `whiteSpace: 'nowrap'` + `flexShrink: 0` and reduced padding
+- **2a (Test page header):** Mobile header splits into two rows — Row 1 has cert label + 💬 chat button + ⏸ pause button; Row 2 has template bar + scrollable progress dots; desktop layout unchanged
+- **2b (ChatPanel bottom sheet):** On mobile ChatPanel renders as `position: fixed` bottom sheet (60vh, slide-up animation, backdrop, ✕ close button) triggered by 💬 button; desktop still shows 320px side panel
+- **2d (Study Hub grid):** Cert cards grid `repeat(3,1fr)` → `1fr` on mobile via CSS class; stats row `repeat(4,1fr)` → `repeat(2,1fr)` on mobile
+- **2e (Settings tabs):** Tab bar now `overflowX: 'auto'` + `scrollbarWidth: 'none'`; each tab has `minWidth: max-content` + `whiteSpace: 'nowrap'` + `flexShrink: 0`
 
 ### Phase Z — Photo-Based Food Logging — Complete
 

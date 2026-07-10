@@ -153,7 +153,7 @@ export default function LifeHubSidebar() {
   const goalsActive = pathname.startsWith('/life-hub/goals') && pathname !== '/life-hub/goals/supplements'
 
   const sidebarContent = (
-    <aside style={{ width: '220px', minHeight: '100vh', backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '12px 8px', gap: '2px', flexShrink: 0, overflowY: 'auto' }}>
+    <aside style={{ width: '220px', height: '100dvh', backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '12px 8px', gap: '2px', flexShrink: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <button className="lh-sidebar-close-btn" onClick={() => setMobileOpen(false)}
         style={{ display: 'none', position: 'absolute', top: '12px', right: '12px', background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', lineHeight: 1, padding: '4px' }}>✕</button>
 
@@ -257,7 +257,7 @@ export default function LifeHubSidebar() {
             <div onClick={() => setMobileOpen(false)}
               style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 299 }} />
           )}
-          <div style={{ position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 300, transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease' }}>
+          <div style={{ position: 'fixed', top: 0, left: 0, height: '100dvh', zIndex: 300, transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease' }}>
             <div style={{ position: 'relative' }}>{sidebarContent}</div>
           </div>
         </>

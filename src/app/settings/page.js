@@ -660,12 +660,12 @@ function SettingsPageInner() {
         <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>Account preferences and app configuration.</p>
 
         {/* Tab bar */}
-        <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '4px' }}>
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '4px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
           {TABS.map(tab => (
             <button
               key={tab.key}
               onClick={() => { setActiveTab(tab.key); if (tab.key !== 'danger') setDangerGatePassed(false) }}
-              style={{ flex: 1, padding: '8px 12px', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: activeTab === tab.key ? '600' : '400', cursor: 'pointer', backgroundColor: activeTab === tab.key ? 'var(--accent-blue)' : 'transparent', color: activeTab === tab.key ? '#E8E8E8' : 'var(--text-secondary)', transition: 'all 0.15s' }}
+              style={{ flex: 1, minWidth: 'max-content', padding: '8px 12px', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: activeTab === tab.key ? '600' : '400', cursor: 'pointer', backgroundColor: activeTab === tab.key ? 'var(--accent-blue)' : 'transparent', color: activeTab === tab.key ? '#E8E8E8' : 'var(--text-secondary)', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0 }}
             >
               {tab.label}
             </button>

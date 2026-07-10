@@ -551,10 +551,10 @@ export default function CertGuidePage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '28px', borderBottom: '1px solid var(--border)', paddingBottom: '0' }}>
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '28px', borderBottom: '1px solid var(--border)', paddingBottom: '0', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
         {TABS.map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            style={{ padding: '10px 18px', backgroundColor: 'transparent', border: 'none', borderBottom: activeTab === tab ? '2px solid var(--accent-blue)' : '2px solid transparent', color: activeTab === tab ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '13px', fontWeight: activeTab === tab ? '600' : '400', cursor: 'pointer', marginBottom: '-1px', borderRadius: '0', transition: 'color 0.15s' }}>
+            style={{ padding: '10px 14px', backgroundColor: 'transparent', border: 'none', borderBottom: activeTab === tab ? '2px solid var(--accent-blue)' : '2px solid transparent', color: activeTab === tab ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '13px', fontWeight: activeTab === tab ? '600' : '400', cursor: 'pointer', marginBottom: '-1px', borderRadius: '0', transition: 'color 0.15s', whiteSpace: 'nowrap', flexShrink: 0 }}>
             {tab}
           </button>
         ))}

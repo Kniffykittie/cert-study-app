@@ -48,7 +48,7 @@ const MIXED_DOMAINS = {
   'security-plus': ['1.0 General Security Concepts', '2.0 Threats, Vulnerabilities & Mitigations', '3.0 Security Architecture'],
 }
 
-function ChatPanel({ cert, question, topic, options }) {
+function ChatPanel({ cert, question, topic, options, isMobile, isOpen, onClose }) {
   const [messages, setMessages] = useState([{ role: 'assistant', text: "Ask me anything about this question or topic. I won't give away the answer, but I can help you understand the concepts." }])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -76,36 +76,46 @@ function ChatPanel({ cert, question, topic, options }) {
     setLoading(false)
   }
 
+  const panelStyle = isMobile
+    ? { position: 'fixed', bottom: 0, left: 0, right: 0, height: '60vh', borderRadius: '14px 14px 0 0', zIndex: 900, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderTop: '1px solid var(--border)', transform: isOpen ? 'translateY(0)' : 'translateY(100%)', transition: 'transform 0.25s ease' }
+    : { width: '320px', minWidth: '320px', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }
+
   return (
-    <div style={{ width: '320px', minWidth: '320px', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '600' }}>Tutor Chat</div>
-        <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>Ask about this question — no spoilers</div>
-      </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '300px', maxHeight: '500px' }}>
-        {messages.map((m, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-            <div style={{ maxWidth: '85%', padding: '8px 12px', borderRadius: '8px', backgroundColor: m.role === 'user' ? 'var(--accent-blue)' : 'var(--background)', color: m.role === 'user' ? '#E8E8E8' : 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5' }}>
-              {m.text}
+    <>
+      {isMobile && isOpen && <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 899 }} />}
+      <div style={panelStyle}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ color: 'var(--accent-blue)', fontSize: '13px', fontWeight: '600' }}>Tutor Chat</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>Ask about this question — no spoilers</div>
+          </div>
+          {isMobile && <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', lineHeight: 1, padding: '4px' }}>✕</button>}
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {messages.map((m, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+              <div style={{ maxWidth: '85%', padding: '8px 12px', borderRadius: '8px', backgroundColor: m.role === 'user' ? 'var(--accent-blue)' : 'var(--background)', color: m.role === 'user' ? '#E8E8E8' : 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5' }}>
+                {m.text}
+              </div>
             </div>
-          </div>
-        ))}
-        {loading && (
-          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-            <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: 'var(--background)', color: 'var(--text-secondary)', fontSize: '13px' }}>Thinking...</div>
-          </div>
-        )}
-        <div ref={bottomRef} />
+          ))}
+          {loading && (
+            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+              <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: 'var(--background)', color: 'var(--text-secondary)', fontSize: '13px' }}>Thinking...</div>
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+        <div style={{ padding: '10px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px' }}>
+          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()} placeholder="Ask a question..."
+            style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }} />
+          <button onClick={send} disabled={!input.trim() || loading}
+            style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '6px', padding: '8px 14px', fontSize: '13px', fontWeight: '600', cursor: !input.trim() || loading ? 'not-allowed' : 'pointer', opacity: !input.trim() || loading ? 0.5 : 1 }}>
+            Send
+          </button>
+        </div>
       </div>
-      <div style={{ padding: '10px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px' }}>
-        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()} placeholder="Ask a question..."
-          style={{ flex: 1, backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }} />
-        <button onClick={send} disabled={!input.trim() || loading}
-          style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '6px', padding: '8px 14px', fontSize: '13px', fontWeight: '600', cursor: !input.trim() || loading ? 'not-allowed' : 'pointer', opacity: !input.trim() || loading ? 0.5 : 1 }}>
-          Send
-        </button>
-      </div>
-    </div>
+    </>
   )
 }
 
@@ -248,6 +258,8 @@ function TestPageInner() {
   const [wrongReviewCount, setWrongReviewCount] = useState(null)
   const [wrongReviewLoading, setWrongReviewLoading] = useState(false)
   const [markedLearned, setMarkedLearned] = useState({})
+  const [isMobile, setIsMobile] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
   const searchParams = useSearchParams()
 
   // Refs so unmount cleanup can read latest state without stale closures
@@ -259,6 +271,13 @@ function TestPageInner() {
   const doneRef = useRef(false)
   const manualPausedRef = useRef(false)
   const startTimeRef = useRef(null)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   useEffect(() => { questionsRef.current = questions }, [questions])
   useEffect(() => { answersRef.current = answers }, [answers])
@@ -652,6 +671,7 @@ function TestPageInner() {
         if (!res.ok) throw new Error(data.error || 'Failed to generate questions')
         allQuestions = data.questions
       }
+      if (!allQuestions?.length) throw new Error('No questions available. Try adding more templates for this cert and difficulty.')
       startTimeRef.current = Date.now()
       setWeaknessSummary(null)
       setQuestions(allQuestions)
@@ -1149,12 +1169,13 @@ function TestPageInner() {
   )
 
   const progressBar = (
-    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: isMobile ? '3px' : '4px', overflowX: isMobile ? 'auto' : 'visible', WebkitOverflowScrolling: 'touch', maxWidth: isMobile ? '160px' : 'none', flexWrap: isMobile ? 'nowrap' : 'wrap', scrollbarWidth: 'none' }}>
       {questions.map((q, i) => {
         let bg = 'var(--border)'
         if (i === current) bg = 'var(--accent-blue)'
         else if (answers[i] !== undefined) bg = isPractice ? (answers[i] === q.correct ? 'var(--success)' : 'var(--error)') : 'var(--accent-blue)'
-        return <div key={i} style={{ width: '20px', height: '20px', borderRadius: '4px', backgroundColor: bg, opacity: i > current && answers[i] === undefined ? 0.3 : 1, cursor: 'pointer' }} onClick={() => { if (isPractice && !revealed) return; setCurrent(i); setSelectedAnswer(answers[i] || null); setRevealed(!!answers[i]) }} />
+        const dotSize = isMobile ? '14px' : '20px'
+        return <div key={i} style={{ width: dotSize, height: dotSize, borderRadius: '3px', backgroundColor: bg, opacity: i > current && answers[i] === undefined ? 0.3 : 1, cursor: 'pointer', flexShrink: 0 }} onClick={() => { if (isPractice && !revealed) return; setCurrent(i); setSelectedAnswer(answers[i] || null); setRevealed(!!answers[i]) }} />
       })}
     </div>
   )
@@ -1244,6 +1265,24 @@ function TestPageInner() {
     <>
       <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
+          {isMobile ? (
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <div>
+                  <h1 style={{ color: 'var(--accent-blue)', fontSize: '18px', fontWeight: '700' }}>{CERT_LABELS[cert]} Practice</h1>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Question {current + 1} of {questions.length}</p>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button onClick={() => setChatOpen(true)} style={{ backgroundColor: 'var(--surface)', color: 'var(--accent-blue)', border: '1px solid var(--accent-blue)', borderRadius: '6px', padding: '6px 10px', fontSize: '13px', cursor: 'pointer' }}>💬</button>
+                  <button onClick={() => triggerPause(null)} style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', fontSize: '12px', cursor: 'pointer' }}>⏸</button>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {templateBar}
+                {progressBar}
+              </div>
+            </div>
+          ) : (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <div>
               <h1 style={{ color: 'var(--accent-blue)', fontSize: '20px', fontWeight: '700' }}>{CERT_LABELS[cert]} Practice Test</h1>
@@ -1255,6 +1294,7 @@ function TestPageInner() {
               <button onClick={() => triggerPause(null)} style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer' }}>⏸ Pause</button>
             </div>
           </div>
+          )}
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1328,8 +1368,9 @@ function TestPageInner() {
             </div>
           </div>
         </div>
-        <ChatPanel cert={cert} question={q.question} topic={q.topic} options={q.options} />
+        {!isMobile && <ChatPanel cert={cert} question={q.question} topic={q.topic} options={q.options} isMobile={false} />}
       </div>
+      {isMobile && <ChatPanel cert={cert} question={q.question} topic={q.topic} options={q.options} isMobile={true} isOpen={chatOpen} onClose={() => setChatOpen(false)} />}
       {pauseModal}
       {flagModalEl}
       {bookmarkPending !== null && <BookmarkModal onSave={saveBookmark} onCancel={() => setBookmarkPending(null)} />}

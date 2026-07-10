@@ -100,6 +100,12 @@ export default function StudyHubPage() {
 
   return (
     <div>
+      <style>{`
+        @media (max-width: 768px) {
+          .sh-cert-grid { grid-template-columns: 1fr !important; }
+          .sh-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+      `}</style>
       <div style={{ marginBottom: '32px' }}>
         <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Study Hub</h1>
         <p style={{ color: 'var(--text-secondary)' }}>Your cert readiness command center.</p>
@@ -108,7 +114,7 @@ export default function StudyHubPage() {
       <DailyStreak />
 
       {/* Cert Readiness Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px' }}>
+      <div className="sh-cert-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px' }}>
         {certCards.map(({ cert, pct }) => {
           const color = pct !== null ? scoreColor(pct) : CERT_COLORS[cert]
           const displayPct = pct !== null ? pct : '—'
@@ -137,7 +143,7 @@ export default function StudyHubPage() {
       </div>
 
       {/* Stats Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+      <div className="sh-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
         {[
           { label: 'Questions Answered', value: totalQuestions.toLocaleString(), color: 'var(--accent-blue)' },
           { label: 'Weak Topics', value: weakTopics.length, color: weakTopics.length > 0 ? 'var(--error)' : 'var(--success)' },
