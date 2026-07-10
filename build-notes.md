@@ -3021,6 +3021,14 @@ PHASE D (polish):
 
 ## Phase Log
 
+### Phase 87 — Nutrition 6-Nutrient Snapshot Row (5d) — Complete
+
+- **6 nutrient chips above food log**: Fiber, Iron, Calcium, Vit D, Potassium, Sodium shown as a horizontally scrollable row immediately above the meal slot log (only when `entries.length > 0`)
+- **Each chip**: nutrient label, % of DV as a large number, 3px color-coded progress bar
+- **Color logic**: green ≥70%, yellow 30–70%, red <30% for all except Sodium; Sodium is inverted (green = low intake, red = over-limit)
+- **Personalized DV**: uses `calcMicroTargets(age, sex)` when goals loaded; falls back to hardcoded FDA defaults (fiber 28g, iron 18mg, calcium 1000mg, vit D 20mcg, potassium 4700mg, sodium 2300mg)
+- **Horizontally scrollable**: `overflowX: auto`, `scrollbarWidth: none`, `WebkitOverflowScrolling: touch`; each chip `flexShrink: 0` so they never wrap
+
 ### Phase 86 — Exercise Modal: Sticky Chat + Collapsible Instructions (5c) — Complete
 
 - **Sticky chat input**: modal restructured to `display: flex; flex-direction: column` — scrollable content area (`flex: 1; overflowY: auto`) above a pinned chat input footer (`flexShrink: 0`); chat is always visible without scrolling regardless of instruction length

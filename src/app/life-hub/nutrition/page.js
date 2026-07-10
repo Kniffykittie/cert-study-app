@@ -1002,6 +1002,51 @@ function NutritionPageInner() {
             return banners.length > 0 ? <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>{banners}</div> : null
           })()}
 
+          {/* 6-nutrient snapshot row */}
+          {entries.length > 0 && (() => {
+            const mt = goals?.age && goals?.sex ? calcMicroTargets(goals.age, goals.sex) : null
+            const DV_DEFAULTS = {
+              fiber_g: 28, iron_mg: 18, calcium_mg: 1000,
+              vitamin_d_mcg: 20, potassium_mg: 4700, sodium_mg: 2300,
+            }
+            const getDV = key => mt?.[key] ?? DV_DEFAULTS[key]
+            const SNAP = [
+              { key: 'fiber_g',      label: 'Fiber',   unit: 'g' },
+              { key: 'iron_mg',      label: 'Iron',    unit: 'mg' },
+              { key: 'calcium_mg',   label: 'Calcium', unit: 'mg' },
+              { key: 'vitamin_d_mcg',label: 'Vit D',   unit: 'mcg' },
+              { key: 'potassium_mg', label: 'Potass.', unit: 'mg' },
+              { key: 'sodium_mg',    label: 'Sodium',  unit: 'mg', invert: true },
+            ]
+            return (
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', paddingBottom: '2px' }}>
+                {SNAP.map(({ key, label, invert }) => {
+                  const dv = getDV(key)
+                  const val = entries.reduce((s, e) => s + (e[key] || 0), 0)
+                  const pct = dv ? Math.round((val / dv) * 100) : 0
+                  const normPct = invert ? (pct > 150 ? 0 : pct > 100 ? 50 : 100) : Math.min(pct, 100)
+                  let color, bg
+                  if (invert) {
+                    color = pct > 150 ? 'var(--error)' : pct > 100 ? 'var(--warning)' : 'var(--success)'
+                    bg = pct > 150 ? 'rgba(204,0,0,0.10)' : pct > 100 ? 'rgba(241,196,15,0.10)' : 'rgba(46,204,113,0.08)'
+                  } else {
+                    color = pct >= 70 ? 'var(--success)' : pct >= 30 ? 'var(--warning)' : 'var(--error)'
+                    bg = pct >= 70 ? 'rgba(46,204,113,0.08)' : pct >= 30 ? 'rgba(241,196,15,0.08)' : 'rgba(204,0,0,0.08)'
+                  }
+                  return (
+                    <div key={key} style={{ flexShrink: 0, backgroundColor: bg, border: `1px solid ${color}40`, borderRadius: '8px', padding: '7px 10px', minWidth: '62px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '3px', whiteSpace: 'nowrap' }}>{label}</div>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color, marginBottom: '4px', lineHeight: 1 }}>{pct}%</div>
+                      <div style={{ height: '3px', backgroundColor: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${normPct}%`, backgroundColor: color, borderRadius: '2px' }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {MEAL_SLOTS.map(slot => {
               const slotEntries = entries.filter(e => e.meal_slot === slot.key)
