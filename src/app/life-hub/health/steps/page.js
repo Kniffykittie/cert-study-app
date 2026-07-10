@@ -241,6 +241,8 @@ export default function StepTrackerPage() {
 
 function Header({ range, onRange, onRefresh, syncing }) {
   return (
+    <>
+    <Link href="/life-hub/health" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Health</Link>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
       <div>
         <h1 style={{ color: '#22c55e', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Step Tracker</h1>
@@ -261,5 +263,6 @@ function Header({ range, onRange, onRefresh, syncing }) {
         </button>
       </div>
     </div>
+    </>
   )
 }

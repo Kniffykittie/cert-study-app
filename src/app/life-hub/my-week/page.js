@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -192,6 +193,7 @@ export default function MyWeekPage() {
     <div style={{ maxWidth: '1100px' }}>
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
+        <Link href="/life-hub" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Life Hub</Link>
         <h1 style={{ color: SC, fontSize: '26px', fontWeight: '700', marginBottom: '4px' }}>My Week</h1>
         <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '14px' }}>Plan your week — meal times, workout schedule, commitments. Feeds your Daily Brief and AI routes.</p>
       </div>

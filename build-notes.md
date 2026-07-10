@@ -3021,6 +3021,13 @@ PHASE D (polish):
 
 ## Phase Log
 
+### Phase 82 — Breadcrumbs on All Life Hub Sub-Pages (4a) — Complete
+
+- Added `← Life Hub` / `← Parent` breadcrumb links above every Life Hub sub-page H1 (consistent style: `color: var(--text-secondary)`, `fontSize: 13px`, `display: inline-block`, `marginBottom: 8px`)
+- Pages updated (15 total): `health/page.js`, `health/heart-rate/page.js`, `health/sleep/page.js`, `health/steps/page.js`, `health/water/page.js`, `my-week/page.js`, `monthly-wrap/page.js`, `weekly-wrap/page.js`, `nutrition/page.js`, `nutrition/encyclopedia/page.js`, `workouts/page.js`, `workouts/exercises/page.js`, plus previously done `goals/page.js`, `goals/measurements/page.js`, `goals/supplements/page.js`
+- Added `import Link from 'next/link'` to 6 files that were missing it: `water/page.js`, `my-week/page.js`, `monthly-wrap/page.js`, `encyclopedia/page.js`, `workouts/exercises/page.js`, `weekly-wrap/page.js`
+- Steps page uses fragment wrapper since `Header` component returned a single root div; weekly-wrap breadcrumb inserted above the prev/next nav row
+
 ### Phase 81 — Life Hub Home Redesign (3a/3b/3c) — Complete
 
 - **3a (SVG ring):** Recovery Score replaced the `42px` plain number with an `80px` SVG donut ring — `r=40`, circumference=251.33, `strokeDashoffset` animates from 0–251 based on score; score and `/100` text embedded in SVG; mini bar chart hidden on mobile via `.lh-recovery-bars` CSS class

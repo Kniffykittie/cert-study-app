@@ -139,6 +139,7 @@ export default function HealthPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
+          <Link href="/life-hub" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Life Hub</Link>
           <h1 style={{ color: 'var(--success)', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Health Overview</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Today's data from Google Health</p>
         </div>

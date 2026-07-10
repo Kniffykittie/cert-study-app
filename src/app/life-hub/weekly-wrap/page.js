@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
 
 function getMonday(dateStr) {
@@ -126,6 +127,7 @@ export default function WeeklyWrapPage() {
       {/* Main content */}
       <div style={{ flex: 1, minWidth: 0, maxWidth: '600px' }}>
         {/* Week nav header */}
+        <Link href="/life-hub" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Life Hub</Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
           <button onClick={() => setWeek(prevWeek)}
             style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 12px', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>

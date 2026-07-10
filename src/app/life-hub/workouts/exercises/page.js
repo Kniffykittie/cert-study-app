@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -71,6 +72,7 @@ export default function ExerciseLibraryPage() {
     <div>
       {/* Header */}
       <div style={{ marginBottom: '20px' }}>
+        <Link href="/life-hub/workouts" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Workouts</Link>
         <h1 style={{ color: '#3b82f6', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Exercise Library</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
           {loading ? 'Loading...' : `${totalCount.toLocaleString()} dumbbell, bodyweight & cardio exercises`}

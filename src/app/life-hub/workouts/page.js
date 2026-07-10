@@ -347,6 +347,7 @@ export default function WorkoutsPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
+          <Link href="/life-hub" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Life Hub</Link>
           <h1 style={{ color: '#3b82f6', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>My Workout Plan</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{profile.days_per_week} days/week · {goals} · {expLabels[profile.experience]}</p>
         </div>

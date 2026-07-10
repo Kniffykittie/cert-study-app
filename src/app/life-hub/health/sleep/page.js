@@ -260,6 +260,7 @@ export default function SleepTrackerPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
+          <Link href="/life-hub/health" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Health</Link>
           <h1 style={{ color: '#22c55e', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Sleep Tracker</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Last night's sleep from Google Pixel Watch 4</p>

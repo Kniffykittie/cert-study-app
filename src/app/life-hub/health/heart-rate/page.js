@@ -195,6 +195,7 @@ function HeartRatePageInner() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
+          <Link href="/life-hub/health" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Health</Link>
           <h1 style={{ color: '#22c55e', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Heart Rate</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>5-minute view · {data?.date ?? 'Today'}</p>
         </div>

@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
 
 function getLastMonth() {
@@ -98,6 +99,7 @@ export default function MonthlyWrapPage() {
       {/* Main content */}
       <div style={{ flex: 1, minWidth: 0, maxWidth: '600px' }}>
         <div style={{ marginBottom: '24px' }}>
+          <Link href="/life-hub" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Life Hub</Link>
           <h1 style={{ color: 'var(--accent-purple)', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>
             {monthLabel(month)}
           </h1>

@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { NUTRIENTS, NUTRIENT_BY_SLUG, NUTRIENT_CATEGORIES } from '@/data/nutrients'
 import { calcMicroTargets } from '@/lib/tdee'
@@ -694,6 +695,7 @@ export default function EncyclopediaPage() {
   return (
     <div>
       <div style={{ marginBottom: '24px' }}>
+        <Link href="/life-hub/nutrition" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Nutrition</Link>
         <h1 style={{ color: '#f97316', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Nutrient Encyclopedia</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Every vitamin and mineral — what it does, where you stand, and what it means for your goals.</p>

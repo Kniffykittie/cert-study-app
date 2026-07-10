@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import BarcodeScannerModal from '@/components/BarcodeScannerModal'
@@ -648,6 +649,7 @@ export default function DrinksHydrationPage() {
 
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '24px 16px' }}>
+      <Link href="/life-hub/nutrition" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Nutrition</Link>
       <h1 style={{ color: '#f97316', fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>💧 Drinks & Hydration</h1>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: showWhy ? '12px' : '24px' }}>
         <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: 0 }}>
