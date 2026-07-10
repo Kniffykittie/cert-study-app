@@ -3021,6 +3021,12 @@ PHASE D (polish):
 
 ## Phase Log
 
+### Phase 84 — Rating Button Tap Targets (5a) — Complete
+
+- **CheckInSheet.js**: Energy + Mood 1–5 buttons — removed unreadable 9px sublabels from inside buttons; replaced with a live label line above each row (right-aligned, shows "tap to rate" until selection, then shows label in selection color e.g. "Energized"); button padding increased to `12px` + `minHeight: 52px` for reliable ≥44px tap targets; emoji scaled to 18px
+- **PostWorkoutModal (log/page.js)**: Same pattern applied to Difficulty + Energy rows; added distinct emoji per difficulty level (🌿😌💪🔥💀); section header shortened to "Energy During Workout" to fit on one line
+- Both components now show the selected label prominently above the row rather than tiny text crowded inside each button
+
 ### Phase 83 — Mobile Bottom Tab Bar for Life Hub (4b) — Complete
 
 - New `src/components/LifeHubBottomNav.js` — fixed bottom nav with 5 tabs: Home (purple), Goals (teal), Health (green), Nutrition (orange), Workouts (blue)

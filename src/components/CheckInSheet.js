@@ -279,28 +279,36 @@ export default function CheckInSheet({ checkInWindow, wakeTime, onClose, onInsig
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8, letterSpacing: '0.06em' }}>ENERGY</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.06em' }}>ENERGY</div>
+                <div style={{ fontSize: 12, color: energy ? ENERGY_COLORS[energy-1] : 'var(--text-secondary)', fontWeight: energy ? 700 : 400, minWidth: 72, textAlign: 'right' }}>
+                  {energy ? ENERGY_LABELS[energy-1] : 'tap to rate'}
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {[1,2,3,4,5].map(v => (
                   <button key={v} onClick={() => setEnergy(v)}
-                    style={{ flex: 1, padding: '10px 4px', borderRadius: 8, border: `1px solid ${energy === v ? ENERGY_COLORS[v-1] : 'var(--border)'}`, backgroundColor: energy === v ? `${ENERGY_COLORS[v-1]}20` : 'var(--background)', color: energy === v ? ENERGY_COLORS[v-1] : 'var(--text-secondary)', cursor: 'pointer', fontSize: 11, fontWeight: energy === v ? 700 : 400, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                    <span style={{ fontSize: 16 }}>{['😴','😓','😐','😊','⚡'][v-1]}</span>
-                    <span>{v}</span>
-                    <span style={{ fontSize: 9 }}>{ENERGY_LABELS[v-1]}</span>
+                    style={{ flex: 1, padding: '12px 4px', borderRadius: 8, border: `1px solid ${energy === v ? ENERGY_COLORS[v-1] : 'var(--border)'}`, backgroundColor: energy === v ? `${ENERGY_COLORS[v-1]}20` : 'var(--background)', color: energy === v ? ENERGY_COLORS[v-1] : 'var(--text-secondary)', cursor: 'pointer', fontWeight: energy === v ? 700 : 400, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minHeight: 52 }}>
+                    <span style={{ fontSize: 18 }}>{['😴','😓','😐','😊','⚡'][v-1]}</span>
+                    <span style={{ fontSize: 12 }}>{v}</span>
                   </button>
                 ))}
               </div>
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8, letterSpacing: '0.06em' }}>MOOD</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.06em' }}>MOOD</div>
+                <div style={{ fontSize: 12, color: mood ? ENERGY_COLORS[mood-1] : 'var(--text-secondary)', fontWeight: mood ? 700 : 400, minWidth: 72, textAlign: 'right' }}>
+                  {mood ? MOOD_LABELS[mood-1] : 'tap to rate'}
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {[1,2,3,4,5].map(v => (
                   <button key={v} onClick={() => setMood(v)}
-                    style={{ flex: 1, padding: '10px 4px', borderRadius: 8, border: `1px solid ${mood === v ? ENERGY_COLORS[v-1] : 'var(--border)'}`, backgroundColor: mood === v ? `${ENERGY_COLORS[v-1]}20` : 'var(--background)', color: mood === v ? ENERGY_COLORS[v-1] : 'var(--text-secondary)', cursor: 'pointer', fontSize: 11, fontWeight: mood === v ? 700 : 400, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                    <span style={{ fontSize: 16 }}>{['😣','😔','😶','🙂','😄'][v-1]}</span>
-                    <span>{v}</span>
-                    <span style={{ fontSize: 9 }}>{MOOD_LABELS[v-1]}</span>
+                    style={{ flex: 1, padding: '12px 4px', borderRadius: 8, border: `1px solid ${mood === v ? ENERGY_COLORS[v-1] : 'var(--border)'}`, backgroundColor: mood === v ? `${ENERGY_COLORS[v-1]}20` : 'var(--background)', color: mood === v ? ENERGY_COLORS[v-1] : 'var(--text-secondary)', cursor: 'pointer', fontWeight: mood === v ? 700 : 400, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minHeight: 52 }}>
+                    <span style={{ fontSize: 18 }}>{['😣','😔','😶','🙂','😄'][v-1]}</span>
+                    <span style={{ fontSize: 12 }}>{v}</span>
                   </button>
                 ))}
               </div>

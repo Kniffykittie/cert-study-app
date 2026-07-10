@@ -168,26 +168,36 @@ function PostWorkoutModal({ onSave }) {
         </div>
 
         <div style={{ marginBottom: '20px' }}>
-          <div style={{ color: 'var(--accent-purple)', fontSize: '13px', fontWeight: '700', marginBottom: '10px' }}>Difficulty</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <div style={{ color: 'var(--accent-purple)', fontSize: '13px', fontWeight: '700' }}>Difficulty</div>
+            <div style={{ fontSize: '12px', color: difficulty ? DIFF_COLORS[difficulty-1] : 'var(--text-secondary)', fontWeight: difficulty ? '700' : '400', minWidth: 72, textAlign: 'right' }}>
+              {difficulty ? DIFF_LABELS[difficulty-1] : 'tap to rate'}
+            </div>
+          </div>
           <div style={{ display: 'flex', gap: '6px' }}>
             {[1,2,3,4,5].map(v => (
               <button key={v} onClick={() => setDifficulty(v)}
-                style={{ flex: 1, padding: '10px 4px', borderRadius: '8px', border: `1px solid ${difficulty === v ? DIFF_COLORS[v-1] : 'var(--border)'}`, backgroundColor: difficulty === v ? `${DIFF_COLORS[v-1]}20` : 'var(--background)', color: difficulty === v ? DIFF_COLORS[v-1] : 'var(--text-secondary)', cursor: 'pointer', fontSize: '12px', fontWeight: difficulty === v ? '700' : '400', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-                <span style={{ fontSize: '16px' }}>{v}</span>
-                <span style={{ fontSize: '9px', textAlign: 'center', lineHeight: 1.2 }}>{DIFF_LABELS[v-1]}</span>
+                style={{ flex: 1, padding: '12px 4px', borderRadius: '8px', border: `1px solid ${difficulty === v ? DIFF_COLORS[v-1] : 'var(--border)'}`, backgroundColor: difficulty === v ? `${DIFF_COLORS[v-1]}20` : 'var(--background)', color: difficulty === v ? DIFF_COLORS[v-1] : 'var(--text-secondary)', cursor: 'pointer', fontWeight: difficulty === v ? '700' : '400', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minHeight: 52 }}>
+                <span style={{ fontSize: '18px' }}>{['🌿','😌','💪','🔥','💀'][v-1]}</span>
+                <span style={{ fontSize: '12px' }}>{v}</span>
               </button>
             ))}
           </div>
         </div>
 
         <div style={{ marginBottom: '20px' }}>
-          <div style={{ color: 'var(--accent-purple)', fontSize: '13px', fontWeight: '700', marginBottom: '10px' }}>Energy Level During Workout</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <div style={{ color: 'var(--accent-purple)', fontSize: '13px', fontWeight: '700' }}>Energy During Workout</div>
+            <div style={{ fontSize: '12px', color: energy ? ENERGY_COLORS[energy-1] : 'var(--text-secondary)', fontWeight: energy ? '700' : '400', minWidth: 72, textAlign: 'right' }}>
+              {energy ? ENERGY_LABELS[energy-1] : 'tap to rate'}
+            </div>
+          </div>
           <div style={{ display: 'flex', gap: '6px' }}>
             {[1,2,3,4,5].map(v => (
               <button key={v} onClick={() => setEnergy(v)}
-                style={{ flex: 1, padding: '10px 4px', borderRadius: '8px', border: `1px solid ${energy === v ? ENERGY_COLORS[v-1] : 'var(--border)'}`, backgroundColor: energy === v ? `${ENERGY_COLORS[v-1]}20` : 'var(--background)', color: energy === v ? ENERGY_COLORS[v-1] : 'var(--text-secondary)', cursor: 'pointer', fontSize: '12px', fontWeight: energy === v ? '700' : '400', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-                <span style={{ fontSize: '16px' }}>{v}</span>
-                <span style={{ fontSize: '9px', textAlign: 'center', lineHeight: 1.2 }}>{ENERGY_LABELS[v-1]}</span>
+                style={{ flex: 1, padding: '12px 4px', borderRadius: '8px', border: `1px solid ${energy === v ? ENERGY_COLORS[v-1] : 'var(--border)'}`, backgroundColor: energy === v ? `${ENERGY_COLORS[v-1]}20` : 'var(--background)', color: energy === v ? ENERGY_COLORS[v-1] : 'var(--text-secondary)', cursor: 'pointer', fontWeight: energy === v ? '700' : '400', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minHeight: 52 }}>
+                <span style={{ fontSize: '18px' }}>{['😴','😓','😐','😊','⚡'][v-1]}</span>
+                <span style={{ fontSize: '12px' }}>{v}</span>
               </button>
             ))}
           </div>
