@@ -10,7 +10,7 @@ const PUBLIC_PATHS = [
   '/exercises/',
 ]
 
-export function middleware(request) {
+export function proxy(request) {
   const { pathname } = request.nextUrl
 
   // Let public paths, static assets, and the hub itself through

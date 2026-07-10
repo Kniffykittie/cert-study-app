@@ -3017,6 +3017,11 @@ PHASE D (polish):
 
 ## Phase Log
 
+### Build Fix — Turbopack Parse Error + Middleware Deprecation — Complete
+- **Problem:** `src/app/life-hub/page.js` had a stale duplicate IIFE opener (`{recoveryScore && (() => {`) at line 494 that was never closed, causing Turbopack to report "Unterminated regexp literal" at end-of-file
+- **Fix:** Removed the orphaned 2-line duplicate block (comment + IIFE opener); the real block immediately below it was the correct one
+- **Also:** Renamed `src/middleware.js` → `src/proxy.js` and updated export from `middleware` to `proxy` to fix Next.js 16 deprecation warning
+
 ### Phase 90 — Alert System Fixes (Override Labels, Micro Overlap, Protein Brief) — Complete
 
 - **Workout session override label:** Built `overrideInfoMap` alongside `overrideMap` in `log/page.js`; attaches `overrideInfo: { original, reason }` to each exercise object; renders green "↩ swapped · [reason]" chip in the exercise header alongside the existing `+ ADDED` badge

@@ -491,9 +491,6 @@ export default function LifeHubPage() {
         </div>
       )}
 
-      {/* Recovery Score — above briefs */}
-      {recoveryScore && (() => {
-
       {/* Recovery Score — prominent banner above section cards */}
       {recoveryScore && (() => {
         const score = recoveryScore.total
