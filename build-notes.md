@@ -3021,6 +3021,14 @@ PHASE D (polish):
 
 ## Phase Log
 
+### Phase 86 — Exercise Modal: Sticky Chat + Collapsible Instructions (5c) — Complete
+
+- **Sticky chat input**: modal restructured to `display: flex; flex-direction: column` — scrollable content area (`flex: 1; overflowY: auto`) above a pinned chat input footer (`flexShrink: 0`); chat is always visible without scrolling regardless of instruction length
+- **Collapsible instructions**: "Instructions (N steps)" is now a tap-to-toggle button with ▲/▼ indicator; collapsed by default on mobile (`isMobile` state from `window.innerWidth <= 768`), expanded by default on desktop
+- **Mobile bottom sheet**: on mobile the modal slides up from the bottom (`alignItems: flex-end`, `borderRadius: 16px 16px 0 0`, `maxHeight: 92dvh`); image reduced to 160px height to leave more room for content
+- **Chat messages moved into scroll area**: messages render in the scrollable section above the sticky input so they're visible as the conversation grows
+- `isMobile` + `stepsOpen` state added; `useEffect` with resize listener for responsive updates
+
 ### Phase 85 — Study Hub Overview Redesign (5b) — Complete
 
 - **Recommended action moved to top**: worst weak topic shown as the first card below the header — `cert color left border`, cert label + topic name + accuracy % + questions seen; "Practice Now →" button links to `/study-hub/test`

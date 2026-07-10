@@ -45,7 +45,20 @@ function ExerciseDetailModal({ exercise, onClose }) {
   const [chatMessages, setChatMessages] = useState([])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
+  const [stepsOpen, setStepsOpen] = useState(true)
+  const [isMobile, setIsMobile] = useState(false)
   const chatEndRef = useRef(null)
+
+  useEffect(() => {
+    const check = () => {
+      const mobile = window.innerWidth <= 768
+      setIsMobile(mobile)
+      setStepsOpen(!mobile)
+    }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   if (!exercise) return null
   const steps = (exercise.instructions || []).filter(s => !s.startsWith('You should feel') && !s.startsWith('Do NOT'))
@@ -75,46 +88,53 @@ function ExerciseDetailModal({ exercise, onClose }) {
   }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001, padding: '20px' }}>
-      <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
-        {exercise.gif_url
-          ? <img src={exercise.gif_url} alt={exercise.name} style={{ width: '100%', height: '220px', objectFit: 'cover', backgroundColor: '#111', borderRadius: '12px 12px 0 0', display: 'block' }} />
-          : <div style={{ width: '100%', height: '100px', backgroundColor: '#111', borderRadius: '12px 12px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px' }}>🏋️</div>
-        }
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px 8px' }}>
-          <h2 style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700', textTransform: 'capitalize', margin: 0 }}>{exercise.name}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer' }}>✕</button>
-        </div>
-        <div style={{ padding: '0 20px 20px' }}>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
-            {[{ label: exercise.body_part, color: 'var(--accent-blue)' }, { label: exercise.equipment, color: 'var(--accent-purple)' }, { label: exercise.target, color: 'var(--success)' }].filter(t => t.label).map((t, i) => (
-              <span key={i} style={{ fontSize: '12px', color: t.color, backgroundColor: 'var(--background)', border: `1px solid ${t.color}`, borderRadius: '6px', padding: '3px 10px', textTransform: 'capitalize' }}>{t.label}</span>
-            ))}
-          </div>
-          {exercise.secondary_muscles?.length > 0 && (
-            <div style={{ marginBottom: '14px' }}>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px' }}>Secondary muscles</div>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {exercise.secondary_muscles.map(m => <span key={m} style={{ fontSize: '11px', color: 'var(--text-secondary)', backgroundColor: 'var(--background)', borderRadius: '4px', padding: '2px 8px', textTransform: 'capitalize' }}>{m}</span>)}
-              </div>
-            </div>
-          )}
-          {steps.length > 0 && (
-            <div style={{ marginBottom: '14px' }}>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '8px' }}>Instructions</div>
-              <ol style={{ margin: 0, padding: '0 0 0 18px' }}>
-                {steps.map((step, i) => <li key={i} style={{ color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6', marginBottom: '6px' }}>{step}</li>)}
-              </ol>
-            </div>
-          )}
-          {feel && <div style={{ backgroundColor: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.2)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--success)', marginBottom: '10px' }}>{feel}</div>}
-          {doNot && <div style={{ backgroundColor: 'rgba(204,0,0,0.08)', border: '1px solid rgba(204,0,0,0.2)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--error)', marginBottom: '14px' }}>{doNot}</div>}
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', zIndex: 10001, padding: isMobile ? '0' : '20px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: isMobile ? '16px 16px 0 0' : '12px', maxWidth: '520px', width: '100%', maxHeight: isMobile ? '92dvh' : '90vh', display: 'flex', flexDirection: 'column' }}>
 
-          {/* Trainer chat */}
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '14px' }}>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>💬 Ask your trainer</div>
+        {/* Scrollable content area */}
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {exercise.gif_url
+            ? <img src={exercise.gif_url} alt={exercise.name} style={{ width: '100%', height: isMobile ? '160px' : '220px', objectFit: 'cover', backgroundColor: '#111', borderRadius: isMobile ? '16px 16px 0 0' : '12px 12px 0 0', display: 'block' }} />
+            : <div style={{ width: '100%', height: isMobile ? '60px' : '100px', backgroundColor: '#111', borderRadius: isMobile ? '16px 16px 0 0' : '12px 12px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>🏋️</div>
+          }
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px 8px' }}>
+            <h2 style={{ color: 'var(--text-primary)', fontSize: '17px', fontWeight: '700', textTransform: 'capitalize', margin: 0 }}>{exercise.name}</h2>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', padding: '4px 6px' }}>✕</button>
+          </div>
+          <div style={{ padding: '0 20px 16px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+              {[{ label: exercise.body_part, color: 'var(--accent-blue)' }, { label: exercise.equipment, color: 'var(--accent-purple)' }, { label: exercise.target, color: 'var(--success)' }].filter(t => t.label).map((t, i) => (
+                <span key={i} style={{ fontSize: '12px', color: t.color, backgroundColor: 'var(--background)', border: `1px solid ${t.color}`, borderRadius: '6px', padding: '3px 10px', textTransform: 'capitalize' }}>{t.label}</span>
+              ))}
+            </div>
+            {exercise.secondary_muscles?.length > 0 && (
+              <div style={{ marginBottom: '12px' }}>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px' }}>Secondary muscles</div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {exercise.secondary_muscles.map(m => <span key={m} style={{ fontSize: '11px', color: 'var(--text-secondary)', backgroundColor: 'var(--background)', borderRadius: '4px', padding: '2px 8px', textTransform: 'capitalize' }}>{m}</span>)}
+                </div>
+              </div>
+            )}
+            {steps.length > 0 && (
+              <div style={{ marginBottom: '12px' }}>
+                <button onClick={() => setStepsOpen(o => !o)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: stepsOpen ? '8px' : 0 }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600' }}>Instructions ({steps.length} steps)</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{stepsOpen ? '▲' : '▼'}</span>
+                </button>
+                {stepsOpen && (
+                  <ol style={{ margin: 0, padding: '0 0 0 18px' }}>
+                    {steps.map((step, i) => <li key={i} style={{ color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6', marginBottom: '6px' }}>{step}</li>)}
+                  </ol>
+                )}
+              </div>
+            )}
+            {feel && <div style={{ backgroundColor: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.2)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--success)', marginBottom: '10px' }}>{feel}</div>}
+            {doNot && <div style={{ backgroundColor: 'rgba(204,0,0,0.08)', border: '1px solid rgba(204,0,0,0.2)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--error)', marginBottom: '8px' }}>{doNot}</div>}
+
+            {/* Chat messages */}
             {chatMessages.length > 0 && (
-              <div style={{ marginBottom: '10px', maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>💬 Trainer</div>
                 {chatMessages.map((m, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
                     <div style={{ maxWidth: '85%', padding: '8px 12px', borderRadius: m.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px', backgroundColor: m.role === 'user' ? 'var(--accent-blue)' : 'var(--background)', border: m.role === 'assistant' ? '1px solid var(--border)' : 'none', color: m.role === 'user' ? '#fff' : 'var(--text-primary)', fontSize: '13px', lineHeight: '1.5' }}>
@@ -130,19 +150,24 @@ function ExerciseDetailModal({ exercise, onClose }) {
                 <div ref={chatEndRef} />
               </div>
             )}
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                value={chatInput}
-                onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && sendChat()}
-                placeholder="Ask about form, feel, variations..."
-                style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px' }}
-              />
-              <button onClick={sendChat} disabled={!chatInput.trim() || chatLoading}
-                style={{ padding: '8px 14px', background: chatInput.trim() && !chatLoading ? 'var(--accent-blue)' : 'var(--border)', border: 'none', borderRadius: '8px', color: '#fff', cursor: chatInput.trim() && !chatLoading ? 'pointer' : 'default', fontSize: '13px', fontWeight: 600 }}>
-                {chatLoading ? '...' : 'Ask'}
-              </button>
-            </div>
+          </div>
+        </div>
+
+        {/* Sticky chat input */}
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 20px', flexShrink: 0, backgroundColor: 'var(--surface)', borderRadius: isMobile ? '0' : '0 0 12px 12px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>💬 Ask your trainer</div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && sendChat()}
+              placeholder="Ask about form, feel, variations..."
+              style={{ flex: 1, background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }}
+            />
+            <button onClick={sendChat} disabled={!chatInput.trim() || chatLoading}
+              style={{ padding: '10px 16px', background: chatInput.trim() && !chatLoading ? 'var(--accent-blue)' : 'var(--border)', border: 'none', borderRadius: '8px', color: '#fff', cursor: chatInput.trim() && !chatLoading ? 'pointer' : 'default', fontSize: '13px', fontWeight: 600, flexShrink: 0 }}>
+              {chatLoading ? '...' : 'Ask'}
+            </button>
           </div>
         </div>
       </div>
