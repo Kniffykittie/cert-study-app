@@ -3,7 +3,7 @@
 ## Project Overview
 A personal certification study app for CCNA, Network+, and Security+ exam prep. Built with Next.js App Router, Supabase, and the Anthropic Claude API.
 
-**Active branch:** `claude/adoring-shannon-sTxW8`
+**Active branch:** `claude/sleepy-keller-rqiv6h`
 
 **Deploy rule:** After every push to the feature branch, also merge to `main` so Vercel deploys immediately. Single user, no PR review needed.
 
@@ -47,11 +47,12 @@ Workouts    #3b82f6   (blue)
 - **Inline styles only** in JSX — never Tailwind classes
 - **No comments** unless the WHY is non-obvious
 - **Security:** `ANTHROPIC_API_KEY` is secret, never share. Only `NEXT_PUBLIC_` Supabase keys are safe.
-- Mobile responsive via `@media (max-width: 768px)` CSS
+- **Mobile responsive via `@media (max-width: 768px)`** — every new page and component must reflow to single column with no horizontal scroll; verify this before marking UI done
 - **Every AI route must use `getUser()` not `getSession()`** — and check `is_disabled` on the profiles table before proceeding
-- **Every new DB table must have RLS in the same migration** — no exceptions; pattern: `user_id = auth.uid()`
+- **Every new DB table must have RLS in the same migration** — no exceptions; pattern: `user_id = auth.uid()`; verify via Supabase MCP before referencing in code
 - **All user-supplied free text injected into AI prompts must be wrapped in `<user_input>` tags** with a note telling Claude to treat it as data only
 - **Every new loggable feature ships with a reset row in Settings** in the same build session
+- **Before touching any file in a parallel sync pair** (see Parallel Implementations section), check whether the partner file needs the same change and include it in the same commit
 
 ## No-Rebuild & No-Assumption Rules (Enforced — Do Not Skip)
 
@@ -65,13 +66,41 @@ Workouts    #3b82f6   (blue)
 - **If there is any ambiguity about whether something is built, partially built, or not built — ASK before starting.** Do not infer from file names, state variable names, or partial grep matches. Read the actual implementation.
 - **If the user's request could be interpreted two or more ways, ask which they mean** before writing code. One clarifying question saves more time than a wrong implementation.
 - **If a specced feature depends on another feature being built first, confirm the dependency is met** before starting. Do not assume the prerequisite exists because it was discussed.
-- **Never assume a migration has been applied to the database.** If a feature requires a new table or column, confirm it exists via Supabase MCP tools before referencing it in code.
+- **Never assume a migration has been applied to the database.** Before referencing any table or column in new code, explicitly confirm it exists via Supabase MCP `list_tables` or the Database Tables section in `build-notes.md`. "We planned to add it" is not the same as "it exists."
 
 ### The One-Source-of-Truth Rule for Build Status
 - **A feature has exactly ONE authoritative status:** its entry in `build-notes.md`.
 - Built = moved to Phase Log. If it is still in Future Features with a ✅ tag, that tag is stale — move it to the Phase Log in the same session it was verified built.
 - **No feature may exist in both Future Features AND the Phase Log at the same time.** If you see this, resolve it immediately before building anything else.
 - When a session ends, every feature touched (built, partially built, or just discussed) must have its status updated in `build-notes.md` before the commit. No exceptions.
+
+## Session Boundary Protocol (After Context Compaction or Long Pause)
+- **Before writing any code in a resumed session:** Read the last 3 entries of the Phase Log in `build-notes.md` and the top of the Future Features section. The compaction summary is accurate but not sufficient — the actual file state is authoritative.
+- **After any long pause mid-task:** Re-read the specific file being edited before resuming. Line numbers shift after edits; stale line references cause wrong edits.
+- **Before committing:** Confirm current branch with `git branch --show-current`. Never commit to the wrong branch.
+
+## New Route Checklist (Gate Before Marking Any API Route Done)
+Run through this before committing any new route:
+- [ ] Uses `getUser()` not `getSession()`
+- [ ] Checks `is_disabled` if it makes an AI call
+- [ ] Added to `src/lib/rateLimit.js` LIMITS map (all window variants if applicable)
+- [ ] Uses atomic `rpc('increment_rate_limit')` pattern — not read-then-check
+- [ ] All user-supplied strings sanitized and wrapped in `<user_input>` tags with length caps
+- [ ] Every DELETE/PATCH includes `.eq('user_id', user.id)`
+- [ ] No variable referenced before it's defined in scope (trace auth flow from top of route)
+- [ ] DB table/column referenced was confirmed to exist before writing the code
+
+## New UI Checklist (Gate Before Marking Any Page or Component Done)
+- [ ] `@media (max-width: 768px)` breakpoint — grids reflow to 1 col, no horizontal scroll
+- [ ] All colors use CSS variables — no hardcoded hex
+- [ ] Inline styles only — no Tailwind classes
+- [ ] `useSearchParams()` wrapped in `<Suspense>` if used (Vercel build fails otherwise)
+- [ ] Modals have `maxHeight: '90vh'` and `overflow-y: auto`
+
+## Partial Feature Discipline
+- **⚠️ Partial entries must list exactly what's missing** — not just the flag. A ⚠️ Partial entry without a bullet list of unbuilt sub-items is ambiguous and will cause re-work.
+- **Before calling a ⚠️ Partial feature "done," read the original spec** and verify every sub-item, not just the one the user asked about. Many features have 5 steps and only 3 were built.
+- **If something is "probably" already built** — stop and verify. Grep for the key function or read the file. "Probably" is not a build status.
 
 ## Security Rules (Enforced — Do Not Skip)
 These rules were established after a full top-to-bottom security audit and must be applied to every new route and every new feature.
@@ -162,7 +191,7 @@ When adding a new nutrient to `MEAL_NUTRITION_KEYS`, touch ALL of these in the s
 ## Session Rules
 
 ### Deploy Rule — After Every Push
-After pushing to `claude/adoring-shannon-sTxW8`, always merge to `main` so Vercel deploys:
+After pushing to `claude/sleepy-keller-rqiv6h`, always merge to `main` so Vercel deploys:
 ```
 git push origin HEAD:main
 ```
@@ -183,7 +212,7 @@ Always provide a brief summary covering:
 ### Feature Tracking — Enforced Every Session
 - **Any feature discussed but not built in the same session must be added to `build-notes.md` Future Features before the conversation ends.** Even a one-liner placeholder is enough. No exceptions.
 - **At the start of any planning session** ("what should we build?", "what's left?", "let's make a plan") — read the Future Features section of `build-notes.md` before discussing new ideas. Do not re-spec things already captured.
-- **When a feature is built**, move its entry from Future Features to the Phase Log in the same commit. Never leave it in both places.
+- **When a feature is built**, move its entry from Future Features to the Phase Log in the same commit. Never leave it in both places. Also remove or collapse the spec body in Future Features — a one-line reference is enough. The full spec living in Future Features after it's built is how stale entries accumulate.
 - **When a DB table is created or column added**, update the Database Tables section in `build-notes.md` in the same commit.
 - **When a security item is built**, mark it ✅ in the Security Status table in `build-notes.md` in the same commit.
 - **QA items** in the Untested section are removed once the user confirms tested and passing.
