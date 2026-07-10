@@ -3021,6 +3021,16 @@ PHASE D (polish):
 
 ## Phase Log
 
+### Phase 85 — Study Hub Overview Redesign (5b) — Complete
+
+- **Recommended action moved to top**: worst weak topic shown as the first card below the header — `cert color left border`, cert label + topic name + accuracy % + questions seen; "Practice Now →" button links to `/study-hub/test`
+- **Cert cards upgraded**: each card now shows accuracy % (large), predicted exam score chip (weighted formula from domain weights, same as cert detail pages), weak topic count chip, and domains covered count (e.g., "4/6 domains")
+- **Predicted score formula**: covers domains with ≥3 questions seen; `sum(weight × accuracy) / sum(weight) × 100`; shown as `~72% predicted` chip in appropriate color (green/yellow/red)
+- **Mobile cert card layout**: score area stays prominent; `sh-cert-bar` and `sh-cert-pred` chips hidden on mobile to keep cards compact; card inner uses `flex-direction: row` so cert label + score scan left-to-right
+- **Stats row**: labels shortened ("Questions" / "Streak") to fit 2-col mobile grid without overflow
+- **DailyStreak moved below stats**: was above cert cards; now below stats so the action cards are seen first
+- **Recent tests**: date shortened to `MMM D`, cert displayed in section color
+
 ### Phase 84 — Rating Button Tap Targets (5a) — Complete
 
 - **CheckInSheet.js**: Energy + Mood 1–5 buttons — removed unreadable 9px sublabels from inside buttons; replaced with a live label line above each row (right-aligned, shows "tap to rate" until selection, then shows label in selection color e.g. "Energized"); button padding increased to `12px` + `minHeight: 52px` for reliable ≥44px tap targets; emoji scaled to 18px
