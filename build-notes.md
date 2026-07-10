@@ -3021,6 +3021,15 @@ PHASE D (polish):
 
 ## Phase Log
 
+### Phase 88 — Workout Day Hub Full Wiring (6a–6f) — Complete
+
+- **6a (DB migration):** Added `context TEXT CHECK IN ('pre_workout','post_workout','bedtime','standalone')` column to `stretch_logs` — enables exact phase completion detection without time-of-day heuristics
+- **6b (plan page dates):** Each day card on My Workout Plan now shows the actual calendar date (e.g. "Monday · Jul 7") next to the day-of-week select; computed from current week's Monday + day index offset
+- **6c (Day Hub):** Already fully built — 4-phase journey (Pre-Stretch → Workout → Post-Stretch → Bedtime), phase completion dots, prev session hints, AI coaching card with unread badge, adjacent day nav, rest day variant
+- **6d (stretch logging flow):** Rewrote `/life-hub/workouts/stretches/page.js` to support dual mode — Reference mode (no context param = existing browse/filter UI) and Session mode (`?context=pre_workout|post_workout|bedtime` from Day Hub = tap-to-check stretches with sticky "Log Session →" button that POSTs to `/api/workouts/stretch-log` with context + stretch_ids + duration, then returns to `?from=` Day Hub URL); updated all 3 Day Hub "Start X Stretches" links to use `/stretches?context=...&from=/life-hub/workouts/day/${dayIndex}`; wrapped in Suspense for useSearchParams
+- **6e (coaching unread badge):** Already built in Day Hub — `coaching_feedback_read_at` column exists, unread badge fires when response is ready but unread, marks read on expand
+- **6f (history links):** Already built — history page is week-grouped with "View Day →" links to Day Hub for each session
+
 ### Phase 87 — Nutrition 6-Nutrient Snapshot Row (5d) — Complete
 
 - **6 nutrient chips above food log**: Fiber, Iron, Calcium, Vit D, Potassium, Sodium shown as a horizontally scrollable row immediately above the meal slot log (only when `entries.length > 0`)

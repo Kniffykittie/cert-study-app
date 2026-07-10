@@ -230,7 +230,7 @@ function DayHubInner({ params }) {
                     ))}
                   </div>
                 )}
-                <Link href={`/life-hub/workouts/stretching/library?context=pre_workout`}
+                <Link href={`/life-hub/workouts/stretches?context=pre_workout&from=/life-hub/workouts/day/${dayIndex}`}
                   style={{ display: 'inline-block', padding: '9px 16px', backgroundColor: '#22c55e', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
                   Start Pre-Workout Stretches →
                 </Link>
@@ -338,7 +338,7 @@ function DayHubInner({ params }) {
                   ))}
                 </div>
               )}
-              <Link href={`/life-hub/workouts/stretching/library?context=post_workout`}
+              <Link href={`/life-hub/workouts/stretches?context=post_workout&from=/life-hub/workouts/day/${dayIndex}`}
                 style={{ display: 'inline-block', padding: '9px 16px', backgroundColor: '#f97316', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
                 Start Post-Workout Stretches →
               </Link>
@@ -367,7 +367,7 @@ function DayHubInner({ params }) {
             <p style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.6, margin: '0 0 12px' }}>
               5–10 minutes of gentle holds before bed activates the parasympathetic nervous system, lowers cortisol, and improves sleep onset.
             </p>
-            <Link href={`/life-hub/workouts/stretching/library?context=bedtime`}
+            <Link href={`/life-hub/workouts/stretches?context=bedtime&from=/life-hub/workouts/day/${dayIndex}`}
               style={{ display: 'inline-block', padding: '9px 16px', backgroundColor: '#a78bfa', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
               Start Bedtime Stretches →
             </Link>

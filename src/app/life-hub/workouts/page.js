@@ -320,6 +320,15 @@ export default function WorkoutsPage() {
 
   const todayDowName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()]
 
+  function getMondayDate() {
+    const d = new Date()
+    const day = d.getDay()
+    d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
+    d.setHours(0, 0, 0, 0)
+    return d
+  }
+  const monday = getMondayDate()
+
   const todayPlan = plan?.plan?.find(d => d.day_of_week === todayDowName)
   const todayBodyParts = todayPlan?.day_label
     ? Object.entries(BODY_PART_TO_STRETCH_GROUPS).filter(([k]) => todayPlan.day_label.toLowerCase().includes(k)).flatMap(([, v]) => v)
@@ -416,6 +425,13 @@ export default function WorkoutsPage() {
                           style={{ backgroundColor: 'transparent', border: 'none', color: 'var(--accent-purple)', fontSize: '15px', fontWeight: '700', cursor: 'pointer', outline: 'none', padding: 0 }}>
                           {DAYS_OF_WEEK.map(d => <option key={d} value={d} style={{ backgroundColor: '#1A1A1A' }}>{d}</option>)}
                         </select>
+                        {(() => {
+                          const dowIdx = DAYS_OF_WEEK.indexOf(day.day_of_week)
+                          if (dowIdx < 0) return null
+                          const d = new Date(monday)
+                          d.setDate(monday.getDate() + dowIdx)
+                          return <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>· {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                        })()}
                       </div>
                       <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{day.day_name}</div>
                     </div>
