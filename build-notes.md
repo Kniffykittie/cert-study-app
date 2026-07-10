@@ -3021,6 +3021,15 @@ PHASE D (polish):
 
 ## Phase Log
 
+### Phase 83 — Mobile Bottom Tab Bar for Life Hub (4b) — Complete
+
+- New `src/components/LifeHubBottomNav.js` — fixed bottom nav with 5 tabs: Home (purple), Goals (teal), Health (green), Nutrition (orange), Workouts (blue)
+- Only visible on mobile (`display: none` by default; `display: flex` at ≤768px via CSS class)
+- Active tab gets its section color + `2px solid` top border indicator; inactive tabs use `var(--text-secondary)`
+- `usePathname()` drives active state — exact match for `/life-hub`, prefix match for all sections; Goals match covers `/life-hub/goals/*`, Health covers water page too (sidebar groups it there)
+- `padding-bottom: env(safe-area-inset-bottom)` handles iPhone home indicator
+- Layout updated: `LifeHubBottomNav` mounted in `life-hub/layout.js`; `.life-hub-main` gets `padding-bottom: 72px` on mobile so content never hides under nav
+
 ### Phase 82 — Breadcrumbs on All Life Hub Sub-Pages (4a) — Complete
 
 - Added `← Life Hub` / `← Parent` breadcrumb links above every Life Hub sub-page H1 (consistent style: `color: var(--text-secondary)`, `fontSize: 13px`, `display: inline-block`, `marginBottom: 8px`)
