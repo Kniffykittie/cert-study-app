@@ -948,6 +948,34 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 
 ---
 
+### ✅ CONFIRMED BUILT — Do Not Rebuild These (Verified 2026-07-10)
+
+This table is the authoritative "already done" list. Before starting any feature, check here first. If it is on this list, the code exists in the repo — verified by reading the actual files, not just the notes.
+
+| Feature | Verified In | Notes |
+|---------|------------|-------|
+| Food Log Editing Mode + Session-Scoped Meal Insight | `src/app/life-hub/nutrition/page.js` (isEditing, sessionEntries, insightToast states); `src/app/api/nutrition/meal-insight/route.js` | Fixed bottom bar, Finish Editing, toast all confirmed |
+| Retroactive Log Editing (any past day) | `src/app/life-hub/nutrition/page.js` (viewingDate state, editDateParam, editDate passed to log calls) | Date picker navigates to past date, editing mode carries the date |
+| Morning Log Review Pop-Up | `src/components/nutrition/DailyLogReview.js` (three states: normal/sparse/empty); imported in `LifeHubClientShell.js` | Fires 5am–noon, once/day via localStorage gate |
+| Food Water Content in Hydration Tab | `src/app/life-hub/health/water/page.js` (three-segment ring: water/beverages/food water; food entries queried for water_g) | Third ring segment, food water oz computed and displayed |
+| Real-Time State Adjustment / Check-in → Workout Swaps | `src/components/CheckInSheet.js` (keepTalking state, contextSnapshotRef, proposed_actions handling) | Swap suggestions and apply flow confirmed |
+| Conversational AI Keep Talking | `src/components/CheckInSheet.js` (contextSnapshotRef.current, multi-turn messages, proposed_actions with inline apply-cards) | Context snapshot pattern; no re-fetch on subsequent turns |
+| Sleep Debt Tracking | `src/app/life-hub/health/sleep/page.js` (sleepDebt + sleepDebtSource state; color-coded display at line 367) | Health and checkin fallback sources; InfoChip explanation |
+| Food Logging Streak | `src/app/life-hub/nutrition/page.js` (logStreak state; streak computed from food_log_entries over 60 days) | Consecutive day count, displayed on nutrition page |
+| gain_weight Goal Option | `src/app/life-hub/goals/setup/page.js` | Surplus math, gain-framing timeline, scale expectations |
+| Dietary Preferences Wired Downstream | `src/lib/nutritionUtils.js` (getDietaryWarnings); AddFoodModal, SearchModal, meal-plan | Warning chips on food search, favorites, meal plan |
+| Orphaned Inputs Wired Up | Daily Brief route, coaching-response route, checkin/insight route | biggest_obstacles, motivations, why_goals, dietary_preferences all injected |
+| Supplement Adherence Tracking | `src/app/life-hub/goals/supplements/page.js`; `supplement_logs` table | Mark Taken toggle, Mark All, 30-day tracking |
+| Pre/Post Workout Meal Advisor | `src/app/life-hub/nutrition/page.js` (dismissible banners) | Post-workout within 2hrs, pre-workout planned label |
+| Photo-Based Food Logging | `src/app/api/nutrition/ai-photo-log/route.js`; Photo tab in AddFoodModal | Vision API, confidence chips, 10/hr rate limit |
+| Full Stretching & Mobility Section | `src/data/stretches.js`; `/life-hub/workouts/stretches/page.js`; `stretch_logs` table | 38 stretches, 10 muscle groups, sore spot chips |
+
+**Rule: When a feature in the sections below is built and verified in code, move its entry to this table AND to the Phase Log in the same commit. Remove it from Future Features entirely. A feature must never exist in more than one place.**
+
+---
+
+---
+
 ### 🎯 Goals & Body Setup
 
 **1. Age-Specific Framing Copy** — ✅ Partially built (age callouts in Goals Setup step 5); remaining: nutrition page showing age-adjusted targets vs FDA defaults side-by-side
@@ -956,21 +984,6 @@ Build order is listed within each section. The overall priority is: Goals Setup 
 - 25–35: "Your metabolism is beginning a gradual slowdown — the numbers reflect a small adjustment."
 - 35–50: "After 35, muscle is harder to maintain — your protein target is slightly higher to compensate."
 - 50+: "After 50, protein and calcium needs actually increase. Your targets are higher than the generic FDA averages on purpose."
-
-**2. `gain_weight` Goal Option** — ✅ Built (Phase 51)
-
-**3. Dietary Preferences Wired Downstream** — ✅ Built (Phase 50)
-
-**4. Orphaned Inputs — Wire Up Remaining** — ✅ Built (Phase 55 + Phase 68)
-- `biggest_obstacles` → workout plan AI prompt (injury-aware adjustments) [Phase 55]
-- `primary_motivations` + `why_goals` → Daily Brief personalization (tone shaping) [Phase 55]
-- `sleep_hours` → Daily Brief sleep target vs actual gap when relevant [Phase 55]
-- `mood_level` → Daily Brief mood streak [Phase 68]
-- `post_workout_difficulty/energy/note/hr_zones` → Daily Brief yesterday's workout coaching context [Phase 68]
-- `dietary_preferences` → Daily Brief nutrition commentary [Phase 68]
-- `calorie_history_note` → Daily Brief as ground truth overriding formula estimates [Phase 68]
-- `primary_motivations/biggest_obstacles/why_goals/dietary_preferences` → Monthly Wrap personal context [Phase 68]
-- `workout_days/equipment/cardio_options` → actually persisted to workout_profiles (were silently lost) [Phase 68]
 
 **17. Persistent Coach Memory (`coach_memory` table)** — 💬 Discussed
 
@@ -1059,19 +1072,11 @@ Distinct from coach_memory. This is the check-in note "tired, right shoulder sor
 ### 🍎 Nutrition
 
 
-**Photo-Based Food Logging** — ✅ Built (Phase Z)
-
-**5. Pre/Post Workout Meal Advisor** — ✅ Built (Phase 51)
-
-**10. Supplement Logs Table + Adherence Tracking** — ✅ Built (Phase 51)
-
-**12. Food Log Editing Mode + Session-Scoped Meal Insight** — ✅ Built (Phase 69)
-
-**Decision: Feature A (post-meal slot insight) is retired.** Replaced fully by Feature 12. Feature C (catch-up detection) is incorporated into Feature 12's session metadata — also retired.
+**Decision: Feature A (post-meal slot insight) is retired.** Replaced fully by Feature 12 (Food Log Editing Mode). Feature C (catch-up detection) is incorporated into Feature 12's session metadata — also retired.
 
 ---
 
-### Feature 12 — Comprehensive Build Spec
+### Feature 12 — Comprehensive Build Spec (Reference Only — ✅ Built Phase 69)
 
 #### The Problem Being Solved
 The current nutrition page has add/delete buttons always visible. This causes three problems:
@@ -1426,30 +1431,11 @@ Intentional? Sometimes we all need a day off from tracking.
 
 ### 🧘 Stretching & Mobility
 
-**11. Full Stretching & Mobility Section** — ✅ Built (Phase 54)
-
 ---
 
 ### ❤️ Health & Recovery
 
 *(Soreness tracking and chronic pain follow-up are covered under Stretching & Mobility above. No additional items currently.)*
-
----
-
-### 💧 Hydration
-
-**Food Water Content in Hydration Tab** — 💬 Discussed
-
-The Hydration page (`water/page.js`) currently only counts explicit water logs and drink entries from `food_log_entries` (meal_slot='drink'). It does not surface the passive water content in solid foods (e.g. fruits, vegetables, oatmeal, soups — all of which have `water_g` values in `food_log_entries`).
-
-The Life Hub dashboard home and the Weekly/Monthly Wrap already include this via `f.water_g * 0.0338` (g → oz conversion). The Hydration page should match.
-
-**What to add:**
-- Query all non-drink `food_log_entries` for the day where `water_g > 0`
-- Convert to oz and add to the hydration ring total as a third segment (distinct color from water-blue and beverage-purple — use a light green or teal)
-- Show a "from food" line in the breakdown: `Water from food: 8 oz (cucumbers, oatmeal, apple)`
-- Keep this visually secondary — passive food water is a "bonus" category, not a primary hydration source. The ring should show it but the goal progress bar should only count explicit water + drinks (that's what users control and intend)
-- The 7-day bar chart should also include food water in the stacked totals for completeness
 
 ---
 
@@ -1581,7 +1567,7 @@ This exists in the stretch library but never surfaces in recommendation context.
 
 ---
 
-**22. Workout Day Hub — Full Architecture** — ✅ Built (Phase R)
+**22. Workout Day Hub — Full Architecture** — ✅ Built (Phase R) — [Reference spec below]
 
 **The architectural shift:** The Day Hub collapses four current pages (plan day expand, standalone stretching page, workout logger entry, coaching completion screen) into one coherent owner for the full training day. It is the single entry point for starting any workout or stretch session. The standalone Stretching & Mobility page (`/life-hub/workouts/stretching`) is retired — that flow lives exclusively inside the Day Hub. The Stretch Library stays but becomes reference documentation under the Workouts section, not a flow destination.
 

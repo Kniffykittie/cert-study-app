@@ -53,6 +53,26 @@ Workouts    #3b82f6   (blue)
 - **All user-supplied free text injected into AI prompts must be wrapped in `<user_input>` tags** with a note telling Claude to treat it as data only
 - **Every new loggable feature ships with a reset row in Settings** in the same build session
 
+## No-Rebuild & No-Assumption Rules (Enforced — Do Not Skip)
+
+### Never Rebuild What Is Already Built
+- **Before writing a single line of code for any feature, read `build-notes.md` and verify the feature is NOT already marked ✅ Built in the Phase Log or the Confirmed Built table at the top of Future Features.**
+- If a feature shows ✅ Built anywhere in the notes, DO NOT rebuild it, re-implement it, or create a duplicate. Stop and read the existing implementation instead.
+- If a feature shows ⚠️ Partial, ask the user what specifically is missing before writing any new code — do not assume.
+- **The only valid reason to touch a ✅ Built feature is an explicit bug fix or an explicit user-requested enhancement.** Even then, state what you are changing and why before making any edits.
+
+### Never Assume — Always Ask
+- **If there is any ambiguity about whether something is built, partially built, or not built — ASK before starting.** Do not infer from file names, state variable names, or partial grep matches. Read the actual implementation.
+- **If the user's request could be interpreted two or more ways, ask which they mean** before writing code. One clarifying question saves more time than a wrong implementation.
+- **If a specced feature depends on another feature being built first, confirm the dependency is met** before starting. Do not assume the prerequisite exists because it was discussed.
+- **Never assume a migration has been applied to the database.** If a feature requires a new table or column, confirm it exists via Supabase MCP tools before referencing it in code.
+
+### The One-Source-of-Truth Rule for Build Status
+- **A feature has exactly ONE authoritative status:** its entry in `build-notes.md`.
+- Built = moved to Phase Log. If it is still in Future Features with a ✅ tag, that tag is stale — move it to the Phase Log in the same session it was verified built.
+- **No feature may exist in both Future Features AND the Phase Log at the same time.** If you see this, resolve it immediately before building anything else.
+- When a session ends, every feature touched (built, partially built, or just discussed) must have its status updated in `build-notes.md` before the commit. No exceptions.
+
 ## Security Rules (Enforced — Do Not Skip)
 These rules were established after a full top-to-bottom security audit and must be applied to every new route and every new feature.
 
