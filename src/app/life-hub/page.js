@@ -105,6 +105,8 @@ export default function LifeHubPage() {
   const [activeBrief, setActiveBrief] = useState('morning')
   const [recoveryExpanded, setRecoveryExpanded] = useState(false)
   const [checkinWhyOpen, setCheckinWhyOpen] = useState(false)
+  const [afternoonCheckin, setAfternoonCheckin] = useState(null)
+  const [checkinTab, setCheckinTab] = useState('morning')
 
   const briefTriggered = useRef(false)
 
@@ -191,6 +193,9 @@ export default function LifeHubPage() {
         setSleepHoursInput(todayEntry.sleep_hours != null ? String(todayEntry.sleep_hours) : '')
         setNote(todayEntry.note ?? '')
         setSaved(true)
+        if (todayEntry.afternoon_energy || todayEntry.afternoon_mood) {
+          setAfternoonCheckin({ energy: todayEntry.afternoon_energy ?? 0, mood: todayEntry.afternoon_mood ?? 0, note: todayEntry.afternoon_note ?? '' })
+        }
       }
 
       const waterOz = (waterData ?? []).reduce((s, r) => s + parseFloat(r.amount_oz), 0)
@@ -320,6 +325,21 @@ export default function LifeHubPage() {
     }
     load()
   }, [today, yesterday])
+
+  useEffect(() => {
+    async function refreshKcal() {
+      if (document.visibilityState !== 'visible') return
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const t = dateStr()
+      const { data } = await supabase.from('food_log_entries').select('calories').eq('user_id', user.id).eq('date', t)
+      const kcal = Math.round((data || []).reduce((s, r) => s + (r.calories || 0), 0))
+      setSectionData(prev => prev ? { ...prev, todayKcal: kcal } : prev)
+    }
+    document.addEventListener('visibilitychange', refreshKcal)
+    return () => document.removeEventListener('visibilitychange', refreshKcal)
+  }, [])
 
   async function handleSave() {
     if (!energy && !mood) return
@@ -735,9 +755,187 @@ export default function LifeHubPage() {
         )
       })()}
 
+      {/* Check-In + Heatmap — combined card */}
+      <div style={{ backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', marginBottom: '20px', overflow: 'hidden' }}>
+        {/* Morning / Afternoon tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
+          {[
+            { key: 'morning', icon: '☀️', label: 'Morning' },
+            ...(afternoonCheckin ? [{ key: 'afternoon', icon: '🌤️', label: 'Afternoon' }] : []),
+          ].map(tab => {
+            const isActive = checkinTab === tab.key
+            return (
+              <button key={tab.key} onClick={() => setCheckinTab(tab.key)}
+                style={{ flex: 1, padding: '10px 8px', border: 'none', background: isActive ? `${SC.overview}12` : 'transparent', color: isActive ? SC.overview : 'var(--text-secondary)', fontSize: '12px', fontWeight: isActive ? '700' : '400', cursor: 'pointer', borderBottom: isActive ? `2px solid ${SC.overview}` : '2px solid transparent', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        <div style={{ padding: '24px' }}>
+          {/* Afternoon read-only view */}
+          {checkinTab === 'afternoon' && afternoonCheckin ? (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h2 style={{ color: '#f59e0b', fontSize: '16px', fontWeight: '700', margin: 0 }}>🌤️ Afternoon Check-In</h2>
+                <span style={{ fontSize: '12px', color: 'var(--success)', fontWeight: '600' }}>✓ Logged</span>
+              </div>
+              <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                {[
+                  { label: 'Energy', value: afternoonCheckin.energy, max: 5 },
+                  { label: 'Mood', value: afternoonCheckin.mood, max: 5 },
+                ].map(({ label, value }) => (
+                  <div key={label} style={{ flex: 1, minWidth: '120px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>{label}</div>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      {[1, 2, 3, 4, 5].map(n => (
+                        <div key={n} style={{ flex: 1, height: '36px', borderRadius: '7px', backgroundColor: n <= value ? '#f59e0b22' : 'var(--background)', border: `1px solid ${n <= value ? '#f59e0b' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '700', color: n <= value ? '#f59e0b' : 'var(--border)' }}>{n}</div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {afternoonCheckin.note && (
+                <div style={{ marginTop: '14px', backgroundColor: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '8px', padding: '10px 13px' }}>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>{afternoonCheckin.note}</p>
+                </div>
+              )}
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '14px', marginBottom: '0' }}>Logged via the afternoon check-in pop-up. Open it again from the bottom bar to update.</p>
+            </div>
+          ) : (
+            <>
+              {/* Header row */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <h2 style={{ color: SC.overview, fontSize: '16px', fontWeight: '700', margin: 0 }}>✍️ Today's Check-In</h2>
+                    {(() => {
+                      const checkinMap = {}
+                      for (const c of checkins) checkinMap[c.date] = c
+                      let streak = 0
+                      for (let i = 0; i <= 27; i++) {
+                        const d = dateStr(i)
+                        if (d === today && (energy || mood)) { streak++; continue }
+                        if (checkinMap[d]) streak++
+                        else break
+                      }
+                      return streak >= 2 ? (
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--warning)', backgroundColor: 'rgba(241,196,15,0.12)', border: '1px solid rgba(241,196,15,0.25)', borderRadius: '20px', padding: '2px 8px' }}>
+                          🔥 {streak}-day streak
+                        </span>
+                      ) : null
+                    })()}
+                    <button onClick={() => setCheckinWhyOpen(o => !o)}
+                      style={{ background: 'none', border: `1px solid ${SC.overview}44`, borderRadius: '20px', color: SC.overview, fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', opacity: 0.8 }}>
+                      ℹ️ Why log this?
+                    </button>
+                  </div>
+                  {saved && <span style={{ fontSize: '12px', color: 'var(--success)', fontWeight: '600', flexShrink: 0 }}>✓ Logged</span>}
+                </div>
+                {checkinContext?.contextNote
+                  ? <p style={{ color: SC.overview, fontSize: '12px', fontWeight: '500', margin: '0 0 0', opacity: 0.85 }}>{checkinContext.contextNote}</p>
+                  : <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0' }}>How are you feeling today?</p>
+                }
+                {checkinWhyOpen && (
+                  <div style={{ marginTop: '12px', backgroundColor: `${SC.overview}0d`, border: `1px solid ${SC.overview}30`, borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: SC.overview, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Why your daily check-in matters</div>
+                    {[
+                      { icon: '🤖', text: 'Powers your Daily Brief — the AI reads your energy and mood when writing your personalized morning summary, so it actually reflects how you\'re doing.' },
+                      { icon: '🧠', text: 'Makes your questions smarter — leg day? low sleep? calorie deficit? The app adjusts what it asks you based on patterns in your real data.' },
+                      { icon: '📊', text: 'Builds your health picture — your 28-day heatmap tracks consistency, and low-energy streaks trigger warnings in your workout plan so you don\'t overtrain.' },
+                    ].map(({ icon, text }) => (
+                      <div key={icon} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: '14px', flexShrink: 0 }}>{icon}</span>
+                        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>{text}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Two-column: form left, heatmap right */}
+              <div className="lh-checkin-cols" style={{ display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
+                {/* Form */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {loaded && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      <RatingRow label={checkinContext?.energyLabel || 'Energy'} sublabels={['', ...(checkinContext?.energySubs || ['Exhausted', 'Low', 'Okay', 'Good', 'Energized'])]} value={energy} setValue={setEnergy} />
+                      <RatingRow label={checkinContext?.moodLabel || 'Mood'} sublabels={['', ...(checkinContext?.moodSubs || ['Rough', 'Meh', 'Okay', 'Good', 'Great'])]} value={mood} setValue={setMood} colors={MOOD_COLORS} />
+                      {!hasGoogleSleep && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontSize: '13px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>😴 Hours slept?</span>
+                          <input
+                            type="number" min="0" max="24" step="0.5"
+                            value={sleepHoursInput}
+                            onChange={e => setSleepHoursInput(e.target.value)}
+                            placeholder="e.g. 7.5"
+                            style={{ width: '80px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '7px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }}
+                          />
+                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Used by Recovery Score</span>
+                        </div>
+                      )}
+                      {!microInsight && (
+                        <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add a note (optional)..." rows={2}
+                          style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+                      )}
+                      {microInsight && (
+                        <div style={{ backgroundColor: `${SC.overview}12`, border: `1px solid ${SC.overview}30`, borderRadius: '8px', padding: '10px 13px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '13px', flexShrink: 0 }}>💡</span>
+                          <p style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.6', margin: 0 }}>{microInsight}</p>
+                        </div>
+                      )}
+                      <button onClick={handleSave} disabled={saving || (!energy && !mood)}
+                        style={{ alignSelf: 'flex-start', backgroundColor: SC.overview, border: 'none', color: '#fff', borderRadius: '8px', padding: '9px 22px', fontSize: '13px', fontWeight: '600', cursor: (saving || (!energy && !mood)) ? 'not-allowed' : 'pointer', opacity: (saving || (!energy && !mood)) ? 0.5 : 1 }}>
+                        {saving ? 'Saving...' : saved ? 'Update' : 'Save Check-In'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Heatmap */}
+                <div style={{ flexShrink: 0 }}>
+                  <div style={{ color: SC.overview, fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>📅 28-Day History</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+                    {Array.from({ length: 28 }, (_, i) => dateStr(27 - i)).map(date => {
+                      const checkinMap = {}
+                      for (const c of checkins) checkinMap[c.date] = c
+                      const entry = checkinMap[date]
+                      const isToday = date === today
+                      const eSum = entry ? (entry.energy_level || 0) + (entry.mood_level || 0) : 0
+                      const eCnt = entry?.energy_level && entry?.mood_level ? 2 : 1
+                      const avg = entry ? Math.round(eSum / eCnt) : 0
+                      let bg = 'var(--border)'
+                      if (isToday && (energy || mood)) bg = avg >= 4 ? 'var(--success)' : avg === 3 ? 'var(--accent-blue)' : avg >= 1 ? 'var(--warning)' : SC.overview
+                      else if (avg >= 4) bg = 'var(--success)'
+                      else if (avg === 3) bg = 'var(--accent-blue)'
+                      else if (avg >= 1) bg = 'var(--warning)'
+                      return (
+                        <div key={date}
+                          title={entry ? `${date}: Energy ${entry.energy_level || '—'}, Mood ${entry.mood_level || '—'}` : date}
+                          style={{ width: '20px', height: '20px', borderRadius: '3px', backgroundColor: bg, outline: isToday ? `2px solid ${SC.overview}` : 'none', outlineOffset: '1px', opacity: entry || (isToday && (energy || mood)) ? 1 : 0.25 }} />
+                      )
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
+                    {[{ bg: 'var(--success)', label: 'Good (4–5)' }, { bg: 'var(--accent-blue)', label: 'Okay (3)' }, { bg: 'var(--warning)', label: 'Low (1–2)' }].map(l => (
+                      <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <div style={{ width: '9px', height: '9px', borderRadius: '2px', backgroundColor: l.bg, flexShrink: 0 }} />
+                        <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{l.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
       {/* Zone 3 — Section Summary Cards */}
       {loaded && sd && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '0' }}>
           <SectionCard
             color={SC.nutrition} icon="🍽️" sectionLabel="Nutrition"
             hero={sd.tdee ? `${sd.todayKcal.toLocaleString()} kcal` : sd.todayKcal > 0 ? `${sd.todayKcal.toLocaleString()} kcal` : 'Nothing logged'}
@@ -768,132 +966,6 @@ export default function LifeHubPage() {
           />
         </div>
       )}
-
-      {/* Check-In + Heatmap — combined card */}
-      <div style={{ backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', padding: '24px', marginBottom: '0' }}>
-        {/* Header row */}
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <h2 style={{ color: SC.overview, fontSize: '16px', fontWeight: '700', margin: 0 }}>✍️ Today's Check-In</h2>
-              {(() => {
-                const checkinMap = {}
-                for (const c of checkins) checkinMap[c.date] = c
-                let streak = 0
-                for (let i = 0; i <= 27; i++) {
-                  const d = dateStr(i)
-                  if (d === today && (energy || mood)) { streak++; continue }
-                  if (checkinMap[d]) streak++
-                  else break
-                }
-                return streak >= 2 ? (
-                  <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--warning)', backgroundColor: 'rgba(241,196,15,0.12)', border: '1px solid rgba(241,196,15,0.25)', borderRadius: '20px', padding: '2px 8px' }}>
-                    🔥 {streak}-day streak
-                  </span>
-                ) : null
-              })()}
-              <button onClick={() => setCheckinWhyOpen(o => !o)}
-                style={{ background: 'none', border: `1px solid ${SC.overview}44`, borderRadius: '20px', color: SC.overview, fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', opacity: 0.8 }}>
-                ℹ️ Why log this?
-              </button>
-            </div>
-            {saved && <span style={{ fontSize: '12px', color: 'var(--success)', fontWeight: '600', flexShrink: 0 }}>✓ Logged</span>}
-          </div>
-          {checkinContext?.contextNote
-            ? <p style={{ color: SC.overview, fontSize: '12px', fontWeight: '500', margin: '0 0 0', opacity: 0.85 }}>{checkinContext.contextNote}</p>
-            : <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0' }}>How are you feeling today?</p>
-          }
-          {checkinWhyOpen && (
-            <div style={{ marginTop: '12px', backgroundColor: `${SC.overview}0d`, border: `1px solid ${SC.overview}30`, borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: SC.overview, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Why your daily check-in matters</div>
-              {[
-                { icon: '🤖', text: 'Powers your Daily Brief — the AI reads your energy and mood when writing your personalized morning summary, so it actually reflects how you\'re doing.' },
-                { icon: '🧠', text: 'Makes your questions smarter — leg day? low sleep? calorie deficit? The app adjusts what it asks you based on patterns in your real data.' },
-                { icon: '📊', text: 'Builds your health picture — your 28-day heatmap tracks consistency, and low-energy streaks trigger warnings in your workout plan so you don\'t overtrain.' },
-              ].map(({ icon, text }) => (
-                <div key={icon} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '14px', flexShrink: 0 }}>{icon}</span>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>{text}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Two-column: form left, heatmap right */}
-        <div className="lh-checkin-cols" style={{ display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
-          {/* Form */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {loaded && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <RatingRow label={checkinContext?.energyLabel || 'Energy'} sublabels={['', ...(checkinContext?.energySubs || ['Exhausted', 'Low', 'Okay', 'Good', 'Energized'])]} value={energy} setValue={setEnergy} />
-                <RatingRow label={checkinContext?.moodLabel || 'Mood'} sublabels={['', ...(checkinContext?.moodSubs || ['Rough', 'Meh', 'Okay', 'Good', 'Great'])]} value={mood} setValue={setMood} colors={MOOD_COLORS} />
-                {!hasGoogleSleep && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '13px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>😴 Hours slept?</span>
-                    <input
-                      type="number" min="0" max="24" step="0.5"
-                      value={sleepHoursInput}
-                      onChange={e => setSleepHoursInput(e.target.value)}
-                      placeholder="e.g. 7.5"
-                      style={{ width: '80px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '7px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }}
-                    />
-                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Used by Recovery Score</span>
-                  </div>
-                )}
-                {!microInsight && (
-                  <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add a note (optional)..." rows={2}
-                    style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
-                )}
-                {microInsight && (
-                  <div style={{ backgroundColor: `${SC.overview}12`, border: `1px solid ${SC.overview}30`, borderRadius: '8px', padding: '10px 13px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '13px', flexShrink: 0 }}>💡</span>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.6', margin: 0 }}>{microInsight}</p>
-                  </div>
-                )}
-                <button onClick={handleSave} disabled={saving || (!energy && !mood)}
-                  style={{ alignSelf: 'flex-start', backgroundColor: SC.overview, border: 'none', color: '#fff', borderRadius: '8px', padding: '9px 22px', fontSize: '13px', fontWeight: '600', cursor: (saving || (!energy && !mood)) ? 'not-allowed' : 'pointer', opacity: (saving || (!energy && !mood)) ? 0.5 : 1 }}>
-                  {saving ? 'Saving...' : saved ? 'Update' : 'Save Check-In'}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Heatmap */}
-          <div style={{ flexShrink: 0 }}>
-            <div style={{ color: SC.overview, fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>📅 28-Day History</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
-              {Array.from({ length: 28 }, (_, i) => dateStr(27 - i)).map(date => {
-                const checkinMap = {}
-                for (const c of checkins) checkinMap[c.date] = c
-                const entry = checkinMap[date]
-                const isToday = date === today
-                const eSum = entry ? (entry.energy_level || 0) + (entry.mood_level || 0) : 0
-                const eCnt = entry?.energy_level && entry?.mood_level ? 2 : 1
-                const avg = entry ? Math.round(eSum / eCnt) : 0
-                let bg = 'var(--border)'
-                if (isToday && (energy || mood)) bg = avg >= 4 ? 'var(--success)' : avg === 3 ? 'var(--accent-blue)' : avg >= 1 ? 'var(--warning)' : SC.overview
-                else if (avg >= 4) bg = 'var(--success)'
-                else if (avg === 3) bg = 'var(--accent-blue)'
-                else if (avg >= 1) bg = 'var(--warning)'
-                return (
-                  <div key={date}
-                    title={entry ? `${date}: Energy ${entry.energy_level || '—'}, Mood ${entry.mood_level || '—'}` : date}
-                    style={{ width: '20px', height: '20px', borderRadius: '3px', backgroundColor: bg, outline: isToday ? `2px solid ${SC.overview}` : 'none', outlineOffset: '1px', opacity: entry || (isToday && (energy || mood)) ? 1 : 0.25 }} />
-                )
-              })}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
-              {[{ bg: 'var(--success)', label: 'Good (4–5)' }, { bg: 'var(--accent-blue)', label: 'Okay (3)' }, { bg: 'var(--warning)', label: 'Low (1–2)' }].map(l => (
-                <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <div style={{ width: '9px', height: '9px', borderRadius: '2px', backgroundColor: l.bg, flexShrink: 0 }} />
-                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{l.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }

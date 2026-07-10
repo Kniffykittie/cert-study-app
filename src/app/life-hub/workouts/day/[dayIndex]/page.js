@@ -3,6 +3,7 @@ import { useEffect, useState, use } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Suspense } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { getRecommendedStretches, STRETCHES } from '@/data/stretches'
 
 const DOW_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -65,14 +66,31 @@ function DayHubInner({ params }) {
   const [loading, setLoading] = useState(true)
   const [coachExpanded, setCoachExpanded] = useState(false)
   const [markingRead, setMarkingRead] = useState(false)
+  const [tomorrowPlan, setTomorrowPlan] = useState(null)
+  const [soreSpots, setSoreSpots] = useState([])
 
   useEffect(() => { load() }, [targetDate])
 
   async function load() {
     setLoading(true)
-    const res = await fetch(`/api/workouts/day-hub?date=${targetDate}`)
-    const json = await res.json()
+    const tomorrow = addDays(targetDate, 1)
+    const [mainRes, tomorrowRes] = await Promise.all([
+      fetch(`/api/workouts/day-hub?date=${targetDate}`),
+      fetch(`/api/workouts/day-hub?date=${tomorrow}`),
+    ])
+    const [json, tomorrowJson] = await Promise.all([mainRes.json(), tomorrowRes.json()])
     setData(json)
+    setTomorrowPlan(tomorrowJson.plan_day ?? null)
+
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: checkin } = await supabase.from('daily_checkins').select('sore_spots').eq('user_id', user.id).eq('date', targetDate).maybeSingle()
+        setSoreSpots(checkin?.sore_spots ?? [])
+      }
+    } catch {}
+
     setLoading(false)
   }
 
@@ -131,21 +149,33 @@ function DayHubInner({ params }) {
     setsByExercise[key].push(s)
   }
 
-  // Recommend stretches for the plan day — derive body parts from label keywords AND actual exercises
-  const bodyPartsSet = new Set()
-  if (plan_day?.day_label) {
-    const label = plan_day.day_label.toLowerCase()
-    if (label.includes('chest') || label.includes('push')) { bodyPartsSet.add('chest'); bodyPartsSet.add('shoulders') }
-    if (label.includes('back') || label.includes('pull')) bodyPartsSet.add('back')
-    if (label.includes('leg') || label.includes('lower')) { bodyPartsSet.add('legs'); bodyPartsSet.add('glutes'); bodyPartsSet.add('hamstrings') }
-    if (label.includes('shoulder')) bodyPartsSet.add('shoulders')
-    if (label.includes('arm')) bodyPartsSet.add('arms')
-    if (label.includes('core') || label.includes('abs')) bodyPartsSet.add('core')
+  function labelToBodyParts(label) {
+    const s = new Set()
+    if (!label) return s
+    const l = label.toLowerCase()
+    if (l.includes('chest') || l.includes('push')) { s.add('chest'); s.add('shoulders') }
+    if (l.includes('back') || l.includes('pull')) s.add('back')
+    if (l.includes('leg') || l.includes('lower')) { s.add('legs'); s.add('glutes'); s.add('hamstrings') }
+    if (l.includes('shoulder')) s.add('shoulders')
+    if (l.includes('arm')) s.add('arms')
+    if (l.includes('core') || l.includes('abs')) s.add('core')
+    return s
   }
-  for (const ex of plan_day?.exercises ?? []) {
-    if (ex.body_part) bodyPartsSet.add(ex.body_part.toLowerCase())
-  }
-  const { dynamic: dynStretches, static: staStretches } = getRecommendedStretches([...bodyPartsSet], [])
+
+  const todayBodyParts = new Set([...labelToBodyParts(plan_day?.day_label)])
+  for (const ex of plan_day?.exercises ?? []) { if (ex.body_part) todayBodyParts.add(ex.body_part.toLowerCase()) }
+  if (plan_day?.cardio) todayBodyParts.add('cardio')
+
+  const tomorrowBodyParts = new Set([...labelToBodyParts(tomorrowPlan?.day_label)])
+  for (const ex of tomorrowPlan?.exercises ?? []) { if (ex.body_part) tomorrowBodyParts.add(ex.body_part.toLowerCase()) }
+  if (tomorrowPlan?.cardio && !tomorrowPlan?.exercises?.length) tomorrowBodyParts.add('cardio')
+
+  const preBodyParts = new Set([...todayBodyParts, ...tomorrowBodyParts])
+  const { dynamic: dynStretches } = getRecommendedStretches([...preBodyParts], soreSpots)
+  const { static: staStretches } = getRecommendedStretches([...todayBodyParts], [])
+  const bedBodyParts = new Set([...todayBodyParts])
+  const { static: bedStaStretches, dynamic: bedDynStretches } = getRecommendedStretches([...bedBodyParts], soreSpots)
+  const bedtimeStretches = [...bedStaStretches, ...bedDynStretches].slice(0, 5)
 
   const hasCoach = !!workout_log?.ai_coaching_response
   const coachUnread = hasCoach && !workout_log.coaching_feedback_read_at
@@ -218,14 +248,20 @@ function DayHubInner({ params }) {
               </div>
             ) : isToday ? (
               <div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.6, margin: '0 0 12px' }}>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.6, margin: '0 0 4px' }}>
                   5–8 minutes of dynamic movement primes your joints and raises muscle temperature before lifting.
                 </p>
-                {dynStretches.slice(0, 4).length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-                    {dynStretches.slice(0, 4).map(s => (
-                      <div key={s.id} style={{ fontSize: 12, color: 'var(--text-secondary)', backgroundColor: 'var(--background)', borderRadius: 6, padding: '6px 10px', border: '1px solid var(--border)' }}>
-                        ⚡ {s.name} <span style={{ color: 'var(--text-secondary)', opacity: 0.6 }}>· {s.duration_seconds}s</span>
+                {tomorrowBodyParts.size > 0 && (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.5, margin: '0 0 12px', opacity: 0.8 }}>
+                    💡 Includes mobility for tomorrow's muscles — pre-loading range of motion now means less stiffness mid-session tomorrow.
+                  </p>
+                )}
+                {dynStretches.slice(0, 5).length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                    {dynStretches.slice(0, 5).map(s => (
+                      <div key={s.id} style={{ backgroundColor: 'var(--background)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: s.why ? 5 : 0 }}>⚡ {s.name} <span style={{ color: 'var(--text-secondary)', fontWeight: 400, fontSize: 11 }}>· {s.duration_seconds}s</span></div>
+                        {s.why && <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>{s.why}</p>}
                       </div>
                     ))}
                   </div>
@@ -327,13 +363,14 @@ function DayHubInner({ params }) {
           ) : isToday ? (
             <div>
               <p style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.6, margin: '0 0 12px' }}>
-                Static holds right after lifting extend muscle fibers while they're warm and pliable — this is when stretching does the most for flexibility.
+                Static holds right after lifting extend muscle fibers while they're warm and pliable — this is when stretching does the most for long-term flexibility gains.
               </p>
-              {staStretches.slice(0, 4).length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-                  {staStretches.slice(0, 4).map(s => (
-                    <div key={s.id} style={{ fontSize: 12, color: 'var(--text-secondary)', backgroundColor: 'var(--background)', borderRadius: 6, padding: '6px 10px', border: '1px solid var(--border)' }}>
-                      🧘 {s.name} <span style={{ color: 'var(--text-secondary)', opacity: 0.6 }}>· {s.duration_seconds}s</span>
+              {staStretches.slice(0, 5).length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                  {staStretches.slice(0, 5).map(s => (
+                    <div key={s.id} style={{ backgroundColor: 'var(--background)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: s.why ? 5 : 0 }}>🧘 {s.name} <span style={{ color: 'var(--text-secondary)', fontWeight: 400, fontSize: 11 }}>· {s.duration_seconds}s</span></div>
+                      {s.why && <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>{s.why}</p>}
                     </div>
                   ))}
                 </div>
@@ -364,9 +401,25 @@ function DayHubInner({ params }) {
           </div>
         ) : isToday ? (
           <div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.6, margin: '0 0 12px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.6, margin: '0 0 4px' }}>
               5–10 minutes of gentle holds before bed activates the parasympathetic nervous system, lowers cortisol, and improves sleep onset.
             </p>
+            {soreSpots.length > 0 && (
+              <p style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.5, margin: '0 0 12px', opacity: 0.8 }}>
+                💡 Targeting sore spots ({soreSpots.join(', ')}) — gentle static holds help flush metabolic waste and reduce overnight stiffness.
+              </p>
+            )}
+            {bedtimeStretches.length === 0 && <div style={{ marginBottom: 12 }} />}
+            {bedtimeStretches.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                {bedtimeStretches.map(s => (
+                  <div key={s.id} style={{ backgroundColor: 'var(--background)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: s.why ? 5 : 0 }}>🌙 {s.name} <span style={{ color: 'var(--text-secondary)', fontWeight: 400, fontSize: 11 }}>· {s.duration_seconds}s</span></div>
+                    {s.why && <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>{s.why}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
             <Link href={`/life-hub/workouts/stretches?context=bedtime&from=/life-hub/workouts/day/${dayIndex}`}
               style={{ display: 'inline-block', padding: '9px 16px', backgroundColor: '#a78bfa', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
               Start Bedtime Stretches →

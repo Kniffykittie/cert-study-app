@@ -3017,6 +3017,17 @@ PHASE D (polish):
 
 ## Phase Log
 
+### Phase 91 — Home Page UX + Day Hub Stretch Improvements — Complete
+- **Why:** Multiple UX pain points found from usage: check-in card was buried below section summary cards; afternoon mood/energy wasn't visible anywhere on home page; kcal on home page went stale when navigating away and back; Day Hub stretch lists had no WHY descriptions and didn't use adjacent-day workout context; bedtime phase showed no stretch suggestions at all
+- **Check-in card moved:** Now appears directly below the Daily Brief (before Zone 3 section cards) so it's the first interactive element after reading your brief
+- **Morning/Afternoon tabs on check-in:** Added `checkinTab` + `afternoonCheckin` state; after `load()` extracts today's entry, if `afternoon_energy` or `afternoon_mood` is set, `setAfternoonCheckin(...)` populates it; Afternoon tab appears conditionally; shows read-only energy/mood grid + note in yellow (#f59e0b) theme matching the afternoon check-in bottom sheet
+- **kcal stale fix:** Added `visibilitychange` useEffect that re-fetches today's `food_log_entries` calories when the user returns to the Life Hub tab; updates `sectionData.todayKcal` without re-fetching everything else
+- **Day Hub — adjacent day muscles:** Added parallel fetch for tomorrow's day-hub in `load()`; computes `tomorrowBodyParts` set; pre-workout stretch list now uses `[...todayBodyParts, ...tomorrowBodyParts]` so upcoming muscles are included; rest-day cardio mapped via `todayBodyParts.add('cardio')` so `getRecommendedStretches()` handles it
+- **Day Hub — sore spots fetch:** Added Supabase client import + sore spots query from `daily_checkins` in `load()`; passed into bedtime stretch computation and shown in a context note ("Targeting sore spots: …")
+- **Day Hub — WHY descriptions:** All three stretch lists (pre/post/bedtime) now render as proper cards with `s.why` below each stretch name instead of plain text chips
+- **Day Hub — bedtime recommendations:** Previously bedtime phase showed only the description + start button with no suggested stretches; now shows up to 5 static stretches targeting today's muscles + sore spots with full WHY text
+- **What to test:** (1) Complete afternoon check-in from bottom sheet, then open Life Hub — Afternoon tab should appear on check-in card with correct energy/mood; (2) Log food, navigate away, come back — kcal pill should show the latest total without a full page reload; (3) Day Hub on a training day — pre-workout stretches should mention tomorrow's muscles if tomorrow is also a training day; (4) Day Hub bedtime phase — stretch recommendations should appear with WHY text; (5) Rest day — bedtime should recommend stretches if cardio is planned
+
 ### Build Fix — Turbopack Parse Error + Middleware Deprecation — Complete
 - **Problem:** `src/app/life-hub/page.js` had a stale duplicate IIFE opener (`{recoveryScore && (() => {`) at line 494 that was never closed, causing Turbopack to report "Unterminated regexp literal" at end-of-file
 - **Fix:** Removed the orphaned 2-line duplicate block (comment + IIFE opener); the real block immediately below it was the correct one
