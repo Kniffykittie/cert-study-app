@@ -3021,6 +3021,13 @@ PHASE D (polish):
 
 ## Phase Log
 
+### Phase 81 — Life Hub Home Redesign (3a/3b/3c) — Complete
+
+- **3a (SVG ring):** Recovery Score replaced the `42px` plain number with an `80px` SVG donut ring — `r=40`, circumference=251.33, `strokeDashoffset` animates from 0–251 based on score; score and `/100` text embedded in SVG; mini bar chart hidden on mobile via `.lh-recovery-bars` CSS class
+- **3b (tabbed brief):** Three stacked Daily Brief cards replaced with a single card that has ☀️ Morning / 🌤️ Afternoon / 🌙 Evening tabs; Afternoon tab only visible when a brief exists; Evening tab only visible after 6pm or when brief exists; active tab underlined in section color; dot indicator when a brief is ready; `activeBrief` state with `resolvedKey` fallback guards tab switching
+- **3c (zone reorder):** Recovery Score now renders immediately after Zone 1 status pills; Daily Brief tabbed card renders below Recovery Score; Zone 3 section cards and Check-In remain below; page reads top-to-bottom: Status → Recovery → Brief → Sections → Check-In
+- **Mobile fix:** Check-in two-column layout (form + heatmap) stacks to single column via `.lh-checkin-cols` CSS class + `@media (max-width: 768px)` in page style block
+
 ### Phase 80 — Mobile UI Fixes — Complete
 
 - **Bug 1 (sidebar cutoff):** Both `LifeHubSidebar.js` and `StudyHubSidebar.js` changed from `minHeight: 100vh` to `height: 100dvh` so sidebar fills exact visible viewport height on mobile; added `overflowY: 'auto'` + `WebkitOverflowScrolling: 'touch'`; mobile overlay divs also changed to `100dvh`

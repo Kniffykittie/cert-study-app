@@ -102,6 +102,7 @@ export default function LifeHubPage() {
   const [briefs, setBriefs] = useState({ morning: null, afternoon: null, evening: null })
   const [briefLoading, setBriefLoading] = useState(false)
   const [briefExpanded, setBriefExpanded] = useState({ morning: false, afternoon: false, evening: false })
+  const [activeBrief, setActiveBrief] = useState('morning')
   const [recoveryExpanded, setRecoveryExpanded] = useState(false)
   const [checkinWhyOpen, setCheckinWhyOpen] = useState(false)
 
@@ -443,6 +444,12 @@ export default function LifeHubPage() {
 
   return (
     <div>
+      <style>{`
+        @media (max-width: 768px) {
+          .lh-checkin-cols { flex-direction: column !important; gap: 20px !important; }
+          .lh-recovery-bars { display: none !important; }
+        }
+      `}</style>
       <div style={{ marginBottom: '20px' }}>
         <h1 style={{ color: SC.overview, fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Life Hub</h1>
         <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Your health, fitness, and nutrition — all in one place.</p>
@@ -484,66 +491,8 @@ export default function LifeHubPage() {
         </div>
       )}
 
-      {/* Zone 2 — Daily Briefs */}
-      {(() => {
-        const currentHour = new Date().getHours()
-        const BRIEF_CONFIG = [
-          { key: 'morning', icon: '☀️', label: 'Morning Brief', color: SC.overview, alwaysShow: true },
-          { key: 'afternoon', icon: '🌤️', label: 'Afternoon Check-In', color: '#f59e0b', alwaysShow: false },
-          { key: 'evening', icon: '🌙', label: 'Evening Summary', color: '#818cf8', alwaysShow: false, minHour: 18 },
-        ]
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-            {BRIEF_CONFIG.map(cfg => {
-              const text = briefs[cfg.key]
-              const show = cfg.alwaysShow || text || (cfg.minHour != null && currentHour >= cfg.minHour)
-              if (!show) return null
-              const isExpanded = briefExpanded[cfg.key]
-              return (
-                <div key={cfg.key} style={{ backgroundColor: 'var(--surface)', borderTop: `1px solid ${text ? `${cfg.color}44` : 'var(--border)'}`, borderRight: `1px solid ${text ? `${cfg.color}44` : 'var(--border)'}`, borderBottom: `1px solid ${text ? `${cfg.color}44` : 'var(--border)'}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: '12px', padding: '16px 20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: text ? '10px' : '0', cursor: text ? 'pointer' : 'default' }}
-                    onClick={() => text && setBriefExpanded(prev => ({ ...prev, [cfg.key]: !prev[cfg.key] }))}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '16px' }}>{cfg.icon}</span>
-                      <div style={{ color: cfg.color, fontSize: '13px', fontWeight: '700' }}>{cfg.label}</div>
-                    </div>
-                    {text && <div style={{ color: 'var(--text-secondary)', fontSize: '16px', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>▾</div>}
-                  </div>
-                  {cfg.key === 'morning' && briefLoading && !text && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {[100, 85, 60].map((w, i) => (
-                        <div key={i} style={{ height: '13px', borderRadius: '4px', backgroundColor: 'var(--border)', width: `${w}%`, opacity: 0.5 }} />
-                      ))}
-                    </div>
-                  )}
-                  {cfg.key === 'morning' && !text && !briefLoading && (
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Complete your goals setup and start logging to get a personalized daily brief.</p>
-                  )}
-                  {cfg.key === 'afternoon' && !text && (
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Complete your morning or afternoon check-in to see your midday insight here.</p>
-                  )}
-                  {cfg.key === 'evening' && !text && (
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Generating your end-of-day summary…</p>
-                  )}
-                  {text && (
-                    <div>
-                      <p style={{ color: 'var(--text-primary)', fontSize: '14px', lineHeight: '1.7', margin: 0, display: isExpanded ? 'block' : '-webkit-box', WebkitLineClamp: isExpanded ? 'unset' : 3, WebkitBoxOrient: 'vertical', overflow: isExpanded ? 'visible' : 'hidden' }}>
-                        {text}
-                      </p>
-                      {text.length > 200 && (
-                        <button onClick={e => { e.stopPropagation(); setBriefExpanded(prev => ({ ...prev, [cfg.key]: !prev[cfg.key] })) }}
-                          style={{ background: 'none', border: 'none', color: cfg.color, fontSize: '12px', cursor: 'pointer', marginTop: '4px', padding: 0 }}>
-                          {isExpanded ? 'Show less' : 'Read more'}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )
-      })()}
+      {/* Recovery Score — above briefs */}
+      {recoveryScore && (() => {
 
       {/* Recovery Score — prominent banner above section cards */}
       {recoveryScore && (() => {
@@ -641,18 +590,27 @@ export default function LifeHubPage() {
             {/* Header row */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div>
-                  <div style={{ fontSize: '42px', fontWeight: '800', lineHeight: 1, color: scoreColor }}>{score}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>out of 100</div>
-                </div>
+                {/* SVG Ring */}
+                <svg width="76" height="76" viewBox="0 0 100 100" style={{ flexShrink: 0 }}>
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="var(--border)" strokeWidth="11" />
+                  <circle cx="50" cy="50" r="40" fill="none" stroke={scoreColor} strokeWidth="11"
+                    strokeDasharray="251.33"
+                    strokeDashoffset={251.33 * (1 - score / 100)}
+                    strokeLinecap="round"
+                    style={{ transform: 'rotate(-90deg)', transformOrigin: '50px 50px', transition: 'stroke-dashoffset 0.5s ease' }}
+                  />
+                  <text x="50" y="46" textAnchor="middle" dominantBaseline="middle" fill={scoreColor} fontSize="24" fontWeight="800">{score}</text>
+                  <text x="50" y="64" textAnchor="middle" dominantBaseline="middle" fill="var(--text-secondary)" fontSize="11">/100</text>
+                </svg>
                 <div>
                   <div style={{ fontSize: '17px', fontWeight: '700', color: scoreColor, marginBottom: '2px' }}>⚡ {scoreLabel}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>Recovery Score — based on yesterday's data <InfoChip label="ℹ️" text="Recovery Score (0–100) combines five factors from yesterday: Sleep (25 pts), Hydration (20 pts), Protein (20 pts), Daily Energy (15 pts), and Workout Load + Stretching (up to 20 pts). The score reflects how ready your body is for today's training and daily demands." /></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>Recovery Score <InfoChip label="ℹ️" text="Recovery Score (0–100) combines five factors from yesterday: Sleep (25 pts), Hydration (20 pts), Protein (20 pts), Daily Energy (15 pts), and Workout Load + Stretching (up to 20 pts). The score reflects how ready your body is for today's training and daily demands." /></div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', opacity: 0.7 }}>based on yesterday's data · tap to expand</div>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                {/* Mini component bars */}
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+                {/* Mini component bars — hidden on mobile via CSS */}
+                <div className="lh-recovery-bars" style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
                   {componentDetails.map(c => {
                     const pct = c.pts != null ? Math.round((c.pts / c.max) * 100) : 0
                     const barColor = pct >= 70 ? 'var(--success)' : pct >= 40 ? 'var(--warning)' : 'var(--error)'
@@ -709,6 +667,73 @@ export default function LifeHubPage() {
                 </div>
               </div>
             )}
+          </div>
+        )
+      })()}
+
+      {/* Zone 2 — Daily Brief (tabbed) */}
+      {(() => {
+        const currentHour = new Date().getHours()
+        const BRIEF_CONFIG = [
+          { key: 'morning', icon: '☀️', label: 'Morning', color: SC.overview },
+          { key: 'afternoon', icon: '🌤️', label: 'Afternoon', color: '#f59e0b' },
+          { key: 'evening', icon: '🌙', label: 'Evening', color: '#818cf8' },
+        ]
+        const visibleTabs = BRIEF_CONFIG.filter(cfg => {
+          if (cfg.key === 'morning') return true
+          if (briefs[cfg.key]) return true
+          if (cfg.key === 'evening' && currentHour >= 18) return true
+          return false
+        })
+        const resolvedKey = visibleTabs.find(t => t.key === activeBrief) ? activeBrief : visibleTabs[0]?.key || 'morning'
+        const activeCfg = BRIEF_CONFIG.find(c => c.key === resolvedKey)
+        const text = briefs[resolvedKey]
+        return (
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', marginBottom: '20px', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
+              {visibleTabs.map(cfg => {
+                const isActive = resolvedKey === cfg.key
+                return (
+                  <button key={cfg.key} onClick={() => setActiveBrief(cfg.key)}
+                    style={{ flex: 1, padding: '11px 8px', border: 'none', background: isActive ? `${cfg.color}12` : 'transparent', color: isActive ? cfg.color : 'var(--text-secondary)', fontSize: '12px', fontWeight: isActive ? '700' : '400', cursor: 'pointer', borderBottom: isActive ? `2px solid ${cfg.color}` : '2px solid transparent', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', whiteSpace: 'nowrap' }}>
+                    <span>{cfg.icon}</span>
+                    <span>{cfg.label}</span>
+                    {briefs[cfg.key] && <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cfg.color, display: 'inline-block', flexShrink: 0 }} />}
+                  </button>
+                )
+              })}
+            </div>
+            <div style={{ padding: '16px 20px' }}>
+              {resolvedKey === 'morning' && briefLoading && !text && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {[100, 85, 60].map((w, i) => (
+                    <div key={i} style={{ height: '13px', borderRadius: '4px', backgroundColor: 'var(--border)', width: `${w}%`, opacity: 0.5 }} />
+                  ))}
+                </div>
+              )}
+              {resolvedKey === 'morning' && !text && !briefLoading && (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Complete your goals setup and start logging to get a personalized daily brief.</p>
+              )}
+              {resolvedKey === 'afternoon' && !text && (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Complete your morning or afternoon check-in to see your midday insight here.</p>
+              )}
+              {resolvedKey === 'evening' && !text && (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Generating your end-of-day summary…</p>
+              )}
+              {text && (
+                <div>
+                  <p style={{ color: 'var(--text-primary)', fontSize: '14px', lineHeight: '1.7', margin: 0, display: briefExpanded[resolvedKey] ? 'block' : '-webkit-box', WebkitLineClamp: briefExpanded[resolvedKey] ? 'unset' : 3, WebkitBoxOrient: 'vertical', overflow: briefExpanded[resolvedKey] ? 'visible' : 'hidden' }}>
+                    {text}
+                  </p>
+                  {text.length > 200 && (
+                    <button onClick={() => setBriefExpanded(prev => ({ ...prev, [resolvedKey]: !prev[resolvedKey] }))}
+                      style={{ background: 'none', border: 'none', color: activeCfg?.color || SC.overview, fontSize: '12px', cursor: 'pointer', marginTop: '4px', padding: 0 }}>
+                      {briefExpanded[resolvedKey] ? 'Show less' : 'Read more'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )
       })()}
@@ -799,7 +824,7 @@ export default function LifeHubPage() {
         </div>
 
         {/* Two-column: form left, heatmap right */}
-        <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
+        <div className="lh-checkin-cols" style={{ display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
           {/* Form */}
           <div style={{ flex: 1, minWidth: 0 }}>
             {loaded && (
