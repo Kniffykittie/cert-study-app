@@ -871,7 +871,9 @@ export default function LifeHubPage() {
                 for (const c of checkins) checkinMap[c.date] = c
                 const entry = checkinMap[date]
                 const isToday = date === today
-                const avg = entry ? Math.round(((entry.energy_level || 0) + (entry.mood_level || 0)) / (entry.energy_level && entry.mood_level ? 2 : 1)) : 0
+                const eSum = entry ? (entry.energy_level || 0) + (entry.mood_level || 0) : 0
+                const eCnt = entry?.energy_level && entry?.mood_level ? 2 : 1
+                const avg = entry ? Math.round(eSum / eCnt) : 0
                 let bg = 'var(--border)'
                 if (isToday && (energy || mood)) bg = avg >= 4 ? 'var(--success)' : avg === 3 ? 'var(--accent-blue)' : avg >= 1 ? 'var(--warning)' : SC.overview
                 else if (avg >= 4) bg = 'var(--success)'
