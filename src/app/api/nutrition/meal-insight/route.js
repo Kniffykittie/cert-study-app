@@ -46,7 +46,14 @@ Day totals so far (including this session):
 - Carbs: ${Math.round(day_totals.carbs_g || 0)}g
 - Fat: ${Math.round(day_totals.fat_g || 0)}g
 
-Write exactly 2 sentences. First sentence: one specific observation about what they just logged (a macro balance, a standout nutrient, a pattern, or a timing note — pick the most interesting one). Second sentence: one concrete, actionable suggestion for the rest of the day based on remaining targets. Be direct. No filler. No "great job" or "keep it up" openers.`
+NUTRIENT PAIRING RULES — mention one only when directly relevant to the foods just logged:
+- Coffee or tea near iron-rich foods: caffeine/tannins reduce iron absorption ~30%; vitamin C roughly doubles it
+- Sodium above target: sodium draws water out of cells; extra water intake helps balance it
+- Calcium-rich foods without vitamin D context: absorption is significantly reduced without it
+- Zinc with high-fiber foods: phytates in fiber bind zinc and reduce absorption
+- Omega-3 from fatty fish or fish oil: anti-inflammatory effect accelerates muscle recovery
+
+Write exactly 2 sentences. First sentence: one specific observation about what they just logged (a macro balance, a standout nutrient, a pairing note, or a timing note — pick the most interesting one). Second sentence: one concrete, actionable suggestion for the rest of the day based on remaining targets. Be direct. No filler. No "great job" or "keep it up" openers.`
 
   const response = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',

@@ -740,7 +740,7 @@ function NutritionPageInner() {
         </div>
       )}
 
-      {false && activeTab === 'log' && entries.length > 0 && !viewingDate && (() => {
+      {activeTab === 'log' && entries.length > 0 && !viewingDate && (() => {
         const microTargets = goals?.age && goals?.sex ? calcMicroTargets(goals.age, goals.sex) : null
         const hour = new Date().getHours()
 
@@ -854,6 +854,7 @@ function NutritionPageInner() {
             <div style={{ padding: '12px 16px 8px', borderBottom: shownWarns.length > 0 || shownGood.length > 0 ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '13px' }}>🧬</span>
               <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Today's Micro Snapshot</span>
+              {microTargets && <span style={{ fontSize: '11px', color: 'var(--text-secondary)', marginLeft: 'auto' }}>Targets adjusted for your age &amp; sex</span>}
             </div>
 
             {shownWarns.length > 0 && (

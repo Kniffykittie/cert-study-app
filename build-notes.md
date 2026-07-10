@@ -969,6 +969,9 @@ This table is the authoritative "already done" list. Before starting any feature
 | Pre/Post Workout Meal Advisor | `src/app/life-hub/nutrition/page.js` (dismissible banners) | Post-workout within 2hrs, pre-workout planned label |
 | Photo-Based Food Logging | `src/app/api/nutrition/ai-photo-log/route.js`; Photo tab in AddFoodModal | Vision API, confidence chips, 10/hr rate limit |
 | Full Stretching & Mobility Section | `src/data/stretches.js`; `/life-hub/workouts/stretches/page.js`; `stretch_logs` table | 38 stretches, 10 muscle groups, sore spot chips |
+| Micro Awareness Card + Age-Adjusted Targets | `src/app/life-hub/nutrition/page.js` (was disabled, now active); age-adjusted note in card header | Re-enabled Phase 79 card; "Targets adjusted for your age & sex" label when goals profile has age+sex |
+| Meal Insight Nutrient Pairing Rules | `src/app/api/nutrition/meal-insight/route.js` | 5 pairing rules in Haiku system prompt: iron+coffee, vitamin C+iron, sodium+water, calcium+D, zinc+fiber |
+| Daily Brief Micro Gap Detection | `src/app/api/life-hub/daily-brief/route.js` | 15th parallel query; absent-3-days nutrients injected as MICRO GAPS line into Claude context |
 
 **Rule: When a feature in the sections below is built and verified in code, move its entry to this table AND to the Phase Log in the same commit. Remove it from Future Features entirely. A feature must never exist in more than one place.**
 
@@ -977,13 +980,6 @@ This table is the authoritative "already done" list. Before starting any feature
 ---
 
 ### 🎯 Goals & Body Setup
-
-**1. Age-Specific Framing Copy** — ✅ Partially built (age callouts in Goals Setup step 5); remaining: nutrition page showing age-adjusted targets vs FDA defaults side-by-side
-- Under 18: "You're still growing — bone density builds during these years. We've kept your deficit conservative to protect this window." Deficit capped at 300 cal/day for teens.
-- 18–25: "Your body is in its peak building window — this is the best time to establish a strong base."
-- 25–35: "Your metabolism is beginning a gradual slowdown — the numbers reflect a small adjustment."
-- 35–50: "After 35, muscle is harder to maintain — your protein target is slightly higher to compensate."
-- 50+: "After 50, protein and calcium needs actually increase. Your targets are higher than the generic FDA averages on purpose."
 
 **17. Persistent Coach Memory (`coach_memory` table)** — 💬 Discussed
 
@@ -3020,6 +3016,14 @@ PHASE D (polish):
 ---
 
 ## Phase Log
+
+### Phase 89 — Micro Awareness Card Re-Enable + Meal Insight Pairing + Daily Brief Gaps — Complete
+
+- **Micro awareness card re-enabled:** Removed `false &&` guard at `nutrition/page.js` line 743 — the fully-implemented Phase 79 card now renders on the food log tab when entries exist; shows red/orange/purple warning callouts (sodium over, low after 3pm, absent 3+ days) and green "working for you" highlights
+- **Age-adjusted note:** Added "Targets adjusted for your age & sex" label to the card header when `microTargets` is available (i.e. goals profile has age + sex set) — makes the personalization visible to the user
+- **Meal insight nutrient pairing rules:** Extended the Haiku system prompt in `meal-insight/route.js` with 5 pairing rules (iron+coffee absorption block, vitamin C doubles iron, sodium draws water, calcium needs D, zinc+fiber conflict, omega-3 anti-inflammatory) — Claude mentions one when relevant to logged foods
+- **Daily Brief micro gap detection:** Added 15th parallel query to `daily-brief/route.js` morning path — fetches last 3 days of `food_log_entries` micro columns (vitamin_d_mcg, iron_mg, omega3_g, magnesium_mg, calcium_mg, vitamin_c_mg); computes which nutrients summed to zero all 3 days; injects `MICRO GAPS (absent 3+ days)` line into Claude context when gaps exist
+- **Moved "Age-Specific Framing Copy" from Future Features** to the CONFIRMED BUILT table (the remaining nutrition-page sub-item is now done); item 1 in Goals & Body Setup fully complete
 
 ### Phase 88 — Workout Day Hub Full Wiring (6a–6f) — Complete
 

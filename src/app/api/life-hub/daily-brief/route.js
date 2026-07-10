@@ -133,6 +133,7 @@ export async function POST(req) {
     { data: hrYesterday },
     { data: todayCheckin },
     { data: yesterdayStretchLogs },
+    { data: microEntries3Days },
   ] = await Promise.all([
     supabase.from('goals_profiles').select('*').eq('user_id', user.id).single(),
     supabase.from('body_measurements').select('date, weight_lbs').eq('user_id', user.id).order('date', { ascending: false }).limit(5),
@@ -152,6 +153,7 @@ export async function POST(req) {
       .maybeSingle(),
     supabase.from('daily_checkins').select('sore_spots').eq('user_id', user.id).eq('date', today).maybeSingle(),
     supabase.from('stretch_logs').select('session_type, stretch_ids').eq('user_id', user.id).eq('date', yesterday),
+    supabase.from('food_log_entries').select('date, vitamin_d_mcg, iron_mg, omega3_g, magnesium_mg, calcium_mg, vitamin_c_mg').eq('user_id', user.id).gte('date', dateStr(3)).lt('date', today),
   ])
 
   // No goals → generic nudge
@@ -281,6 +283,19 @@ export async function POST(req) {
     suppInteractionWarnings.push(`Vitamin D not taken with a meal — fat-soluble, needs food for absorption`)
   }
 
+  // Micro absence detection — nutrients with zero intake across last 3 days
+  const MICRO_ABSENCE_KEYS = [
+    { key: 'vitamin_d_mcg', label: 'Vitamin D' },
+    { key: 'iron_mg', label: 'Iron' },
+    { key: 'omega3_g', label: 'Omega-3' },
+    { key: 'magnesium_mg', label: 'Magnesium' },
+    { key: 'calcium_mg', label: 'Calcium' },
+    { key: 'vitamin_c_mg', label: 'Vitamin C' },
+  ]
+  const absentNutrients = MICRO_ABSENCE_KEYS
+    .filter(({ key }) => !(microEntries3Days || []).some(e => (e[key] || 0) > 0))
+    .map(({ label }) => label)
+
   // Build summary for Claude
   const lines = [
     `Goals: ${(goals.goals || []).join(', ') || 'not set'}`,
@@ -291,6 +306,7 @@ export async function POST(req) {
     `  Days logged: ${loggedDays}/7`,
     loggedDays ? `  Avg daily calories: ${avgCal} cal (target: ${tdee || '?'}) | Avg protein: ${avgProtein}g (target: ${proteinTarget}g)` : '  No data',
     yesterdayFood ? `  Yesterday: ${Math.round(yesterdayFood.cal)} cal, ${Math.round(yesterdayFood.protein)}g protein` : '  Yesterday: not logged',
+    absentNutrients.length ? `  MICRO GAPS (absent 3+ days from food log): ${absentNutrients.join(', ')} — mention briefly if relevant to today's recovery, energy, or food pattern` : '',
     '',
     `WEIGHT TREND:`,
     weightDelta !== null ? `  ${Math.abs(weightDelta)} lbs ${weightDelta < 0 ? 'lost' : 'gained'} over ${weightDays} days` : '  Not enough weight entries (logging measurements unlocks trend analysis)',
