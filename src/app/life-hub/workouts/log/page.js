@@ -425,11 +425,17 @@ function LogWorkoutPageInner() {
         .eq('date', today)
 
       const overrideMap = {}
-      for (const o of overrides ?? []) overrideMap[o.original_exercise.toLowerCase()] = o.override_exercise
+      const overrideInfoMap = {}
+      for (const o of overrides ?? []) {
+        overrideMap[o.original_exercise.toLowerCase()] = o.override_exercise
+        overrideInfoMap[o.original_exercise.toLowerCase()] = { original: o.original_exercise, reason: o.reason }
+      }
 
       const exList = (todayPlan.exercises || []).map(ex => {
-        const override = overrideMap[ex.exercise_name?.toLowerCase()]
-        return { ...ex, exercise_name: override ?? ex.exercise_name, sets: buildDefaultSets(ex) }
+        const origKey = ex.exercise_name?.toLowerCase()
+        const override = overrideMap[origKey]
+        const overrideInfo = override ? overrideInfoMap[origKey] : null
+        return { ...ex, exercise_name: override ?? ex.exercise_name, overrideInfo, sets: buildDefaultSets(ex) }
       })
       setExercises(exList)
     }
@@ -867,6 +873,7 @@ function LogWorkoutPageInner() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 15 }}>{ex.exercise_name}</span>
                   {ex.added_mid_workout && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-purple)', background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.4)', borderRadius: 4, padding: '2px 6px', letterSpacing: '0.04em' }}>+ ADDED</span>}
+                  {ex.overrideInfo && <span style={{ fontSize: 10, color: '#22c55e', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 4, padding: '2px 6px' }}>↩ swapped · {ex.overrideInfo.reason}</span>}
                   <button
                     onClick={() => fetchExerciseDetail(ex.exercise_name)}
                     title="What is this exercise?"

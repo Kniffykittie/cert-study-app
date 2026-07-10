@@ -3017,6 +3017,12 @@ PHASE D (polish):
 
 ## Phase Log
 
+### Phase 90 — Alert System Fixes (Override Labels, Micro Overlap, Protein Brief) — Complete
+
+- **Workout session override label:** Built `overrideInfoMap` alongside `overrideMap` in `log/page.js`; attaches `overrideInfo: { original, reason }` to each exercise object; renders green "↩ swapped · [reason]" chip in the exercise header alongside the existing `+ ADDED` badge
+- **6-nutrient snapshot row removed:** The always-visible Phase 87 chip row was redundant with the now-active Phase 79 "Today's Micro Snapshot" awareness card (which covers all 6 of those nutrients plus 4 more with richer callouts). Removed the chip row — the awareness card is now the single micro surface on the nutrition page
+- **Protein miss streak in daily brief:** Added `proteinMissDays` count to `daily-brief/route.js` — fires into Claude context when ≥70% of logged days in last 7 are below protein target; phrased as "Mention this naturally in the brief" so Claude weaves it in without mechanical repetition; threshold requires ≥3 days logged to fire
+
 ### Phase 89 — Micro Awareness Card Re-Enable + Meal Insight Pairing + Daily Brief Gaps — Complete
 
 - **Micro awareness card re-enabled:** Removed `false &&` guard at `nutrition/page.js` line 743 — the fully-implemented Phase 79 card now renders on the food log tab when entries exist; shows red/orange/purple warning callouts (sodium over, low after 3pm, absent 3+ days) and green "working for you" highlights

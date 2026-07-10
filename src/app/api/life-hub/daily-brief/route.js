@@ -283,6 +283,9 @@ export async function POST(req) {
     suppInteractionWarnings.push(`Vitamin D not taken with a meal — fat-soluble, needs food for absorption`)
   }
 
+  // Protein miss detection — how many of last 7 logged days were below target
+  const proteinMissDays = foodDays.filter(([, d]) => d.protein < proteinTarget).length
+
   // Micro absence detection — nutrients with zero intake across last 3 days
   const MICRO_ABSENCE_KEYS = [
     { key: 'vitamin_d_mcg', label: 'Vitamin D' },
@@ -306,6 +309,7 @@ export async function POST(req) {
     `  Days logged: ${loggedDays}/7`,
     loggedDays ? `  Avg daily calories: ${avgCal} cal (target: ${tdee || '?'}) | Avg protein: ${avgProtein}g (target: ${proteinTarget}g)` : '  No data',
     yesterdayFood ? `  Yesterday: ${Math.round(yesterdayFood.cal)} cal, ${Math.round(yesterdayFood.protein)}g protein` : '  Yesterday: not logged',
+    loggedDays >= 3 && proteinMissDays >= Math.ceil(loggedDays * 0.7) ? `  ⚠ PROTEIN GAP: Below target (${proteinTarget}g) on ${proteinMissDays}/${loggedDays} logged days — avg was ${avgProtein}g. Mention this naturally in the brief.` : '',
     absentNutrients.length ? `  MICRO GAPS (absent 3+ days from food log): ${absentNutrients.join(', ')} — mention briefly if relevant to today's recovery, energy, or food pattern` : '',
     '',
     `WEIGHT TREND:`,
