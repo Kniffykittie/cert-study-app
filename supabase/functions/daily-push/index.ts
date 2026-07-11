@@ -284,162 +284,112 @@ Deno.serve(async (_req) => {
 
         if (!isMorning && !isMidday && !isEvening) continue
 
-        // ── MORNING WINDOW ─────────────────────────────────────────────────
-        if (isMorning) {
-          // Morning brief (priority — sends as main window notification)
-          if (prefs.morning_brief) {
+        // ── MORNING WINDOW — one bundled notification ──────────────────────
+        if (isMorning && prefs.morning_brief) {
+          const nudges: string[] = []
+
+          const [weighIn, bodyMeasure, suppMorning] = await Promise.all([
+            prefs.weigh_in_reminder ? checkWeighInReminder(supabase, sub.user_id) : Promise.resolve(false),
+            prefs.body_measurement_reminder ? checkBodyMeasurementReminder(supabase, sub.user_id) : Promise.resolve(false),
+            prefs.supplement_reminder ? checkSupplementReminder(supabase, sub.user_id, false) : Promise.resolve(false),
+          ])
+
+          if (suppMorning) nudges.push('take your supplements')
+          if (weighIn) nudges.push('log your weight')
+          if (bodyMeasure) nudges.push('log measurements')
+
+          const body = nudges.length
+            ? `Your morning brief is ready. Don't forget to ${nudges.join(' · ')}.`
+            : 'Your morning brief is ready.'
+
+          await sendPush(supabase, sub, {
+            title: 'Good morning 🌅',
+            body,
+            url: '/life-hub',
+            tag: 'morning-brief',
+          }, 'morning')
+          totalSent++
+        }
+
+        // Workout reminder fires separately at workout_time − 60min, not at wake
+        if (isMorning && prefs.workout_reminder) {
+          const { fire } = await checkWorkoutReminder(supabase, sub.user_id, wakeMin)
+          if (fire) {
+            const { data: dayRow } = await supabase.from('my_week').select('workout_time').eq('user_id', sub.user_id).maybeSingle()
+            const timeStr = dayRow?.workout_time ? dayRow.workout_time.slice(0, 5) : '—'
             await sendPush(supabase, sub, {
-              title: 'Good morning 🌅',
-              body: 'Your morning brief is ready.',
-              url: '/life-hub',
-              tag: 'morning-brief',
-            }, 'morning')
+              title: 'Workout day 💪',
+              body: `You have a workout planned at ${timeStr}. Fuel up and get ready!`,
+              url: '/life-hub/workouts',
+              tag: 'workout-reminder',
+            }, 'morning-workout')
             totalSent++
-          }
-
-          // Workout reminder — separate log key so it doesn't block the brief
-          if (prefs.workout_reminder) {
-            const { fire } = await checkWorkoutReminder(supabase, sub.user_id, wakeMin)
-            if (fire) {
-              const { data: dayRow } = await supabase.from('my_week').select('workout_time').eq('user_id', sub.user_id).maybeSingle()
-              const timeStr = dayRow?.workout_time ? dayRow.workout_time.slice(0, 5) : '—'
-              await sendPush(supabase, sub, {
-                title: "Workout day 💪",
-                body: `You have a workout planned at ${timeStr}. Fuel up!`,
-                url: '/life-hub/workouts',
-                tag: 'workout-reminder',
-              }, 'morning-workout')
-              totalSent++
-            }
-          }
-
-          // Supplement reminder (morning)
-          if (prefs.supplement_reminder) {
-            const needsReminder = await checkSupplementReminder(supabase, sub.user_id, false)
-            if (needsReminder) {
-              await sendPush(supabase, sub, {
-                title: 'Morning supplements 💊',
-                body: 'You have morning supplements to take.',
-                url: '/life-hub/goals/supplements',
-                tag: 'supplement-morning',
-              }, 'morning-supplement')
-              totalSent++
-            }
-          }
-
-          // Weigh-in reminder
-          if (prefs.weigh_in_reminder) {
-            const needsReminder = await checkWeighInReminder(supabase, sub.user_id)
-            if (needsReminder) {
-              await sendPush(supabase, sub, {
-                title: "Time to weigh in ⚖️",
-                body: "It's been a few days since your last weight log.",
-                url: '/life-hub/goals/measurements',
-                tag: 'weigh-in',
-              }, 'morning-weighin')
-              totalSent++
-            }
-          }
-
-          // Body measurement reminder
-          if (prefs.body_measurement_reminder) {
-            const needsReminder = await checkBodyMeasurementReminder(supabase, sub.user_id)
-            if (needsReminder) {
-              await sendPush(supabase, sub, {
-                title: 'Measurement check 📏',
-                body: "It's been a week — time to log your measurements.",
-                url: '/life-hub/goals/measurements',
-                tag: 'body-measurement',
-              }, 'morning-measurement')
-              totalSent++
-            }
           }
         }
 
-        // ── MIDDAY WINDOW ──────────────────────────────────────────────────
-        if (isMidday) {
-          if (prefs.midday_checkin) {
-            await sendPush(supabase, sub, {
-              title: 'Midday check-in ☀️',
-              body: "How's your day going? Log your afternoon check-in.",
-              url: '/life-hub',
-              tag: 'midday-checkin',
-            }, 'midday')
-            totalSent++
-          }
+        // ── MIDDAY WINDOW — one bundled notification ────────────────────────
+        if (isMidday && prefs.midday_checkin) {
+          let body = "How's your day going? Log your afternoon check-in."
 
           if (prefs.hydration_nudge) {
-            const needsNudge = await checkHydrationNudge(supabase, sub.user_id)
-            if (needsNudge) {
-              await sendPush(supabase, sub, {
-                title: 'Drink some water 💧',
-                body: "You're under halfway on your water goal. Drink up!",
-                url: '/life-hub/health/water',
-                tag: 'hydration-nudge',
-              }, 'midday-hydration')
-              totalSent++
-            }
+            const lowWater = await checkHydrationNudge(supabase, sub.user_id)
+            if (lowWater) body += ' You\'re under halfway on your water goal — drink up! 💧'
           }
+
+          await sendPush(supabase, sub, {
+            title: 'Midday check-in ☀️',
+            body,
+            url: '/life-hub',
+            tag: 'midday-checkin',
+          }, 'midday')
+          totalSent++
         }
 
-        // ── EVENING WINDOW ─────────────────────────────────────────────────
-        if (isEvening) {
-          if (prefs.evening_wrap) {
+        // ── EVENING WINDOW — one bundled notification ───────────────────────
+        if (isEvening && prefs.evening_wrap) {
+          const nudges: string[] = []
+
+          const [streak, suppEvening] = await Promise.all([
+            prefs.study_streak ? checkStudyStreak(supabase, sub.user_id) : Promise.resolve(false),
+            prefs.supplement_reminder ? checkSupplementReminder(supabase, sub.user_id, true) : Promise.resolve(false),
+          ])
+
+          if (streak) nudges.push("you haven't hit your study goal yet")
+          if (suppEvening) nudges.push('evening supplements to take')
+
+          const body = nudges.length
+            ? `Log dinner and wind down. Heads up: ${nudges.join(' · ')}.`
+            : 'Log dinner and review your day before winding down.'
+
+          await sendPush(supabase, sub, {
+            title: 'Evening wrap-up 🌙',
+            body,
+            url: '/life-hub',
+            tag: 'evening-wrap',
+          }, 'evening')
+          totalSent++
+        }
+
+        // Wrap ready fires as its own notification (weekly/monthly — infrequent enough to warrant it)
+        if (isEvening && prefs.wrap_ready) {
+          const { weekly, monthly } = await checkWrapReady(supabase, sub.user_id)
+          if (weekly) {
             await sendPush(supabase, sub, {
-              title: 'Evening wrap-up 🌙',
-              body: 'Log dinner and review your day before winding down.',
-              url: '/life-hub',
-              tag: 'evening-wrap',
-            }, 'evening')
+              title: 'Weekly Wrap ready 📅',
+              body: 'Your week is complete. Generate your weekly summary!',
+              url: '/life-hub/weekly-wrap',
+              tag: 'wrap-weekly',
+            }, 'evening-wrap-weekly')
             totalSent++
           }
-
-          if (prefs.study_streak) {
-            const needsAlert = await checkStudyStreak(supabase, sub.user_id)
-            if (needsAlert) {
-              await sendPush(supabase, sub, {
-                title: "Don't break your streak 📚",
-                body: "You haven't hit your study goal today. A few questions before bed?",
-                url: '/study-hub/test',
-                tag: 'study-streak',
-              }, 'evening-streak')
-              totalSent++
-            }
-          }
-
-          if (prefs.supplement_reminder) {
-            const needsReminder = await checkSupplementReminder(supabase, sub.user_id, true)
-            if (needsReminder) {
-              await sendPush(supabase, sub, {
-                title: 'Evening supplements 💊',
-                body: 'You have evening supplements to take.',
-                url: '/life-hub/goals/supplements',
-                tag: 'supplement-evening',
-              }, 'evening-supplement')
-              totalSent++
-            }
-          }
-
-          if (prefs.wrap_ready) {
-            const { weekly, monthly } = await checkWrapReady(supabase, sub.user_id)
-            if (weekly) {
-              await sendPush(supabase, sub, {
-                title: 'Weekly Wrap ready 📅',
-                body: 'Your week is complete. Generate your weekly summary!',
-                url: '/life-hub/weekly-wrap',
-                tag: 'wrap-weekly',
-              }, 'evening-wrap-weekly')
-              totalSent++
-            }
-            if (monthly) {
-              await sendPush(supabase, sub, {
-                title: 'Monthly Wrap ready 📅',
-                body: 'A new month started — generate last month\'s summary!',
-                url: '/life-hub/monthly-wrap',
-                tag: 'wrap-monthly',
-              }, 'evening-wrap-monthly')
-              totalSent++
-            }
+          if (monthly) {
+            await sendPush(supabase, sub, {
+              title: 'Monthly Wrap ready 📅',
+              body: "A new month started — generate last month's summary!",
+              url: '/life-hub/monthly-wrap',
+              tag: 'wrap-monthly',
+            }, 'evening-wrap-monthly')
+            totalSent++
           }
         }
       } catch {
