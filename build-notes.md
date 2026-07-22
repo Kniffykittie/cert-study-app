@@ -3136,6 +3136,39 @@ Small independent fixes, all touching nutrition + stretches. No migrations.
 5. **generate-templates route:** prompt upgrade — for topology-relevant domains (IP Connectivity, Network Access, Network Implementation, Security Architecture etc.) instruct Claude to produce exhibit-based questions with the topology JSON schema documented in the prompt. Owner then generates fresh batches per cert.
 6. FloatingReferencePanel/chat unaffected.
 
+### 🎯 Exam Realism Track (added 2026-07-22, user-approved) — build BEFORE Life Hub restructure
+User decisions: build 1, 3, 4, 5, 6 below; SKIP "not exam-like" flag (user declined); post-exam debrief = covered enough by existing flagging.
+
+**R1. Objective-driven coverage engine (BUILD FIRST)**
+- Embed official sub-objective lists per domain (CCNA 200-301, N10-009, SY0-701 exam objectives) in a new data file `src/data/examObjectives.js`
+- generate-templates prompt receives the sub-objective list + which ones existing templates already cover → instructs Claude to target UNCOVERED sub-objectives
+- Coverage table UI on templates page: per domain, X of Y sub-objectives covered (match templates to sub-objectives via a `sub_objective` TEXT column on question_templates, set at generation time)
+- Migration: `ALTER TABLE question_templates ADD COLUMN sub_objective TEXT`
+
+**R3. Pacing feedback**
+- Real exams ≈ 1 min/question (Sec+ 90q/90min, N+ 90q/90min, CCNA ~102q/120min ≈ 1.18min)
+- Track per-question time during tests (timestamps between answers); results screen shows avg time/question vs the real exam budget, color-coded; flag slowest 3 questions
+- No DB change needed if computed client-side and stored in test_sessions (add `avg_seconds_per_question` NUMERIC or derive from duration_seconds/total — per-question needs JSONB; keep simple: avg + slowest domains)
+
+**R4. Official acronym flashcard decks (PRE-GENERATED, not user-triggered)**
+- CompTIA publishes official acronym lists in exam objectives (Sec+ ~300, N+ ~200); CCNA has standard command/protocol glossary
+- One-time generation session: owner generates ALL acronym cards per cert in bulk (batched API calls), saved to existing `flashcards` table with a `deck_type='acronym'` tag or cert-suffix — decide at build: likely new column `deck TEXT DEFAULT 'core'`
+- Flashcards landing shows Core deck + Acronyms deck per cert
+
+**R5. Multi-select "(Choose two)" questions**
+- Schema: `correct_answers TEXT[]` (nullable — null = single-answer legacy) on question_templates; template generator may emit `"correct_answers": ["A","C"]` + question text ends "(Choose two.)"
+- Test page: checkbox UI when correct_answers present; submit enabled when exactly N selected; scoring = exact set match
+- Carries through bookmarks/wrong-answer snapshots like exhibit
+
+**R6. PBQ-lite question types**
+- New template types: `ordering` (drag/tap to order steps — e.g. CompTIA troubleshooting methodology), `matching` (match terms to definitions)
+- Schema: `question_type TEXT DEFAULT 'mc'` + type-specific JSONB payload
+- Test page renders per type; mobile = tap-to-place (no drag needed)
+- Cisco-style stateful CLI sim is OUT of scope — Packet Tracer labs cover that need
+- Build LAST of this track (biggest UI lift)
+
+Build order: R1 → R3 + R4 (same session) → R5 → R6
+
 ### Session 5 — Life Hub Home Restructure (spec already in 2026-07-09 audit)
 1. Recovery Score SVG ring hero + component chips + expand.
 2. Daily Brief single tabbed card (Morning/Afternoon/Evening).
