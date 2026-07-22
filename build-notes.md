@@ -3086,10 +3086,15 @@ User-reported pain points, investigated in code. Each has root cause + proposed 
 **12. Back button in add-food header uses window.location.href**
 - Full reload on every Back tap (plus all Add buttons, already noted in #2/#6). Convert all to router.push in the consolidation pass.
 
-**Questions asked of user (awaiting answers):**
-1. Stretch photo sourcing: OK with AI-generated exercise illustrations, or prefer real photography from a stock/source set?
-2. Sidebar bottom cutoff + Real Exam crash — still reproducible?
-3. For the toast/feedback system: subtle (small bottom toast) or celebratory (checkmark animation) for successful logs?
+**Answers received (2026-07-22):**
+1. Stretch photos: **user will source them personally** (avoiding AI generation). Checklist of all 35 stretches + target filenames (`public/stretches/<id>.jpg`) delivered to user. 5 suggested additions offered: Wrist Flexor/Extensor, Standing Glute Stretch, Knees-to-Chest, Seated Straddle, Downward Dog — awaiting user pick. NOTE: data file has 35 stretches, not 38 as older notes claimed.
+2. Sidebar bottom cutoff + Real Exam crash: user will test — **⏰ REMIND USER in a future session to check both.**
+3. Toast system: **CONFIRMED build item** — success toast on log/save AND visible error state when a save fails. Ship with the silent-data-loss fix (#7) in the same session.
+
+**⏰ Standing reminders for future sessions:**
+- Ask user: is the sidebar bottom cutoff still happening? Is the Real Exam crash still happening?
+- Ask user: how did notification delivery behave over several days (test passed 2026-07-22 after settings change)?
+- When user delivers stretch photos → build stretch image display + wire filenames by stretch id.
 
 **Open questions for user:** Does the sidebar bottom cutoff bug still occur? Does the Real Exam crash still occur? (Neither appears in the Phase Log as fixed.)
 
