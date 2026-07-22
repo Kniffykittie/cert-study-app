@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import BarcodeScannerModal from '@/components/BarcodeScannerModal'
 import { MEAL_SLOTS, categorizeFoods, buildFoodLogEntry, FOOD_CATEGORIES, categoryToFlags } from '@/lib/nutritionUtils'
 import LogConfirmModal from '@/components/nutrition/LogConfirmModal'
+import ManualFoodForm from '@/components/nutrition/ManualFoodForm'
 import { showToast } from '@/components/Toast'
 
 function resizeImage(file, maxPx) {
@@ -51,7 +52,7 @@ function AddFoodPageInner() {
   const dateParam = params.get('date') || null
   const slotLabel = SLOT_LABELS[slot] || slot
 
-  const [tab, setTab] = useState('favorites')
+  const [tab, setTab] = useState(() => ['favorites', 'search', 'manual', 'photo'].includes(params.get('tab')) ? params.get('tab') : 'favorites')
   const [myFoods, setMyFoods] = useState([])
   const [filter, setFilter] = useState('')
   const [logging, setLogging] = useState(false)
@@ -84,11 +85,19 @@ function AddFoodPageInner() {
   const debounceRef = useRef(null)
   const supabase = createClient()
 
-  useEffect(() => {
-    fetch('/api/nutrition/my-foods').then(r => r.json()).then(d => {
+  const [favLoadError, setFavLoadError] = useState(false)
+
+  function loadMyFoods() {
+    setFavLoadError(false)
+    fetch('/api/nutrition/my-foods').then(r => {
+      if (!r.ok) throw new Error()
+      return r.json()
+    }).then(d => {
       if (d.foods) setMyFoods(d.foods)
-    }).catch(() => {})
-  }, [])
+    }).catch(() => setFavLoadError(true))
+  }
+
+  useEffect(() => { loadMyFoods() }, [])
 
   async function logEntry(entry) {
     setLogging(true)
@@ -247,6 +256,7 @@ function AddFoodPageInner() {
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)', padding: '0 16px' }}>
         {tabBtn('favorites', '⭐ Favorites')}
         {tabBtn('search', '🔍 Search')}
+        {tabBtn('manual', '✏️ Manual')}
         {tabBtn('photo', '📷 Photo')}
       </div>
 
@@ -277,7 +287,14 @@ function AddFoodPageInner() {
             <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter favorites..."
               style={{ width: '100%', boxSizing: 'border-box', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '14px' }} />
 
-            {filtered.length === 0 && (
+            {favLoadError && (
+              <button onClick={loadMyFoods}
+                style={{ backgroundColor: 'rgba(204,0,0,0.08)', border: '1px solid rgba(204,0,0,0.3)', borderRadius: '10px', padding: '14px', color: 'var(--error)', fontSize: '13px', fontWeight: '600', cursor: 'pointer', textAlign: 'center' }}>
+                Couldn't load your favorites — tap to retry
+              </button>
+            )}
+
+            {!favLoadError && filtered.length === 0 && (
               <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)', fontSize: '14px' }}>
                 {filter ? `No favorites match "${filter}"` : 'No saved favorites yet.'}
               </div>
@@ -301,7 +318,7 @@ function AddFoodPageInner() {
             ))}
 
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '14px', textAlign: 'center' }}>
-              <button onClick={() => router.push(`/life-hub/nutrition/log-manual?slot=${slot}`)}
+              <button onClick={() => setTab('manual')}
                 style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                 ✏️ Enter food manually
               </button>
@@ -353,7 +370,7 @@ function AddFoodPageInner() {
                   ))}
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={() => { sessionStorage.setItem('manual_prefill', JSON.stringify(aiPreview)); router.push(`/life-hub/nutrition/log-manual?slot=${slot}`) }}
+                  <button onClick={() => { sessionStorage.setItem('manual_prefill', JSON.stringify(aiPreview)); setTab('manual') }}
                     style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: '7px', padding: '9px', fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                     ✏️ Edit Details
                   </button>
@@ -432,12 +449,17 @@ function AddFoodPageInner() {
             )}
 
             <div style={{ textAlign: 'center', paddingTop: '4px' }}>
-              <button onClick={() => router.push(`/life-hub/nutrition/log-manual?slot=${slot}`)}
+              <button onClick={() => setTab('manual')}
                 style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                 ✏️ Enter food manually
               </button>
             </div>
           </div>
+        )}
+
+        {/* ── Manual tab ── */}
+        {tab === 'manual' && (
+          <ManualFoodForm slot={slot} slotLabel={slotLabel} date={dateParam} />
         )}
 
         {/* ── Photo tab ── */}

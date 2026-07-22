@@ -7,7 +7,6 @@ import { calcTDEE as calcTDEEShared, calcMacros as calcMacrosShared, calcGoalAdj
 import { NUTRIENTS, matchSuppToNutrient, parseSuppAmount } from '@/data/nutrients'
 import { MEAL_SLOTS, DV } from '@/lib/nutritionUtils'
 import SearchModal from '@/components/nutrition/SearchModal'
-import AddFoodModal from '@/components/nutrition/AddFoodModal'
 import MealBuilderModal from '@/components/nutrition/MealBuilderModal'
 import NutrientBars from '@/components/nutrition/NutrientBars'
 import EditFoodModal from '@/components/nutrition/EditFoodModal'
@@ -79,7 +78,6 @@ function NutritionPageInner() {
   const [supplements, setSupplements] = useState([])
   const [entries, setEntries] = useState([])
   const [myFoods, setMyFoods] = useState([])
-  const [logModal, setLogModal] = useState(null)
   const [libraryModal, setLibraryModal] = useState(false)
   const [mealBuilderModal, setMealBuilderModal] = useState(false)
   const [editingFood, setEditingFood] = useState(null)
@@ -526,10 +524,6 @@ function NutritionPageInner() {
             </button>
           </div>
         </div>
-      )}
-      {logModal && (
-        <AddFoodModal slot={logModal} onClose={() => setLogModal(null)} onAdd={handleAddEntry}
-          myFoods={myFoods} onSaveFood={handleSaveToMyFoods} onCreateMeal={() => setMealBuilderModal(true)} workoutCtx={workoutCtx} dietaryPrefs={goals?.dietary_preferences || []} />
       )}
       {libraryModal && (
         <SearchModal slot={null} onClose={() => setLibraryModal(false)} onAdd={() => {}}

@@ -149,23 +149,23 @@ These rules were established after a full top-to-bottom security audit and must 
 |--------|---------|
 | `MEAL_SLOTS` | All nutrition pages — import and derive labels/keys from the object array |
 | `MEAL_NUTRITION_KEYS` | API routes `log/route.js` and `my-foods/route.js` — derive MICRO_FIELDS from it |
-| `getDietaryWarnings` | `AddFoodModal`, `SearchModal`, `meal-plan/page.js` — never re-implement dietary rules |
-| `categorizeFoods(foods)` | `add-food/page.js`, `AddFoodModal.js`, `SavedFoodsTab.js` — always use this for is_drink/is_ingredient/is_snack splits |
+| `getDietaryWarnings` | `SearchModal`, `meal-plan/page.js` — never re-implement dietary rules |
+| `categorizeFoods(foods)` | `add-food/page.js`, `SavedFoodsTab.js` — always use this for is_drink/is_ingredient/is_snack splits |
 | `buildFoodLogEntry(food, slot, sv, source)` | `add-food/page.js` (and any future log-entry point) — never build the entry object manually |
-| `FOOD_CATEGORIES`, `foodToCategory()`, `categoryToFlags()` | EditFoodModal, AddFoodModal, add-food/page.js, SearchModal — always import, never redefine locally |
+| `FOOD_CATEGORIES`, `foodToCategory()`, `categoryToFlags()` | EditFoodModal, add-food/page.js, SearchModal — always import, never redefine locally |
 
 ### What Still Requires Manual Sync (no shared import)
 These pairs can't easily share code but must be kept in sync manually. Any change to one must be applied to the other in the **same commit**.
 
 | What | File A | File B | What must match |
 |------|--------|--------|-----------------|
-| Favorites sub-tabs UI | `src/components/nutrition/AddFoodModal.js` | `src/app/life-hub/nutrition/add-food/page.js` | Tab keys, labels, count badges, smart default per slot, `localStorage` key `favTab` — both use `categorizeFoods()` now, but UI layout must match |
+| Favorites sub-tabs UI | `src/components/nutrition/SavedFoodsTab.js` | `src/app/life-hub/nutrition/add-food/page.js` | Same 5 sub-tabs (All/Foods & Meals/Drinks/Snacks/Ingredients), same `localStorage` key `favTab`, same `categorizeFoods()` call — (AddFoodModal deleted Phase 94) |
 | Favorites sub-tabs UI | `src/components/nutrition/SavedFoodsTab.js` | `src/app/life-hub/nutrition/add-food/page.js` | Same 5 sub-tabs (All/Foods & Meals/Drinks/Snacks/Ingredients), same `localStorage` key `favTab`, same `categorizeFoods()` call |
 | Time picker on log | `src/components/nutrition/SavedFoodsTab.js` (log expand panel) | `src/app/life-hub/nutrition/add-food/page.js` (expanded card) | Both must show time input, default to now, pass `logged_time` to the log API |
 | Drink log time picker | `src/app/life-hub/health/water/page.js` (logModal + editLogModal) | Any future drink-logging surface | Both the add modal and the edit modal must include a time input; PATCH must send `date` + `logged_time` |
 | Drink nutrient picker | `src/app/life-hub/health/water/page.js` (`DRINK_EXTRA_NUTRIENTS`) | `src/components/nutrition/EditFoodModal.js` (NUTRIENT_GROUPS) | When a new nutrient is added to `MEAL_NUTRITION_KEYS`, add it to both pickers |
 | OFF nutrient extraction | `src/app/api/nutrition/search/route.js` | `src/app/api/nutrition/ai-micro-fill/route.js` (prompt fields) | When a new nutrient column is added, update both the OFFs extraction AND the AI prompt |
-| DV%/mg toggle | `src/components/nutrition/EditFoodModal.js` | `src/components/nutrition/AddFoodModal.js`, `src/app/life-hub/health/water/page.js`, `src/app/life-hub/nutrition/log-manual/page.js` | All 4 files must show the same toggle, same conversion formula, same "no DV" fallback behavior |
+| DV%/mg toggle | `src/components/nutrition/EditFoodModal.js` | `src/components/nutrition/ManualFoodForm.js`, `src/app/life-hub/health/water/page.js`, `src/components/nutrition/SearchModal.js` | All files must show the same toggle, same conversion formula, same "no DV" fallback behavior |
 
 ### Time Logging Pattern — `logged_time`
 Any log entry surface (food or drink) that lets the user set a custom time must:
@@ -325,8 +325,8 @@ src/
         day/[dayIndex]/page.js         Day Hub — 4-phase journey (Pre-Stretch → Workout → Post-Stretch → Bedtime); rest day mode (recovery note + Phase 4 only); prev session hints (last working weight per exercise); coach feedback card (collapsible, unread badge, marks read on expand); read-only for past dates; adjacent day nav; fetches tomorrow's day-hub in parallel on load to derive tomorrowBodyParts (pre-stretch includes both today's + tomorrow's muscles); fetches today's sore_spots from daily_checkins (used in bedtime context note + recommendations); all stretch lists show WHY descriptions per stretch; bedtime phase shows up to 5 stretch recommendations (static first, then dynamic) based on today's muscles + sore spots; "Start Stretches" links pass `ids=` with the recommended stretch IDs so the stretches page only shows those
         stretches/page.js             Stretch Reference / Guided Session — when accessed with `?context=&ids=` params from Day Hub, shows only the recommended stretch IDs in order, all UNCHECKED (tap to mark done), hides type/muscle filters; collapsible 💡 education banner per context (dynamic-before/static-after/bedtime physiology); expanded rows ("How? ▼" button) show WHY callout + how-to + mistake warnings + contraindications; without params shows all 35 stretches with type/muscle filters
       nutrition/
-        add-food/page.js               Standalone add-food page — 3 tabs: Favorites (sub-tab pills 🌟 All | 🍽️ Foods & Meals | 🥤 Drinks | 🍿 Snacks | 🥚 Ingredients; drink/snack slots force their sub-tab over localStorage) + Search (OFFs + barcode + AI estimate) + 📷 Photo (AI photo analysis, ported from AddFoodModal); navigates here from all "Add [slot]" buttons; always sends `date: toLocaleDateString('en-CA')` (local timezone); logEntry checks res.ok — error toast + stays on page on failure, success toast + router.push on success
-        log-manual/page.js             Standalone lightweight manual food entry — reads AI prefill from sessionStorage; core macros + optional micronutrients; avoids loading heavy nutrition page DOM; wrapped in Suspense
+        add-food/page.js               THE canonical add-food surface — 4 tabs: ⭐ Favorites (sub-tab pills; drink/snack slots force their sub-tab) | 🔍 Search (OFFs + barcode + AI estimate; AI "Edit Details" opens Manual tab inline via sessionStorage prefill) | ✏️ Manual (embeds ManualFoodForm) | 📷 Photo (AI photo analysis); accepts ?tab= URL param; favorites fetch has tap-to-retry error state; always sends local date; logEntry checks res.ok with toast feedback
+        log-manual/page.js             Thin redirect → /life-hub/nutrition/add-food?slot=X&tab=manual (kept for old links)
         page.js                        Nutrition dashboard — `today` uses `toLocaleDateString('en-CA')` (local timezone, not UTC); TDEE + macro targets, calorie ring, food log by meal slot, Supplements tab, TDEE calibration card, micronutrient panel; Micronutrient Daily Awareness card (Phase 79) between TDEE card and food log — surfaces up to 3 callouts (over 150% DV = red, under 20% DV after 3pm = orange, absent 3+ days = purple); hidden when no callouts fire; imports 6 extracted components from src/components/nutrition/ and shared utils from src/lib/nutritionUtils.js
         meal-plan/page.js              Weekly Meal Plan — Mon–Sun grid, meal slot rows, food search, AI insight analysis (typed callouts citing specific days and foods)
     join/
@@ -372,7 +372,7 @@ src/
       NutrientBars.js                Micronutrient stacked bars (food + supplement segments, color-coded by % DV)
       MealBuilderModal.js            Meal recipe builder — ingredient search, custom ingredients, save as recipe
       SearchModal.js                 OFFs search + manual entry + AI fill + AI micro-fill; dietary warning chips; manual form uses chip picker UI matching EditFoodModal (NUTRIENT_GROUPS, ALL_MICRO_META, dvMode toggle, per-field remove, manualCategory picker)
-      AddFoodModal.js                3-tab add-food modal (⭐ Favorites | ✏️ Manual | 🔍 Search); Favorites has sub-tabs (All | Foods & Meals | Drinks | Snacks | Ingredients) with counts; smart default tab based on meal slot; last sub-tab persisted to localStorage; manual entry has Drink checkbox
+      ManualFoodForm.js              Shared manual food entry form — name/brand/serving + macros + optional micros with %DV toggle; reads AI prefill from sessionStorage 'manual_prefill'; Save to Favorites checkbox; toast on success/failure; embedded in add-food Manual tab
       DailyLogReview.js              Morning log review bottom sheet (5am–noon, once/day via localStorage key log_review_YYYY-MM-DD); 3 states: Normal / Sparse / Empty; "Fix something" navigates to /life-hub/nutrition?editDate=YYYY-MM-DD
     StudyHubSidebar.js                 Nav sidebar with test-in-progress guard
     LifeHubSidebar.js                  Life Hub nav — section color system (overview=purple, health=green, nutrition=orange, workouts=blue, goals=teal); Overview section (Dashboard + Monthly Wrap), Goals dropdown (Overview + Measurements + Setup), Health dropdown (Overview + Step Tracker + Heart Rate + Sleep Tracker), Nutrition dropdown (Food Log + Meal Plan + Encyclopedia + Hydration + Supplements), Workouts dropdown (My Plan + History + Exercise Library + Stretching & Mobility + Stretch Library); Hydration and Supplements live under Nutrition group; auto-opens on active routes; SECTION_COLORS constant defines all section accent colors

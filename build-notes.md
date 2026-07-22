@@ -3113,8 +3113,7 @@ Small independent fixes, all touching nutrition + stretches. No migrations.
 7. **Replace native dialogs** — alert() in test/page.js:477, flashcards/page.js:76, workouts/setup:142, workouts/page.js:218 → error toast; window.confirm in StudyHubSidebar:62 → styled modal (matches pause modal pattern).
 8. **DST date fix** — life-hub/page.js `dateStr()`: replace ms-subtraction with setDate + toLocaleDateString('en-CA').
 
-### Session 2 — Nutrition Consolidation
-Depends on Session 1 (photo tab + toast live in add-food).
+### Session 2 — Nutrition Consolidation ✅ BUILT (Phase 94)
 1. **add-food page = the one canonical surface**, 4 tabs: Favorites | Search | ✏️ Manual | Photo. Manual tab embeds the log-manual form inline (port from log-manual/page.js; keep AI-prefill path but drop the sessionStorage page-hop — AI estimate fills the inline form directly).
 2. **Delete AddFoodModal.js** (~1000 lines, orphaned — verified unreachable: only mounted via logModal state that nothing sets). Extract any still-needed pieces (photo flow already ported; dietary warning chips come from nutritionUtils).
 3. **log-manual/page.js** → keep route as thin redirect to add-food?tab=manual (bookmarks/muscle memory), or delete if unreferenced.
@@ -3194,6 +3193,18 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 94 — Session 2: Nutrition Consolidation — Complete
+- **add-food page is now THE canonical add surface** — 4 tabs: ⭐ Favorites | 🔍 Search | ✏️ Manual | 📷 Photo; accepts `?tab=` URL param
+- **New `src/components/nutrition/ManualFoodForm.js`** — extracted from log-manual page; embedded as the Manual tab; sessionStorage AI-prefill preserved; toast success/error handling
+- **AI estimate "Edit Details" now opens the Manual tab inline** (no page hop)
+- **"Enter food manually" buttons switch to the Manual tab** instead of navigating
+- **`AddFoodModal.js` DELETED** (~1000 lines of orphaned code); import + logModal state removed from nutrition page; CLAUDE.md parallel sync tables updated
+- **log-manual/page.js → thin redirect** to add-food?slot=X&tab=manual (old links keep working)
+- **Water page:** "🔍 Search & log →" link in the Log a Drink header deep-links to add-food?slot=drink (Favorites opens on Drinks sub-tab automatically)
+- **Favorites fetch failure now shows "Couldn't load — tap to retry"** instead of silently showing an empty list
+- Build verified passing
+- Files: ManualFoodForm.js (new), add-food/page.js, log-manual/page.js (rewritten), nutrition/page.js, water/page.js, AddFoodModal.js (deleted), CLAUDE.md tables
 
 ### Phase 93 — Session 1: Trust & Feedback Quick Wins — Complete
 - **Toast system:** new `src/components/Toast.js` (showToast helper + component), mounted in both hub layouts; success/error variants

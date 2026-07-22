@@ -798,7 +798,12 @@ export default function DrinksHydrationPage() {
 
       {/* Log a Drink */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>🥤 Log a Drink</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, gap: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.08em' }}>🥤 Log a Drink</div>
+          <Link href="/life-hub/nutrition/add-food?slot=drink" style={{ fontSize: 11, color: '#f97316', textDecoration: 'none', fontWeight: 600, border: '1px solid rgba(249,115,22,0.35)', borderRadius: 6, padding: '3px 8px', backgroundColor: 'rgba(249,115,22,0.08)', whiteSpace: 'nowrap' }}>
+            🔍 Search & log →
+          </Link>
+        </div>
         <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>Tracks calories, caffeine, and hydration from beverages</div>
 
         {/* Saved drinks chips */}
