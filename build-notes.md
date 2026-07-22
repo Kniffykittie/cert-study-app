@@ -3136,6 +3136,47 @@ Small independent fixes, all touching nutrition + stretches. No migrations.
 5. **generate-templates route:** prompt upgrade — for topology-relevant domains (IP Connectivity, Network Access, Network Implementation, Security Architecture etc.) instruct Claude to produce exhibit-based questions with the topology JSON schema documented in the prompt. Owner then generates fresh batches per cert.
 6. FloatingReferencePanel/chat unaffected.
 
+## 🗺️ MASTER BUILD ROADMAP (authoritative, 2026-07-22) — BUILD IN THIS ORDER, DO NOT REORDER without updating here
+This supersedes all scattered "Session N" numbering below. Detailed specs for each item live in the sections beneath this roadmap (Exam Realism Track, infra audit, gap analysis, 2026-07-09 UI audit). Cross-reference by the R#/gap# tags.
+
+### Definition of Done — EVERY session must pass ALL of these before it's called complete:
+1. `npm run build` passes clean
+2. Relevant items from the REGRESSION CHECKLIST (in the infra audit section) verified — especially "legacy MC still works" after any test-page change
+3. `CLAUDE.md` updated (structure/features/counts) in the SAME commit
+4. `build-notes.md` updated: new Phase Log entry at top + item marked ✅ BUILT in this roadmap + removed from Future Features
+5. Committed + pushed to `claude/sleepy-keller-rqiv6h` AND merged to `main` (deploy)
+6. Summary to user: what was the problem, what changed, what to test
+7. Any feature discussed-but-not-built this session added to Future Features before ending
+
+### BLOCK A — Exam Content Fidelity (makes questions FEEL right; no new question formats yet)
+- **S1 — Pre-made Flashcard Decks** ⬜ — CCNA commands/concepts/terminology deck (seed directly, NOT generated) + CompTIA acronym decks (Sec+ ~300, N+ ~200). Migration: `deck TEXT DEFAULT 'core'` on flashcards + flashcard landing shows Core/Acronyms(or Commands) per cert. Low-risk warm-up, delivers parked user request. (R4)
+- **S2 — Real Exam Mode Authenticity** ⬜ — FIX live bug #1 (force all domains in real mode) + bug #2 (skip spaced-rep personalization in real mode → pure official weights); add scaled-score/pass-likelihood estimate on results screen (gap #3); per-cert navigation rules incl. Cisco no-going-back for CCNA (gap #4). Makes existing Real Exam honest; no new infra.
+- **S3 — Generation Quality Engine** ⬜ — fact-check verify pass with BEST-answer nuance (gap #5, must NOT reject correct-but-not-best distractors) + real Jaccard dedup vs all difficulties (concern #1) + rewrite difficulty guide to the locked definition (voice constant, only distractor depth changes) + confirm current exam versions SY0-701/N10-009/200-301 v1.1 (gap #6). Design verify as a second BATCHED call to avoid serverless timeout (gap #11). Generation-API only; no test-render changes.
+- **S4 — Coverage Engine (R1)** ⬜ — `src/data/examObjectives.js` (current-version sub-objective lists, all 3 certs) + `sub_objective TEXT` column + generator targets UNCOVERED sub-objectives + coverage table UI on templates page (X/Y per domain).
+- **S5 — Pool Cleanup + Regeneration** ⬜ — audit existing 161 (all-hard, off-style); confirm retiring is history-safe (question_answers/topic_performance are snapshot-based, no FK) BEFORE mass-retire; retire off-style; regenerate medium+hard per domain with style guides + verify + coverage. Content fidelity complete after this. (gap #10)
+
+### BLOCK B — New Question Formats (need the refactor first)
+- **S6 — QuestionBody + scoreAnswer Refactor** ⬜ — extract one `<QuestionBody>` component (switch on question_type) replacing all 3 inline render paths + pure `scoreAnswer(q, answer)` used by saveResults AND live scoring; make answers-map + resume tolerate non-string values. INVISIBLE to user. FULL regression of every existing flow (checklist). Foundation — blocks S7-S9.
+- **S7 — Multi-select / "Choose two" (R5)** ⬜ — `correct_answers TEXT[]` (null=legacy); checkbox UI; exact-set (all-or-nothing) scoring; carries through snapshots/bookmarks/resume.
+- **S8 — PBQ-lite (R6)** ⬜ — `question_type` ordering + matching; `type_payload JSONB`; tap-to-place (no drag) for mobile; `rationale` explanation (concern #3).
+- **S9 — CCNA CLI Mode Engine (R8, Tier 1.5)** ⬜ — `src/lib/iosCliEngine.js` (mode state machine + command table + abbrev expansion + replay grading); terminal-transcript UI (Enter runs line, prompt evolves, mode practice enforced via wrong-mode rejection); per-command rationale. Biggest single build. Desktop-recommended banner + mobile hints (UX gap #18). Disable global 1-4/Enter handler when CLI focused.
+
+### BLOCK C — Real Exam Experience (needs all formats to exist)
+- **S10 — Real Exam Blend + Pacing (R7 + R3)** ⬜ — per-cert recipe assembly (official domain weights, ~70/30 medium/hard, PBQ-first, 2-3 multi-select, exhibits, real count+timer), graceful degradation when pool can't fill (gap #15), CLI/PBQ excluded from Mixed (gap #14); pacing feedback on results (~1 min/q budget, R3); readiness signal (gap #8). Ties the exam experience together.
+
+### BLOCK D — Rest of App (previously planned, pull forward anytime user wants a break from the track)
+- **S11 — Life Hub Home Restructure** ⬜ — recovery ring hero, single tabbed brief, zone reorder, skeleton loaders, split 971-line page (2026-07-09 audit spec).
+- **S12 — Notification Schedule UI + PWA** ⬜ — settings shows/edits send times (wake/bedtime), PWA install banner.
+- **S13 — Study Hub Motivation Layer** ⬜ — exam countdown chips (exam_dates), jump-back-in row (paused test/labs/flashcards).
+- **S14 — Polish Wave** ⬜ — typography, card variety, empty states, milestones, theme presets, personality layer, accessibility (ARIA/keyboard).
+
+### PARKED (waiting on user — slot in when ready)
+- Stretch photos (user sourcing; checklist delivered) → then stretch image display build + optional 5 new stretches
+- ⏰ Confirm with user: does sidebar bottom cutoff still occur? Does Real Exam crash still occur? How has notification delivery behaved over several days?
+- Multi-select partial-credit / Tab-complete + `?` CLI help (gap #7, #9) — optional enhancements, fold in if desired
+
+---
+
 ### 🎯 Exam Realism Track (added 2026-07-22, user-approved) — build BEFORE Life Hub restructure
 User decisions: build 1, 3, 4, 5, 6 below; SKIP "not exam-like" flag (user declined); post-exam debrief = covered enough by existing flagging.
 
