@@ -2999,6 +2999,28 @@ PHASE D (polish):
 
 ---
 
+### 🔍 UX/UI Audit Round 2 (2026-07-22) — New Findings
+Fresh code audit of both hubs. Items below are NEW (not in the 2026-07-09 audit). Recommended build order at bottom.
+
+1. **Exam countdown on Study Hub overview** — 💬 Discussed. `profiles.exam_dates` JSONB exists but is never shown on the overview. Add "CCNA in X days" chips to the cert readiness cards (red when <30 days, warning <60). High motivational value, small build.
+2. **"Jump back in" row on Study Hub overview** — 💬 Discussed. One row surfacing: paused test (paused_tests), labs in progress (lab_progress partial sets), flashcards learning (flashcard_progress consecutive_correct > 0 but not mastered). Currently the user must remember what they were doing.
+3. **Skeleton loaders on both hub landings** — 💬 Discussed. Both hubs show plain "Loading your data..." text. Replace with grey shimmer skeleton cards matching final layout to prevent layout jump and reduce perceived wait.
+4. **DST date bug on Life Hub home** — 📋 Specced. `life-hub/page.js` `dateStr()` uses `Date.now() - daysBack * 86400000` — off by one on daylight-saving transition days. Fix to match the `toLocaleDateString('en-CA')` + `setDate()` pattern used in nutrition (Phase 92).
+5. **Notification schedule UI in Settings** — 💬 Discussed. wake_time/bedtime only settable via 5-step Goals Setup; Settings → Notifications should show computed send times ("Morning brief: 8:00 AM — based on wake time") with inline time pickers writing to goals_profiles.
+6. **PWA install banner** — 💬 Discussed. App is PWA-ready (manifest + sw.js) but never invites install. One-time dismissible banner; installed PWAs get more reliable Android push delivery.
+7. **Life Hub home file size** — note: 971 lines, ~30 state vars. Split into components during the planned home restructure (don't split separately).
+8. **Accessibility pass** — 💬 Discussed, LOW priority (single user). ~5 ARIA attributes app-wide; charts, rating buttons, progress rings unlabeled for screen readers; keyboard navigation untested. Fold small fixes into pages being touched anyway rather than a dedicated pass.
+
+**Recommended order (agreed 2026-07-22, pending user confirmation):**
+1. Life Hub home restructure (already specced in 2026-07-09 audit) + quick wins in same session (DST fix, skeletons, sidebar 100dvh)
+2. Notification schedule UI + PWA install banner
+3. Study Hub motivation layer (exam countdown + jump-back-in row)
+4. Polish wave (typography, card variety, empty states, personality layer)
+
+**Open questions for user:** Does the sidebar bottom cutoff bug still occur? Does the Real Exam crash still occur? (Neither appears in the Phase Log as fixed.)
+
+---
+
 ### 🔔 Push Notifications — Status
 
 **Infrastructure:** Fully built and active
