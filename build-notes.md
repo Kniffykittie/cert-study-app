@@ -3171,11 +3171,9 @@ Build order: R1 → R3 + R4 (same session) → R5 → R6
 
 **R8. CCNA CLI command-entry question type (NEW — user-approved concept, 2026-07-22)**
 - Real CCNA 200-301 has: **sims** (live stateful CLI, graded on end-state, fully interactive), **simlets** (read-only sim + MC), drag-and-drop, MC single/multi.
-- **Tier 1 = BUILD THIS:** command-entry question type. Scenario + goal, user types real IOS commands into a terminal-styled box, validated against an answer key. Trains command RECALL (what sims actually test) vs MC recognition.
-  - Schema: `question_type='cli'` + payload JSONB `{ prompt, accepted: [[canonical lines], ...alt sequences], mode: 'config'|'exec' }`
-  - Validator lib `src/lib/cliValidate.js`: lowercase, collapse whitespace, expand IOS abbreviations via keyword prefix table, canonicalize interface names (gi/gig/gigabitethernet→GigabitEthernet), accept mask dotted-or-/prefix; per-question alternate-answer list as escape hatch; line-set compare (order-sensitive in config mode)
-  - Test page: monospace terminal input, per-line check, reveal expected on submit; mobile-friendly (textarea, no drag)
-  - Honest limitation documented: grades typed commands not simulated end-state; no free `show run` iteration (not stateful)
+- **Tier 1.5 = BUILD THIS (upgraded from Tier 1 to include MODE tracking — see USER CONCERN 4 in the infra audit):** command-entry question type with mode-aware validation via `src/lib/iosCliEngine.js` (mode state machine + command table + abbreviation expansion, replay-grading). Terminal-transcript UI (Enter runs each line, prompt evolves by mode). Forces enable/conf t/interface navigation because wrong-mode commands are rejected.
+  - Schema: `question_type='cli'` + type_payload JSONB `{ starting_mode, goal: [{command, required_mode}], accepted_alternates: [...], hostname }` + `rationale`
+  - Honest limitation documented: grades mode+commands, NOT simulated network end-state; `show` output not reflective unless pre-scripted (Tier 2)
 - **Tier 2 = LATER/optional:** scripted "feels-live" terminal — canned show output per step for a few showcase scenarios; feels interactive on the happy path only; not truly stateful.
 - **Tier 3 = OUT OF SCOPE (do NOT attempt):** full live stateful IOS simulator = Packet Tracer/Boson territory, years of eng. Packet Tracer labs section already covers the interactive-sim training need.
 
@@ -3216,10 +3214,21 @@ Deep read of test/page.js (1384 lines), generate-templates, generate-questions, 
 - Dedup today: only `question_template` TEXT sent to Claude with "don't duplicate" instruction. No similarity math, no cross-difficulty check. IMPROVE: server-side Jaccard similarity (reuse the ≥50% word-overlap detector already in premade-templates page) against ALL existing templates in that cert+domain (all difficulties) AFTER generation; drop/flag near-dupes before insert.
 - Fact-checking today: NONE. Generated answers are trusted blindly. BUILD: a **verify pass** — after generation, send each Q + marked answer + distractors back to Claude (ideally a fresh call, "act as a Cisco/CompTIA SME") asking: is the marked answer definitively correct? is any distractor ALSO correct (fatal)? any factual error? Only insert templates that pass; log failures. ~2x generation cost, high trust payoff. This is the single biggest quality lever for "not blatantly wrong."
 
-**USER CONCERN 2 — CLI input format (no shift+enter):**
+**USER CONCERN 2 — CLI input format (no shift+enter) — REVISED to terminal-transcript for mode practice:**
 - Real exam: type command → Enter runs it → next line. Multi-line config = sequential Enters.
-- SOLUTION: use a `<textarea>` styled as a terminal. In a textarea, **Enter already makes a newline natively — no shift needed.** User types the whole command block, taps "Submit Answer" (or a ▶ Run button). This exactly matches "type commands, press Enter between them." Tier 1 = plain textarea + submit. (Tier 2 optional: terminal transcript that echoes each line on Enter for stateful feel.)
-- CRITICAL: disable the global 1-4/Enter keyboard handler while the textarea is focused (see keyboard conflict above) or Enter advances the question instead of making a newline.
+- SOLUTION (upgraded from textarea to terminal-transcript because of the mode-practice requirement below): single-line input where **Enter commits the line** to a transcript above (echoed with its live prompt prefix) and a fresh prompt appears. Enter naturally = "run this command" — no shift needed. A "Submit / Done" button ends the question.
+- Why transcript over textarea: it shows the EVOLVING PROMPT (`Router>` → `Router#` → `Router(config)#` → `Router(config-if)#`) which is core realism AND is required to give live feedback on mode transitions.
+- CRITICAL: disable the global 1-4/Enter keyboard handler while the CLI input is focused, or Enter advances the question instead of running the line.
+
+**USER CONCERN 4 — Mode-transition practice (enable/disable/conf t/interface/exit/end) — the CLI realism crux:**
+- User wants the CLI questions to force practicing IOS mode navigation, not just the "meat" commands.
+- KEY INSIGHT: a live CLI does two separable things — (1) track MODE + which commands are legal per mode, (2) simulate the NETWORK (routing tables, show output). #2 is impossible Tier 3. **#1 is a small finite deterministic state machine and is exactly what mode practice needs.** Build #1 only. Call it **Tier 1.5 — mode-aware validation.**
+- BUILD: `src/lib/iosCliEngine.js` — a mode state machine + command table (~60-100 commands in CCNA scope). Each entry: { command/pattern, required_mode, resulting_mode }. Modes: user_exec (`R>`), priv_exec (`R#`), global_config (`R(config)#`), interface_config (`R(config-if)#`), router_config (`R(config-router)#`), line_config (`R(config-line)#`), vlan_config. Transitions: enable→priv, disable→user, `configure terminal`/`conf t`→global, `interface X`→if, `router X`→router, `line X`→line, `vlan N`→vlan, `exit`→up one, `end`/Ctrl-Z→priv.
+- GRADING via REPLAY: feed each typed line through the mode machine. A command typed in the WRONG mode is rejected with a real IOS error (`% Invalid input detected at '^' marker.`) — so skipping `enable`/`conf t`/`interface` causes the config command to fail → question wrong. This FORCES the navigation practice the user wants. Then check the set of successfully-applied commands (entered in a valid mode) against the question's required goal set. Forgiving of PATH (extra exits, different order, end-then-reenter) but strict on MODE — mirrors real-exam outcome grading while requiring genuine navigation.
+- Includes the IOS abbreviation expansion + interface-name canonicalization from the cliValidate spec (fold cliValidate INTO iosCliEngine — one lib).
+- BOUNDARY (honest): `show` commands do NOT reflect typed config (that's network sim = Tier 3). Config questions don't need show. If a question needs show output, pre-script canned output (Tier 2). Document this so we don't promise a stateful device.
+- This is the LARGEST single lib in the realism track — bounded and buildable, but real work. Tier 1.5 > the initial "match commands" Tier 1.
+- Explanation/rationale for CLI questions (concern 3) shows: the correct command sequence WITH prompts + per-command why + (if user failed) which line was rejected and the mode reason.
 
 **USER CONCERN 3 — Explanations for ALL new types incl. CLI:**
 - MC/multi-select: keep per-letter `explanations` (works as-is).
