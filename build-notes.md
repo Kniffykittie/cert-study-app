@@ -3169,10 +3169,22 @@ User decisions: build 1, 3, 4, 5, 6 below; SKIP "not exam-like" flag (user decli
 
 Build order: R1 → R3 + R4 (same session) → R5 → R6
 
+**R8. CCNA CLI command-entry question type (NEW — user-approved concept, 2026-07-22)**
+- Real CCNA 200-301 has: **sims** (live stateful CLI, graded on end-state, fully interactive), **simlets** (read-only sim + MC), drag-and-drop, MC single/multi.
+- **Tier 1 = BUILD THIS:** command-entry question type. Scenario + goal, user types real IOS commands into a terminal-styled box, validated against an answer key. Trains command RECALL (what sims actually test) vs MC recognition.
+  - Schema: `question_type='cli'` + payload JSONB `{ prompt, accepted: [[canonical lines], ...alt sequences], mode: 'config'|'exec' }`
+  - Validator lib `src/lib/cliValidate.js`: lowercase, collapse whitespace, expand IOS abbreviations via keyword prefix table, canonicalize interface names (gi/gig/gigabitethernet→GigabitEthernet), accept mask dotted-or-/prefix; per-question alternate-answer list as escape hatch; line-set compare (order-sensitive in config mode)
+  - Test page: monospace terminal input, per-line check, reveal expected on submit; mobile-friendly (textarea, no drag)
+  - Honest limitation documented: grades typed commands not simulated end-state; no free `show run` iteration (not stateful)
+- **Tier 2 = LATER/optional:** scripted "feels-live" terminal — canned show output per step for a few showcase scenarios; feels interactive on the happy path only; not truly stateful.
+- **Tier 3 = OUT OF SCOPE (do NOT attempt):** full live stateful IOS simulator = Packet Tracer/Boson territory, years of eng. Packet Tracer labs section already covers the interactive-sim training need.
+
+Build order: R1 → R3 + R4 (same session) → R5 → R6 → R8 (CLI type, pairs well with R6 PBQ engine)
+
 **Design decisions locked in (2026-07-22 discussion):**
 - **Difficulty redefinition — voice never changes, only thinking depth:** Easy = recall/definitions in exam phrasing (learning tool). Medium = THE real exam level (short scenario, one concept, standard distractors) — becomes the bulk of the pool. Hard = same format/voice/length but nastiest distractors (two-plausible-answers, edge cases, correct-in-another-context traps) — the over-preparation tier. Difficulty guide in generate-templates must be rewritten to this definition so hard ≠ different genre (no CySA+ drift at any tier).
 - **Real Exam mode blend (R7 — new):** stop forcing hard-only. Assemble per-cert recipe: ~70% medium / 30% hard (once medium pool exists), PBQ-lite items first, 2-3 choose-twos, exhibits sprinkled, official domain weights (already), real question count + timer (already). Practice mode keeps free difficulty choice for grinding.
-- **R4 per-cert variants:** acronym decks are CompTIA-only (no Cisco acronym list exists). CCNA gets a commands/terminology deck instead (seed from IOS_COMMANDS + objectives: command purposes, OSPF states, ADs, port roles).
+- **R4 per-cert variants:** acronym decks are CompTIA-only (no Cisco acronym list exists). CCNA gets a **pre-made commands/terminology/concepts deck** instead — seeded directly (NOT user-generated): command purposes, OSPF states, administrative distances, STP/RSTP port roles+states, subnetting facts (/8–/30 host counts, magic number), common ports, protocol behaviors, encapsulation, DTP/VTP, ACL logic. User explicitly wants this pre-built to "solve a lot of problems." Seed straight into flashcards table with deck tag.
 - **CCNA applicability:** multi-select very high (Choose two is a Cisco staple); exhibits highest of the 3 certs; R6 matching covers Cisco drag-and-drop; lab sims = Packet Tracer section (out of scope by design).
 - **Over-preparation strategy = hard distractors + coverage breadth + pacing, never a different question genre.** User's goal: real exam should feel like the medium set they've seen a hundred times.
 - **Generation workflow unchanged for owner** — same Generate button; R1 coverage table tells you WHERE to generate, prompt auto-targets uncovered sub-objectives.
