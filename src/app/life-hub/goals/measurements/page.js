@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { estimateBodyFatPct } from '@/lib/tdee'
 import InfoChip from '@/components/InfoChip'
@@ -151,6 +152,7 @@ function interpretBodyComp(history, goalsProfile, supplements, recentCarbAvg) {
 }
 
 export default function MeasurementsPage() {
+  const router = useRouter()
   const [history, setHistory] = useState([])
   const [goalsProfile, setGoalsProfile] = useState(null)
   const [supplements, setSupplements] = useState([])
@@ -318,7 +320,7 @@ export default function MeasurementsPage() {
     }
     setGoalCompletionAction(action)
     setGoalActionSaving(false)
-    if (action === 'new_goal') window.location.href = '/life-hub/goals/setup'
+    if (action === 'new_goal') router.push('/life-hub/goals/setup')
   }
 
   async function handleDelete(id) {

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { showToast } from '@/components/Toast'
 import { createClient } from '@/lib/supabase/client'
 
 const CERTS = [
@@ -73,7 +74,7 @@ export default function FlashcardsPage() {
       if (!res.ok) throw new Error(data.error)
       await loadStats()
     } catch (e) {
-      alert('Failed to generate: ' + e.message)
+      showToast('Failed to generate: ' + e.message, 'error')
     }
     setGenerating(null)
   }

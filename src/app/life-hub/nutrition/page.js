@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { calcTDEE as calcTDEEShared, calcMacros as calcMacrosShared, calcGoalAdjustment, calcMicroTargets } from '@/lib/tdee'
@@ -70,6 +70,7 @@ function MacroBar({ value, goal, color, warn }) {
 
 function NutritionPageInner() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const editDateParam = searchParams.get('editDate')
   const [goalsGated, setGoalsGated] = useState(false)
   const [checked, setChecked] = useState(false)
@@ -961,7 +962,7 @@ function NutritionPageInner() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                    <button onClick={() => { window.location.href = '/life-hub/nutrition/add-food?slot=lunch' }} style={{ backgroundColor: '#f97316', border: 'none', color: '#fff', borderRadius: '7px', padding: '6px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Log Lunch</button>
+                    <button onClick={() => router.push('/life-hub/nutrition/add-food?slot=lunch')} style={{ backgroundColor: '#f97316', border: 'none', color: '#fff', borderRadius: '7px', padding: '6px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Log Lunch</button>
                     <button onClick={() => setDismissedBanners(s => new Set([...s, 'lunch']))} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
                   </div>
                 </div>
@@ -1017,7 +1018,7 @@ function NutritionPageInner() {
                       {slotCals > 0 && <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{Math.round(slotCals)} kcal</span>}
                     </div>
                     {isEditing && (
-                      <button onClick={() => { window.location.href = `/life-hub/nutrition/add-food?slot=${slot.key}${viewingDate ? `&date=${viewingDate}` : ''}` }}
+                      <button onClick={() => router.push(`/life-hub/nutrition/add-food?slot=${slot.key}${viewingDate ? `&date=${viewingDate}` : ''}`)}
                         style={{ backgroundColor: 'rgba(0,128,255,0.12)', color: 'var(--accent-blue)', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
                         + Add
                       </button>
@@ -1049,7 +1050,7 @@ function NutritionPageInner() {
                     </div>
                   )}
                   {slotEntries.length === 0 && isEditing && (
-                    <button onClick={() => { window.location.href = `/life-hub/nutrition/add-food?slot=${slot.key}${viewingDate ? `&date=${viewingDate}` : ''}` }}
+                    <button onClick={() => router.push(`/life-hub/nutrition/add-food?slot=${slot.key}${viewingDate ? `&date=${viewingDate}` : ''}`)}
                       style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: '7px', padding: '8px 12px', cursor: 'pointer', textAlign: 'left', width: '100%', marginTop: '6px', color: 'var(--text-secondary)', fontSize: '12px' }}>
                       + Log {slot.label.toLowerCase()}…
                     </button>

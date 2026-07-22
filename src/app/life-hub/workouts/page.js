@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { showToast } from '@/components/Toast'
 import { BODY_PART_TO_STRETCH_GROUPS, getRecommendedStretches, getTimingLabel } from '@/data/stretches'
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -215,7 +216,7 @@ export default function WorkoutsPage() {
     })
     const json = await res.json()
     if (json.ok) await load()
-    else alert(json.error)
+    else showToast(json.error, 'error')
     setRegenerating(false)
   }
 

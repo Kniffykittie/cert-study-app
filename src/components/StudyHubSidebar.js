@@ -53,18 +53,39 @@ const SECTIONS = [
 export default function StudyHubSidebar() {
   const [displayName, setDisplayName] = useState('')
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [leaveTarget, setLeaveTarget] = useState(null)
   const pathname = usePathname()
   const router = useRouter()
 
   function handleNavClick(e, href) {
     if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('testInProgress')) {
       e.preventDefault()
-      const confirmed = window.confirm('You have an active test in progress.\n\nIt will be automatically saved so you can resume it later. Leave anyway?')
-      if (confirmed) {
-        router.push(href)
-      }
+      setLeaveTarget(href)
     }
   }
+
+  const leaveModal = leaveTarget && (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '20px' }}
+      onClick={() => setLeaveTarget(null)}>
+      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', maxWidth: '380px', width: '100%' }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ color: 'var(--warning)', fontSize: '15px', fontWeight: '700', marginBottom: '8px' }}>⏸ Test in progress</div>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.6, margin: '0 0 18px' }}>
+          Your test will be saved automatically so you can resume it later. Leave anyway?
+        </p>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={() => setLeaveTarget(null)}
+            style={{ flex: 1, backgroundColor: 'var(--background)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+            Stay
+          </button>
+          <button onClick={() => { const href = leaveTarget; setLeaveTarget(null); router.push(href) }}
+            style={{ flex: 1, backgroundColor: 'var(--warning)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>
+            Leave
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 
   // Auto-expand the section containing the active route; all open by default
   const defaultOpen = SECTIONS.reduce((acc, s) => {
@@ -162,6 +183,7 @@ export default function StudyHubSidebar() {
 
   return (
     <>
+      {leaveModal}
       <style>{`
         /* Hamburger button — hidden on desktop, visible on mobile */
         .sidebar-hamburger {

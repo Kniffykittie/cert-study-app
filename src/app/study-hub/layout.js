@@ -1,5 +1,6 @@
 import StudyHubSidebar from '@/components/StudyHubSidebar'
 import FloatingChat from '@/components/FloatingChat'
+import Toast from '@/components/Toast'
 
 export default function StudyHubLayout({ children }) {
   return (
@@ -19,6 +20,7 @@ export default function StudyHubLayout({ children }) {
         </main>
       </div>
       <FloatingChat />
+      <Toast />
     </>
   )
 }

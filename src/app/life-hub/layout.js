@@ -2,6 +2,7 @@ import LifeHubSidebar from '@/components/LifeHubSidebar'
 import LifeHubClientShell from '@/components/LifeHubClientShell'
 import HealthSyncBar from '@/components/HealthSyncBar'
 import LifeHubBottomNav from '@/components/LifeHubBottomNav'
+import Toast from '@/components/Toast'
 
 export default function LifeHubLayout({ children }) {
   return (
@@ -20,6 +21,7 @@ export default function LifeHubLayout({ children }) {
       <LifeHubClientShell />
       <HealthSyncBar />
       <LifeHubBottomNav />
+      <Toast />
     </>
   )
 }

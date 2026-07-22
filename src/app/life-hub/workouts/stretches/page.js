@@ -10,6 +10,35 @@ const CONTEXT_CONFIG = {
   bedtime:      { label: 'Bedtime Stretches',       type: 'static',  color: '#a78bfa', emoji: '🌙' },
 }
 
+const CONTEXT_EDUCATION = {
+  pre_workout: {
+    title: 'Why dynamic stretches before a workout?',
+    text: "Moving stretches raise muscle temperature, increase blood flow, and wake up your nervous system — priming the exact ranges of motion you're about to load. Holding long static stretches before lifting can temporarily reduce power output, so save those for after.",
+  },
+  post_workout: {
+    title: 'Why static stretches after a workout?',
+    text: "Your muscles are warm and most pliable right now, so held stretches reach deeper safely. Static stretching after training helps restore resting muscle length, kick-starts recovery, and shifts your body out of fight-or-flight mode toward rest-and-repair.",
+  },
+  bedtime: {
+    title: 'Why stretch before bed?',
+    text: 'Slow held stretches activate your parasympathetic nervous system — heart rate drops, muscles release stored tension, and your body gets the "safe to sleep" signal. Gentle spine and hip work before bed is linked to falling asleep faster and less nighttime restlessness.',
+  },
+}
+
+function EducationBanner({ color, title, text }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ backgroundColor: `${color}0d`, border: `1px solid ${color}40`, borderRadius: 10, padding: '10px 14px', marginBottom: 16, cursor: 'pointer' }}
+      onClick={() => setOpen(o => !o)}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <span style={{ color, fontSize: 13, fontWeight: 700 }}>💡 {title}</span>
+        <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && <p style={{ margin: '8px 0 0', color: 'var(--text-primary)', fontSize: 13, lineHeight: 1.6 }}>{text}</p>}
+    </div>
+  )
+}
+
 function StretchesInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -23,7 +52,7 @@ function StretchesInner() {
   const [activeGroup, setActiveGroup] = useState('All')
   const [activeType, setActiveType] = useState(config?.type ?? 'all')
   const [expanded, setExpanded] = useState(null)
-  const [checked, setChecked] = useState(() => pinnedIds ? new Set(pinnedIds) : new Set())
+  const [checked, setChecked] = useState(new Set())
   const [logging, setLogging] = useState(false)
   const [logged, setLogged] = useState(false)
   const startTime = useRef(Date.now())
@@ -79,7 +108,7 @@ function StretchesInner() {
         </h1>
         {config ? (
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
-            {pinnedIds ? `${pinnedIds.length} stretches selected for you. All pre-checked — uncheck any you skip, then log.` : 'Tap each stretch to mark it done, then log your session.'}
+            {pinnedIds ? `${pinnedIds.length} stretches selected for you. Tap each one as you finish it, then log.` : 'Tap each stretch to mark it done, then log your session.'}
           </p>
         ) : (
           <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: 14 }}>
@@ -87,6 +116,10 @@ function StretchesInner() {
           </p>
         )}
       </div>
+
+      {config && CONTEXT_EDUCATION[context] && (
+        <EducationBanner color={color} title={CONTEXT_EDUCATION[context].title} text={CONTEXT_EDUCATION[context].text} />
+      )}
 
       {!config && !pinnedIds && (
         <>
@@ -133,8 +166,8 @@ function StretchesInner() {
                 <span style={{ fontSize: 11, color: 'var(--text-secondary)', minWidth: 36, textAlign: 'right' }}>{s.duration_seconds}s</span>
                 {config ? (
                   <button onClick={e => { e.stopPropagation(); setExpanded(v => v === s.id ? null : s.id) }}
-                    style={{ background: 'none', border: 'none', fontSize: 11, color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px 4px', flexShrink: 0 }}>
-                    {isExpanded ? '▲' : '▼'}
+                    style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11, color: 'var(--text-secondary)', cursor: 'pointer', padding: '3px 8px', flexShrink: 0 }}>
+                    {isExpanded ? 'Hide ▲' : 'How? ▼'}
                   </button>
                 ) : (
                   <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 4 }}>{isExpanded ? '▲' : '▼'}</span>
@@ -142,6 +175,12 @@ function StretchesInner() {
               </div>
               {isExpanded && (
                 <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {s.why && (
+                    <div style={{ backgroundColor: `${color}0d`, border: `1px solid ${color}33`, borderRadius: 7, padding: '8px 12px', fontSize: 12 }}>
+                      <span style={{ color, fontWeight: 600 }}>Why this one: </span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{s.why}</span>
+                    </div>
+                  )}
                   <p style={{ margin: 0, color: 'var(--text-primary)', fontSize: 13, lineHeight: 1.65 }}>{s.how_to}</p>
                   {s.common_mistakes && (
                     <div style={{ backgroundColor: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.2)', borderRadius: 7, padding: '8px 12px', fontSize: 12 }}>

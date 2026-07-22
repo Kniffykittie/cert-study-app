@@ -1,7 +1,9 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function DailyLogReview() {
+  const router = useRouter()
   const [state, setState] = useState(null) // null | 'loading' | 'normal' | 'sparse' | 'empty' | 'done'
   const [summary, setSummary] = useState(null)
 
@@ -38,7 +40,7 @@ export default function DailyLogReview() {
   function goEdit(yesterday) {
     localStorage.setItem(`log_review_${yesterday}`, '1')
     setState('done')
-    window.location.href = `/life-hub/nutrition?editDate=${yesterday}`
+    router.push(`/life-hub/nutrition?editDate=${yesterday}`)
   }
 
   if (!state || state === 'loading' || state === 'done') return null

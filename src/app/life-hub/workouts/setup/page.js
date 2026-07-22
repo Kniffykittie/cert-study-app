@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { showToast } from '@/components/Toast'
 import { createClient } from '@/lib/supabase/client'
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -139,7 +140,7 @@ export default function WorkoutSetupPage() {
       body: JSON.stringify({ ...form, profile: profileData }),
     })
     const json = await res.json()
-    if (json.error) { alert(json.error); setGenerating(false); return }
+    if (json.error) { showToast(json.error, 'error'); setGenerating(false); return }
     router.push('/life-hub/workouts')
   }
 

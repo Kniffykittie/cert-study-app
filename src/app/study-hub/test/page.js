@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import BookmarkModal from '@/components/BookmarkModal'
+import { showToast } from '@/components/Toast'
 import FloatingReferencePanel from '@/components/FloatingReferencePanel'
 
 const DOMAINS = {
@@ -474,7 +475,7 @@ function TestPageInner() {
     if (matched.length > 0) {
       setSelectedTopics(matched.map(d => domainKey(d)))
     } else {
-      alert('Not enough data yet. Take a few tests first to identify weak domains.')
+      showToast('Not enough data yet — take a few tests first to identify weak domains', 'error')
     }
     setWeakLoading(false)
   }

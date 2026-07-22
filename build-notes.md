@@ -3102,7 +3102,7 @@ User-reported pain points, investigated in code. Each has root cause + proposed 
 
 All audit findings consolidated into build sessions, sequenced by dependency. Code assumptions verified where noted. This supersedes the scattered priority lists above — build in this order.
 
-### Session 1 — Trust & Feedback Quick Wins ✅ verified in code
+### Session 1 — Trust & Feedback Quick Wins ✅ BUILT (Phase 93)
 Small independent fixes, all touching nutrition + stretches. No migrations.
 1. **Shared `<Toast>` component** (`src/components/Toast.js`) — bottom-center, auto-dismiss ~2s, success (✓ green) + error (red, longer dismiss) variants. Context or simple event-bus so any page can fire it.
 2. **Fix silent food-log data loss** — `add-food/page.js` `logEntry()` (line ~58): check `res.ok`; on failure show error toast + STAY on page with selection intact; on success show "✓ Logged" toast then navigate. (Verified: zero res.ok checks in file today.)
@@ -3194,6 +3194,19 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 93 — Session 1: Trust & Feedback Quick Wins — Complete
+- **Toast system:** new `src/components/Toast.js` (showToast helper + component), mounted in both hub layouts; success/error variants
+- **Silent food-log data loss FIXED:** add-food `logEntry()` now checks res.ok — on failure shows error toast and stays on page (selection intact); on success shows "Logged to [slot]" toast and router.push home; network errors show "food was NOT logged"
+- **📷 Photo tab ported into add-food page** — full flow from orphaned AddFoodModal (take/upload → resize → AI analysis → confidence card → per-item Log via LogConfirmModal → hint re-analysis); photo food logging reachable for the first time
+- **favTab precedence fixed:** drink/snack slots force their sub-tab over saved localStorage tab
+- **router.push everywhere:** nutrition page Add buttons (×3), add-food Back + manual links (×3), DailyLogReview Fix-something, measurements new-goal — no more full page reloads
+- **Stretch guided session:** starts UNCHECKED (tap = done, per user request); per-stretch WHY callout in expanded view; collapsible 💡 education banner per context (pre=dynamic warm-up physiology, post=static recovery, bedtime=parasympathetic); expand button now labeled "How? ▼"
+- **Native dialogs replaced:** alert() → error toast in test (weak domains), flashcards (generate fail), workout setup, workout page regenerate; window.confirm → styled Stay/Leave modal in StudyHubSidebar
+- **DST date fix:** life-hub home dateStr() uses setDate + toLocaleDateString('en-CA') (was ms-subtraction, off-by-one on DST days)
+- NOTE: sidebar already had 100dvh + touch scrolling — the old cutoff bug appears fixed; still awaiting user confirmation
+- Build verified passing (npm run build)
+- Files: Toast.js (new), both hub layouts, add-food/page.js, nutrition/page.js, DailyLogReview.js, measurements/page.js, life-hub/page.js, stretches/page.js, test/page.js, flashcards/page.js, workouts/setup/page.js, workouts/page.js, StudyHubSidebar.js
 
 ### Phase 91 — Home Page UX + Day Hub Stretch Improvements — Complete
 - **Why:** Multiple UX pain points found from usage: check-in card was buried below section summary cards; afternoon mood/energy wasn't visible anywhere on home page; kcal on home page went stale when navigating away and back; Day Hub stretch lists had no WHY descriptions and didn't use adjacent-day workout context; bedtime phase showed no stretch suggestions at all

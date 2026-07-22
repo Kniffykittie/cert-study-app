@@ -14,8 +14,9 @@ const SC = {
 }
 
 function dateStr(daysBack = 0) {
-  const d = new Date(Date.now() - daysBack * 86400000)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const d = new Date()
+  d.setDate(d.getDate() - daysBack)
+  return d.toLocaleDateString('en-CA')
 }
 
 function getCheckinContext(ctx) {
