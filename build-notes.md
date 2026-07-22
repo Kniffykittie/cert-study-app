@@ -3169,6 +3169,14 @@ User decisions: build 1, 3, 4, 5, 6 below; SKIP "not exam-like" flag (user decli
 
 Build order: R1 → R3 + R4 (same session) → R5 → R6
 
+**Design decisions locked in (2026-07-22 discussion):**
+- **Difficulty redefinition — voice never changes, only thinking depth:** Easy = recall/definitions in exam phrasing (learning tool). Medium = THE real exam level (short scenario, one concept, standard distractors) — becomes the bulk of the pool. Hard = same format/voice/length but nastiest distractors (two-plausible-answers, edge cases, correct-in-another-context traps) — the over-preparation tier. Difficulty guide in generate-templates must be rewritten to this definition so hard ≠ different genre (no CySA+ drift at any tier).
+- **Real Exam mode blend (R7 — new):** stop forcing hard-only. Assemble per-cert recipe: ~70% medium / 30% hard (once medium pool exists), PBQ-lite items first, 2-3 choose-twos, exhibits sprinkled, official domain weights (already), real question count + timer (already). Practice mode keeps free difficulty choice for grinding.
+- **R4 per-cert variants:** acronym decks are CompTIA-only (no Cisco acronym list exists). CCNA gets a commands/terminology deck instead (seed from IOS_COMMANDS + objectives: command purposes, OSPF states, ADs, port roles).
+- **CCNA applicability:** multi-select very high (Choose two is a Cisco staple); exhibits highest of the 3 certs; R6 matching covers Cisco drag-and-drop; lab sims = Packet Tracer section (out of scope by design).
+- **Over-preparation strategy = hard distractors + coverage breadth + pacing, never a different question genre.** User's goal: real exam should feel like the medium set they've seen a hundred times.
+- **Generation workflow unchanged for owner** — same Generate button; R1 coverage table tells you WHERE to generate, prompt auto-targets uncovered sub-objectives.
+
 ### Session 5 — Life Hub Home Restructure (spec already in 2026-07-09 audit)
 1. Recovery Score SVG ring hero + component chips + expand.
 2. Daily Brief single tabbed card (Morning/Afternoon/Evening).
