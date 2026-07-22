@@ -3060,6 +3060,37 @@ User-reported pain points, investigated in code. Each has root cause + proposed 
 
 **Status: 💬 Discussed — priorities to be agreed with user before building.**
 
+**DECISION (2026-07-22): Stretch images = source real photos/illustrations**, not SVG stick figures. User saw two SVG samples and found stick figures harder to picture. Sourcing ~38 license-safe, visually consistent images is the work item. Fallback: SVG diagrams for any stretch without a good photo.
+
+---
+
+### 🔍 Feel & Flow Audit — Session 3 Additions (2026-07-22)
+
+**7. ⚠️ Silent data loss on food logging (BUG, high priority)**
+- `add-food/page.js` `logEntry()` POSTs to `/api/nutrition/log` and navigates back to nutrition WITHOUT checking `res.ok` — zero `res.ok` checks in the whole file. If the log fails (rate limit, network blip, session expired), the user is sent back to the food log believing it saved. No error shown, entry gone.
+- **Fix:** check response, show inline error + keep the user on the page with their selection intact. Same pattern-check needed on water page quick-add and supplement Mark Taken.
+
+**8. No success feedback anywhere (app-wide pattern)**
+- Only 1 file in the app has any toast-like mechanism. Logging food, saving check-ins, marking supplements = the page just changes with no confirmation moment. Combined with #7, the user can't distinguish "saved" from "silently failed."
+- **Fix:** one shared `<Toast>` component (bottom-center, auto-dismiss 2s, success/error variants) used by all log/save actions. Small build, large trust payoff.
+
+**9. Silently swallowed errors app-wide**
+- 26 empty `catch {}` blocks across 14 page files — failed fetches leave sections blank with no retry or message (e.g. My Favorites list just doesn't appear). **Fix:** minimum viable: set an error state with a "Couldn't load — tap to retry" row instead of empty catch.
+
+**10. Native browser dialogs clash with app UI**
+- `alert()` in flashcards generate, workouts setup, workouts page, test page weak-domains; `window.confirm()` in StudyHubSidebar test-in-progress guard. All other confirmations use styled modals. **Fix:** replace with the app's modal/toast patterns.
+
+**11. favTab localStorage overrides smart slot default**
+- `add-food/page.js` line 36: saved `favTab` beats `smartFavDefault`, so tapping "Add drink" opens whatever sub-tab was used last instead of Drinks. **Fix:** slot-specific defaults win when slot is drink/snack; localStorage only remembers within same slot type.
+
+**12. Back button in add-food header uses window.location.href**
+- Full reload on every Back tap (plus all Add buttons, already noted in #2/#6). Convert all to router.push in the consolidation pass.
+
+**Questions asked of user (awaiting answers):**
+1. Stretch photo sourcing: OK with AI-generated exercise illustrations, or prefer real photography from a stock/source set?
+2. Sidebar bottom cutoff + Real Exam crash — still reproducible?
+3. For the toast/feedback system: subtle (small bottom toast) or celebratory (checkmark animation) for successful logs?
+
 **Open questions for user:** Does the sidebar bottom cutoff bug still occur? Does the Real Exam crash still occur? (Neither appears in the Phase Log as fixed.)
 
 ---
