@@ -3139,6 +3139,8 @@ Small independent fixes, all touching nutrition + stretches. No migrations.
 ## 🗺️ MASTER BUILD ROADMAP (authoritative, 2026-07-22) — BUILD IN THIS ORDER, DO NOT REORDER without updating here
 This supersedes all scattered "Session N" numbering below. Detailed specs for each item live in the sections beneath this roadmap (Exam Realism Track, infra audit, gap analysis, 2026-07-09 UI audit). Cross-reference by the R#/gap# tags.
 
+### ⚠️ GENERATION HOLD (user, 2026-07-22): User will NOT run any AI generation (flashcard decks OR question templates) until the ENTIRE realism track is built. → Front-load all pure-code work; defer every generation-dependent step (S1 decks, S3 verify RUN, S4 coverage refill, S5 purge+regen) to a final "Generation Day" at the end. Build the machinery now, pull the trigger once at the end. REORDERED build order below reflects this: start S2.
+
 ### Definition of Done — EVERY session must pass ALL of these before it's called complete:
 1. `npm run build` passes clean
 2. Relevant items from the REGRESSION CHECKLIST (in the infra audit section) verified — especially "legacy MC still works" after any test-page change
@@ -3150,7 +3152,7 @@ This supersedes all scattered "Session N" numbering below. Detailed specs for ea
 
 ### BLOCK A — Exam Content Fidelity (makes questions FEEL right; no new question formats yet)
 - **S1 — Pre-made Flashcard Decks** ⬜ — CCNA commands/concepts/terminology deck (seed directly, NOT generated) + CompTIA acronym decks (Sec+ ~300, N+ ~200). Migration: `deck TEXT DEFAULT 'core'` on flashcards + flashcard landing shows Core/Acronyms(or Commands) per cert. Low-risk warm-up, delivers parked user request. (R4)
-- **S2 — Real Exam Mode Authenticity** ⬜ — FIX live bug #1 (force all domains in real mode) + bug #2 (skip spaced-rep personalization in real mode → pure official weights); add scaled-score/pass-likelihood estimate on results screen (gap #3); per-cert navigation rules incl. Cisco no-going-back for CCNA (gap #4). Makes existing Real Exam honest; no new infra.
+- **S2 — Real Exam Mode Authenticity** ✅ BUILT (Phase 97) — FIX live bug #1 (force all domains in real mode) + bug #2 (skip spaced-rep personalization in real mode → pure official weights); add scaled-score/pass-likelihood estimate on results screen (gap #3); per-cert navigation rules incl. Cisco no-going-back for CCNA (gap #4). Makes existing Real Exam honest; no new infra.
   - **DECIDED (user, 2026-07-22):** Scaled score = show an HONEST pass-likelihood estimate, made AS ACCURATE AS POSSIBLE from available data (weighted domain accuracy vs official pass threshold, green/yellow/red readiness), NOT a fabricated exact scaled number — CompTIA/Cisco scaling formulas are proprietary/unpublished so a precise scaled score is impossible; never fake one. Accuracy levers to use: weight by official domain %, require minimum sample size per domain before showing confidence, factor in recency (recent accuracy > old), and only draw on real-exam-style questions (not easy-tier) for the estimate. Show the estimate with a plain-language confidence caveat.
   - **DECIDED (user, 2026-07-22):** Real Exam mode = NO going back, ALL certs (not just CCNA). Once you advance past a question it is locked — remove Previous button + block navigation to answered questions in real mode. Practice/Simulation keep free navigation.
 - **S3 — Generation Quality Engine** ⬜ — fact-check verify pass with BEST-answer nuance (gap #5, must NOT reject correct-but-not-best distractors) + real Jaccard dedup vs all difficulties (concern #1) + rewrite difficulty guide to the locked definition (voice constant, only distractor depth changes) + confirm current exam versions SY0-701/N10-009/200-301 v1.1 (gap #6). Design verify as a second BATCHED call to avoid serverless timeout (gap #11). Generation-API only; no test-render changes.
@@ -3392,6 +3394,15 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 97 — S2: Real Exam Mode Authenticity — Complete
+- **Bug #1 FIXED:** Real Exam mode now forces ALL domains (passes `topics: []`) instead of leaking a prior domain selection — the "real" exam actually covers everything now.
+- **Bug #2 FIXED:** Real Exam mode passes `personalize: false` to generate-questions → skips spaced-rep weak-domain multipliers → pure official domain weights. Authentic domain mix. (Route defaults personalize=true so practice/mixed/weakness unchanged — backward compatible.)
+- **No going back (all certs):** RealExam component — removed Previous button, progress dots are read-only (past=green, current=blue, future=dim), must answer current question to advance (Next disabled until answered), "🔒 you can't return" note. Practice/Simulation keep free navigation.
+- **Honest pass-likelihood estimate on results:** new `passEstimate()` + `PASS_THRESHOLD` — weighted accuracy by official domain %, vs pass threshold, green/yellow/red verdict (On track / Borderline / Not ready), low-confidence caveat when sample <25 or not all domains covered. Explicitly labeled an estimate, NOT a fake scaled score.
+- Build verified passing. Regression: legacy MC scoring untouched; practice/simulation/mixed/resume paths unchanged (personalize default).
+- Files: api/generate-questions/route.js, study-hub/test/page.js, CLAUDE.md
+- Roadmap: S2 ✅
 
 ### Phase 96b — Question Realism Audit + Per-Cert Style Guides — Complete
 **Audit findings (DB sample of 161 active templates):**

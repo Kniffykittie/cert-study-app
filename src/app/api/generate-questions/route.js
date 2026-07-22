@@ -51,7 +51,7 @@ export async function POST(request) {
   const { data: profile } = await supabase.from('profiles').select('is_disabled').eq('id', user.id).single()
   if (profile?.is_disabled) return Response.json({ error: 'Account disabled' }, { status: 403 })
 
-  const { cert, count, topics, difficulty = 'hard' } = await request.json()
+  const { cert, count, topics, difficulty = 'hard', personalize = true } = await request.json()
 
   if (!DOMAINS[cert]) return Response.json({ error: 'Invalid cert' }, { status: 400 })
   if (!count || typeof count !== 'number' || count < 1 || count > 150) {
@@ -76,7 +76,9 @@ export async function POST(request) {
     perfMap[row.topic] = row.total_seen > 0 ? row.total_correct / row.total_seen : null
   }
 
+  // Real Exam mode passes personalize=false → pure official domain weights (no spaced-rep skew)
   const spacedDomains = activeDomains.map(d => {
+    if (!personalize) return { ...d }
     const key = `${d.id} ${d.name}`
     const acc = perfMap[key]
     let multiplier = 1

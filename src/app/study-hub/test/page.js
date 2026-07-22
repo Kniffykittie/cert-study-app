@@ -43,6 +43,26 @@ const REAL_EXAM = {
   'security-plus': { questions: 90, minutes: 90 },
 }
 
+// Raw-% equivalents of the scaled passing scores (CompTIA/Cisco don't publish exact scaling — these approximate)
+const PASS_THRESHOLD = { ccna: 82.5, 'network-plus': 80, 'security-plus': 83.3, mixed: 82 }
+
+// Honest pass-likelihood estimate: accuracy weighted by official domain %, vs the pass threshold.
+// Returns null when there isn't enough signal to be meaningful.
+function passEstimate(cert, domainBreakdown) {
+  const domains = DOMAINS[cert]
+  if (!domains) return null
+  const covered = Object.entries(domainBreakdown)
+    .map(([topic, s]) => ({ w: domains.find(d => `${d.id} ${d.name}` === topic)?.weight, acc: s.correct / s.total, total: s.total }))
+    .filter(d => d.w != null)
+  if (!covered.length) return null
+  const totalSample = covered.reduce((s, d) => s + d.total, 0)
+  const weighted = covered.reduce((s, d) => s + d.w * d.acc, 0) / covered.reduce((s, d) => s + d.w, 0) * 100
+  const threshold = PASS_THRESHOLD[cert] ?? 82
+  const domainsCovered = covered.length
+  const totalDomains = domains.length
+  return { weighted: Math.round(weighted), threshold, totalSample, domainsCovered, totalDomains }
+}
+
 // Overlap domains used for Mixed mode — maps each cert to its shared-topic domains
 const MIXED_DOMAINS = {
   ccna: ['1.0 Network Fundamentals', '3.0 IP Connectivity', '5.0 Security Fundamentals'],
@@ -146,7 +166,6 @@ function useTimer(initialSeconds, onExpire) {
 
 function RealExam({ cert, questions, answers, setAnswers, current, setCurrent, saving, onTimeout, onSubmit, onPause, initialSeconds }) {
   const { display, urgent, secondsRef } = useTimer(initialSeconds ?? REAL_EXAM[cert].minutes * 60, onTimeout)
-  const unanswered = questions.filter((_, i) => answers[i] === undefined).length
   const q = questions[current]
   const isLast = current === questions.length - 1
 
@@ -164,7 +183,7 @@ function RealExam({ cert, questions, answers, setAnswers, current, setCurrent, s
           {templateBar}
           <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', maxWidth: '220px' }}>
             {questions.map((_, i) => (
-              <div key={i} onClick={() => setCurrent(i)} style={{ width: '16px', height: '16px', borderRadius: '3px', backgroundColor: i === current ? 'var(--accent-blue)' : answers[i] !== undefined ? 'var(--accent-blue)' : 'var(--border)', opacity: answers[i] !== undefined || i === current ? 1 : 0.3, cursor: 'pointer' }} />
+              <div key={i} style={{ width: '16px', height: '16px', borderRadius: '3px', backgroundColor: i === current ? 'var(--accent-blue)' : i < current ? 'var(--success)' : 'var(--border)', opacity: i <= current ? 1 : 0.3 }} />
             ))}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -200,23 +219,19 @@ function RealExam({ cert, questions, answers, setAnswers, current, setCurrent, s
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => setCurrent(c => c - 1)} disabled={current === 0}
-            style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', cursor: current === 0 ? 'not-allowed' : 'pointer', opacity: current === 0 ? 0.4 : 1 }}>
-            ← Previous
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        <span style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          🔒 Real exam — you can't return to a question once you move on
+        </span>
+        {!isLast ? (
+          <button onClick={() => setCurrent(c => c + 1)} disabled={answers[current] === undefined}
+            style={{ backgroundColor: answers[current] === undefined ? 'var(--border)' : 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: answers[current] === undefined ? 'not-allowed' : 'pointer', opacity: answers[current] === undefined ? 0.6 : 1 }}>
+            Next Question →
           </button>
-          {!isLast && (
-            <button onClick={() => setCurrent(c => c + 1)}
-              style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', cursor: 'pointer' }}>
-              Next →
-            </button>
-          )}
-        </div>
-        {isLast && (
-          <button onClick={onSubmit} disabled={saving}
-            style={{ backgroundColor: unanswered > 0 ? 'var(--warning)' : 'var(--success)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: saving ? 'not-allowed' : 'pointer' }}>
-            {saving ? 'Saving...' : unanswered > 0 ? `Submit (${unanswered} unanswered)` : 'Submit Exam'}
+        ) : (
+          <button onClick={onSubmit} disabled={saving || answers[current] === undefined}
+            style={{ backgroundColor: (saving || answers[current] === undefined) ? 'var(--border)' : 'var(--success)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: (saving || answers[current] === undefined) ? 'not-allowed' : 'pointer', opacity: answers[current] === undefined ? 0.6 : 1 }}>
+            {saving ? 'Saving...' : 'Submit Exam'}
           </button>
         )}
       </div>
@@ -665,10 +680,12 @@ function TestPageInner() {
       } else {
         const actualCount = mode === 'real' ? REAL_EXAM[cert].questions : count
         const actualDifficulty = mode === 'real' ? 'hard' : difficulty
+        // Real Exam: force ALL domains (official weighting) + disable spaced-rep personalization for an authentic draw
+        const actualTopics = mode === 'real' ? [] : selectedTopics
         const res = await fetch('/api/generate-questions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cert, count: actualCount, topics: selectedTopics, difficulty: actualDifficulty })
+          body: JSON.stringify({ cert, count: actualCount, topics: actualTopics, difficulty: actualDifficulty, personalize: mode !== 'real' })
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Failed to generate questions')
@@ -1106,6 +1123,31 @@ function TestPageInner() {
           <div style={{ color, fontSize: '72px', fontWeight: '700', lineHeight: 1 }}>{pct}%</div>
           <div style={{ color: 'var(--text-secondary)', fontSize: '14px', marginTop: '8px' }}>{correct} / {questions.length} correct</div>
         </div>
+
+        {/* Pass-likelihood estimate — weighted by official domain %, honest (not a real scaled score) */}
+        {(() => {
+          const est = passEstimate(cert, domainBreakdown)
+          if (!est) return null
+          const gap = est.weighted - est.threshold
+          const verdict = gap >= 2 ? { c: 'var(--success)', t: 'On track to pass', bg: 'rgba(46,204,113,0.08)', bd: 'var(--success-border)' }
+            : gap >= -7 ? { c: 'var(--warning)', t: 'Borderline — keep going', bg: 'rgba(241,196,15,0.08)', bd: 'var(--warning-border)' }
+            : { c: 'var(--error)', t: 'Not ready yet', bg: 'rgba(204,0,0,0.08)', bd: 'var(--error-border)' }
+          const lowConfidence = est.totalSample < 25 || est.domainsCovered < est.totalDomains
+          return (
+            <div style={{ backgroundColor: est.bg, border: `1px solid ${verdict.bd}`, borderRadius: '10px', padding: '18px 20px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
+                <span style={{ color: verdict.c, fontSize: '15px', fontWeight: '700' }}>{verdict.t}</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+                  <span style={{ color: verdict.c, fontWeight: '700' }}>{est.weighted}%</span> weighted · passing ≈ {est.threshold}%
+                </span>
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: 1.5, margin: '8px 0 0' }}>
+                Weighted by official domain percentages — an estimate, not the exam's real scaled score (CompTIA/Cisco don't publish that formula).
+                {lowConfidence && ' Low confidence: build a bigger sample across all domains for a reliable read.'}
+              </p>
+            </div>
+          )
+        })()}
 
         {/* Domain breakdown */}
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
