@@ -3249,6 +3249,43 @@ Extract a single `<QuestionBody question={q} answer={answers[i]} onAnswer={} rev
 - [ ] Mobile: new type usable at 375px (no drag-required; tap/textarea)
 - [ ] Real Exam blend recipe doesn't request more of a type than exist in pool
 
+### 🔎 PRE-BUILD GAP ANALYSIS (2026-07-22) — What's still missing for real-exam fidelity + what to QA
+Reflective pass after the whole realism track was planned. These are gaps NOT yet in the plan. Two are live bugs found by reading code.
+
+**🐛 LIVE BUGS FOUND (fix as part of R7 Real Exam blend):**
+1. **Real Exam mode doesn't guarantee all domains.** startTest passes `topics: selectedTopics` even in real mode (line ~671). The UI says "All domains covered (fixed)" and disables the picker, but if the user had selected specific domains before switching to Real Exam, that selection persists and the "real" exam only draws those. FIX: force selectedTopics = all domains (or pass []) when mode === 'real'.
+2. **Spaced repetition skews the Real Exam.** generate-questions applies weak-domain multipliers (up to 2.5x) for ALL modes including real (route lines ~76-90). The real exam uses FIXED official domain weights with no personalization — our Real Exam over-samples your weak domains, so the domain mix isn't authentic. FIX: pass a flag (e.g. `personalize:false` or `mode:'real'`) to skip the spaced-rep multiplier in real mode; use pure official weights.
+
+**EXAM-FIDELITY GAPS not yet planned:**
+3. **Scaled scoring / pass estimate.** Real exams are scaled (CompTIA 100-900, pass 750; Cisco scaled ~825/1000), NOT raw %. We show raw %. A user at 80% raw can't tell if that's a pass. ADD: results screen shows a pass-likelihood/scaled estimate using official domain weights + pass thresholds (we already compute weighted predicted score — reuse it on the result, not just the cert page).
+4. **No-going-back navigation rules differ per exam.** Cisco 200-301 does NOT let you return to a previous question — once you advance it's locked. CompTIA lets you flag & review. Our Real Exam mode should enforce Cisco's no-back rule for CCNA (biggest "shock" factor). Currently Previous/Next is free in sim/real. Per-cert navigation policy needed.
+5. **BEST-answer vs fact-check tension (CRITICAL for CompTIA feel).** CompTIA's signature is "two answers are both technically correct, pick the BEST." Our planned fact-check verify pass (concern 1) could WRONGLY reject these as "distractor also correct." The verify prompt MUST distinguish "distractor equally correct = reject" from "distractor correct-but-not-best = intended CompTIA style, keep." Without this nuance the verify pass strips out exactly the questions that feel most real.
+6. **Exam-version currency.** Current versions: Security+ SY0-701, Network+ N10-009, CCNA 200-301 (v1.1). Templates were AI-generated — audit that content matches CURRENT objectives (e.g. SY0-701 added GenAI/zero-trust emphasis, dropped older items). Embed the RIGHT version's objectives in R1.
+7. **Partial credit rules per type.** CompTIA multi-select = all-or-nothing (get 1 of 2 → 0). Cisco sims = partial credit. Our scoring is binary — fine for multi-select (matches CompTIA), but CLI/PBQ should consider partial credit to match Cisco. Decide per type; document.
+8. **Readiness signal.** "Am I ready?" indicator tied to REAL thresholds (consistent ~85%+ on fresh questions across ALL domains, not just overall avg). More honest than raw predicted score.
+9. **Tab-complete & `?` help (CLI muscle memory).** Real IOS has Tab completion and `?` context help — people rely on them. Our CLI sim (R8) without them trains slightly different muscle memory. OPTIONAL enhancement: at least `?` help; Tab-complete is a stretch. Note so we set expectations.
+
+**POOL HEALTH (do BEFORE heavy new-type work):**
+10. **Existing 161 templates are all-hard + mostly off-style (CySA+ flavor).** Mixing them with new proper-style questions makes a single test feel schizophrenic. NEED a cleanup+regen gate: audit existing, retire off-style/all-hard, regenerate with style guides + verify pass + coverage. Retiring is safe for history (question_answers/topic_performance are snapshot-based, don't FK to templates) — verify this assumption before mass-retire.
+11. **Verify-pass cost/latency vs serverless timeout.** Generation batch is locked at 5 (truncation). Adding a per-question verify pass ~doubles time + tokens — risk of Vercel function timeout. DESIGN: verify as a second batched call (all 5 at once), or a separate endpoint, so it fits the timeout. Must solve before shipping fact-check.
+12. **Learning-wrong-info risk = worst outcome.** Shared AI questions with a wrong marked answer teach the user wrong. Verify pass is NON-NEGOTIABLE, not optional. Emphasized.
+
+**ENGINEERING / REGRESSION (beyond the question-type checklist already logged):**
+13. **Spaced-rep interaction with new types + difficulty.** Harder CLI/hard questions drag domain accuracy → over-weight that domain in future draws. Probably fine, but confirm it's not a doom loop. Also: should users be able to filter to practice ONLY a question type (only CLI, only multi-select)? Likely yes — add type filter to practice mode.
+14. **Mixed-cert mode + new types.** CLI is CCNA-only — exclude from Mixed. PBQ/multi-select — decide. Mixed already excludes Real Exam mode.
+15. **Graceful degradation when pool can't fill the blend.** Real Exam wants official domain weights + type mix + count; if pool lacks e.g. medium CLI questions, must degrade gracefully (fill with what exists, never crash or short the count).
+16. **Full-flow regression (not just question rendering):** practice, simulation, real, mixed, pause/resume (localStorage + paused_tests), bookmarks, wrong-answer review, flag-and-replace, mark-as-learned, weakness finder, predicted score, streak, mixed shuffle — ALL must be re-verified after the QuestionBody/scoreAnswer refactor, not just the new types.
+
+**UI / UX (keep it as good as it is):**
+17. **Test config screen clutter.** Adding difficulty + type filters + modes risks a cluttered setup. Keep Real Exam as ONE button (it owns the recipe); put complexity only in Practice. Audit the setup screen after changes.
+18. **CLI on mobile.** Typing IOS on a phone keyboard (symbols, no tab) is painful; real exam is desktop. Decide: desktop-recommended banner for CLI questions, and/or on-screen command hints. Don't ship CLI that's miserable on the phone the user actually studies on.
+19. **Results screen hierarchy.** With pacing + scaled score + readiness + domain breakdown, the results screen gets dense. Needs deliberate visual hierarchy so the one number that matters (pass-likelihood) leads.
+20. **Generation loading UX.** Verify pass makes generation slower — owner-facing, but needs a real progress/loading state so it doesn't look hung.
+21. **Tutor chat (ChatPanel) context for new types.** Gets question/options/topic today; options is undefined for CLI/ordering. Feed type-aware context so the tutor can actually help on a CLI/PBQ question.
+22. **Explanation teaching quality.** The app's value is LEARNING, not just testing. Spot-check that AI explanations actually teach (especially the CLI rationale explaining mode logic). A wrong answer with a weak explanation is a missed teaching moment.
+
+**SUGGESTED GATING ORDER (revised):** QuestionBody/scoreAnswer refactor → pool cleanup+regen with style guides + verify pass (fixes #5,#10,#11,#12,#6) → R1 coverage + fix real-mode bugs #1,#2 + R7 blend + scaled score #3 + nav rules #4 → R3 pacing → R4 decks → R5 multi-select → R6 PBQ → R8 CLI engine. Readiness #8, type filters #13, Tab/? #9 fold in where natural.
+
 ### Session 5 — Life Hub Home Restructure (spec already in 2026-07-09 audit)
 1. Recovery Score SVG ring hero + component chips + expand.
 2. Daily Brief single tabbed card (Morning/Afternoon/Evening).
