@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import BookmarkModal from '@/components/BookmarkModal'
+import QuestionExhibit from '@/components/QuestionExhibit'
 import { showToast } from '@/components/Toast'
 import FloatingReferencePanel from '@/components/FloatingReferencePanel'
 
@@ -184,6 +185,7 @@ function RealExam({ cert, questions, answers, setAnswers, current, setCurrent, s
           </div>
         )}
         <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>
+        <QuestionExhibit exhibit={q.exhibit} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {q.options.map((opt, i) => {
             const letter = letters[i]
@@ -536,7 +538,7 @@ function TestPageInner() {
     const q = questions[idx]
     const res = await fetch('/api/bookmarks', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cert, topic: q.topic, question_text: q.question, options: q.options, correct_answer: q.correct, explanations: q.explanations ?? {}, difficulty, reason, notes })
+      body: JSON.stringify({ cert, topic: q.topic, question_text: q.question, options: q.options, correct_answer: q.correct, explanations: q.explanations ?? {}, exhibit: q.exhibit ?? null, difficulty, reason, notes })
     })
     const data = await res.json()
     if (data.id) setBookmarked(prev => ({ ...prev, [idx]: data.id }))
@@ -706,7 +708,7 @@ function TestPageInner() {
           session_id: session.id, user_id: user.id, cert, topic: q.topic,
           question_text: q.question, correct_answer: q.correct,
           user_answer: finalAnswers[i] || '', is_correct: isCorrect,
-          question_snapshot: isCorrect ? null : { question: q.question, options: q.options, correct: q.correct, topic: q.topic, explanations: q.explanations ?? {} },
+          question_snapshot: isCorrect ? null : { question: q.question, options: q.options, correct: q.correct, topic: q.topic, explanations: q.explanations ?? {}, exhibit: q.exhibit ?? null },
         }
       }))
       const topicMap = {}
@@ -1224,6 +1226,7 @@ function TestPageInner() {
                 style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-secondary)', fontSize: '11px', padding: '2px 8px', cursor: 'pointer' }}>⚑ Flag</button>
             </div>
             <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>
+        <QuestionExhibit exhibit={q.exhibit} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {q.options.map((opt, i) => {
                 const letter = letters[i]
@@ -1316,6 +1319,7 @@ function TestPageInner() {
               </div>
             </div>
             <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>
+        <QuestionExhibit exhibit={q.exhibit} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {q.options.map((opt, i) => {
                 const letter = letters[i]

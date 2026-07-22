@@ -390,6 +390,7 @@ src/
       daily-push/
         index.ts                         Deno Edge Function — verify_jwt: false; pg_cron runs every 30 minutes; per-user window computed from goals_profiles.wake_time + bedtime (morning=wake_time, midday=wake_time+6h, evening=bedtime-1h); checks profiles.notification_preferences before each send; 10 notification types (3 briefs + 7 nudges); each type has its own window key for dedup; builds VAPID JWT via Web Crypto; handles 410/404 (expires sub)
         config.toml                      verify_jwt = false
+    QuestionExhibit.js                 Renders question exhibits (topology diagram via LabTopology + monospace CLI/config block, both horizontally scrollable); used in test page (all 3 question views), study mode, bookmarks expanded view
     Toast.js                           Shared toast notifications — exports showToast(message, type); mounted in both hub layouts; success (green ✓, 2.2s) and error (red ✕, 4.5s) variants; fired via 'app-toast' CustomEvent
     InfoChip.js                        Reusable ℹ️ education chip — grey pill, orange when active, toggles inline callout; props: text, label (default "ℹ️"), style; used at 11 touchpoints across 8 pages for domain-knowledge data points
     BookmarkModal.js                   Bookmark reason + notes modal
@@ -482,6 +483,14 @@ src/
 - Save any question with a reason: 🔥 Super Hard / 🤔 Confusing / 📢 Show Others / ⭐ Important
 - Optional notes field
 - Bookmarks page has cert tabs (All / CCNA / Network+ / Security+), reason badges, expandable full question view
+
+### Question Exhibits (Real-Exam Realism)
+- `question_templates.exhibit` JSONB (nullable): `{ topology?: {nodes, links}, config_text?: string }` — either or both
+- Topology uses the same node/link format as lab files (rendered by LabTopology); config_text is IOS CLI output in a monospace block
+- `fillTemplate()` substitutes `{{placeholders}}` inside exhibit labels, sublabels, and config_text from the same variable_sets
+- Rendered by `QuestionExhibit` between question text and options; included in bookmark rows (`bookmarked_questions.exhibit`) and wrong-answer `question_snapshot`
+- Template generator prompt instructs Claude to add exhibits to 2-3 of each batch of 5 for topology-relevant domains
+- 2 hand-seeded exhibit templates exist (CCNA: IP Connectivity interface-down scenario, Network Access trunk allowed-vlan scenario)
 
 ### Template System
 - Templates are **shared** — `question_templates` has open SELECT RLS for all authenticated users; generation locked to owner only at API level (403 for non-owner)

@@ -51,6 +51,15 @@ TEMPLATE FORMAT RULES:
 
 IMPORTANT: For conceptual questions with no numeric variables, use an empty variable_sets array [] and write the question/options/explanations as plain text.
 
+EXHIBITS (real-exam realism — use for 2-3 of the ${count} templates when the domain involves topologies, routing, switching, subnetting, ACLs, or device configuration):
+The real exams show exhibit diagrams and CLI output. Add an optional "exhibit" field to make questions match:
+- "exhibit": { "topology": {...}, "config_text": "..." } — include topology, config_text, or both; omit the exhibit field entirely for pure-concept questions
+- topology format: { "nodes": [{ "id": "r1", "type": "router|switch|pc|server|cloud", "label": "R1", "sublabel": "{{ip1}}/24", "x": 400, "y": 70 }], "links": [{ "from": "r1", "to": "sw1", "label": "G0/0\\nG0/1" }] }
+- Lay out nodes on a canvas roughly 100-700 wide, 50-400 tall; routers on top, switches middle, PCs/servers bottom; keep 150+ px between nodes
+- config_text: realistic IOS CLI output (show ip route, show ip interface brief, running-config excerpts, show vlan brief, etc.) — 4-12 lines, may use {{placeholders}}
+- The question should REQUIRE reading the exhibit to answer (e.g. "Based on the exhibit, why can't PC1 reach the server?")
+- {{placeholders}} work inside exhibit labels, sublabels, and config_text and are filled from the same variable_sets
+
 Return a JSON array of exactly ${count} template objects. Each object must have:
 {
   "question_template": "string with {{placeholders}}",
@@ -62,7 +71,8 @@ Return a JSON array of exactly ${count} template objects. Each object must have:
     "B": "why B is right/wrong",
     "C": "why C is right/wrong",
     "D": "why D is right/wrong"
-  }
+  },
+  "exhibit": { "topology": {...}, "config_text": "..." }  // OPTIONAL — only when the question reads from an exhibit
 }
 
 Return ONLY the JSON array, no markdown, no explanation.`
@@ -94,6 +104,7 @@ Return ONLY the JSON array, no markdown, no explanation.`
       options_templates: t.options_templates || [],
       correct_answer: t.correct_answer,
       explanations: t.explanations || {},
+      exhibit: t.exhibit || null,
     }))
 
     const { data, error } = await supabase.from('question_templates').insert(rows).select('id')

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import QuestionExhibit from '@/components/QuestionExhibit'
 
 const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
 const letters = ['A', 'B', 'C', 'D']
@@ -122,6 +123,7 @@ export default function BookmarksPage() {
                     )}
 
                     <p style={{ color: 'var(--text-primary)', fontSize: '15px', lineHeight: '1.6', marginBottom: '16px', whiteSpace: 'pre-wrap' }}>{b.question_text}</p>
+                    <QuestionExhibit exhibit={b.exhibit} />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                       {(b.options ?? []).map((opt, i) => {
                         const letter = letters[i]

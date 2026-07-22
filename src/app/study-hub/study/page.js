@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import BookmarkModal from '@/components/BookmarkModal'
+import QuestionExhibit from '@/components/QuestionExhibit'
 
 const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
 const letters = ['A', 'B', 'C', 'D']
@@ -175,6 +176,7 @@ export default function StudyModePage() {
                 </button>
               </div>
               <p style={{ color: 'var(--text-primary)', fontSize: '15px', lineHeight: '1.7', marginBottom: '20px', whiteSpace: 'pre-wrap' }}>{question.question}</p>
+              <QuestionExhibit exhibit={question.exhibit} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
                 {question.options.map((opt, i) => {
                   const letter = letters[i]

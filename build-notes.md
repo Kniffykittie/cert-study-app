@@ -3128,8 +3128,7 @@ Small independent fixes, all touching nutrition + stretches. No migrations.
 4. **New hard rule → CLAUDE.md UI checklist: no font below 12px on mobile; question/answer body text ≥15px.**
 5. Sidebar 100dvh + -webkit-overflow-scrolling fix, both sidebars (pending user repro confirmation, but harmless to apply).
 
-### Session 4 — Exam Exhibits (topology + config questions)
-Own session: migration + template regeneration. ✅ Verified: generate-questions uses select('*') and fillTemplate passes whole template through — exhibit column flows to client with no serving changes.
+### Session 4 — Exam Exhibits (topology + config questions) ✅ BUILT (Phase 96)
 1. **Migration:** `ALTER TABLE question_templates ADD COLUMN exhibit JSONB` — `{ topology: {...LabTopology format...}, config_text: 'R1# show ip route...' }`, either/both optional.
 2. **fillTemplate:** apply {{variable}} substitution inside exhibit.config_text and topology labels too.
 3. **Test page render:** between question text and options — topology via existing LabTopology component (verify its props: nodes/links format from lab files), config_text in monospace pre block with horizontal scroll container (mobile!).
@@ -3192,6 +3191,18 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 96 — Session 4: Exam Exhibits (Topology + CLI Output in Questions) — Complete
+- **Migration:** `exhibit JSONB` added to `question_templates` AND `bookmarked_questions`
+- **`fillTemplate()`** now fills {{placeholders}} inside exhibit config_text, node labels/sublabels, link labels; returns exhibit on the question object
+- **New `src/components/QuestionExhibit.js`** — 📋 Exhibit section: topology diagram (LabTopology reuse) + green-on-black monospace CLI block; both horizontally scrollable for mobile
+- **Rendered in all question surfaces:** test page (practice/simulation/results review), Study Mode, Bookmarks expanded view
+- **Snapshots carry exhibits:** bookmark POST + bookmarked_questions column; wrong-answer question_snapshot includes exhibit (review sessions show it automatically); flag snapshot spreads whole q
+- **Template generator prompt upgraded** — documents exhibit schema, instructs 2-3 exhibit questions per batch of 5 for topology-relevant domains (layout guidance, realistic IOS output, "must require reading the exhibit")
+- **2 hand-seeded exhibit templates** inserted (CCNA IP Connectivity: administratively-down interface; CCNA Network Access: trunk allowed-vlan filtering) so exhibits appear in practice immediately
+- **Owner action:** generate fresh template batches per cert/domain to grow the exhibit pool
+- Build verified passing
+- Files: fillTemplate.js, QuestionExhibit.js (new), test/page.js, study/page.js, bookmarks/page.js, api/bookmarks/route.js, api/generate-templates/route.js + DB migration
 
 ### Phase 95 — Session 3: Study Hub Mobile Text Pass — Complete
 - **Test page config:** difficulty selector stacks vertically on mobile (was 3-across unwrapped flex = tiny text); Save/Flag buttons bumped 11px→12px with bigger touch targets (6px 10px padding)
