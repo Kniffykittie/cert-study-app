@@ -3096,6 +3096,72 @@ User-reported pain points, investigated in code. Each has root cause + proposed 
 - Ask user: how did notification delivery behave over several days (test passed 2026-07-22 after settings change)?
 - When user delivers stretch photos → build stretch image display + wire filenames by stretch id.
 
+---
+
+## 🗺️ MASTER PLAN (2026-07-22) — Consolidated & Code-Verified
+
+All audit findings consolidated into build sessions, sequenced by dependency. Code assumptions verified where noted. This supersedes the scattered priority lists above — build in this order.
+
+### Session 1 — Trust & Feedback Quick Wins ✅ verified in code
+Small independent fixes, all touching nutrition + stretches. No migrations.
+1. **Shared `<Toast>` component** (`src/components/Toast.js`) — bottom-center, auto-dismiss ~2s, success (✓ green) + error (red, longer dismiss) variants. Context or simple event-bus so any page can fire it.
+2. **Fix silent food-log data loss** — `add-food/page.js` `logEntry()` (line ~58): check `res.ok`; on failure show error toast + STAY on page with selection intact; on success show "✓ Logged" toast then navigate. (Verified: zero res.ok checks in file today.)
+3. **router.push replacements** — nutrition/page.js lines 964/1020/1052, add-food back button + 3 log-manual links, DailyLogReview.js line 41, measurements page line 321. All currently `window.location.href` full reloads.
+4. **favTab default precedence** — add-food line 36: when slot is drink/snack, smart default WINS over saved localStorage tab.
+5. **Stretch guided-session fixes** (stretches/page.js): (a) remove pre-check — `useState(new Set())` even in pinned mode, check = done; (b) add `why` text to expanded card (data exists, currently unrendered there); (c) context education banner above list — 3 short physiology explainers keyed by context (pre_workout=dynamic warm-up raises muscle temp/nervous system, post_workout=static + recovery window, bedtime=parasympathetic downshift); (d) make ▼ expand affordance more obvious ("Details" label).
+6. **Port 📷 Photo tab into add-food page** — copy photo flow from AddFoodModal (states ~line 159-215, UI ~line 811+, resize helper): file input w/ capture, preview, description field, analyze via /api/nutrition/ai-photo-log, review items, log each. Tab row becomes ⭐ Favorites | 🔍 Search | 📷 Photo.
+7. **Replace native dialogs** — alert() in test/page.js:477, flashcards/page.js:76, workouts/setup:142, workouts/page.js:218 → error toast; window.confirm in StudyHubSidebar:62 → styled modal (matches pause modal pattern).
+8. **DST date fix** — life-hub/page.js `dateStr()`: replace ms-subtraction with setDate + toLocaleDateString('en-CA').
+
+### Session 2 — Nutrition Consolidation
+Depends on Session 1 (photo tab + toast live in add-food).
+1. **add-food page = the one canonical surface**, 4 tabs: Favorites | Search | ✏️ Manual | Photo. Manual tab embeds the log-manual form inline (port from log-manual/page.js; keep AI-prefill path but drop the sessionStorage page-hop — AI estimate fills the inline form directly).
+2. **Delete AddFoodModal.js** (~1000 lines, orphaned — verified unreachable: only mounted via logModal state that nothing sets). Extract any still-needed pieces (photo flow already ported; dietary warning chips come from nutritionUtils).
+3. **log-manual/page.js** → keep route as thin redirect to add-food?tab=manual (bookmarks/muscle memory), or delete if unreferenced.
+4. **Water page drink adds** deep-link to add-food?slot=drink (Favorites opens on Drinks sub-tab via #4 above); quick-add oz buttons stay as-is.
+5. **Error retry states** — replace empty `catch {}` in nutrition surfaces (my-foods fetch etc.) with "Couldn't load — tap to retry" rows.
+6. Update Parallel Implementations table in CLAUDE.md — several sync pairs die with AddFoodModal.
+
+### Session 3 — Study Hub Mobile Text Pass
+Independent. Audit each page at 375px width.
+1. Test page config screen: difficulty + question-count selectors stack on mobile (currently unwrapped 3-across flex, line ~857).
+2. In-test view: bump 11px metadata/buttons to 12-13px; Save/Flag bigger touch targets.
+3. Per-page pass: reference, cert-guide, progress, results, flashcards, bookmarks (check text scaling, grid reflow, horizontal scroll).
+4. **New hard rule → CLAUDE.md UI checklist: no font below 12px on mobile; question/answer body text ≥15px.**
+5. Sidebar 100dvh + -webkit-overflow-scrolling fix, both sidebars (pending user repro confirmation, but harmless to apply).
+
+### Session 4 — Exam Exhibits (topology + config questions)
+Own session: migration + template regeneration. ✅ Verified: generate-questions uses select('*') and fillTemplate passes whole template through — exhibit column flows to client with no serving changes.
+1. **Migration:** `ALTER TABLE question_templates ADD COLUMN exhibit JSONB` — `{ topology: {...LabTopology format...}, config_text: 'R1# show ip route...' }`, either/both optional.
+2. **fillTemplate:** apply {{variable}} substitution inside exhibit.config_text and topology labels too.
+3. **Test page render:** between question text and options — topology via existing LabTopology component (verify its props: nodes/links format from lab files), config_text in monospace pre block with horizontal scroll container (mobile!).
+4. **Bookmark/wrong-answer snapshots:** include exhibit in question_snapshot JSONB + render in bookmarks page + wrong-answer review.
+5. **generate-templates route:** prompt upgrade — for topology-relevant domains (IP Connectivity, Network Access, Network Implementation, Security Architecture etc.) instruct Claude to produce exhibit-based questions with the topology JSON schema documented in the prompt. Owner then generates fresh batches per cert.
+6. FloatingReferencePanel/chat unaffected.
+
+### Session 5 — Life Hub Home Restructure (spec already in 2026-07-09 audit)
+1. Recovery Score SVG ring hero + component chips + expand.
+2. Daily Brief single tabbed card (Morning/Afternoon/Evening).
+3. Zone reorder: ring → check-in → slim stats row → brief → heatmap → simplified nav cards.
+4. Skeleton loaders on both hub landings (grey shimmer cards matching final layout).
+5. Split page.js (971 lines) into components (RecoveryRing, DailyBriefCard, CheckInCard, QuickStats) during the rebuild.
+
+### Session 6 — Notification Schedule UI + PWA
+1. Settings → Notifications: show computed send times ("Morning brief · 8:00 AM — based on your wake time") + inline time pickers writing wake_time/bedtime to goals_profiles; nudge windows explained per toggle.
+2. PWA install banner — one-time dismissible, beforeinstallprompt capture + iOS Safari instructions fallback; note reliability benefit for push.
+
+### Session 7 — Study Hub Motivation Layer
+1. **Exam countdown** — profiles.exam_dates (verified: edited in settings, shown on home page, absent from study-hub overview). Add countdown chips to cert cards: red <30d, yellow <60d.
+2. **Jump back in row** — paused test (paused_tests), in-progress labs (lab_progress partial sets vs lab step counts), learning flashcards (flashcard_progress unmastered w/ progress). One row, max 3 items, above Recommended Focus.
+
+### Session 8 — Polish Wave
+Typography/spacing pass · left-border card diversification · empty-state redesigns · milestone moments · theme presets · personality layer (specced in Future Features) · accessibility labels (ARIA on rating buttons/rings/charts, keyboard nav) — folded per page.
+
+### Parked / awaiting user
+- Stretch photos (user sourcing; checklist delivered) → then image display build + optional 5 new stretches (Wrist, Standing Glute, Knees-to-Chest, Seated Straddle, Downward Dog).
+- Sidebar cutoff + Real Exam crash repro confirmation → fixes fold into Sessions 3/4.
+- Notification delivery observation over coming days.
+
 **Open questions for user:** Does the sidebar bottom cutoff bug still occur? Does the Real Exam crash still occur? (Neither appears in the Phase Log as fixed.)
 
 ---
