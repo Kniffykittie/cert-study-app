@@ -3189,6 +3189,57 @@ Build order: R1 → R3 + R4 (same session) → R5 → R6 → R8 (CLI type, pairs
 - **Over-preparation strategy = hard distractors + coverage breadth + pacing, never a different question genre.** User's goal: real exam should feel like the medium set they've seen a hundred times.
 - **Generation workflow unchanged for owner** — same Generate button; R1 coverage table tells you WHERE to generate, prompt auto-targets uncovered sub-objectives.
 
+### 🏗️ STUDY PAGE INFRASTRUCTURE AUDIT (2026-07-22) — Read before building ANY realism-track item
+Deep read of test/page.js (1384 lines), generate-templates, generate-questions, fillTemplate, bookmarks, wrong-answers. This is the "what breaks" reference — check every item here before calling a realism build done.
+
+**THE CENTRAL ARCHITECTURAL TRUTH — everything assumes single-letter A/B/C/D answers:**
+- Scoring is string equality everywhere: `finalAnswers[i] === q.correct`, `answers[current] === letter` (saveResults line ~698/706, submitAnswer, simSelectAnswer). Multi-select, CLI, ordering, matching ALL break this — need a per-type `isCorrect(q, answer)` scoring function.
+- `const letters = ['A','B','C','D']` hardcoded (line 39); `q.options.map` with `letters[i]` in THREE separate render paths (practice ~1325, simulation ~1232, and the answer-review ~189). No shared question-body component — every new type must be handled in all 3 paths OR we refactor to one `<QuestionBody>`.
+- `answers` state is a map `{ index: 'A' }` (string values). Multi-select answer = array; CLI = typed string; ordering = array; matching = object. **The answers map value type changes** — pause/resume + localStorage snapshot serialize this map (interruptedTest), so resume must tolerate non-string values.
+- Explanations keyed by letter: `q.explanations[letter]` (line 1344). CLI/ordering/matching have no letters.
+
+**KEYBOARD HANDLER CONFLICT (line 371-387):** global keydown maps '1'-'4' → select option, Enter → submit/next. This will HIJACK typing in a CLI textarea (user types "1" in an IP, Enter to make a newline). MUST disable the global handler when a text/CLI input is focused (check document.activeElement tag, or gate on question_type).
+
+**SNAPSHOT/PERSISTENCE SURFACES that need each new field (question_type, type payload, correct_answers, rationale):**
+1. `question_snapshot` JSONB (wrong answers, saveResults line 711) — currently adds exhibit; add new fields or wrong-answer review renders blank
+2. `bookmarked_questions` insert (api/bookmarks) + bookmarks page render — same
+3. localStorage `interruptedTest` snapshot + Supabase `paused_tests` — full question array serialized; new payloads must round-trip
+4. Mixed-cert mode merges questions from 3 parallel calls (line 645) — new types must survive the merge/shuffle
+5. ChatPanel gets `question/options/topic` (line 1379) — options undefined for CLI/ordering; tutor context needs type-aware props
+
+**SCHEMA CHANGES NEEDED (cumulative across realism track):**
+- `question_templates`: `sub_objective TEXT` (R1), `correct_answers TEXT[]` (R5, null=legacy single), `question_type TEXT DEFAULT 'mc'` (R6/R8), `type_payload JSONB` (R6/R8 — ordering items / matching pairs / cli accepted-answers), `rationale TEXT` (R6/R8/CLI explanation since no per-letter)
+- `bookmarked_questions` + `question_snapshot`: mirror question_type + type_payload + correct_answers + rationale
+- All nullable/defaulted so the existing 161 templates keep working untouched.
+
+**USER CONCERN 1 — Fact-checking + dedup (currently WEAK):**
+- Dedup today: only `question_template` TEXT sent to Claude with "don't duplicate" instruction. No similarity math, no cross-difficulty check. IMPROVE: server-side Jaccard similarity (reuse the ≥50% word-overlap detector already in premade-templates page) against ALL existing templates in that cert+domain (all difficulties) AFTER generation; drop/flag near-dupes before insert.
+- Fact-checking today: NONE. Generated answers are trusted blindly. BUILD: a **verify pass** — after generation, send each Q + marked answer + distractors back to Claude (ideally a fresh call, "act as a Cisco/CompTIA SME") asking: is the marked answer definitively correct? is any distractor ALSO correct (fatal)? any factual error? Only insert templates that pass; log failures. ~2x generation cost, high trust payoff. This is the single biggest quality lever for "not blatantly wrong."
+
+**USER CONCERN 2 — CLI input format (no shift+enter):**
+- Real exam: type command → Enter runs it → next line. Multi-line config = sequential Enters.
+- SOLUTION: use a `<textarea>` styled as a terminal. In a textarea, **Enter already makes a newline natively — no shift needed.** User types the whole command block, taps "Submit Answer" (or a ▶ Run button). This exactly matches "type commands, press Enter between them." Tier 1 = plain textarea + submit. (Tier 2 optional: terminal transcript that echoes each line on Enter for stateful feel.)
+- CRITICAL: disable the global 1-4/Enter keyboard handler while the textarea is focused (see keyboard conflict above) or Enter advances the question instead of making a newline.
+
+**USER CONCERN 3 — Explanations for ALL new types incl. CLI:**
+- MC/multi-select: keep per-letter `explanations` (works as-is).
+- CLI/ordering/matching: no letters → add a general `rationale TEXT` field. Generator MUST produce it. For CLI: show expected command(s) + rationale explaining WHY each command (e.g. "`router ospf 1` starts OSPF process 1; `network 10.0.0.0 0.0.0.255 area 0` advertises the /24 into area 0"). Reveal panel renders `rationale` when no per-letter explanations exist. Every new question type is BLOCKED from "done" until its reveal shows a why.
+
+**DE-RISK RECOMMENDATION — do this refactor FIRST, before R5/R6/R8:**
+Extract a single `<QuestionBody question={q} answer={answers[i]} onAnswer={} revealed={} />` component that switches on `question_type` and owns rendering + selection for every type, plus a pure `scoreAnswer(question, answer) → bool` used by saveResults AND live scoring. Replace all 3 inline render paths with it. This turns "add a question type" into "add one branch in two functions" instead of touching scoring, 3 render paths, snapshots, and resume separately every time. Without this refactor, each of R5/R6/R8 risks regressing the other two and the existing MC flow.
+
+**REGRESSION CHECKLIST — verify before calling ANY realism item done:**
+- [ ] Existing MC (legacy, no question_type) still renders + scores in practice/simulation/real
+- [ ] Mixed-cert mode still merges/shuffles without crashing on new types
+- [ ] Pause mid-test on a new-type question → resume restores the typed/selected answer
+- [ ] Wrong answer on a new-type question → appears correctly in Wrong Answer Review
+- [ ] Bookmark a new-type question → renders in Bookmarks with its exhibit/payload/rationale
+- [ ] Keyboard 1-4/Enter still works for MC but does NOT hijack CLI textarea
+- [ ] Reveal shows a "why" (per-letter explanations OR rationale) for the type
+- [ ] Score math correct (multi-select = exact set match; CLI = normalized accepted match)
+- [ ] Mobile: new type usable at 375px (no drag-required; tap/textarea)
+- [ ] Real Exam blend recipe doesn't request more of a type than exist in pool
+
 ### Session 5 — Life Hub Home Restructure (spec already in 2026-07-09 audit)
 1. Recovery Score SVG ring hero + component chips + expand.
 2. Daily Brief single tabbed card (Morning/Afternoon/Evening).
