@@ -42,12 +42,6 @@ interface PushMessage { title: string; body: string; url: string; tag: string }
 // Time helpers
 // ---------------------------------------------------------------------------
 
-// Returns HH:MM string in UTC from a timestamptz-now
-function nowUTCHHMM(): string {
-  const now = new Date()
-  return `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`
-}
-
 function todayUTC(): string {
   return new Date().toISOString().slice(0, 10)
 }
@@ -90,6 +84,24 @@ function bytesToBase64url(bytes: Uint8Array): string {
   return btoa(bin).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
 }
 
+// web-push generates raw base64url keys (private = 32-byte scalar, public =
+// 65-byte uncompressed point), not PKCS8 — import via JWK built from both
+async function importVapidPrivateKey(): Promise<CryptoKey> {
+  const priv = new Uint8Array(base64urlToBytes(VAPID_PRIVATE_KEY))
+  if (priv.length === 32) {
+    const pub = new Uint8Array(base64urlToBytes(VAPID_PUBLIC_KEY))
+    const jwk = {
+      kty: 'EC',
+      crv: 'P-256',
+      d: bytesToBase64url(priv),
+      x: bytesToBase64url(pub.slice(1, 33)),
+      y: bytesToBase64url(pub.slice(33, 65)),
+    }
+    return crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
+  }
+  return crypto.subtle.importKey('pkcs8', base64urlToBytes(VAPID_PRIVATE_KEY), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
+}
+
 async function buildVapidHeaders(endpoint: string) {
   const url = new URL(endpoint)
   const audience = `${url.protocol}//${url.host}`
@@ -97,20 +109,54 @@ async function buildVapidHeaders(endpoint: string) {
   const header = btoa(JSON.stringify({ typ: 'JWT', alg: 'ES256' })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
   const payload = btoa(JSON.stringify({ aud: audience, exp: now + 43200, sub: VAPID_SUBJECT })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
   const signingInput = `${header}.${payload}`
-  const privateKey = await crypto.subtle.importKey(
-    'pkcs8',
-    base64urlToBytes(VAPID_PRIVATE_KEY),
-    { name: 'ECDSA', namedCurve: 'P-256' },
-    false,
-    ['sign'],
-  )
+  const privateKey = await importVapidPrivateKey()
   const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, privateKey, new TextEncoder().encode(signingInput))
   const jwt = `${signingInput}.${bytesToBase64url(new Uint8Array(sig))}`
   return {
     'Authorization': `vapid t=${jwt}, k=${VAPID_PUBLIC_KEY}`,
-    'Content-Type': 'application/json',
     'TTL': '86400',
   }
+}
+
+// ---------------------------------------------------------------------------
+// RFC 8291 payload encryption (aes128gcm) — push services reject plaintext
+// ---------------------------------------------------------------------------
+
+async function hkdf(salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, length: number): Promise<Uint8Array> {
+  const key = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits'])
+  const bits = await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, key, length * 8)
+  return new Uint8Array(bits)
+}
+
+async function encryptPayload(plaintext: string, p256dh: string, auth: string): Promise<Uint8Array> {
+  const uaPublic = new Uint8Array(base64urlToBytes(p256dh))
+  const authSecret = new Uint8Array(base64urlToBytes(auth))
+
+  const asKeys = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits'])
+  const asPublic = new Uint8Array(await crypto.subtle.exportKey('raw', asKeys.publicKey))
+
+  const uaKey = await crypto.subtle.importKey('raw', uaPublic, { name: 'ECDH', namedCurve: 'P-256' }, false, [])
+  const ecdhSecret = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaKey }, asKeys.privateKey, 256))
+
+  const enc = new TextEncoder()
+  const keyInfo = new Uint8Array([...enc.encode('WebPush: info\0'), ...uaPublic, ...asPublic])
+  const ikm = await hkdf(authSecret, ecdhSecret, keyInfo, 32)
+
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const cek = await hkdf(salt, ikm, enc.encode('Content-Encoding: aes128gcm\0'), 16)
+  const nonce = await hkdf(salt, ikm, enc.encode('Content-Encoding: nonce\0'), 12)
+
+  const padded = new Uint8Array([...enc.encode(plaintext), 2])
+  const aesKey = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt'])
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, padded))
+
+  const header = new Uint8Array(16 + 4 + 1 + 65)
+  header.set(salt, 0)
+  new DataView(header.buffer).setUint32(16, 4096)
+  header[20] = 65
+  header.set(asPublic, 21)
+
+  return new Uint8Array([...header, ...ciphertext])
 }
 
 // ---------------------------------------------------------------------------
@@ -131,12 +177,21 @@ async function sendPush(supabase: ReturnType<typeof createClient>, sub: { user_i
   if (existing) return
 
   const headers = await buildVapidHeaders(sub.endpoint)
-  const body = JSON.stringify({ title: msg.title, body: msg.body, url: msg.url, tag: msg.tag })
-  const res = await fetch(sub.endpoint, { method: 'POST', headers, body })
+  const payload = JSON.stringify({ title: msg.title, body: msg.body, url: msg.url, tag: msg.tag })
+  const encrypted = await encryptPayload(payload, sub.p256dh, sub.auth_key)
+  const res = await fetch(sub.endpoint, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream' },
+    body: encrypted,
+  })
 
   if (res.status === 410 || res.status === 404) {
     await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint)
     return
+  }
+
+  if (!res.ok) {
+    throw new Error(`push failed ${res.status}: ${(await res.text()).slice(0, 200)}`)
   }
 
   await supabase.from('push_notification_log').insert({
@@ -145,7 +200,7 @@ async function sendPush(supabase: ReturnType<typeof createClient>, sub: { user_i
     window: windowKey,
     title: msg.title,
     body: msg.body,
-    delivered: res.ok,
+    delivered: true,
   })
 }
 
@@ -252,12 +307,19 @@ async function checkWrapReady(supabase: ReturnType<typeof createClient>, userId:
 // Main handler
 // ---------------------------------------------------------------------------
 
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const nowMin = nowUTCMinutes()
     const today = todayUTC()
     let totalSent = 0
+    const errors: string[] = []
+
+    let isTest = false
+    try {
+      const body = await req.json()
+      isTest = body?.test === true
+    } catch { /* no body */ }
 
     // Load all subscriptions
     const { data: subs, error: subErr } = await supabase.from('push_subscriptions').select('user_id, endpoint, p256dh, auth_key')
@@ -265,6 +327,16 @@ Deno.serve(async (_req) => {
 
     for (const sub of subs ?? []) {
       try {
+        if (isTest) {
+          await sendPush(supabase, sub, {
+            title: 'Test notification ✅',
+            body: 'Push delivery is working. This was a manual test.',
+            url: '/life-hub',
+            tag: 'test',
+          }, `test-${Date.now()}`)
+          totalSent++
+          continue
+        }
         // Load profile + goals in parallel
         const [profileRes, goalsRes] = await Promise.all([
           supabase.from('profiles').select('notification_preferences, daily_goal').eq('id', sub.user_id).maybeSingle(),
@@ -392,12 +464,12 @@ Deno.serve(async (_req) => {
             totalSent++
           }
         }
-      } catch {
-        // isolate per-user failures
+      } catch (err) {
+        errors.push(`${sub.user_id}: ${String(err)}`)
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, sent: totalSent, nowMin, today }), {
+    return new Response(JSON.stringify({ ok: true, sent: totalSent, nowMin, today, errors }), {
       headers: { 'Content-Type': 'application/json' },
     })
   } catch (err) {

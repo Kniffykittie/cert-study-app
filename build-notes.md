@@ -3007,9 +3007,12 @@ PHASE D (polish):
 - `generate-coach-memory` Edge Function deployed, cron runs Monday 2am, active ✅
 - Settings page has "Enable Notifications" button that requests browser permission and saves subscription
 
-**Why user hasn't received any notifications:**
-- `push_subscriptions` table is empty — the browser permission + subscription registration flow has never been completed
-- **To fix:** Go to Settings → Notifications section → click "Enable Notifications" → allow browser prompt → subscription saves to DB → Edge Function will find it on next 30-min cron run
+**Delivery fixed 2026-07-22 (verified with live test push):**
+- Root cause 1: VAPID private key was imported as PKCS8, but `web-push` generates raw base64url keys — import threw on every send and was silently swallowed. Fixed via JWK import built from the raw private + public keys.
+- Root cause 2: payload was sent as plain JSON — Web Push requires RFC 8291 `aes128gcm` encryption with the subscription's p256dh/auth keys. Implemented full encryption (ECDH → HKDF → AES-128-GCM).
+- Per-user errors are no longer swallowed — returned in the response `errors[]` array.
+- Test mode added: POST `{"test": true}` to the function sends an immediate test notification to all subscriptions, ignoring windows.
+- **User still needs to set wake_time + bedtime in Goals Setup** — currently NULL, so windows default to 08:00/14:00/22:00 UTC (4 AM / 10 AM / 6 PM EST).
 
 ---
 
