@@ -3192,6 +3192,20 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 96b — Question Realism Audit + Per-Cert Style Guides — Complete
+**Audit findings (DB sample of 161 active templates):**
+1. **Difficulty monoculture:** effectively ALL templates are 'hard' (1 medium = seeded exhibit). Real exams are mostly short/medium questions with a few hard ones — our all-hard pool makes practice feel like a different exam.
+2. **Style mismatch (worst on Security+):** many templates are long multi-artifact forensic scenarios (registry dumps, hex payloads, DNS log excerpts) — that's CySA+ style. Real SY0-701 = 1-3 sentence scenario + "Which of the following BEST/MOST likely/FIRST" + acronym-dense options. Explains user's friend: "similar, but several questions felt brand new."
+3. **Coverage breadth:** ~10 templates/domain vs dozens of sub-objectives per official domain — untested sub-objectives = "brand new" questions on the real exam.
+4. **No multi-select:** real exams have "(Choose two)" — our schema is single-answer A-D only.
+**Built this session:** per-cert REAL-EXAM STYLE guides injected into generate-templates prompt (Cisco short-stem/config-reading conventions for CCNA; CompTIA BEST/MOST/FIRST + job-role + acronym-option conventions for N+/Sec+; explicit "do NOT write CySA+-style forensics" for Sec+).
+**Recommended next (not yet built):**
+- Owner regenerates batches per domain (new style guide + exhibit support apply automatically); consider retiring the most CySA+-flavored Sec+ templates
+- Generate MEDIUM batches per domain (pool is all-hard); consider Real Exam mode drawing mixed medium+hard instead of hard-only for realism
+- Embed official sub-objective lists per domain in the generator prompt for systematic coverage (fills the "brand new question" gap)
+- Multi-select "(Choose two)" support — schema change (correct_answers array) + test page checkbox UI — Future Features
+- Files: api/generate-templates/route.js
+
 ### Phase 96 — Session 4: Exam Exhibits (Topology + CLI Output in Questions) — Complete
 - **Migration:** `exhibit JSONB` added to `question_templates` AND `bookmarked_questions`
 - **`fillTemplate()`** now fills {{placeholders}} inside exhibit config_text, node labels/sublabels, link labels; returns exhibit on the question object

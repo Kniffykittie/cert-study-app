@@ -37,7 +37,30 @@ export async function POST(req) {
       ? `\nEXISTING TEMPLATES TO AVOID DUPLICATING:\n${existingList.join('\n')}\n\nDo NOT generate questions that test the same concept or scenario as any of the above. Each new template must cover a distinct topic, scenario type, or skill within the domain.\n`
       : ''
 
+    const styleGuides = {
+      ccna: `REAL-EXAM STYLE (Cisco 200-301) — questions must FEEL like the real exam:
+- Cisco stems are short and direct: "Refer to the exhibit...", "Which two statements about X are true?", "What is the effect of this configuration?", "Which command...?"
+- Most real questions are 1-3 sentences. Do NOT write multi-paragraph forensic scenarios — that is not Cisco's style.
+- Heavy use of: config interpretation, command output reading, subnetting math, protocol behavior ("What happens when...")
+- Options are often commands, config lines, or short technical facts — rarely full sentences
+- Mix per batch: mostly short direct questions, 2-3 exhibit-based, at most 1 longer scenario`,
+      'network-plus': `REAL-EXAM STYLE (CompTIA N10-009) — questions must FEEL like the real exam:
+- CompTIA stems follow strict conventions: "Which of the following BEST describes...", "...MOST likely cause?", "...should the technician do FIRST/NEXT?"
+- Scenario = 1-3 sentences with a job role ("A network technician is troubleshooting..."), then the question
+- Options are often short: protocol names, port numbers, tool names, or acronyms (e.g. "A. VLAN  B. VXLAN  C. VPN  D. VRF")
+- Troubleshooting questions follow the CompTIA methodology order (identify problem → establish theory → test → plan → implement → verify → document)
+- Do NOT write long log-dump forensics — keep scenarios tight like the real exam`,
+      'security-plus': `REAL-EXAM STYLE (CompTIA SY0-701) — questions must FEEL like the real exam:
+- SY0-701 stems are SHORT: 1-3 sentence scenario with a job role, then "Which of the following BEST/MOST likely/FIRST..."
+- Very acronym-dense: many questions have acronym-only option sets (e.g. "A. SIEM  B. SOAR  C. EDR  D. XDR" or "A. MTBF  B. RTO  C. RPO  D. MTTR")
+- Common patterns: "BEST describes", "MOST likely explanation", "do FIRST", "BEST mitigates", "GREATEST concern"
+- Concept-matching over deep forensics: the real exam tests whether you can match a scenario to the right control/attack/concept in seconds
+- Do NOT write multi-artifact incident investigations with registry dumps and hex payloads — that is CySA+ style, not Security+. At most 1 per batch may include a short log excerpt.`,
+    }
+
     const prompt = `Generate exactly ${count} question TEMPLATES for ${cert.toUpperCase()} certification, domain: "${domain}", difficulty: ${difficulty}.${existingSection}
+
+${styleGuides[cert] ?? ''}
 
 Difficulty guidance: ${difficultyGuide[difficulty]}
 
