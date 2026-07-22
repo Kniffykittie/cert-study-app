@@ -3015,7 +3015,50 @@ Fresh code audit of both hubs. Items below are NEW (not in the 2026-07-09 audit)
 1. Life Hub home restructure (already specced in 2026-07-09 audit) + quick wins in same session (DST fix, skeletons, sidebar 100dvh)
 2. Notification schedule UI + PWA install banner
 3. Study Hub motivation layer (exam countdown + jump-back-in row)
-4. Polish wave (typography, card variety, empty states, personality layer)
+4. Polish wave (typography, card variety, empty states, personality layer, **accessibility fixes** — add ARIA labels to rating buttons/rings/charts + keyboard nav on custom controls, folded into each page as it's touched)
+
+---
+
+### 🔍 Feel & Flow Audit (2026-07-22, session 2) — User-Reported + Code-Confirmed
+
+User-reported pain points, investigated in code. Each has root cause + proposed solution.
+
+**1. 📷 Photo food logging is UNREACHABLE (confirmed dead feature)**
+- The 📷 Photo tab was built in `AddFoodModal.js` (tab exists at line ~473, full upload/analyze/review flow works, route `/api/nutrition/ai-photo-log` live).
+- BUT: every "Add [slot]" button on the nutrition page navigates to `/life-hub/nutrition/add-food?slot=X` (the standalone page) — which has ONLY Favorites + Search tabs. Nothing sets `logModal` state anymore, so `AddFoodModal` never opens. The photo feature shipped, then the add-food page superseded the modal without porting the photo tab.
+- **Fix:** Add a 📷 Photo tab to `add-food/page.js` (port the flow from AddFoodModal), then either delete AddFoodModal or reduce it to shared components. This also answers "how do I take pictures of food" — currently: you can't.
+
+**2. 🍽️ Nutrition add-food flows feel like "every part has its own rules" (confirmed — 4 parallel surfaces)**
+- Four different add surfaces with different tab sets, different manual-entry forms, different drink handling:
+  a. `add-food/page.js` — Favorites (5 sub-tabs) + Search; no Manual tab, no Photo tab (AI estimate goes through sessionStorage → log-manual page)
+  b. `AddFoodModal.js` — Favorites/Manual/Search/Photo (orphaned, unreachable)
+  c. `SavedFoodsTab.js` — its own inline log flow on the nutrition page
+  d. `water/page.js` — completely separate drink search/save/log flow
+- **Fix (consolidation spec):** ONE canonical add surface = `add-food/page.js` with 4 tabs (⭐ Favorites | 🔍 Search | ✏️ Manual | 📷 Photo). Manual tab embeds the log-manual form inline (no sessionStorage hop). Drinks: water page quick-adds stay, but "add a drink" deep-links to add-food?slot=drink with is_drink filter preset. Delete AddFoodModal after port. Every entry point behaves identically.
+- Also: nutrition page uses `window.location.href` for Add buttons (full page reload, slow) — switch to `router.push`.
+
+**3. 🧘 Day Hub stretching feels bland + pre-check complaint**
+- User does NOT want stretches pre-checked in the guided session (`ids=` mode) — reverse of what Phase 92 shipped. Change: start unchecked; check = done (consistent with non-pinned mode).
+- Guided session expanded view shows how_to/common_mistakes/contraindications but NOT the `why` text (data exists in stretches.js — only Day Hub cards show it). Add why to the expanded card.
+- No images/illustrations exist for any of the 38 stretches — user who doesn't know a stretch by name is lost. **Fix options:** (a) static illustration per stretch in `public/stretches/` (same pattern as exercises), (b) simple SVG stick-figure diagrams. Needs asset sourcing decision.
+- No education on WHY dynamic-before / static-after / static-before-bed. The stretching page has physiological callouts, but the guided session doesn't. Add a collapsible education banner per context (pre_workout explains dynamic warm-up physiology, post_workout explains static + recovery, bedtime explains parasympathetic downshift).
+
+**4. 📱 Mobile text still too small on study pages (partially confirmed)**
+- Test page in-test view: question text is 16px (fine), but metadata row, Save/Flag buttons, template chips are all 11px; the difficulty selector row (config screen, ~line 857) is `display: flex` with NO wrap and no mobile class — 3 cards squeeze side-by-side on a phone = tiny text. Mode grid + cert grid have media rules; difficulty/question-count rows do not.
+- **Fix:** mobile pass on test page config screen (stack difficulty cards, larger touch targets), bump 11px metadata to 12-13px minimum on mobile, verify per-page at 375px width. User says "certain study pages" — audit each study page at 375px: reference, cert-guide, progress, results, flashcards.
+- **Rule going forward:** no font below 12px on mobile, question/answer text ≥15px.
+
+**5. 🖼️ Exam questions lack exhibits (topology diagrams + config output) — realism gap**
+- Real CCNA/Network+ exams show topology exhibits and config/CLI output blocks; our questions are plain text only. `question_templates` has no exhibit support. The `LabTopology.js` SVG renderer already exists and could render topology JSON inside test questions.
+- **Fix (specced):** add optional `exhibit` JSONB column to `question_templates`: `{ type: 'topology', topology: {...LabTopology format...} }` or `{ type: 'config', text: 'R1# show ip route\n...' }` or both. Test page renders exhibit between question text and options (topology via LabTopology, config in a monospace code block). Template generator prompt updated to produce exhibit-based questions for topology-relevant domains (IP Connectivity, Network Access, etc.). Owner regenerates a batch of exhibit templates per cert.
+- This is the highest-effort item but directly serves exam accuracy — the user's core goal.
+
+**6. Additional problems found while auditing (new)**
+- `window.location.href` navigation in nutrition page (full reloads where router.push belongs) — see #2.
+- AddFoodModal orphaned = ~1000 lines of dead-ish code shipping in the bundle.
+- Test page difficulty/question-count selectors have no mobile handling (see #4).
+
+**Status: 💬 Discussed — priorities to be agreed with user before building.**
 
 **Open questions for user:** Does the sidebar bottom cutoff bug still occur? Does the Real Exam crash still occur? (Neither appears in the Phase Log as fixed.)
 
