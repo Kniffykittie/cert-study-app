@@ -179,7 +179,7 @@ function OverviewTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Cert cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+      <div className="cg-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
         {Object.values(CERTS).map(cert => (
           <div key={cert.key} style={{ backgroundColor: 'var(--surface)', border: `1px solid ${cert.color}`, borderRadius: '12px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
@@ -265,7 +265,7 @@ function OverlapTab() {
         <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.7', marginBottom: '16px' }}>
           These three certs share a significant foundation — roughly <strong style={{ color: 'var(--text-primary)' }}>40–50% of the concepts</strong> appear across all three, though each cert tests them at different depths. Studying them together is more efficient than treating them as completely separate subjects.
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+        <div className="cg-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
           {[
             { label: 'CCNA ∩ Network+', value: '~60%', sub: 'Routing, switching, IP, protocols', color: 'var(--accent-blue)' },
             { label: 'Network+ ∩ Security+', value: '~45%', sub: 'Network security, threats, protocols', color: 'var(--accent-purple)' },
@@ -328,7 +328,7 @@ function OverlapTab() {
       {/* Study once callout */}
       <div style={{ backgroundColor: 'rgba(46,204,113,0.06)', border: '1px solid var(--success)', borderRadius: '10px', padding: '20px 24px' }}>
         <h2 style={{ color: 'var(--success)', fontSize: '15px', fontWeight: '600', marginBottom: '12px' }}>✓ Study These Once — They Count for All Three</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+        <div className="cg-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
           {['OSI model layers and what lives at each layer', 'IPv4 subnetting and CIDR notation', 'Common port numbers (DNS 53, HTTP 80, HTTPS 443, SSH 22, etc.)', 'TCP vs UDP — when each is used and why', 'How DNS, DHCP, and ARP work', 'The difference between hubs, switches, and routers'].map(item => (
             <div key={item} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
               <span style={{ color: 'var(--success)', fontSize: '14px', flexShrink: 0 }}>✓</span>
@@ -545,6 +545,12 @@ export default function CertGuidePage() {
 
   return (
     <div>
+      <style>{`
+        @media (max-width: 768px) {
+          .cg-grid-3 { grid-template-columns: 1fr !important; }
+          .cg-grid-2 { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
       <div style={{ marginBottom: '28px' }}>
         <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Cert Guide</h1>
         <p style={{ color: 'var(--text-secondary)' }}>Everything you need to know about CCNA, Network+, and Security+ — what they are, how they overlap, and how to approach all three.</p>

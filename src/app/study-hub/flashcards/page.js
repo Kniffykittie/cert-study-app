@@ -86,7 +86,12 @@ export default function FlashcardsPage() {
         <p style={{ color: 'var(--text-secondary)' }}>Shared decks — every card available to all users. Your progress is tracked individually.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .fc-cert-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
+      <div className="fc-cert-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
         {CERTS.map(cert => {
           const s = stats[cert.key]
           const hasDeck = s?.total > 0

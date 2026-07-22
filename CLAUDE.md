@@ -92,6 +92,7 @@ Run through this before committing any new route:
 
 ## New UI Checklist (Gate Before Marking Any Page or Component Done)
 - [ ] `@media (max-width: 768px)` breakpoint — grids reflow to 1 col, no horizontal scroll
+- [ ] **No font below 12px on mobile; question/answer body text ≥15px** — never shrink text to force a desktop layout to fit a phone
 - [ ] All colors use CSS variables — no hardcoded hex
 - [ ] Inline styles only — no Tailwind classes
 - [ ] `useSearchParams()` wrapped in `<Suspense>` if used (Vercel build fails otherwise)

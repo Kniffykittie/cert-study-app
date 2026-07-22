@@ -81,7 +81,7 @@ export default function BookmarksPage() {
               <div key={b.id} style={{ backgroundColor: 'var(--surface)', border: `1px solid ${isOpen ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '10px', overflow: 'hidden' }}>
                 {/* Header row */}
                 <div onClick={() => setExpanded(isOpen ? null : b.id)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', cursor: 'pointer' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', cursor: 'pointer', flexWrap: 'wrap' }}>
                   {/* Cert badge */}
                   <span style={{ color: 'var(--accent-blue)', fontSize: '11px', fontWeight: '700', minWidth: '56px', flexShrink: 0 }}>{CERT_LABELS[b.cert]}</span>
                   {/* Reason badge */}
@@ -93,9 +93,9 @@ export default function BookmarksPage() {
                     <span style={{ fontSize: '11px', color: 'var(--text-secondary)', flexShrink: 0, minWidth: '80px' }}>🔖 Saved</span>
                   )}
                   {/* Topic */}
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px', flexShrink: 0, minWidth: '140px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.topic}</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px', flexShrink: 0, maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.topic}</span>
                   {/* Question preview */}
-                  <span style={{ color: 'var(--text-primary)', fontSize: '13px', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.question_text}</span>
+                  <span style={{ color: 'var(--text-primary)', fontSize: '13px', flex: 1, minWidth: '160px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.question_text}</span>
                   {/* Date */}
                   <span style={{ color: 'var(--text-secondary)', fontSize: '11px', flexShrink: 0 }}>
                     {new Date(b.bookmarked_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}

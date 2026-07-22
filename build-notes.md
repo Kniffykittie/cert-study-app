@@ -3121,8 +3121,7 @@ Small independent fixes, all touching nutrition + stretches. No migrations.
 5. **Error retry states** — replace empty `catch {}` in nutrition surfaces (my-foods fetch etc.) with "Couldn't load — tap to retry" rows.
 6. Update Parallel Implementations table in CLAUDE.md — several sync pairs die with AddFoodModal.
 
-### Session 3 — Study Hub Mobile Text Pass
-Independent. Audit each page at 375px width.
+### Session 3 — Study Hub Mobile Text Pass ✅ BUILT (Phase 95)
 1. Test page config screen: difficulty + question-count selectors stack on mobile (currently unwrapped 3-across flex, line ~857).
 2. In-test view: bump 11px metadata/buttons to 12-13px; Save/Flag bigger touch targets.
 3. Per-page pass: reference, cert-guide, progress, results, flashcards, bookmarks (check text scaling, grid reflow, horizontal scroll).
@@ -3193,6 +3192,19 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 95 — Session 3: Study Hub Mobile Text Pass — Complete
+- **Test page config:** difficulty selector stacks vertically on mobile (was 3-across unwrapped flex = tiny text); Save/Flag buttons bumped 11px→12px with bigger touch targets (6px 10px padding)
+- **Cert Guide:** cert cards (3-col), overlap summary (3-col), study-once list (2-col) all reflow to 1 col on mobile
+- **Progress:** 5-col stat row → 2-col on mobile
+- **Results:** 3-col summary → 1-col on mobile
+- **Flashcards:** 3-col cert deck grid → 1-col on mobile
+- **Bookmarks:** header rows wrap instead of squeezing; question preview gets min-width so it drops to its own line on phones
+- **Reference page verified fine** (tables already scroll in their own container)
+- **Both sidebars verified already using 100dvh + touch scrolling** (old cutoff bug fix already in place)
+- **New hard rule added to CLAUDE.md UI checklist:** no font below 12px on mobile; question/answer body text ≥15px
+- Build verified passing
+- Files: test/page.js, cert-guide/page.js, progress/page.js, results/page.js, flashcards/page.js, bookmarks/page.js, CLAUDE.md
 
 ### Phase 94 — Session 2: Nutrition Consolidation — Complete
 - **add-food page is now THE canonical add surface** — 4 tabs: ⭐ Favorites | 🔍 Search | ✏️ Manual | 📷 Photo; accepts `?tab=` URL param

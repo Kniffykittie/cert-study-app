@@ -817,6 +817,9 @@ function TestPageInner() {
             .test-cert-count-grid {
               grid-template-columns: 1fr !important;
             }
+            .test-difficulty-row {
+              flex-direction: column !important;
+            }
           }
         `}</style>
         <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -855,7 +858,7 @@ function TestPageInner() {
         {/* Difficulty */}
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '16px', opacity: mode === 'real' ? 0.4 : 1, pointerEvents: mode === 'real' ? 'none' : 'auto' }}>
           <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>{mode === 'real' ? 'Difficulty — Hard (fixed for Real Exam)' : 'Difficulty'}</h2>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div className="test-difficulty-row" style={{ display: 'flex', gap: '10px' }}>
             {[
               { key: 'easy', label: 'Easy', desc: 'Basic recall & definitions' },
               { key: 'medium', label: 'Medium', desc: 'Application & concepts' },
@@ -1305,11 +1308,11 @@ function TestPageInner() {
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button onClick={() => toggleBookmark(current)}
-                  style={{ background: 'none', border: `1px solid ${bookmarked[current] ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '4px', color: bookmarked[current] ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '11px', padding: '2px 8px', cursor: 'pointer', fontWeight: bookmarked[current] ? '600' : '400' }}>
+                  style={{ background: 'none', border: `1px solid ${bookmarked[current] ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '6px', color: bookmarked[current] ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '12px', padding: '6px 10px', cursor: 'pointer', fontWeight: bookmarked[current] ? '600' : '400' }}>
                   🔖 {bookmarked[current] ? 'Saved' : 'Save'}
                 </button>
                 <button onClick={() => setFlagModal({ questionIndex: current })}
-                  style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-secondary)', fontSize: '11px', padding: '2px 8px', cursor: 'pointer' }}>⚑ Flag</button>
+                  style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-secondary)', fontSize: '12px', padding: '6px 10px', cursor: 'pointer' }}>⚑ Flag</button>
               </div>
             </div>
             <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>

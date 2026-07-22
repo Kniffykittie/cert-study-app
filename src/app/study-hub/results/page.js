@@ -54,6 +54,11 @@ export default function ResultsPage() {
 
   return (
     <div>
+      <style>{`
+        @media (max-width: 768px) {
+          .res-stats-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
       <div style={{ marginBottom: '32px' }}>
         <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Test History</h1>
         <p style={{ color: 'var(--text-secondary)' }}>All completed tests. Use Discard to remove test sessions from your stats.</p>
@@ -61,7 +66,7 @@ export default function ResultsPage() {
 
       {/* Summary row */}
       {!loading && totalTests > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px' }}>
+        <div className="res-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px' }}>
           {[
             { label: 'Tests Taken', value: totalTests, color: 'var(--accent-blue)' },
             { label: 'Average Score', value: `${avgScore}%`, color: scoreColor(avgScore) },

@@ -236,13 +236,18 @@ export default function ProgressPage() {
 
   return (
     <div>
+      <style>{`
+        @media (max-width: 768px) {
+          .pg-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+      `}</style>
       <div style={{ marginBottom: '28px' }}>
         <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Progress</h1>
         <p style={{ color: 'var(--text-secondary)' }}>Your performance across all certifications over time.</p>
       </div>
 
       {/* Top stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '24px' }}>
+      <div className="pg-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '24px' }}>
         {[
           { label: 'Total Questions', value: loading ? '...' : totalQuestions.toLocaleString(), color: 'var(--accent-blue)' },
           { label: 'Average Score', value: loading ? '...' : avgScore !== null ? `${avgScore}%` : '—', color: avgScore !== null ? scoreColor(avgScore) : 'var(--text-secondary)' },
