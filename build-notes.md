@@ -3168,7 +3168,7 @@ This supersedes all scattered "Session N" numbering below. Detailed specs for ea
   - **SEQUENCING (important):** do NOT delete-and-regenerate until S3 verify pass exists, or the fresh pool won't be fact-checked and you'll regenerate twice. Recommend bundling: build DELETE tool (S5a) + S3 quality engine + S4 coverage, THEN one clean purge + coverage-driven regen. Delete once, regenerate once, into a verified evenly-spaced pool.
 
 ### BLOCK B — New Question Formats (need the refactor first)
-- **S6 — QuestionBody + scoreAnswer Refactor** ⬜ — extract one `<QuestionBody>` component (switch on question_type) replacing all 3 inline render paths + pure `scoreAnswer(q, answer)` used by saveResults AND live scoring; make answers-map + resume tolerate non-string values. INVISIBLE to user. FULL regression of every existing flow (checklist). Foundation — blocks S7-S9.
+- **S6 — QuestionBody + scoreAnswer Refactor** ✅ BUILT (Phase 98) — extract one `<QuestionBody>` component (switch on question_type) replacing all 3 inline render paths + pure `scoreAnswer(q, answer)` used by saveResults AND live scoring; make answers-map + resume tolerate non-string values. INVISIBLE to user. FULL regression of every existing flow (checklist). Foundation — blocks S7-S9.
 - **S7 — Multi-select / "Choose two" (R5)** ⬜ — `correct_answers TEXT[]` (null=legacy); checkbox UI; exact-set (all-or-nothing) scoring; carries through snapshots/bookmarks/resume.
 - **S8 — PBQ-lite (R6)** ⬜ — `question_type` ordering + matching; `type_payload JSONB`; tap-to-place (no drag) for mobile; `rationale` explanation (concern #3).
 - **S9 — CCNA CLI Mode Engine (R8, Tier 1.5)** ⬜ — `src/lib/iosCliEngine.js` (mode state machine + command table + abbrev expansion + replay grading); terminal-transcript UI (Enter runs line, prompt evolves, mode practice enforced via wrong-mode rejection); per-command rationale. Biggest single build. Desktop-recommended banner + mobile hints (UX gap #18). Disable global 1-4/Enter handler when CLI focused.
@@ -3394,6 +3394,16 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 98 — S6: QuestionBody / scoreAnswer Refactor — Complete
+- **`src/lib/scoreAnswer.js`** (new): `scoreAnswer(question, answer)` + `isAnswered(question, answer)` — central, type-dispatching. MC now; multi (exact-set/all-or-nothing) already stubbed; cli/ordering/matching add branches. Replaced all 8 question-level correctness comparisons in test/page.js (saveResults correct count + snapshot + topicMap; results correct/wrong/domain breakdown; results list coloring).
+- **`src/components/study/AnswerArea.js`** (new): one component replacing all 4 inline option-render blocks (practice-reveal, simulation, real, results-review) via props `revealed` + `explanationScope`('all'|'answered'|'none') + `verboseMarks`. Dispatches on question_type.
+- Real-mode Next/Submit gates now use `isAnswered()` (type-aware) instead of `=== undefined`.
+- INVISIBLE refactor — behavior preserved exactly. Bonus: wrong-answer review now renders exhibits (previously omitted).
+- Foundation for S7/S8/S9: a new question type = add a branch in scoreAnswer.js + AnswerArea.js, not touch 4 render paths + scoring separately.
+- Build verified passing. Regression traced: practice/simulation/real/mixed/review/wrong-answer-review all route through AnswerArea; keyboard 1-4 selection intact; scoring identical for MC (answer === correct).
+- Files: lib/scoreAnswer.js (new), components/study/AnswerArea.js (new), study-hub/test/page.js, CLAUDE.md
+- Roadmap: S6 ✅
 
 ### Phase 97 — S2: Real Exam Mode Authenticity — Complete
 - **Bug #1 FIXED:** Real Exam mode now forces ALL domains (passes `topics: []`) instead of leaking a prior domain selection — the "real" exam actually covers everything now.

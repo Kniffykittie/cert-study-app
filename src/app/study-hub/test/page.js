@@ -4,6 +4,8 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import BookmarkModal from '@/components/BookmarkModal'
 import QuestionExhibit from '@/components/QuestionExhibit'
+import AnswerArea from '@/components/study/AnswerArea'
+import { scoreAnswer, isAnswered } from '@/lib/scoreAnswer'
 import { showToast } from '@/components/Toast'
 import FloatingReferencePanel from '@/components/FloatingReferencePanel'
 
@@ -205,18 +207,7 @@ function RealExam({ cert, questions, answers, setAnswers, current, setCurrent, s
         )}
         <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>
         <QuestionExhibit exhibit={q.exhibit} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {q.options.map((opt, i) => {
-            const letter = letters[i]
-            const isSelected = answers[current] === letter
-            return (
-              <div key={letter} onClick={() => setAnswers(prev => ({ ...prev, [current]: letter }))}
-                style={{ padding: '12px 16px', backgroundColor: isSelected ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `1px solid ${isSelected ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '8px', color: isSelected ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer', fontWeight: isSelected ? '600' : '400' }}>
-                {opt}
-              </div>
-            )
-          })}
-        </div>
+        <AnswerArea question={q} value={answers[current]} onChange={letter => setAnswers(prev => ({ ...prev, [current]: letter }))} />
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
@@ -224,13 +215,13 @@ function RealExam({ cert, questions, answers, setAnswers, current, setCurrent, s
           🔒 Real exam — you can't return to a question once you move on
         </span>
         {!isLast ? (
-          <button onClick={() => setCurrent(c => c + 1)} disabled={answers[current] === undefined}
-            style={{ backgroundColor: answers[current] === undefined ? 'var(--border)' : 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: answers[current] === undefined ? 'not-allowed' : 'pointer', opacity: answers[current] === undefined ? 0.6 : 1 }}>
+          <button onClick={() => setCurrent(c => c + 1)} disabled={!isAnswered(q, answers[current])}
+            style={{ backgroundColor: !isAnswered(q, answers[current]) ? 'var(--border)' : 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: !isAnswered(q, answers[current]) ? 'not-allowed' : 'pointer', opacity: !isAnswered(q, answers[current]) ? 0.6 : 1 }}>
             Next Question →
           </button>
         ) : (
-          <button onClick={onSubmit} disabled={saving || answers[current] === undefined}
-            style={{ backgroundColor: (saving || answers[current] === undefined) ? 'var(--border)' : 'var(--success)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: (saving || answers[current] === undefined) ? 'not-allowed' : 'pointer', opacity: answers[current] === undefined ? 0.6 : 1 }}>
+          <button onClick={onSubmit} disabled={saving || !isAnswered(q, answers[current])}
+            style={{ backgroundColor: (saving || !isAnswered(q, answers[current])) ? 'var(--border)' : 'var(--success)', color: '#0D0D0D', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: (saving || !isAnswered(q, answers[current])) ? 'not-allowed' : 'pointer', opacity: !isAnswered(q, answers[current]) ? 0.6 : 1 }}>
             {saving ? 'Saving...' : 'Submit Exam'}
           </button>
         )}
@@ -712,7 +703,7 @@ function TestPageInner() {
     setSaving(true)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    const correct = questions.filter((q, i) => finalAnswers[i] === q.correct).length
+    const correct = questions.filter((q, i) => scoreAnswer(q, finalAnswers[i])).length
     const scorePct = Math.round((correct / questions.length) * 100)
     const durationSeconds = startTimeRef.current ? Math.round((Date.now() - startTimeRef.current) / 1000) : null
     const { data: session } = await supabase.from('test_sessions').insert({
@@ -720,7 +711,7 @@ function TestPageInner() {
     }).select().single()
     if (session) {
       await supabase.from('question_answers').insert(questions.map((q, i) => {
-        const isCorrect = finalAnswers[i] === q.correct
+        const isCorrect = scoreAnswer(q, finalAnswers[i])
         return {
           session_id: session.id, user_id: user.id, cert, topic: q.topic,
           question_text: q.question, correct_answer: q.correct,
@@ -732,7 +723,7 @@ function TestPageInner() {
       questions.forEach((q, i) => {
         if (!topicMap[q.topic]) topicMap[q.topic] = { total: 0, correct: 0 }
         topicMap[q.topic].total++
-        if (finalAnswers[i] === q.correct) topicMap[q.topic].correct++
+        if (scoreAnswer(q, finalAnswers[i])) topicMap[q.topic].correct++
       })
       for (const [topic, stats] of Object.entries(topicMap)) {
         await supabase.rpc('upsert_topic_performance', { p_user_id: user.id, p_cert: cert, p_topic: topic, p_total: stats.total, p_correct: stats.correct })
@@ -1040,10 +1031,10 @@ function TestPageInner() {
 
   // Results screen
   if (done) {
-    const correct = questions.filter((q, i) => answers[i] === q.correct).length
+    const correct = questions.filter((q, i) => scoreAnswer(q, answers[i])).length
     const pct = Math.round((correct / questions.length) * 100)
     const color = pct >= 80 ? 'var(--success)' : pct >= 65 ? 'var(--warning)' : 'var(--error)'
-    const wrongAnswers = questions.map((q, i) => ({ ...q, idx: i, userAnswer: answers[i] })).filter(q => q.userAnswer !== q.correct)
+    const wrongAnswers = questions.map((q, i) => ({ ...q, idx: i, userAnswer: answers[i] })).filter(q => !scoreAnswer(q, q.userAnswer))
 
     if (reviewMode && wrongAnswers.length > 0) {
       const rq = wrongAnswers[reviewIndex]
@@ -1060,30 +1051,8 @@ function TestPageInner() {
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--error-border)', borderRadius: '10px', padding: '24px', marginBottom: '16px' }}>
             <div style={{ color: 'var(--error)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>{rq.topic}</div>
             <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{rq.question}</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {rq.options.map((opt, i) => {
-                const letter = letters[i]
-                const isCorrect = letter === rq.correct
-                const isWrong = letter === rq.userAnswer && !isCorrect
-                let bg = 'var(--background)', border = 'var(--border)', textColor = 'var(--text-secondary)'
-                if (isCorrect) { bg = 'rgba(46,204,113,0.08)'; border = 'var(--success)'; textColor = 'var(--success)' }
-                if (isWrong) { bg = 'rgba(204,0,0,0.08)'; border = 'var(--error)'; textColor = 'var(--error)' }
-                return (
-                  <div key={letter}>
-                    <div style={{ padding: '12px 16px', backgroundColor: bg, border: `1px solid ${border}`, borderRadius: rq.explanations?.[letter] ? '8px 8px 0 0' : '8px', color: textColor, fontSize: '14px', fontWeight: isCorrect || isWrong ? '600' : '400', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>{opt}</span>
-                      {isCorrect && <span>✓ Correct</span>}
-                      {isWrong && <span>✗ Your Answer</span>}
-                    </div>
-                    {rq.explanations?.[letter] && (isCorrect || isWrong) && (
-                      <div style={{ padding: '10px 16px', backgroundColor: isCorrect ? 'rgba(46,204,113,0.05)' : 'rgba(204,0,0,0.05)', border: `1px solid ${isCorrect ? 'var(--success-border)' : 'var(--error-border)'}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5', margin: 0 }}>{rq.explanations[letter]}</p>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+            <QuestionExhibit exhibit={rq.exhibit} />
+            <AnswerArea question={rq} value={rq.userAnswer} revealed explanationScope="answered" verboseMarks />
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1112,7 +1081,7 @@ function TestPageInner() {
     questions.forEach((q, i) => {
       if (!domainBreakdown[q.topic]) domainBreakdown[q.topic] = { correct: 0, total: 0 }
       domainBreakdown[q.topic].total++
-      if (answers[i] === q.correct) domainBreakdown[q.topic].correct++
+      if (scoreAnswer(q, answers[i])) domainBreakdown[q.topic].correct++
     })
     const domainRows = Object.entries(domainBreakdown).sort((a, b) => (a[1].correct / a[1].total) - (b[1].correct / b[1].total))
 
@@ -1188,7 +1157,7 @@ function TestPageInner() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
           {questions.map((q, i) => {
-            const isCorrect = answers[i] === q.correct
+            const isCorrect = scoreAnswer(q, answers[i])
             return (
               <div key={i} style={{ backgroundColor: 'var(--surface)', border: `1px solid ${isCorrect ? 'var(--success-border)' : 'var(--error-border)'}`, borderRadius: '10px', padding: '16px' }}>
                 <div style={{ display: 'flex', gap: '10px', marginBottom: '6px' }}>
@@ -1221,7 +1190,7 @@ function TestPageInner() {
       {questions.map((q, i) => {
         let bg = 'var(--border)'
         if (i === current) bg = 'var(--accent-blue)'
-        else if (answers[i] !== undefined) bg = isPractice ? (answers[i] === q.correct ? 'var(--success)' : 'var(--error)') : 'var(--accent-blue)'
+        else if (answers[i] !== undefined) bg = isPractice ? (scoreAnswer(q, answers[i]) ? 'var(--success)' : 'var(--error)') : 'var(--accent-blue)'
         const dotSize = isMobile ? '14px' : '20px'
         return <div key={i} style={{ width: dotSize, height: dotSize, borderRadius: '3px', backgroundColor: bg, opacity: i > current && answers[i] === undefined ? 0.3 : 1, cursor: 'pointer', flexShrink: 0 }} onClick={() => { if (isPractice && !revealed) return; setCurrent(i); setSelectedAnswer(answers[i] || null); setRevealed(!!answers[i]) }} />
       })}
@@ -1269,18 +1238,7 @@ function TestPageInner() {
             </div>
             <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>
         <QuestionExhibit exhibit={q.exhibit} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {q.options.map((opt, i) => {
-                const letter = letters[i]
-                const isSelected = answers[current] === letter
-                return (
-                  <div key={letter} onClick={() => simSelectAnswer(letter)}
-                    style={{ padding: '12px 16px', backgroundColor: isSelected ? 'rgba(0,128,255,0.1)' : 'var(--background)', border: `1px solid ${isSelected ? 'var(--accent-blue)' : 'var(--border)'}`, borderRadius: '8px', color: isSelected ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer', fontWeight: isSelected ? '600' : '400' }}>
-                    {opt}
-                  </div>
-                )
-              })}
-            </div>
+            <AnswerArea question={q} value={answers[current]} onChange={simSelectAnswer} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -1362,36 +1320,7 @@ function TestPageInner() {
             </div>
             <p style={{ color: 'var(--text-primary)', fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>{q.question}</p>
         <QuestionExhibit exhibit={q.exhibit} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {q.options.map((opt, i) => {
-                const letter = letters[i]
-                const isSelected = selectedAnswer === letter
-                const isCorrect = letter === q.correct
-                const isWrong = revealed && isSelected && !isCorrect
-                let borderColor = 'var(--border)', bgColor = 'var(--background)', textColor = 'var(--text-secondary)'
-                if (revealed) {
-                  if (isCorrect) { borderColor = 'var(--success)'; bgColor = 'rgba(46,204,113,0.08)'; textColor = 'var(--success)' }
-                  else if (isSelected) { borderColor = 'var(--error)'; bgColor = 'rgba(204,0,0,0.08)'; textColor = 'var(--error)' }
-                } else if (isSelected) {
-                  borderColor = 'var(--accent-blue)'; bgColor = 'rgba(0,128,255,0.1)'; textColor = 'var(--accent-blue)'
-                }
-                return (
-                  <div key={letter}>
-                    <div onClick={() => !revealed && setSelectedAnswer(letter)}
-                      style={{ padding: '12px 16px', backgroundColor: bgColor, border: `1px solid ${borderColor}`, borderRadius: revealed && q.explanations ? '8px 8px 0 0' : '8px', color: textColor, fontSize: '14px', cursor: revealed ? 'default' : 'pointer', fontWeight: isSelected || (revealed && isCorrect) ? '600' : '400', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>{opt}</span>
-                      {revealed && isCorrect && <span>✓</span>}
-                      {revealed && isWrong && <span>✗</span>}
-                    </div>
-                    {revealed && q.explanations?.[letter] && (
-                      <div style={{ padding: '10px 16px', backgroundColor: isCorrect ? 'rgba(46,204,113,0.05)' : 'rgba(204,0,0,0.05)', border: `1px solid ${isCorrect ? 'var(--success-border)' : 'var(--error-border)'}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5', margin: 0 }}>{q.explanations[letter]}</p>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+            <AnswerArea question={q} value={selectedAnswer} onChange={setSelectedAnswer} revealed={revealed} explanationScope="all" />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>1–4 to select · Enter to submit/next</span>

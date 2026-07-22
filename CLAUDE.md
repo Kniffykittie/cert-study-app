@@ -380,6 +380,7 @@ src/
     LifeHubClientShell.js              'use client' shell; dynamically imports DailyLogReview + CheckInSheet (SSR disabled); fetches wake_time on mount; shows morning check-in within 60min of wake_time, afternoon at wake_time+7h; 30s delay; hasShownRef persists across Life Hub navigation; localStorage gate keys checkin_morning/afternoon_YYYY-MM-DD; mounted in life-hub/layout.js
     CheckInSheet.js                    Bottom-sheet check-in (morning=#f59e0b, afternoon=#a78bfa); energy+mood 1-5 raters; note textarea; extractSoreSpots keyword parser; assembles 8-table context on save; calls /api/checkin/insight; shows AI insight 5s then auto-closes; onInsight(proposed_actions, sore_spots) callback
   lib/
+    scoreAnswer.js                     Central answer scoring — `scoreAnswer(question, answer)` + `isAnswered(question, answer)`; dispatches on question_type (mc now; multi/cli/ordering/matching add branches); single source of truth used by saveResults, results screen, domain breakdown
     coachMemory.js                     `getCoachMemoryContext(supabase, userId)` — fetches top 8 active coach_memory rows ordered by confidence; returns formatted block or '' when empty; imported by daily-brief, coaching-response, exercise-chat, meal-insight routes
   supabase/
     functions/
@@ -390,6 +391,7 @@ src/
       daily-push/
         index.ts                         Deno Edge Function — verify_jwt: false; pg_cron runs every 30 minutes; per-user window computed from goals_profiles.wake_time + bedtime (morning=wake_time, midday=wake_time+6h, evening=bedtime-1h); checks profiles.notification_preferences before each send; 10 notification types (3 briefs + 7 nudges); each type has its own window key for dedup; builds VAPID JWT via Web Crypto; handles 410/404 (expires sub)
         config.toml                      verify_jwt = false
+    study/AnswerArea.js                Shared answer-rendering surface for the test flow — dispatches on question_type (only 'mc' today); one component for all 4 states (practice-reveal/simulation/real/results-review) via revealed + explanationScope('all'|'answered'|'none') + verboseMarks props; new question types add a branch here
     QuestionExhibit.js                 Renders question exhibits (topology diagram via LabTopology + monospace CLI/config block, both horizontally scrollable); used in test page (all 3 question views), study mode, bookmarks expanded view
     Toast.js                           Shared toast notifications — exports showToast(message, type); mounted in both hub layouts; success (green ✓, 2.2s) and error (red ✕, 4.5s) variants; fired via 'app-toast' CustomEvent
     InfoChip.js                        Reusable ℹ️ education chip — grey pill, orange when active, toggles inline callout; props: text, label (default "ℹ️"), style; used at 11 touchpoints across 8 pages for domain-knowledge data points
