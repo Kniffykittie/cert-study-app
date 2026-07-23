@@ -88,6 +88,11 @@ MULTI-SELECT (real exams include "Choose TWO/THREE" questions — make 1 of ever
 - Provide 5-6 options for multi-select so the choose-two isn't trivially obvious.
 - Every option still gets an explanation. Scoring is all-or-nothing, so distractors must be clearly wrong on inspection, not ambiguous.
 
+PERFORMANCE-BASED (PBQ-lite) — the real exams open with drag/drop ordering and matching tasks. Make AT MOST 1 of every ${count} a PBQ when the topic fits (troubleshooting steps, OSI layers, protocol sequences, term/definition sets):
+- ORDERING: "question_type": "ordering", "type_payload": { "items": [ ...strings in the CORRECT order... ] } (4-6 items). No options/correct_answer needed. Provide a "rationale" string explaining the correct sequence.
+- MATCHING: "question_type": "matching", "type_payload": { "terms": ["t1","t2",...], "defs": ["d1","d2",...] } where defs[i] is the correct match for terms[i] (parallel arrays, 3-5 pairs). Provide a "rationale". No options/correct_answer needed.
+- PBQs use "rationale" (a single explanation), NOT per-letter "explanations".
+
 Return a JSON array of exactly ${count} template objects. Each object must have:
 {
   "question_template": "string with {{placeholders}}",
@@ -132,9 +137,11 @@ Return ONLY the JSON array, no markdown, no explanation.`
       question_template: t.question_template,
       variable_sets: t.variable_sets || [],
       options_templates: t.options_templates || [],
-      correct_answer: t.correct_answer,
-      question_type: t.question_type === 'multi' ? 'multi' : 'mc',
+      correct_answer: ['ordering', 'matching'].includes(t.question_type) ? null : t.correct_answer,
+      question_type: ['multi', 'ordering', 'matching'].includes(t.question_type) ? t.question_type : 'mc',
       correct_answers: t.question_type === 'multi' ? (t.correct_answers || null) : null,
+      type_payload: ['ordering', 'matching'].includes(t.question_type) ? (t.type_payload || null) : null,
+      rationale: t.rationale || null,
       explanations: t.explanations || {},
       exhibit: t.exhibit || null,
     }))

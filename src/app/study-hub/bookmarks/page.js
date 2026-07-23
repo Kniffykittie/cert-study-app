@@ -124,6 +124,15 @@ export default function BookmarksPage() {
 
                     <p style={{ color: 'var(--text-primary)', fontSize: '15px', lineHeight: '1.6', marginBottom: '16px', whiteSpace: 'pre-wrap' }}>{b.question_text}</p>
                     <QuestionExhibit exhibit={b.exhibit} />
+                    {(b.question_type === 'ordering' || b.question_type === 'matching') && (
+                      <div style={{ padding: '10px 14px', backgroundColor: 'rgba(46,204,113,0.06)', border: '1px solid var(--success-border)', borderRadius: '8px', marginBottom: '12px' }}>
+                        <div style={{ color: 'var(--success)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', marginBottom: '6px' }}>Correct answer</div>
+                        {b.question_type === 'ordering'
+                          ? (b.type_payload?.items || []).map((it, i) => <div key={i} style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.6 }}>{i + 1}. {it}</div>)
+                          : (b.type_payload?.terms || []).map((t, i) => <div key={i} style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.6 }}>{t} → {b.type_payload.defs[i]}</div>)}
+                        {b.rationale && <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontStyle: 'italic', marginTop: '8px' }}>{b.rationale}</div>}
+                      </div>
+                    )}
                     {b.question_type === 'multi' && <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Multiple answers — {(b.correct_answers || []).length} correct</div>}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                       {(b.options ?? []).map((opt, i) => {

@@ -30,12 +30,23 @@ export function fillTemplate(template) {
     }
   }
 
+  let typePayload = null
+  if (template.type_payload) {
+    const p = template.type_payload
+    typePayload = { ...p }
+    if (Array.isArray(p.items)) typePayload.items = p.items.map(s => fill(String(s), vars))
+    if (Array.isArray(p.terms)) typePayload.terms = p.terms.map(s => fill(String(s), vars))
+    if (Array.isArray(p.defs)) typePayload.defs = p.defs.map(s => fill(String(s), vars))
+  }
+
   return {
     question,
     options,
     correct: template.correct_answer,
     correct_answers: template.correct_answers ?? null,
     question_type: template.question_type || 'mc',
+    type_payload: typePayload,
+    rationale: template.rationale ? fill(template.rationale, vars) : null,
     explanations,
     exhibit,
     topic: template.domain,

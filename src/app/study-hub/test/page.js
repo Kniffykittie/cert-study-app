@@ -48,15 +48,22 @@ const REAL_EXAM = {
 // Raw-% equivalents of the scaled passing scores (CompTIA/Cisco don't publish exact scaling — these approximate)
 const PASS_THRESHOLD = { ccna: 82.5, 'network-plus': 80, 'security-plus': 83.3, mixed: 82 }
 
-// Display helpers for answers (letter for MC, array for multi-select)
-function fmtAnswer(a) {
+// Display helpers for answers (letter for MC, array for multi/ordering, term→def for matching)
+function fmtAnswer(a, q) {
+  const type = q?.question_type || 'mc'
+  if (type === 'ordering') return Array.isArray(a) && a.length ? a.join(' → ') : 'No answer'
+  if (type === 'matching') return Array.isArray(a) && a.some(x => x != null) ? 'see below' : 'No answer'
   if (Array.isArray(a)) return a.length ? [...a].sort().join(', ') : 'No answer'
   return a || 'No answer'
 }
 function correctDisplay(q) {
-  return q.question_type === 'multi' ? [...(q.correct_answers || [])].sort().join(', ') : q.correct
+  if (q.question_type === 'ordering') return (q.type_payload?.items || []).join(' → ')
+  if (q.question_type === 'matching') return (q.type_payload?.terms || []).map((t, i) => `${t} = ${q.type_payload.defs[i]}`).join('; ')
+  if (q.question_type === 'multi') return [...(q.correct_answers || [])].sort().join(', ')
+  return q.correct
 }
 function explForResult(q) {
+  if (q.question_type === 'ordering' || q.question_type === 'matching') return q.rationale || null
   if (q.question_type === 'multi') {
     const parts = (q.correct_answers || []).map(l => q.explanations?.[l]).filter(Boolean)
     return parts.length ? parts.join(' ') : null
@@ -391,9 +398,11 @@ function TestPageInner() {
     function handleKey(e) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
       const q = questions[current]
-      const isMulti = q?.question_type === 'multi'
+      const qType = q?.question_type || 'mc'
+      const isMulti = qType === 'multi'
+      const usesLetters = qType === 'mc' || qType === 'multi'
       const num = { '1': 0, '2': 1, '3': 2, '4': 3 }[e.key]
-      if (num !== undefined) {
+      if (num !== undefined && usesLetters) {
         const letter = letters[num]
         // Multi-select: number keys toggle the letter in/out of the array
         const apply = (prevVal) => {
@@ -568,7 +577,7 @@ function TestPageInner() {
     const q = questions[idx]
     const res = await fetch('/api/bookmarks', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cert, topic: q.topic, question_text: q.question, options: q.options, correct_answer: q.correct, correct_answers: q.correct_answers ?? null, question_type: q.question_type ?? 'mc', explanations: q.explanations ?? {}, exhibit: q.exhibit ?? null, difficulty, reason, notes })
+      body: JSON.stringify({ cert, topic: q.topic, question_text: q.question, options: q.options, correct_answer: q.correct, correct_answers: q.correct_answers ?? null, question_type: q.question_type ?? 'mc', type_payload: q.type_payload ?? null, rationale: q.rationale ?? null, explanations: q.explanations ?? {}, exhibit: q.exhibit ?? null, difficulty, reason, notes })
     })
     const data = await res.json()
     if (data.id) setBookmarked(prev => ({ ...prev, [idx]: data.id }))
@@ -740,7 +749,7 @@ function TestPageInner() {
           session_id: session.id, user_id: user.id, cert, topic: q.topic,
           question_text: q.question, correct_answer: q.correct,
           user_answer: finalAnswers[i] || '', is_correct: isCorrect,
-          question_snapshot: isCorrect ? null : { question: q.question, options: q.options, correct: q.correct, correct_answers: q.correct_answers ?? null, question_type: q.question_type ?? 'mc', topic: q.topic, explanations: q.explanations ?? {}, exhibit: q.exhibit ?? null },
+          question_snapshot: isCorrect ? null : { question: q.question, options: q.options, correct: q.correct, correct_answers: q.correct_answers ?? null, question_type: q.question_type ?? 'mc', type_payload: q.type_payload ?? null, rationale: q.rationale ?? null, topic: q.topic, explanations: q.explanations ?? {}, exhibit: q.exhibit ?? null },
         }
       }))
       const topicMap = {}
@@ -1188,7 +1197,7 @@ function TestPageInner() {
                   <span style={{ color: isCorrect ? 'var(--success)' : 'var(--error)', fontWeight: '600' }}>{isCorrect ? '✓' : '✗'}</span>
                   <span style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{q.question}</span>
                 </div>
-                {!isCorrect && <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '4px' }}>Your answer: <span style={{ color: 'var(--error)' }}>{fmtAnswer(answers[i])}</span> — Correct: <span style={{ color: 'var(--success)' }}>{correctDisplay(q)}</span></div>}
+                {!isCorrect && <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '4px' }}>Your answer: <span style={{ color: 'var(--error)' }}>{fmtAnswer(answers[i], q)}</span> — Correct: <span style={{ color: 'var(--success)' }}>{correctDisplay(q)}</span></div>}
                 {explForResult(q) && <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontStyle: 'italic' }}>{explForResult(q)}</div>}
               </div>
             )

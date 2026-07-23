@@ -3170,7 +3170,7 @@ This supersedes all scattered "Session N" numbering below. Detailed specs for ea
 ### BLOCK B — New Question Formats (need the refactor first)
 - **S6 — QuestionBody + scoreAnswer Refactor** ✅ BUILT (Phase 98) — extract one `<QuestionBody>` component (switch on question_type) replacing all 3 inline render paths + pure `scoreAnswer(q, answer)` used by saveResults AND live scoring; make answers-map + resume tolerate non-string values. INVISIBLE to user. FULL regression of every existing flow (checklist). Foundation — blocks S7-S9.
 - **S7 — Multi-select / "Choose two" (R5)** ✅ BUILT (Phase 99) — `correct_answers TEXT[]` (null=legacy); checkbox UI; exact-set (all-or-nothing) scoring; carries through snapshots/bookmarks/resume.
-- **S8 — PBQ-lite (R6)** ⬜ — `question_type` ordering + matching; `type_payload JSONB`; tap-to-place (no drag) for mobile; `rationale` explanation (concern #3).
+- **S8 — PBQ-lite (R6)** ✅ BUILT (Phase 100) — `question_type` ordering + matching; `type_payload JSONB`; tap-to-place (no drag) for mobile; `rationale` explanation (concern #3).
 - **S9 — CCNA CLI Mode Engine (R8, Tier 1.5)** ⬜ — `src/lib/iosCliEngine.js` (mode state machine + command table + abbrev expansion + replay grading); terminal-transcript UI (Enter runs line, prompt evolves, mode practice enforced via wrong-mode rejection); per-command rationale. Biggest single build. Desktop-recommended banner + mobile hints (UX gap #18). Disable global 1-4/Enter handler when CLI focused.
 
 ### BLOCK C — Real Exam Experience (needs all formats to exist)
@@ -3394,6 +3394,19 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 100 — S8: PBQ-lite (Ordering + Matching Question Types) — Complete
+- **Migration:** `type_payload JSONB` + `rationale TEXT` on question_templates AND bookmarked_questions.
+- **scoreAnswer/isAnswered:** ordering = user array === payload.items exactly; matching = answer[i] === defs[i] for all terms; isAnswered requires full/complete arrays.
+- **AnswerArea:** OrderingQuestion (tap available item → appends to numbered sequence, tap numbered → removes; reveal marks each position ✓/✗ + shows correct order); MatchingQuestion (lettered definition legend + per-term A/B/C tap picker; reveal marks rows + shows correct def). Both render a shared `Rationale` block on reveal. Stable useMemo shuffle keyed on question identity. Fully tap-based (no drag) — mobile-friendly.
+- **fillTemplate:** passes type_payload + rationale, fills {{placeholders}} inside items/terms/defs and rationale.
+- **test/page.js:** keyboard number-keys gated to mc/multi only (ordering/matching use taps); snapshot + bookmark carry type_payload + rationale; results display helpers (fmtAnswer/correctDisplay/explForResult) handle ordering (→ join) + matching (term=def) + rationale.
+- **Bookmarks:** route carries fields; page shows read-only correct-answer block (ordered list / term→def pairs) + rationale for PBQ types.
+- **Generator:** prompt instructs ≤1 PBQ per batch (ordering payload.items in correct order / matching parallel terms+defs, both with rationale); insert maps type_payload + rationale + nulls correct_answer for PBQ.
+- **2 seed templates:** Network+ ordering (CompTIA troubleshooting 7 steps), CCNA matching (OSI layer → PDU).
+- Build verified passing. Regression: mc/multi unchanged; keyboard gated correctly; real-mode "must answer to advance" uses isAnswered (requires complete PBQ). 
+- Files: scoreAnswer.js, fillTemplate.js, components/study/AnswerArea.js, study-hub/test/page.js, study-hub/bookmarks/page.js, api/bookmarks/route.js, api/generate-templates/route.js, CLAUDE.md + migration
+- Roadmap: S8 ✅
 
 ### Phase 99 — S7: Multi-Select "Choose Two" Questions — Complete
 - **Migration:** `question_type TEXT DEFAULT 'mc'` + `correct_answers TEXT[]` on question_templates AND bookmarked_questions; `correct_answer` made nullable (multi has no single answer).
