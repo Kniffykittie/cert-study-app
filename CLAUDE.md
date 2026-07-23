@@ -743,6 +743,7 @@ src/
 ---
 
 ## Gotchas
+- **`question_templates.variable_sets` can be `null`** — always coerce to `[]` before `.length`/index (`fillTemplate` guards this). JSONB array columns are not guaranteed non-null.
 - **`user_answer` (question_answers) is a `text` column** — array-valued answers (multi/ordering/matching/cli) must be `JSON.stringify`-ed before insert, or PostgREST rejects the whole batch. Same applies to any text column receiving a possibly-array value.
 - **`setInterval`/`setTimeout` effects with `[]` deps capture stale closures** — if the callback needs current state or a current prop (e.g. a timer's `onExpire` that saves `answers`), route it through a ref updated each render, not the closure bound on first render.
 - **A JSX reference to an out-of-scope identifier is NOT a build error** — it compiles fine and throws `ReferenceError` only at runtime when that component renders. When splitting a render into a separate top-level component, verify every variable it uses is either a prop, a module-level import, or a module const (this caused the Real Exam crash: `RealExam` referenced `TestPageInner`'s `templateBar`). Build passing ≠ page renders.

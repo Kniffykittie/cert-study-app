@@ -5,7 +5,7 @@ function fill(str, vars) {
 
 // Takes a question_templates row and returns a filled, ready-to-use question object
 export function fillTemplate(template) {
-  const sets = template.variable_sets
+  const sets = Array.isArray(template.variable_sets) ? template.variable_sets : []
   const vars = sets.length > 0
     ? sets[Math.floor(Math.random() * sets.length)]
     : {}

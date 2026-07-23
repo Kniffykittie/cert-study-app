@@ -3401,6 +3401,16 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 119 — Audit: scoring engine, CLI engine, fillTemplate, generate-questions — Complete
+Systematic bug audit of the core test-serving/grading path (list item 1–4):
+- **`scoreAnswer.js` + `AnswerArea.js` (#1) — clean.** Verified the UI emits exactly the answer shapes the scorer expects for all 5 types (mc=letter, multi=letters[], ordering=items[] in user order, matching=`answer[i]`=def for `terms[i]`, cli=lines[]). Only benign edges (duplicate option strings, >6 options past `LETTERS`).
+- **`iosCliEngine.js` (#2) — one noted edge bug, not fixed:** duplicate identical config goals (same cmd+mode across two interfaces) can never all satisfy because `hits.find(g.mode === mode)` returns the first (already-satisfied) hit, so `correct` stays false. Rare (1 CLI template); revisit if Generation Day emits such payloads. Fix would be to prefer the first *unsatisfied* hit.
+- **`fillTemplate.js` (#3) — FIXED latent crash:** `sets.length` threw if `variable_sets` were `null`. Now `Array.isArray(...) ? ... : []`. DB currently has 0 null (5 empty `[]`, already handled) — defensive against future/manual rows.
+- **`generate-questions` route (#4) — clean.** Spaced-rep multipliers, weighted distribution, and pool cycling correct; last-domain rounding can nudge domain sums over `count` but the serving loop caps at `count` (harmless); `sort(() => random-0.5)` is a biased-but-acceptable shuffle.
+- Remaining audit list: progress page, cert pages/predicted score, flashcards, study mode, templates, labs, pause/resume, other API routes, then Life Hub.
+- Build verified passing.
+- Files: lib/fillTemplate.js
+
 ### Phase 118 — Test page bug audit: 3 fixes — Complete
 - **Stale-closure in `useTimer` (real, important):** the interval effect had `[]` deps but called the `onExpire` from the first render, which captured the initial empty `answers`. A **timed-out Real Exam** therefore saved empty answers → 0% with no history. Fixed by storing the latest `onExpire` in a ref (`onExpireRef`) updated each render and calling `onExpireRef.current()` on expiry.
 - **Array `user_answer` into a `text` column (real, latent→worsening):** `saveResults` stored `finalAnswers[i]` raw; for multi/ordering/matching/cli questions that value is an array, which makes PostgREST reject the **entire** `question_answers` batch insert — so a test containing any non-mc question saved no answer history at all. Fixed by `JSON.stringify`-ing array answers. (Pool currently has 1 each of multi/ordering/matching/cli; impact grows after Generation Day.)
