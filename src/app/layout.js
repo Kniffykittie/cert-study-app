@@ -1,5 +1,6 @@
 import "./globals.css";
 import ServiceWorkerRegistrar from '@/components/ServiceWorkerRegistrar'
+import TimezoneSync from '@/components/TimezoneSync'
 
 export const metadata = {
   title: "CSA",
@@ -21,6 +22,7 @@ export default function RootLayout({ children }) {
       </head>
       <body style={{ backgroundColor: 'var(--background)', color: 'var(--text-primary)', minHeight: '100vh' }}>
         <ServiceWorkerRegistrar />
+        <TimezoneSync />
         {children}
       </body>
     </html>

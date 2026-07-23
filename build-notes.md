@@ -3399,6 +3399,17 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 109 — Timezone auto-follow (travel) + timezone audit — Complete
+- **Problem:** `profiles.timezone` (used by the daily-push Edge Function to fire notifications at local time) was only written when the user saved their schedule / a notification time — a stale snapshot that would NOT follow the user if they travelled to another state/country. Notifications would keep firing on the old timezone until a manual re-save.
+- **Fix:** new app-wide `TimezoneSync.js` mounted in the root layout. On every app open it reads the device's current `Intl.DateTimeFormat().resolvedOptions().timeZone`, compares to the stored `profiles.timezone`, and updates only when they differ. So opening the app once after landing re-points all notifications to the new local time automatically.
+- **Timezone audit (full codebase):**
+  - **Client-side "today"/logging dates** (nutrition, water, results, streaks, etc.) use `toLocaleDateString('en-CA')` with NO explicit timeZone → device-local, already auto-follow travel. ✅
+  - **Date-label displays** (my-week, workout history, weekly-wrap, day-hub, heart-rate 7-day) format a `YYYY-MM-DD` key via `T12:00:00Z` + `timeZone:'UTC'` — a deliberate noon-UTC trick that renders the same calendar-day label everywhere, timezone-independent by design. ✅
+  - **Notifications (server)** — now auto-follow via TimezoneSync. ✅
+  - **Google Health bucketing** (`googleHealth.js`/`.ts`, `health/sync`, `health/steps`, `manual-steps`) hardcodes `America/New_York` (`TZ`) to bucket steps/HR into hours. This is intentional (owner-recorded health data anchored to Eastern) and does NOT follow travel — a known, acceptable caveat for now; revisit if step/HR hour buckets ever look shifted while travelling.
+- Build verified passing.
+- Files: components/TimezoneSync.js (new), app/layout.js, CLAUDE.md
+
 ### Phase 108 — Notifications 2.0 (N1/N3/N4) + Study Hub Bottom Nav — Complete
 - **N1 — Per-notification custom timing:** `notification_times JSONB` + `timezone TEXT` columns added to `profiles` (migration `notification_times_and_timezone`). Each notification in Settings → Notifications now shows a `<input type="time">` picker when enabled; custom time saved per-key to `notification_times`, empty resets to the derived default. Defaults computed client-side via `defaultTimeFor(item, wake, bed)` mirroring the Edge Function offsets (morning=wake, midday=wake+6h, evening=bed−1h, hydration=wake+6h, streak=bed−2h, supplement=wake+30, weigh-in=wake+15, measurement=wake+20, wrap=bed−90, workout=schedule-derived). Timezone captured via `Intl.DateTimeFormat().resolvedOptions().timeZone` on schedule save + any time save.
 - **N3 — Per-notification explainers:** each row has an ⓘ button toggling a "how this works" panel describing the trigger, data used, and cadence (added `how` field to NOTIF_TYPES).
