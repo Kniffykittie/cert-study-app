@@ -3401,6 +3401,14 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 118 — Test page bug audit: 3 fixes — Complete
+- **Stale-closure in `useTimer` (real, important):** the interval effect had `[]` deps but called the `onExpire` from the first render, which captured the initial empty `answers`. A **timed-out Real Exam** therefore saved empty answers → 0% with no history. Fixed by storing the latest `onExpire` in a ref (`onExpireRef`) updated each render and calling `onExpireRef.current()` on expiry.
+- **Array `user_answer` into a `text` column (real, latent→worsening):** `saveResults` stored `finalAnswers[i]` raw; for multi/ordering/matching/cli questions that value is an array, which makes PostgREST reject the **entire** `question_answers` batch insert — so a test containing any non-mc question saved no answer history at all. Fixed by `JSON.stringify`-ing array answers. (Pool currently has 1 each of multi/ordering/matching/cli; impact grows after Generation Day.)
+- **`est.bg` → `verdict.bg` (real, minor visual):** the pass-likelihood card read `est.bg`, which `passEstimate` never returns, so its background tint was `undefined`. Now uses `verdict.bg`.
+- **Noted, not changed (design call):** the pacing card renders for all modes (gated only on `finalDuration`), so practice/simulation results show a "real exam pace" comparison that includes reading/deliberation time — usually reads "too slow." Left as-is pending a decision to gate it to Real Exam mode.
+- Build verified passing.
+- Files: study-hub/test/page.js
+
 ### Phase 117 — Fix: Real Exam crash (undefined templateBar) — Complete
 - **Root cause found (parked bug):** `RealExam` (module-level component in `test/page.js`) referenced `templateBar` in its JSX, but `templateBar` is defined inside `TestPageInner`'s scope and was never passed to `RealExam` as a prop. Every Real Exam render threw `ReferenceError: templateBar is not defined` at runtime — invisible to the build (it's a valid identifier at compile time, only undefined at runtime).
 - **Fix:** added `templateBar` to `RealExam`'s props and passed `templateBar={templateBar}` at the call site. Verified `isAnswered` (import) and `REAL_EXAM` (module const) are module-scoped and safe inside `RealExam`.

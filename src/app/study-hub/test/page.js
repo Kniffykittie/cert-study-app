@@ -172,13 +172,17 @@ function useTimer(initialSeconds, onExpire) {
   const [secondsLeft, setSecondsLeft] = useState(initialSeconds)
   const intervalRef = useRef(null)
   const secondsRef = useRef(initialSeconds)
+  // Keep the latest onExpire so the interval (bound once) fires the current
+  // closure — otherwise a timeout saves the initial (empty) answers.
+  const onExpireRef = useRef(onExpire)
+  useEffect(() => { onExpireRef.current = onExpire }, [onExpire])
 
   useEffect(() => {
     intervalRef.current = setInterval(() => {
       setSecondsLeft(s => {
         const next = s <= 1 ? 0 : s - 1
         secondsRef.current = next
-        if (next === 0) { clearInterval(intervalRef.current); onExpire() }
+        if (next === 0) { clearInterval(intervalRef.current); onExpireRef.current() }
         return next
       })
     }, 1000)
@@ -759,7 +763,7 @@ function TestPageInner() {
         return {
           session_id: session.id, user_id: user.id, cert, topic: q.topic,
           question_text: q.question, correct_answer: q.correct,
-          user_answer: finalAnswers[i] || '', is_correct: isCorrect,
+          user_answer: Array.isArray(finalAnswers[i]) ? JSON.stringify(finalAnswers[i]) : (finalAnswers[i] || ''), is_correct: isCorrect,
           question_snapshot: isCorrect ? null : { question: q.question, options: q.options, correct: q.correct, correct_answers: q.correct_answers ?? null, question_type: q.question_type ?? 'mc', type_payload: q.type_payload ?? null, rationale: q.rationale ?? null, topic: q.topic, explanations: q.explanations ?? {}, exhibit: q.exhibit ?? null },
         }
       }))
@@ -1147,7 +1151,7 @@ function TestPageInner() {
             : { c: 'var(--error)', t: 'Not ready yet', bg: 'rgba(204,0,0,0.08)', bd: 'var(--error-border)' }
           const lowConfidence = est.totalSample < 25 || est.domainsCovered < est.totalDomains
           return (
-            <div style={{ backgroundColor: est.bg, border: `1px solid ${verdict.bd}`, borderRadius: '10px', padding: '18px 20px', marginBottom: '16px' }}>
+            <div style={{ backgroundColor: verdict.bg, border: `1px solid ${verdict.bd}`, borderRadius: '10px', padding: '18px 20px', marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
                 <span style={{ color: verdict.c, fontSize: '15px', fontWeight: '700' }}>{verdict.t}</span>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
