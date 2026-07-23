@@ -1166,8 +1166,8 @@ function TestPageInner() {
           )
         })()}
 
-        {/* Pacing — avg time/question vs the real exam budget */}
-        {finalDuration != null && questions.length > 0 && (() => {
+        {/* Pacing — avg time/question vs the real exam budget (Real Exam mode only) */}
+        {mode === 'real' && finalDuration != null && questions.length > 0 && (() => {
           const perQ = finalDuration / questions.length
           const budget = REAL_EXAM[cert] ? (REAL_EXAM[cert].minutes * 60) / REAL_EXAM[cert].questions : 60
           const ratio = perQ / budget
