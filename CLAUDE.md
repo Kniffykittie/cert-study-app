@@ -235,6 +235,7 @@ src/
       wrong-answers/route.js           GET wrong answers by cert (deduped by question text)
       lab-doc-feedback/route.js        AI feedback on step documentation; uses getUser() + is_disabled check; prompt injection protected
       owner/
+        delete-templates/route.js      POST { cert } — owner only; HARD delete question_templates for a cert (or 'all'); safe (flagged_questions FK is SET NULL; answer history/topic_performance unaffected); returns deleted count
         verify-pin/route.js            POST — verifies owner PIN against OWNER_PIN_HASH env var; 3-attempt lockout for 1 hour; owner email check; DB-persisted lockout in api_rate_limits (survives cold starts)
         generate-invite/route.js       POST — owner only; generates random XXXX-XXXX invite code; inserts to invite_codes table
         admin/
@@ -350,7 +351,7 @@ src/
       results/page.js                  Past test results with mode badges, Discard button
       reference/page.js                Reference sheets (subnetting, ports, OSI, etc.)
       flagged/page.js                  Flagged/reported questions
-      templates/page.js                Generate AI templates (5 per batch)
+      templates/page.js                Generate AI templates (5 per batch); question-type breakdown (mc/multi/ordering/matching/cli active counts per cert); Coverage vs weighted Target bars (target ∝ official domain %); owner Danger Zone (delete all templates per cert or globally, confirm modal) → /api/owner/delete-templates
       premade-templates/page.js        Browse/manage template library (duplicates, retired)
       labs/page.js                     Packet Tracer Labs landing — all lab sets, per-lab progress dots
       labs/commands/page.js            IOS Command Reference — exports IOS_COMMANDS for FloatingCommandPanel

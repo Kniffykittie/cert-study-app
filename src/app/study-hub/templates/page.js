@@ -18,6 +18,20 @@ const CERTS = {
 }
 const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
 
+// Official domain weights (%) — used to compute weight-proportional coverage targets
+const DOMAIN_WEIGHTS = {
+  ccna: { '1.0 Network Fundamentals': 20, '2.0 Network Access': 20, '3.0 IP Connectivity': 25, '4.0 IP Services': 10, '5.0 Security Fundamentals': 15, '6.0 Automation & Programmability': 10 },
+  'network-plus': { '1.0 Networking Concepts': 23, '2.0 Network Implementation': 20, '3.0 Network Operations': 19, '4.0 Network Security': 14, '5.0 Network Troubleshooting': 24 },
+  'security-plus': { '1.0 General Security Concepts': 12, '2.0 Threats, Vulnerabilities & Mitigations': 22, '3.0 Security Architecture': 18, '4.0 Security Operations': 28, '5.0 Security Program Management & Oversight': 20 },
+}
+// Weighted coverage target per domain: heavier domains get proportionally more (matches real-exam distribution)
+function targetFor(cert, domain) {
+  const w = DOMAIN_WEIGHTS[cert]?.[domain] ?? 15
+  return Math.max(12, Math.round(w * 1.2))
+}
+
+const TYPE_LABELS = { mc: 'Multiple choice', multi: 'Multi-select', ordering: 'Ordering', matching: 'Matching', cli: 'CLI sim' }
+
 const OWNER_EMAIL = 'sethproper40@yahoo.com'
 
 export default function TemplatesPage() {
@@ -30,6 +44,9 @@ export default function TemplatesPage() {
   const [genCount, setGenCount] = useState(10)
   const [lastResult, setLastResult] = useState(null)
   const [isOwner, setIsOwner] = useState(false)
+  const [typeCounts, setTypeCounts] = useState({})
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => { loadCounts(); checkOwner() }, [])
 
@@ -43,16 +60,45 @@ export default function TemplatesPage() {
     const supabase = createClient()
     const { data } = await supabase
       .from('question_templates')
-      .select('cert, domain, difficulty, is_retired')
+      .select('cert, domain, difficulty, is_retired, question_type')
     const c = {}
+    const tc = {}
     for (const row of data ?? []) {
       const key = `${row.cert}||${row.domain}||${row.difficulty}`
       if (!c[key]) c[key] = { total: 0, active: 0 }
       c[key].total++
       if (!row.is_retired) c[key].active++
+      if (!row.is_retired) {
+        const tk = `${row.cert}||${row.question_type || 'mc'}`
+        tc[tk] = (tc[tk] || 0) + 1
+      }
     }
     setCounts(c)
+    setTypeCounts(tc)
     setLoading(false)
+  }
+
+  // active count per cert+domain (summed across difficulties) for coverage targets
+  function domainActive(cert, domain) {
+    return ['easy', 'medium', 'hard'].reduce((s, d) => s + (counts[`${cert}||${domain}||${d}`]?.active ?? 0), 0)
+  }
+
+  async function confirmDelete() {
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/owner/delete-templates', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cert: deleteTarget }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setLastResult(`🗑 Deleted ${data.deleted} templates${deleteTarget === 'all' ? '' : ` for ${CERT_LABELS[deleteTarget]}`}`)
+      await loadCounts()
+    } catch (e) {
+      setLastResult(`✗ Error: ${e.message}`)
+    }
+    setDeleting(false)
+    setDeleteTarget(null)
   }
 
   async function generate() {
@@ -162,27 +208,100 @@ export default function TemplatesPage() {
         <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Templates are added to the pool permanently. Generating more for the same domain adds to the existing set.</p>
       </div> : null}
 
-      {/* Coverage table */}
-      {!loading && totalAll > 0 && (
-        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-          <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Template Coverage</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {Object.entries(counts).sort().map(([key, c]) => {
-              const [cert, domain, diff] = key.split('||')
+      {/* Question-type breakdown */}
+      {!loading && totalActive > 0 && (
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Question Types (active)</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {Object.keys(CERTS).map(cert => {
+              const types = ['mc', 'multi', 'ordering', 'matching', 'cli'].filter(t => cert === 'ccna' || t !== 'cli')
               return (
-                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: 'var(--background)', borderRadius: '6px' }}>
-                  <div>
-                    <span style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{CERT_LABELS[cert]}</span>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '13px', marginLeft: '8px' }}>{domain}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'capitalize', backgroundColor: 'var(--surface)', padding: '1px 6px', borderRadius: '4px', border: '1px solid var(--border)' }}>{diff}</span>
-                    <span style={{ color: c.active > 0 ? 'var(--success)' : 'var(--error)', fontSize: '13px', fontWeight: '600' }}>{c.active} active</span>
-                    {c.total > c.active && <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>({c.total - c.active} retired)</span>}
-                  </div>
+                <div key={cert} style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', minWidth: '70px' }}>{CERT_LABELS[cert]}</span>
+                  {types.map(t => {
+                    const n = typeCounts[`${cert}||${t}`] || 0
+                    return (
+                      <span key={t} style={{ fontSize: '12px', padding: '3px 10px', borderRadius: '99px', border: `1px solid ${n > 0 ? 'var(--border)' : 'var(--error-border)'}`, backgroundColor: 'var(--background)', color: n > 0 ? 'var(--text-secondary)' : 'var(--error)' }}>
+                        {TYPE_LABELS[t]}: <span style={{ color: n > 0 ? 'var(--success)' : 'var(--error)', fontWeight: '700' }}>{n}</span>
+                      </span>
+                    )
+                  })}
                 </div>
               )
             })}
+          </div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '11px', margin: '12px 0 0' }}>Red = no coverage yet. The generator adds ~1 multi + ≤1 PBQ + (CCNA) ≤1 CLI per batch.</p>
+        </div>
+      )}
+
+      {/* Coverage vs weighted target (per domain) */}
+      {!loading && totalActive > 0 && (
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Coverage vs Target</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 16px' }}>Targets are weighted by official domain % — heavier exam domains need more templates. Red = under target.</p>
+          {Object.keys(CERTS).map(cert => (
+            <div key={cert} style={{ marginBottom: '16px' }}>
+              <div style={{ color: 'var(--accent-blue)', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>{CERT_LABELS[cert]}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {CERTS[cert].map(domain => {
+                  const active = domainActive(cert, domain)
+                  const target = targetFor(cert, domain)
+                  const pct = Math.min(100, Math.round((active / target) * 100))
+                  const met = active >= target
+                  const barColor = met ? 'var(--success)' : active >= target * 0.5 ? 'var(--warning)' : 'var(--error)'
+                  return (
+                    <div key={domain} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{domain}</span>
+                      <div style={{ width: '110px', height: '6px', backgroundColor: 'var(--background)', borderRadius: '3px', overflow: 'hidden', flexShrink: 0 }}>
+                        <div style={{ height: '100%', width: `${pct}%`, backgroundColor: barColor, borderRadius: '3px' }} />
+                      </div>
+                      <span style={{ color: barColor, fontSize: '12px', fontWeight: '600', minWidth: '54px', textAlign: 'right', flexShrink: 0 }}>{active}/{target}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Danger Zone — owner only: fresh-start delete */}
+      {isOwner && !loading && (
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--error-border)', borderRadius: '10px', padding: '20px' }}>
+          <h2 style={{ color: 'var(--error)', fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>⚠ Danger Zone — Start Fresh</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 16px' }}>Permanently delete templates to regenerate a clean pool. Your test history and weakness tracking are NOT affected.</p>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {Object.keys(CERTS).map(cert => (
+              <button key={cert} onClick={() => setDeleteTarget(cert)}
+                style={{ backgroundColor: 'var(--background)', border: '1px solid var(--error-border)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', color: 'var(--error)', cursor: 'pointer', fontWeight: '600' }}>
+                Delete {CERT_LABELS[cert]} ({['easy', 'medium', 'hard'].reduce((s, d) => s + CERTS[cert].reduce((ss, dm) => ss + (counts[`${cert}||${dm}||${d}`]?.total ?? 0), 0), 0)})
+              </button>
+            ))}
+            <button onClick={() => setDeleteTarget('all')}
+              style={{ backgroundColor: 'rgba(204,0,0,0.12)', border: '1px solid var(--error)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', color: 'var(--error)', cursor: 'pointer', fontWeight: '700' }}>
+              Delete ALL templates
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm modal */}
+      {deleteTarget && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }} onClick={() => !deleting && setDeleteTarget(null)}>
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--error-border)', borderRadius: '12px', padding: '28px', maxWidth: '420px', width: '100%' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: '32px', marginBottom: '8px' }}>⚠️</div>
+            <h2 style={{ color: 'var(--error)', fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Delete {deleteTarget === 'all' ? 'ALL templates' : `all ${CERT_LABELS[deleteTarget]} templates`}?</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.6, marginBottom: '24px' }}>
+              This permanently removes {deleteTarget === 'all' ? totalAll : ['easy', 'medium', 'hard'].reduce((s, d) => s + CERTS[deleteTarget].reduce((ss, dm) => ss + (counts[`${deleteTarget}||${dm}||${d}`]?.total ?? 0), 0), 0)} templates. This cannot be undone. Your test history and stats stay intact.
+            </p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={() => setDeleteTarget(null)} disabled={deleting}
+                style={{ flex: 1, backgroundColor: 'var(--background)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={confirmDelete} disabled={deleting}
+                style={{ flex: 1, backgroundColor: 'var(--error)', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '14px', fontWeight: '700', cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}>
+                {deleting ? 'Deleting...' : 'Yes, delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}

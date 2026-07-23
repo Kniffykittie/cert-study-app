@@ -3395,6 +3395,17 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 103 — S4/S5 (partial): Template Pool Control Panel — Complete
+Owner tooling for Generation Day. Machinery built now; actual generation still held per user.
+- **`/api/owner/delete-templates` (new):** owner-guarded HARD delete of question_templates by cert or 'all'; returns deleted count. Safe (verified: flagged_questions FK is SET NULL; answer history + topic_performance are snapshot/aggregate, unaffected).
+- **Templates page — Question Types panel:** active counts per cert for mc/multi/ordering/matching/cli, red when a type has zero coverage (CLI shown CCNA-only).
+- **Templates page — Coverage vs Target:** per-domain bars where the target is WEIGHTED by official domain % (targetFor = max(12, round(weight*1.2))) — heavier exam domains need more templates; green/yellow/red by fill. This is the "even/correct spacing" visibility the user asked for (weighted, not flat-even).
+- **Danger Zone (owner):** delete-per-cert + delete-ALL buttons with a confirm modal showing the count; wired to loadCounts refresh.
+- Build verified passing. Delete endpoint NOT executed (would wipe pool before Generation Day).
+- **Still TODO for full S4/S5 + S3 (Generation Day machinery):** examObjectives.js sub-objective lists + sub_objective column + sub-objective coverage; S3 fact-check verify pass + Jaccard dedup in generate-templates; auto "fill gaps" sequential orchestrator; then the purge + regenerate.
+- Files: api/owner/delete-templates/route.js (new), study-hub/templates/page.js, CLAUDE.md
+- Roadmap: S5 delete tool ✅; S4 coverage dashboard ✅ (sub-objective tracking + fill-gaps orchestrator pending); S3 pending
+
 ### Phase 102 — S10: Real Exam Blend + Pacing (R7 + R3) — Complete
 - **Difficulty blend:** generate-questions accepts `difficulties` array (falls back to single `difficulty` — backward compatible). Real Exam now requests `['medium','hard']` instead of hard-only → authentic level once the medium pool exists (graceful today: serves hard + medium seeds).
 - **PBQ-first:** real mode sorts cli/ordering/matching questions to the front (real exams open with performance-based questions).
