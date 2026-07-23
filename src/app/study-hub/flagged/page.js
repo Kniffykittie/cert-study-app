@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import EmptyState from '@/components/EmptyState'
 
 const FEEDBACK_LABELS = {
   wrong_answer: 'Wrong answer marked correct',
@@ -72,8 +73,8 @@ export default function FlaggedPage() {
       {loading ? (
         <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Loading...</div>
       ) : items.length === 0 ? (
-        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '40px', textAlign: 'center' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>No flagged questions pending review.</p>
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+          <EmptyState icon="🚩" title="Nothing flagged" subtitle="Questions you report as wrong or confusing during a test will show up here for review." compact />
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import QuestionExhibit from '@/components/QuestionExhibit'
+import EmptyState from '@/components/EmptyState'
 
 const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
 const letters = ['A', 'B', 'C', 'D']
@@ -68,11 +69,7 @@ export default function BookmarksPage() {
       {loading ? (
         <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '64px', color: 'var(--text-secondary)' }}>
-          <div style={{ fontSize: '32px', marginBottom: '12px' }}>🔖</div>
-          <p style={{ fontSize: '16px', fontWeight: '600', marginBottom: '6px' }}>No bookmarks yet</p>
-          <p style={{ fontSize: '14px' }}>Hit the bookmark icon on any practice question to save it here.</p>
-        </div>
+        <EmptyState icon="🔖" title="No bookmarks yet" subtitle="Hit the bookmark icon on any practice question to save it here." ctaLabel="Take a Test →" ctaHref="/study-hub/test" />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.map(b => {

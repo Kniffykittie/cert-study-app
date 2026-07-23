@@ -3401,6 +3401,13 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 114 — S14 polish (slice 1): shared EmptyState + streak milestones — Complete
+- **Reusable `EmptyState` component** (icon + title + subtitle + optional CTA link, `compact` variant) for a consistent "feels finished" empty look. Applied to Study Hub results (📊 + Take a Test CTA), flagged (🚩), and bookmarks (unified the previously-bespoke block). Replaces bare one-line empty messages.
+- **Streak milestones/personality (DailyStreak):** milestone banner celebrates 3/7/14/30/60/100/200/365-day streaks (gold, 🎉), and between milestones nudges toward the next one or reminds how many questions remain today to keep the streak alive.
+- S14 is a multi-slice grab-bag; this is slice 1 (empty states + a milestone moment). Remaining S14 sub-areas (typography pass, card variety, theme presets, broader ARIA/keyboard a11y) still ⬜.
+- Build verified passing.
+- Files: components/EmptyState.js (new), components/DailyStreak.js, study-hub/results/page.js, study-hub/flagged/page.js, study-hub/bookmarks/page.js, CLAUDE.md
+
 ### Phase 113 — Schedule follow-ons: today's events on home + wraps — Complete
 - **Life Hub home:** new "📅 Today's Schedule" card (below the status pills) lists today's events (recurring for the weekday + one-offs for the date) with category dot/emoji + time range, sorted by start time; links to My Schedule; hidden when empty. Fetches `schedule-events?month=` and filters client-side.
 - **Weekly Wrap:** injects "NOTABLE EVENTS THIS WEEK" (one-off events dated in the week, weekday-labeled, category, titles in `<user_input>`) so the narrative can connect a busy social week to energy/nutrition patterns.

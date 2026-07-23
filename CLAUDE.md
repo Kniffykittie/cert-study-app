@@ -403,6 +403,7 @@ src/
     QuestionExhibit.js                 Renders question exhibits (topology diagram via LabTopology + monospace CLI/config block, both horizontally scrollable); used in test page (all 3 question views), study mode, bookmarks expanded view
     PwaInstallBanner.js                Dismissible install-to-home-screen banner (captures beforeinstallprompt; iOS shows manual Share→Add instructions); once-dismissed via localStorage; mounted in life-hub layout; improves push reliability
     Toast.js                           Shared toast notifications — exports showToast(message, type); mounted in both hub layouts; success (green ✓, 2.2s) and error (red ✕, 4.5s) variants; fired via 'app-toast' CustomEvent
+    EmptyState.js                      Reusable empty-state block (icon + title + subtitle + optional CTA link; compact variant) — used on results/flagged/bookmarks and any list with no data
     InfoChip.js                        Reusable ℹ️ education chip — grey pill, orange when active, toggles inline callout; props: text, label (default "ℹ️"), style; used at 11 touchpoints across 8 pages for domain-knowledge data points
     BookmarkModal.js                   Bookmark reason + notes modal
     DailyStreak.js                     30q/day streak tracker with 28-day calendar heatmap

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import EmptyState from '@/components/EmptyState'
 
 const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+', mixed: 'Mixed — All Certs' }
 const CERT_COLORS = { ccna: 'var(--accent-blue)', 'network-plus': 'var(--accent-purple)', 'security-plus': 'var(--error)', mixed: 'var(--success)' }
@@ -83,8 +84,8 @@ export default function ResultsPage() {
       {loading ? (
         <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Loading...</div>
       ) : totalTests === 0 ? (
-        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '40px', textAlign: 'center' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>No completed tests yet. Take your first test to see results here.</p>
+        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+          <EmptyState icon="📊" title="No completed tests yet" subtitle="Take your first test and your scores, history, and trends will show up here." ctaLabel="Take a Test →" ctaHref="/study-hub/test" />
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

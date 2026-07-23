@@ -57,6 +57,18 @@ export default function DailyStreak() {
   const pct = Math.min(100, Math.round((todayCount / DAILY_GOAL) * 100))
   const goalMet = todayCount >= DAILY_GOAL
 
+  // Milestone / encouragement banner
+  const MILESTONES = [3, 7, 14, 30, 60, 100, 200, 365]
+  const milestone = MILESTONES.includes(streak) ? streak : null
+  const nextMilestone = MILESTONES.find(m => m > streak)
+  const streakMsg = milestone
+    ? `🎉 ${milestone}-day streak! ${milestone >= 100 ? 'Legendary consistency.' : milestone >= 30 ? "You've built a real habit." : 'Keep it rolling.'}`
+    : goalMet && nextMilestone
+      ? `✅ Goal hit — ${nextMilestone - streak} more day${nextMilestone - streak !== 1 ? 's' : ''} to your ${nextMilestone}-day milestone.`
+      : !goalMet && streak > 0
+        ? `🔥 ${streak}-day streak on the line — ${DAILY_GOAL - todayCount} more question${DAILY_GOAL - todayCount !== 1 ? 's' : ''} today to keep it alive.`
+        : null
+
   return (
     <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
@@ -71,6 +83,12 @@ export default function DailyStreak() {
           <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>day streak</div>
         </div>
       </div>
+
+      {streakMsg && (
+        <div style={{ backgroundColor: milestone ? 'rgba(241,196,15,0.12)' : 'var(--background)', border: `1px solid ${milestone ? 'var(--warning)' : 'var(--border)'}`, borderRadius: '8px', padding: '9px 12px', marginBottom: '16px', fontSize: '13px', fontWeight: milestone ? '700' : '500', color: milestone ? 'var(--warning)' : 'var(--text-secondary)' }}>
+          {streakMsg}
+        </div>
+      )}
 
       {/* Today's progress bar */}
       <div style={{ marginBottom: '16px' }}>
