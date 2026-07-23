@@ -743,6 +743,8 @@ src/
 ---
 
 ## Gotchas
+- **`topic_performance` columns are `total_seen` / `total_correct`** (not `total_count`/`correct_count`). A wrong column name makes the PostgREST select error and return `null` data — the feature silently shows its empty state instead of throwing. Double-check column names against the schema when a section is "always empty."
+- **`flashcard_progress` rows are NOT cert-scoped** — a per-deck count must filter by that deck's card ids (`cards.filter(c => progress[c.id]?.mastered)`), not aggregate all of `progress`.
 - **Bucket answer/log dates by LOCAL day** (`new Date(ts).toLocaleDateString('en-CA')`), never `ts.slice(0,10)` (UTC) — streaks/daily charts must agree with `DailyStreak` and the rest of the app, which are local.
 - **`question_templates.variable_sets` can be `null`** — always coerce to `[]` before `.length`/index (`fillTemplate` guards this). JSONB array columns are not guaranteed non-null.
 - **`user_answer` (question_answers) is a `text` column** — array-valued answers (multi/ordering/matching/cli) must be `JSON.stringify`-ed before insert, or PostgREST rejects the whole batch. Same applies to any text column receiving a possibly-array value.

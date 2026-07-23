@@ -3401,6 +3401,13 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 121 — Audit: flashcards (#7) — 2 fixes — Complete
+- **Weak Domain Study section never worked (real):** `flashcards/page.js` `loadWeakDomains` queried `topic_performance` for `correct_count`/`total_count` — columns that don't exist (real ones are `total_seen`/`total_correct`). PostgREST errored, `data` was null, and the section always showed its empty state. Fixed the column names + accuracy math.
+- **StudySession mastered count leaked across certs (real):** the header "Mastered X / Y" used `Object.values(progress).filter(mastered)`, but `progress` holds the user's rows for **all** decks (no cert filter), so X counted mastered cards from other certs and the bar could overflow. Now `cards.filter(c => progress[c.id]?.mastered)` (this deck only). The landing page's per-cert `loadStats` was already correct (keyed per card).
+- Also noted (not a bug): StudySession's "Card N of total" can exceed total when "Still Learning" re-queues a card — acceptable. Owner add-card uses `getSession` for a UI-only gate (RLS enforces the real write) — acceptable.
+- Build verified passing.
+- Files: study-hub/flashcards/page.js, study-hub/flashcards/StudySession.js
+
 ### Phase 120 — Audit: progress page, cert pages, DomainTrend (#5–6) — Complete
 - **Progress page (#5) — FIXED timezone inconsistency:** the daily-volume chart + day-streak bucketed answers by **UTC** date (`answered_at.slice(0,10)` / `toISOString`), while the `DailyStreak` overview component uses **local** date — so the two could disagree by a day for late-night studying. Progress now buckets by `toLocaleDateString('en-CA')` (local), matching DailyStreak. No crashes otherwise; charts and stat aggregation correct.
 - **Cert pages (#6) — clean.** Predicted Score is rendered and correctly weighted (accuracy × official domain %, ≥5-seen domains only, strips the `N.N ` prefix to match `DOMAIN_WEIGHTS`). Reads rely on RLS for user-scoping (the app's established read pattern) — acceptable. `.eq('cert', CERT)` correctly excludes Mixed.

@@ -134,7 +134,8 @@ export default function StudySession({ cert, label, color }) {
     await loadCards()
   }
 
-  const masteredCount = Object.values(progress).filter(p => p.mastered).length
+  // Count mastered for THIS deck only — progress holds all certs' rows
+  const masteredCount = cards.filter(c => progress[c.id]?.mastered).length
   const totalCount = cards.length
 
   if (loading) return <div style={{ color: 'var(--text-secondary)', padding: '40px', textAlign: 'center' }}>Loading flashcards...</div>

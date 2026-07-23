@@ -52,10 +52,10 @@ export default function FlashcardsPage() {
 
   async function loadWeakDomains() {
     const supabase = createClient()
-    const { data } = await supabase.from('topic_performance').select('cert, topic, correct_count, total_count').gte('total_count', 3)
+    const { data } = await supabase.from('topic_performance').select('cert, topic, total_correct, total_seen').gte('total_seen', 3)
     if (!data) return
     const weak = data
-      .map(d => ({ cert: d.cert, topic: d.topic, accuracy: Math.round((d.correct_count / d.total_count) * 100) }))
+      .map(d => ({ cert: d.cert, topic: d.topic, accuracy: Math.round((d.total_correct / d.total_seen) * 100) }))
       .filter(d => d.accuracy < 65)
       .sort((a, b) => a.accuracy - b.accuracy)
       .slice(0, 6)
