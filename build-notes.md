@@ -3401,6 +3401,13 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 123 — Audit: templates + premade (#9) — RLS hardening — Complete
+- **SECURITY (real): `question_templates` INSERT/UPDATE were open to any authenticated user** (both policies `qual/with_check = true`). Owner-only was enforced only in the UI + generation API, so a non-owner could directly `insert`/`update` (retire, edit, corrupt) the shared question pool via the Supabase client. Fixed with a migration (`restrict_question_templates_writes_to_owner`): INSERT/UPDATE now require `lower(auth.jwt()->>'email') = owner`; SELECT stays open (templates are shared-readable). DELETE already had no policy (denied; owner delete goes through the service-role API). Verified owner email matches (lowercase) so owner writes/generation still work.
+- **premade-templates dedup — clean.** Jaccard-variant (`intersection / max(sizes)`), grouped by cert+domain+difficulty, O(n²) fine at this scale. Retire/restore now additionally guarded by the new RLS.
+- **templates page — clean.** Weighted coverage targets (`max(12, round(weight×1.2))`), per-domain active counts, danger-zone delete via owner API all correct.
+- Build verified passing (no code change — RLS migration + docs).
+- Security Status: add "question_templates writes owner-only (RLS)".
+
 ### Phase 122 — Audit: study mode (#8) — Complete
 - **Study mode rendered every question as multiple-choice (real limitation):** the inline options block assumed `question.options` + `question.correct` + A–D letters, so a `multi`/`ordering`/`matching`/`cli` question from `generate-questions` would render broken (empty options, no correct answer, unanswerable). Replaced the bespoke MC block with the shared `<AnswerArea>` (handles all 5 types) + `isAnswered()` gating the Check-Answer button. Removes ~30 lines and keeps study mode in lockstep with the test flow. Rare today (non-mc seeds aren't medium-difficulty, which study mode requests) but correct now.
 - Study mode intentionally does not persist answers to `question_answers`/`topic_performance` (pure learn tool) — unchanged.

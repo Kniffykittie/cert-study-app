@@ -743,6 +743,7 @@ src/
 ---
 
 ## Gotchas
+- **Shared tables need owner-only write RLS, not just UI/API gating** — `question_templates` had `INSERT`/`UPDATE` policies of `true`, so any authenticated user could write the shared pool despite owner-only buttons. Writes are now `lower(auth.jwt()->>'email') = owner`. When a table is "owner-writes, everyone-reads," enforce it in RLS, not only in the client.
 - **Render questions via `<AnswerArea>`, never a bespoke A–D options map** — only `AnswerArea` handles all 5 `question_type`s; a hand-rolled MC block silently breaks on multi/ordering/matching/cli (empty options, null correct). Study mode was fixed to use it.
 - **`topic_performance` columns are `total_seen` / `total_correct`** (not `total_count`/`correct_count`). A wrong column name makes the PostgREST select error and return `null` data — the feature silently shows its empty state instead of throwing. Double-check column names against the schema when a section is "always empty."
 - **`flashcard_progress` rows are NOT cert-scoped** — a per-deck count must filter by that deck's card ids (`cards.filter(c => progress[c.id]?.mastered)`), not aggregate all of `progress`.
