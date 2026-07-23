@@ -3401,6 +3401,14 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 120 — Audit: progress page, cert pages, DomainTrend (#5–6) — Complete
+- **Progress page (#5) — FIXED timezone inconsistency:** the daily-volume chart + day-streak bucketed answers by **UTC** date (`answered_at.slice(0,10)` / `toISOString`), while the `DailyStreak` overview component uses **local** date — so the two could disagree by a day for late-night studying. Progress now buckets by `toLocaleDateString('en-CA')` (local), matching DailyStreak. No crashes otherwise; charts and stat aggregation correct.
+- **Cert pages (#6) — clean.** Predicted Score is rendered and correctly weighted (accuracy × official domain %, ≥5-seen domains only, strips the `N.N ` prefix to match `DOMAIN_WEIGHTS`). Reads rely on RLS for user-scoping (the app's established read pattern) — acceptable. `.eq('cert', CERT)` correctly excludes Mixed.
+- **DomainTrend (#6) — clean.** Monday-of-week bucketing correct across month boundaries; local-time consistent.
+- Remaining: flashcards, study mode, templates, labs, pause/resume, other API routes, then Life Hub.
+- Build verified passing.
+- Files: study-hub/progress/page.js
+
 ### Phase 119 — Audit: scoring engine, CLI engine, fillTemplate, generate-questions — Complete
 Systematic bug audit of the core test-serving/grading path (list item 1–4):
 - **`scoreAnswer.js` + `AnswerArea.js` (#1) — clean.** Verified the UI emits exactly the answer shapes the scorer expects for all 5 types (mc=letter, multi=letters[], ordering=items[] in user order, matching=`answer[i]`=def for `terms[i]`, cli=lines[]). Only benign edges (duplicate option strings, >6 options past `LETTERS`).

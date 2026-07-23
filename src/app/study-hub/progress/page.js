@@ -203,7 +203,7 @@ export default function ProgressPage() {
     const counts = {}
     for (const a of answers ?? []) {
       if (!a.answered_at) continue
-      const day = a.answered_at.slice(0, 10)
+      const day = new Date(a.answered_at).toLocaleDateString('en-CA') // local date, matches DailyStreak
       counts[day] = (counts[day] || 0) + 1
     }
     const today = new Date()
@@ -211,7 +211,7 @@ export default function ProgressPage() {
     for (let i = 29; i >= 0; i--) {
       const d = new Date(today)
       d.setDate(today.getDate() - i)
-      const key = d.toISOString().slice(0, 10)
+      const key = d.toLocaleDateString('en-CA')
       last30.push({ date: key, count: counts[key] || 0 })
     }
     setDailyCounts(last30)

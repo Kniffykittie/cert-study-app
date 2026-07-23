@@ -743,6 +743,7 @@ src/
 ---
 
 ## Gotchas
+- **Bucket answer/log dates by LOCAL day** (`new Date(ts).toLocaleDateString('en-CA')`), never `ts.slice(0,10)` (UTC) — streaks/daily charts must agree with `DailyStreak` and the rest of the app, which are local.
 - **`question_templates.variable_sets` can be `null`** — always coerce to `[]` before `.length`/index (`fillTemplate` guards this). JSONB array columns are not guaranteed non-null.
 - **`user_answer` (question_answers) is a `text` column** — array-valued answers (multi/ordering/matching/cli) must be `JSON.stringify`-ed before insert, or PostgREST rejects the whole batch. Same applies to any text column receiving a possibly-array value.
 - **`setInterval`/`setTimeout` effects with `[]` deps capture stale closures** — if the callback needs current state or a current prop (e.g. a timer's `onExpire` that saves `answers`), route it through a ref updated each render, not the closure bound on first render.
