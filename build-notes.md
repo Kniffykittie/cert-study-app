@@ -3401,6 +3401,12 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 124 — Audit: labs (#10) + pause/resume (#11) — clean — Complete
+- **Labs (#10) — clean.** `LabTimer` persistence (`elapsed_seconds + (now − last_started_at)`) is consistent across reloads (line 39 `startTimeRef` is dead but harmless). Lab page step-completion uses optimistic functional `setCompletedSteps` + user-scoped `lab_progress` upsert/delete; notes/docs user-scoped. `lab-doc-feedback` route: getUser + is_disabled + rate-limit + `<user_input>` wrapping + length caps — correct.
+- **Pause/resume (#11) — clean.** localStorage snapshot written on every state change, explicit clears on pause/done/resume, `sessionStorage` test-in-progress guard, `beforeunload` warning. `saveToSupabase`/`resumeTest` user-scoped (RLS + explicit). Number-key handler uses module-level `letters` (defined) — no out-of-scope ref. Known edge (not a bug): a navigated-away Real Exam resumed from localStorage restarts the full timer (snapshot omits `seconds_remaining`); manual Supabase pause preserves it.
+- No code changes.
+- Remaining: #12 other API routes (wrong-answers, bookmarks, chat, flagged), then Life Hub.
+
 ### Phase 123 — Audit: templates + premade (#9) — RLS hardening — Complete
 - **SECURITY (real): `question_templates` INSERT/UPDATE were open to any authenticated user** (both policies `qual/with_check = true`). Owner-only was enforced only in the UI + generation API, so a non-owner could directly `insert`/`update` (retire, edit, corrupt) the shared question pool via the Supabase client. Fixed with a migration (`restrict_question_templates_writes_to_owner`): INSERT/UPDATE now require `lower(auth.jwt()->>'email') = owner`; SELECT stays open (templates are shared-readable). DELETE already had no policy (denied; owner delete goes through the service-role API). Verified owner email matches (lowercase) so owner writes/generation still work.
 - **premade-templates dedup — clean.** Jaccard-variant (`intersection / max(sizes)`), grouped by cert+domain+difficulty, O(n²) fine at this scale. Retire/restore now additionally guarded by the new RLS.
