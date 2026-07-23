@@ -3169,7 +3169,7 @@ This supersedes all scattered "Session N" numbering below. Detailed specs for ea
 
 ### BLOCK B — New Question Formats (need the refactor first)
 - **S6 — QuestionBody + scoreAnswer Refactor** ✅ BUILT (Phase 98) — extract one `<QuestionBody>` component (switch on question_type) replacing all 3 inline render paths + pure `scoreAnswer(q, answer)` used by saveResults AND live scoring; make answers-map + resume tolerate non-string values. INVISIBLE to user. FULL regression of every existing flow (checklist). Foundation — blocks S7-S9.
-- **S7 — Multi-select / "Choose two" (R5)** ⬜ — `correct_answers TEXT[]` (null=legacy); checkbox UI; exact-set (all-or-nothing) scoring; carries through snapshots/bookmarks/resume.
+- **S7 — Multi-select / "Choose two" (R5)** ✅ BUILT (Phase 99) — `correct_answers TEXT[]` (null=legacy); checkbox UI; exact-set (all-or-nothing) scoring; carries through snapshots/bookmarks/resume.
 - **S8 — PBQ-lite (R6)** ⬜ — `question_type` ordering + matching; `type_payload JSONB`; tap-to-place (no drag) for mobile; `rationale` explanation (concern #3).
 - **S9 — CCNA CLI Mode Engine (R8, Tier 1.5)** ⬜ — `src/lib/iosCliEngine.js` (mode state machine + command table + abbrev expansion + replay grading); terminal-transcript UI (Enter runs line, prompt evolves, mode practice enforced via wrong-mode rejection); per-command rationale. Biggest single build. Desktop-recommended banner + mobile hints (UX gap #18). Disable global 1-4/Enter handler when CLI focused.
 
@@ -3394,6 +3394,19 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 99 — S7: Multi-Select "Choose Two" Questions — Complete
+- **Migration:** `question_type TEXT DEFAULT 'mc'` + `correct_answers TEXT[]` on question_templates AND bookmarked_questions; `correct_answer` made nullable (multi has no single answer).
+- **scoreAnswer** multi branch active: exact-set match (all-or-nothing, matches CompTIA); **isAnswered** = non-empty array.
+- **AnswerArea** MultiOptions branch: checkbox UI, "Select N — X of N chosen" hint, toggle in/out of array, reveal shows correct (green ✓) / wrong-picked (red ✗) / missed ("correct answer"); supports 5-6 options.
+- **fillTemplate** passes question_type + correct_answers through.
+- **test/page.js:** onChange handlers store value (array or letter); keyboard 1-4 toggles for multi; submit/advance gates use isAnswered; results list shows joined answers via fmtAnswer/correctDisplay/explForResult; wrong-answer snapshot carries question_type + correct_answers.
+- **Bookmarks:** route + page carry and render multi (correctSet-based highlight, "N correct" hint).
+- **Generator:** prompt instructs 1 multi per batch when natural (5-6 options, "(Choose two.)", all-or-nothing distractors); insert maps question_type + correct_answers.
+- **1 hand-seeded multi template** (CCNA Network Access, medium — access port facts) for immediate testing.
+- Build verified passing. Regression: legacy MC (question_type null→'mc') scores + renders unchanged across practice/sim/real/review; keyboard intact.
+- Files: fillTemplate.js, scoreAnswer.js (branch already present), components/study/AnswerArea.js, study-hub/test/page.js, study-hub/bookmarks/page.js, api/bookmarks/route.js, api/generate-templates/route.js, CLAUDE.md + 2 migrations
+- Roadmap: S7 ✅
 
 ### Phase 98 — S6: QuestionBody / scoreAnswer Refactor — Complete
 - **`src/lib/scoreAnswer.js`** (new): `scoreAnswer(question, answer)` + `isAnswered(question, answer)` — central, type-dispatching. MC now; multi (exact-set/all-or-nothing) already stubbed; cli/ordering/matching add branches. Replaced all 8 question-level correctness comparisons in test/page.js (saveResults correct count + snapshot + topicMap; results correct/wrong/domain breakdown; results list coloring).

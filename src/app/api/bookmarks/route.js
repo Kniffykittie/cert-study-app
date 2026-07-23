@@ -16,9 +16,9 @@ export async function POST(req) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  const { cert, topic, question_text, options, correct_answer, explanations, exhibit, difficulty, reason, notes } = await req.json()
+  const { cert, topic, question_text, options, correct_answer, correct_answers, question_type, explanations, exhibit, difficulty, reason, notes } = await req.json()
   const { data, error } = await supabase.from('bookmarked_questions').insert({
-    user_id: user.id, cert, topic, question_text, options, correct_answer, explanations, exhibit: exhibit ?? null, difficulty, reason, notes
+    user_id: user.id, cert, topic, question_text, options, correct_answer, correct_answers: correct_answers ?? null, question_type: question_type ?? 'mc', explanations, exhibit: exhibit ?? null, difficulty, reason, notes
   }).select('id').single()
   if (error) return Response.json({ error: error.message }, { status: 500 })
   return Response.json({ id: data.id })

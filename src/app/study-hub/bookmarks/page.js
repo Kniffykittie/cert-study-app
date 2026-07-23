@@ -124,10 +124,12 @@ export default function BookmarksPage() {
 
                     <p style={{ color: 'var(--text-primary)', fontSize: '15px', lineHeight: '1.6', marginBottom: '16px', whiteSpace: 'pre-wrap' }}>{b.question_text}</p>
                     <QuestionExhibit exhibit={b.exhibit} />
+                    {b.question_type === 'multi' && <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Multiple answers — {(b.correct_answers || []).length} correct</div>}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                       {(b.options ?? []).map((opt, i) => {
                         const letter = letters[i]
-                        const isCorrect = b.correct_answer === letter
+                        const correctSet = b.question_type === 'multi' ? new Set(b.correct_answers || []) : new Set([b.correct_answer])
+                        const isCorrect = correctSet.has(letter)
                         return (
                           <div key={i} style={{ display: 'flex', gap: '10px', padding: '10px 14px', borderRadius: '8px', backgroundColor: isCorrect ? 'rgba(46,204,113,0.08)' : 'var(--surface)', border: `1px solid ${isCorrect ? 'var(--success)' : 'var(--border)'}` }}>
                             <span style={{ color: isCorrect ? 'var(--success)' : 'var(--text-secondary)', fontWeight: '700', fontSize: '14px', minWidth: '16px' }}>{letter}.</span>
@@ -140,12 +142,15 @@ export default function BookmarksPage() {
                     {b.explanations && Object.keys(b.explanations).length > 0 && (
                       <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px', marginBottom: '12px' }}>
                         <div style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Explanations</div>
-                        {Object.entries(b.explanations).map(([letter, text]) => (
+                        {Object.entries(b.explanations).map(([letter, text]) => {
+                          const isCorrectExp = b.question_type === 'multi' ? (b.correct_answers || []).includes(letter) : b.correct_answer === letter
+                          return (
                           <div key={letter} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
-                            <span style={{ color: b.correct_answer === letter ? 'var(--success)' : 'var(--text-secondary)', fontWeight: '700', fontSize: '12px', minWidth: '16px' }}>{letter}.</span>
+                            <span style={{ color: isCorrectExp ? 'var(--success)' : 'var(--text-secondary)', fontWeight: '700', fontSize: '12px', minWidth: '16px' }}>{letter}.</span>
                             <span style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '1.5' }}>{text}</span>
                           </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
                     <button onClick={() => remove(b.id)} disabled={removing === b.id}

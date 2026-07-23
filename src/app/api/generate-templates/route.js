@@ -83,12 +83,19 @@ The real exams show exhibit diagrams and CLI output. Add an optional "exhibit" f
 - The question should REQUIRE reading the exhibit to answer (e.g. "Based on the exhibit, why can't PC1 reach the server?")
 - {{placeholders}} work inside exhibit labels, sublabels, and config_text and are filled from the same variable_sets
 
+MULTI-SELECT (real exams include "Choose TWO/THREE" questions — make 1 of every ${count} a multi-select when the topic naturally has multiple correct facts):
+- Set "question_type": "multi", end the stem with "(Choose two.)" (or three), and provide "correct_answers": ["A","C"] instead of a single correct_answer.
+- Provide 5-6 options for multi-select so the choose-two isn't trivially obvious.
+- Every option still gets an explanation. Scoring is all-or-nothing, so distractors must be clearly wrong on inspection, not ambiguous.
+
 Return a JSON array of exactly ${count} template objects. Each object must have:
 {
   "question_template": "string with {{placeholders}}",
   "variable_sets": [{"var1": "value1", "var2": "value2"}, ...],
   "options_templates": ["A. option text", "B. option text", "C. option text", "D. option text"],
-  "correct_answer": "A" | "B" | "C" | "D",
+  "correct_answer": "A" | "B" | "C" | "D",   // single-answer questions
+  "question_type": "mc" | "multi",             // OPTIONAL, defaults to "mc"
+  "correct_answers": ["A","C"],                // REQUIRED only when question_type is "multi"
   "explanations": {
     "A": "why A is right/wrong",
     "B": "why B is right/wrong",
@@ -126,6 +133,8 @@ Return ONLY the JSON array, no markdown, no explanation.`
       variable_sets: t.variable_sets || [],
       options_templates: t.options_templates || [],
       correct_answer: t.correct_answer,
+      question_type: t.question_type === 'multi' ? 'multi' : 'mc',
+      correct_answers: t.question_type === 'multi' ? (t.correct_answers || null) : null,
       explanations: t.explanations || {},
       exhibit: t.exhibit || null,
     }))

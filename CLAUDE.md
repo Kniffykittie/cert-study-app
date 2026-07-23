@@ -415,7 +415,7 @@ src/
 | `topic_performance` | Aggregated accuracy per cert+topic — drives spaced repetition and weak domain features |
 | `test_sessions` | Completed test records — cert, mode, score_pct, correct, total_questions, duration_seconds, completed_at |
 | `paused_tests` | In-progress tests saved as JSON with full state for resume |
-| `question_templates` | Template library with variable_sets and is_retired flag |
+| `question_templates` | Template library with variable_sets and is_retired flag; `exhibit` JSONB (topology/config), `question_type` TEXT default 'mc' (mc/multi), `correct_answers` TEXT[] (multi-select, null=single), `correct_answer` now nullable (null for multi) |
 | `bookmarked_questions` | Bookmarks with reason, notes, and full question snapshot |
 | `flagged_questions` | User-reported question issues |
 | `profiles` | User display name, exam_dates JSONB, daily_goal INT, default_cert TEXT, is_disabled BOOLEAN (owner ban flag, checked in every AI route), settings_pin_hash TEXT (bcrypt hash for Settings page Privacy PIN), authenticator_name TEXT (e.g. "Google Authenticator" — shown on 2FA login screen), notification_preferences JSONB (10 boolean keys: morning_brief/midday_checkin/evening_wrap/workout_reminder/hydration_nudge/study_streak/supplement_reminder/weigh_in_reminder/body_measurement_reminder/wrap_ready; briefs default true, nudges default false) |

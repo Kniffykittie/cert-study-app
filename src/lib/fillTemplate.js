@@ -34,6 +34,8 @@ export function fillTemplate(template) {
     question,
     options,
     correct: template.correct_answer,
+    correct_answers: template.correct_answers ?? null,
+    question_type: template.question_type || 'mc',
     explanations,
     exhibit,
     topic: template.domain,

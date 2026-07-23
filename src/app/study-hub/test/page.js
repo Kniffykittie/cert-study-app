@@ -48,6 +48,22 @@ const REAL_EXAM = {
 // Raw-% equivalents of the scaled passing scores (CompTIA/Cisco don't publish exact scaling — these approximate)
 const PASS_THRESHOLD = { ccna: 82.5, 'network-plus': 80, 'security-plus': 83.3, mixed: 82 }
 
+// Display helpers for answers (letter for MC, array for multi-select)
+function fmtAnswer(a) {
+  if (Array.isArray(a)) return a.length ? [...a].sort().join(', ') : 'No answer'
+  return a || 'No answer'
+}
+function correctDisplay(q) {
+  return q.question_type === 'multi' ? [...(q.correct_answers || [])].sort().join(', ') : q.correct
+}
+function explForResult(q) {
+  if (q.question_type === 'multi') {
+    const parts = (q.correct_answers || []).map(l => q.explanations?.[l]).filter(Boolean)
+    return parts.length ? parts.join(' ') : null
+  }
+  return q.explanations?.[q.correct] || null
+}
+
 // Honest pass-likelihood estimate: accuracy weighted by official domain %, vs the pass threshold.
 // Returns null when there isn't enough signal to be meaningful.
 function passEstimate(cert, domainBreakdown) {
@@ -374,17 +390,25 @@ function TestPageInner() {
     if (!questions || done || showPauseConfirm) return
     function handleKey(e) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      const q = questions[current]
+      const isMulti = q?.question_type === 'multi'
       const num = { '1': 0, '2': 1, '3': 2, '4': 3 }[e.key]
       if (num !== undefined) {
         const letter = letters[num]
-        if (mode === 'practice' && !revealed) setSelectedAnswer(letter)
-        if (mode === 'simulation') simSelectAnswer(letter)
-        if (mode === 'real') setAnswers(prev => ({ ...prev, [current]: letter }))
+        // Multi-select: number keys toggle the letter in/out of the array
+        const apply = (prevVal) => {
+          if (!isMulti) return letter
+          const arr = Array.isArray(prevVal) ? prevVal : []
+          return arr.includes(letter) ? arr.filter(l => l !== letter) : [...arr, letter]
+        }
+        if (mode === 'practice' && !revealed) setSelectedAnswer(prev => apply(prev))
+        if (mode === 'simulation') simSelectAnswer(apply(answers[current]))
+        if (mode === 'real') setAnswers(prev => ({ ...prev, [current]: apply(prev[current]) }))
       }
       if (e.key === 'Enter') {
         e.preventDefault()
         if (mode === 'practice') {
-          if (!revealed && selectedAnswer) submitAnswer()
+          if (!revealed && isAnswered(q, selectedAnswer)) submitAnswer()
           else if (revealed) nextQuestion()
         }
       }
@@ -544,7 +568,7 @@ function TestPageInner() {
     const q = questions[idx]
     const res = await fetch('/api/bookmarks', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cert, topic: q.topic, question_text: q.question, options: q.options, correct_answer: q.correct, explanations: q.explanations ?? {}, exhibit: q.exhibit ?? null, difficulty, reason, notes })
+      body: JSON.stringify({ cert, topic: q.topic, question_text: q.question, options: q.options, correct_answer: q.correct, correct_answers: q.correct_answers ?? null, question_type: q.question_type ?? 'mc', explanations: q.explanations ?? {}, exhibit: q.exhibit ?? null, difficulty, reason, notes })
     })
     const data = await res.json()
     if (data.id) setBookmarked(prev => ({ ...prev, [idx]: data.id }))
@@ -716,7 +740,7 @@ function TestPageInner() {
           session_id: session.id, user_id: user.id, cert, topic: q.topic,
           question_text: q.question, correct_answer: q.correct,
           user_answer: finalAnswers[i] || '', is_correct: isCorrect,
-          question_snapshot: isCorrect ? null : { question: q.question, options: q.options, correct: q.correct, topic: q.topic, explanations: q.explanations ?? {}, exhibit: q.exhibit ?? null },
+          question_snapshot: isCorrect ? null : { question: q.question, options: q.options, correct: q.correct, correct_answers: q.correct_answers ?? null, question_type: q.question_type ?? 'mc', topic: q.topic, explanations: q.explanations ?? {}, exhibit: q.exhibit ?? null },
         }
       }))
       const topicMap = {}
@@ -733,7 +757,7 @@ function TestPageInner() {
   }
 
   function submitAnswer() {
-    if (!selectedAnswer) return
+    if (!isAnswered(questions[current], selectedAnswer)) return
     setAnswers(prev => ({ ...prev, [current]: selectedAnswer }))
     setRevealed(true)
   }
@@ -1164,8 +1188,8 @@ function TestPageInner() {
                   <span style={{ color: isCorrect ? 'var(--success)' : 'var(--error)', fontWeight: '600' }}>{isCorrect ? '✓' : '✗'}</span>
                   <span style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{q.question}</span>
                 </div>
-                {!isCorrect && <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '4px' }}>Your answer: <span style={{ color: 'var(--error)' }}>{answers[i] || 'No answer'}</span> — Correct: <span style={{ color: 'var(--success)' }}>{q.correct}</span></div>}
-                {q.explanations?.[q.correct] && <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontStyle: 'italic' }}>{q.explanations[q.correct]}</div>}
+                {!isCorrect && <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '4px' }}>Your answer: <span style={{ color: 'var(--error)' }}>{fmtAnswer(answers[i])}</span> — Correct: <span style={{ color: 'var(--success)' }}>{correctDisplay(q)}</span></div>}
+                {explForResult(q) && <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontStyle: 'italic' }}>{explForResult(q)}</div>}
               </div>
             )
           })}
@@ -1334,8 +1358,8 @@ function TestPageInner() {
                 </button>
               )}
               {!revealed ? (
-                <button onClick={submitAnswer} disabled={!selectedAnswer}
-                  style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: !selectedAnswer ? 'not-allowed' : 'pointer', opacity: !selectedAnswer ? 0.5 : 1 }}>
+                <button onClick={submitAnswer} disabled={!isAnswered(q, selectedAnswer)}
+                  style={{ backgroundColor: 'var(--accent-blue)', color: '#E8E8E8', border: 'none', borderRadius: '8px', padding: '12px 28px', fontSize: '14px', fontWeight: '600', cursor: !isAnswered(q, selectedAnswer) ? 'not-allowed' : 'pointer', opacity: !isAnswered(q, selectedAnswer) ? 0.5 : 1 }}>
                   Submit Answer
                 </button>
               ) : (
