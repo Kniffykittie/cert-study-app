@@ -337,7 +337,7 @@ src/
       page.js                          Password reset landing — listens for PASSWORD_RECOVERY auth event; strength bar, match indicator, show/hide toggles; invalid/expired state if no token; redirects to /login on success
     study-hub/
       layout.js                        Study Hub layout with StudyHubSidebar + FloatingChat
-      page.js                          Overview (DailyStreak component)
+      page.js                          Overview (DailyStreak component); skeleton loader while loading; "Jump back in" resume banner for a paused test; exam countdown chip per cert card (📅 Nd, red ≤14 / yellow ≤45 / green, from profiles.exam_dates)
       ccna/page.js                     CCNA cert page (DomainTrend + Recommended Focus + Predicted Score)
       network-plus/page.js             Network+ cert page
       security-plus/page.js            Security+ cert page

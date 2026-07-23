@@ -3177,9 +3177,9 @@ This supersedes all scattered "Session N" numbering below. Detailed specs for ea
 - **S10 — Real Exam Blend + Pacing (R7 + R3)** ✅ BUILT (Phase 102) — per-cert recipe assembly (official domain weights, ~70/30 medium/hard, PBQ-first, 2-3 multi-select, exhibits, real count+timer), graceful degradation when pool can't fill (gap #15), CLI/PBQ excluded from Mixed (gap #14); pacing feedback on results (~1 min/q budget, R3); readiness signal (gap #8). Ties the exam experience together.
 
 ### BLOCK D — Rest of App (previously planned, pull forward anytime user wants a break from the track)
-- **S11 — Life Hub Home Restructure** ⬜ — recovery ring hero, single tabbed brief, zone reorder, skeleton loaders, split 971-line page (2026-07-09 audit spec).
+- **S11 — Life Hub Home Restructure** ✅ largely pre-built (Phase 91); see Phase 106 note — recovery ring hero, single tabbed brief, zone reorder, skeleton loaders, split 971-line page (2026-07-09 audit spec).
 - **S12 — Notification Schedule UI + PWA** ⬜ — settings shows/edits send times (wake/bedtime), PWA install banner.
-- **S13 — Study Hub Motivation Layer** ⬜ — exam countdown chips (exam_dates), jump-back-in row (paused test/labs/flashcards).
+- **S13 — Study Hub Motivation Layer** ✅ BUILT (Phase 106) — exam countdown chips (exam_dates), jump-back-in row (paused test/labs/flashcards).
 - **S14 — Polish Wave** ⬜ — typography, card variety, empty states, milestones, theme presets, personality layer, accessibility (ARIA/keyboard).
 
 ### PARKED (waiting on user — slot in when ready)
@@ -3394,6 +3394,15 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 106 — S13 (+ S11 note): Study Hub Motivation Layer — Complete
+- **⚠️ S11 finding:** the Life Hub home restructure is LARGELY ALREADY BUILT (Recovery Score is already an SVG ring hero with tier label + component bars; Daily Brief is already a single tabbed Morning/Afternoon/Evening card; check-in+heatmap combined) — done in Phase 91/85, superseding the stale 2026-07-09 audit spec. Did NOT rebuild. Remaining S11 = optional zone-reorder/dedup (low value now) + Life Hub skeleton loader (follow-up).
+- **Exam countdown (S13):** study-hub overview loads profiles.exam_dates; each cert card shows a 📅 countdown chip (red ≤14d, yellow ≤45d, green beyond, grey if past). daysUntil() helper.
+- **Jump-back-in (S13):** loads most recent paused_tests row; shows a "↩ Jump back in" resume banner (cert + mode + answered/total) linking to ?resume=id, above Recommended Focus.
+- **Skeleton loader:** replaced "Loading your data..." text with shimmer skeleton cards (banner + 3 cert cards + 4 stats + recent) matching final layout; sh-pulse keyframe + mobile reflow.
+- Build verified passing.
+- Files: study-hub/page.js, CLAUDE.md
+- Roadmap: S13 ✅ (exam countdown + jump-back-in + skeleton; labs/flashcards resume optional add-on); S11 ✅ (already built; Life Hub skeleton is the only small remainder)
 
 ### Phase 105 — S4: Sub-Objective Coverage Engine — Complete
 Fixes the "brand new questions on the real exam" gap by making generation span every official sub-objective.

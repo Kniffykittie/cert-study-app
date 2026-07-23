@@ -60,19 +60,33 @@ function predicted(rows, cert) {
   return den ? Math.round((num / den) * 100) : null
 }
 
+function daysUntil(dateStr) {
+  if (!dateStr) return null
+  const d = new Date(dateStr + 'T00:00:00')
+  if (isNaN(d)) return null
+  return Math.ceil((d - new Date(new Date().toDateString())) / 86400000)
+}
+
 export default function StudyHubPage() {
   const [topicPerf, setTopicPerf] = useState({})
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [streak, setStreak] = useState(0)
+  const [examDates, setExamDates] = useState({})
+  const [pausedTest, setPausedTest] = useState(null)
 
   useEffect(() => {
     async function load() {
       const supabase = createClient()
-      const [{ data: perf }, { data: sess }] = await Promise.all([
+      const { data: { user } } = await supabase.auth.getUser()
+      const [{ data: perf }, { data: sess }, { data: profile }, { data: paused }] = await Promise.all([
         supabase.from('topic_performance').select('cert, topic, total_seen, total_correct, last_seen'),
-        supabase.from('test_sessions').select('cert, score_pct, total_questions, correct, completed_at').order('completed_at', { ascending: false }).limit(20)
+        supabase.from('test_sessions').select('cert, score_pct, total_questions, correct, completed_at').order('completed_at', { ascending: false }).limit(20),
+        user ? supabase.from('profiles').select('exam_dates').eq('id', user.id).single() : Promise.resolve({ data: null }),
+        supabase.from('paused_tests').select('id, cert, mode, total_questions, answered_count, paused_at').order('paused_at', { ascending: false }).limit(1).maybeSingle(),
       ])
+      if (profile?.exam_dates) setExamDates(profile.exam_dates)
+      if (paused) setPausedTest(paused)
 
       const grouped = {}
       for (const row of perf ?? []) {
@@ -124,10 +138,22 @@ export default function StudyHubPage() {
   const worstTopic = allWeak[0] ?? null
 
   if (loading) {
+    const shimmer = { backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', animation: 'sh-pulse 1.4s ease-in-out infinite' }
     return (
       <div>
-        <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Study Hub</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Loading your data...</p>
+        <style>{`@keyframes sh-pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.5 } } @media (max-width:768px){ .sk-cert{ grid-template-columns:1fr !important } .sk-stats{ grid-template-columns:repeat(2,1fr) !important } }`}</style>
+        <div style={{ marginBottom: '24px' }}>
+          <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Study Hub</h1>
+          <p style={{ color: 'var(--text-secondary)' }}>Your cert readiness command center.</p>
+        </div>
+        <div style={{ ...shimmer, height: '72px', marginBottom: '24px' }} />
+        <div className="sk-cert" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
+          {[0, 1, 2].map(i => <div key={i} style={{ ...shimmer, height: '150px' }} />)}
+        </div>
+        <div className="sk-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' }}>
+          {[0, 1, 2, 3].map(i => <div key={i} style={{ ...shimmer, height: '68px' }} />)}
+        </div>
+        <div style={{ ...shimmer, height: '180px' }} />
       </div>
     )
   }
@@ -149,6 +175,22 @@ export default function StudyHubPage() {
         <h1 style={{ color: 'var(--accent-blue)', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Study Hub</h1>
         <p style={{ color: 'var(--text-secondary)' }}>Your cert readiness command center.</p>
       </div>
+
+      {/* Jump back in — resume a paused test */}
+      {pausedTest && (
+        <Link href={`/study-hub/test?resume=${pausedTest.id}`} style={{ textDecoration: 'none' }}>
+          <div style={{ backgroundColor: 'rgba(241,196,15,0.08)', border: '1px solid var(--warning-border)', borderLeft: '4px solid var(--warning)', borderRadius: '10px', padding: '14px 20px', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', cursor: 'pointer' }}>
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--warning)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '3px' }}>↩ Jump back in</div>
+              <div style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600' }}>
+                Resume your {CERT_LABELS[pausedTest.cert] ?? 'Mixed'} {{ practice: 'practice test', simulation: 'simulation', real: 'real exam' }[pausedTest.mode] ?? 'test'}
+                <span style={{ color: 'var(--text-secondary)', fontWeight: '400' }}> — {pausedTest.answered_count}/{pausedTest.total_questions} answered</span>
+              </div>
+            </div>
+            <span style={{ backgroundColor: 'var(--warning)', color: '#0D0D0D', borderRadius: '8px', padding: '9px 16px', fontSize: '13px', fontWeight: '700', whiteSpace: 'nowrap' }}>Resume →</span>
+          </div>
+        </Link>
+      )}
 
       {/* Recommended Focus — top of page */}
       {worstTopic && (() => {
@@ -190,7 +232,16 @@ export default function StudyHubPage() {
               >
                 <div className="sh-cert-card-inner" style={{ display: 'flex', flexDirection: 'column' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color, fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>{CERT_LABELS[cert]}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ color, fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>{CERT_LABELS[cert]}</div>
+                      {(() => {
+                        const d = daysUntil(examDates[cert])
+                        if (d == null) return null
+                        const cc = d < 0 ? 'var(--text-secondary)' : d <= 14 ? 'var(--error)' : d <= 45 ? 'var(--warning)' : 'var(--success)'
+                        const txt = d < 0 ? 'past' : d === 0 ? 'today!' : d === 1 ? 'tomorrow' : `${d}d`
+                        return <span style={{ fontSize: '11px', fontWeight: '700', color: cc, backgroundColor: `${cc}18`, border: `1px solid ${cc}40`, borderRadius: '4px', padding: '2px 7px', whiteSpace: 'nowrap', flexShrink: 0 }}>📅 {txt}</span>
+                      })()}
+                    </div>
                     <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{CERT_FULL[cert]}</div>
                     <div className="sh-cert-score" style={{ color: accColor, fontSize: '36px', fontWeight: '800', lineHeight: 1, marginBottom: '8px' }}>
                       {acc !== null ? `${acc}%` : '—'}
