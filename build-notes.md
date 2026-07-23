@@ -3399,6 +3399,11 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 110 — Settings notifications: remove duplicate brief-time entry — Complete
+- **Problem:** the notifications tab asked for wake/bedtime AND showed a preview list of the three brief send times, while (since Phase 108) each brief also has its own time picker below — so brief times appeared/were-asked in two places, which read as double entry.
+- **Fix:** kept wake/bedtime (renamed the card "Wake & Bedtime") since it anchors the DEFAULT time for all 10 notifications, but removed the redundant computed brief-times preview box. Reworded the copy to clarify wake/bedtime sets defaults you can override per-notification below.
+- Files: settings/page.js, CLAUDE.md
+
 ### Phase 109 — Timezone auto-follow (travel) + timezone audit — Complete
 - **Problem:** `profiles.timezone` (used by the daily-push Edge Function to fire notifications at local time) was only written when the user saved their schedule / a notification time — a stale snapshot that would NOT follow the user if they travelled to another state/country. Notifications would keep firing on the old timezone until a manual re-save.
 - **Fix:** new app-wide `TimezoneSync.js` mounted in the root layout. On every app open it reads the device's current `Intl.DateTimeFormat().resolvedOptions().timeZone`, compares to the stored `profiles.timezone`, and updates only when they differ. So opening the app once after landing re-points all notifications to the new local time automatically.

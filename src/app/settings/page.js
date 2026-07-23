@@ -835,7 +835,7 @@ function SettingsPageInner() {
               {notifMsg && <p style={{ color: notifMsg.startsWith('Failed') ? 'var(--error)' : 'var(--success)', fontSize: '12px', marginTop: '8px' }}>{notifMsg}</p>}
               {notifSubscribed && (
                 <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '10px' }}>
-                  Timing is based on your wake time and bedtime from Goals setup. Toggles below control what gets sent.
+                  Toggles below control what gets sent; each has its own time (defaulting from your wake &amp; bedtime).
                   {prefsSaving && <span style={{ marginLeft: 8, color: 'var(--accent-blue)' }}>Saving…</span>}
                 </p>
               )}
@@ -844,8 +844,8 @@ function SettingsPageInner() {
             {/* Schedule — set wake/bedtime, see computed send times */}
             {notifSubscribed && (
               <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-                <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Schedule</h2>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 16px' }}>Your brief times are based on when you wake and sleep. Set them here (also used across your plan).</p>
+                <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Wake &amp; Bedtime</h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 16px' }}>These anchor the <strong>default</strong> send time for every notification (e.g. morning brief at wake, evening wrap an hour before bed, hydration mid-day). You can override any individual notification&apos;s time below. Also used across your plan.</p>
                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' }}>
                   <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <span style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600' }}>🌅 Wake time</span>
@@ -857,18 +857,6 @@ function SettingsPageInner() {
                     <input type="time" value={bedtime} onChange={e => setBedtime(e.target.value)}
                       style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', colorScheme: 'dark' }} />
                   </label>
-                </div>
-                <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '12px 14px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {[
-                    ['🌅 Morning Brief', wakeTime ? fmt12(wakeTime) : 'set wake time'],
-                    ['☀️ Midday Check-in', wakeTime ? fmt12(addMinutes(wakeTime, 360)) : 'set wake time'],
-                    ['🌙 Evening Wrap', bedtime ? fmt12(addMinutes(bedtime, -60)) : 'set bedtime'],
-                  ].map(([label, time]) => (
-                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
-                      <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{time}</span>
-                    </div>
-                  ))}
                 </div>
                 <button onClick={saveSchedule} disabled={!wakeTime && !bedtime}
                   style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 20px', fontSize: '13px', fontWeight: '600', cursor: (!wakeTime && !bedtime) ? 'not-allowed' : 'pointer', opacity: (!wakeTime && !bedtime) ? 0.5 : 1 }}>
