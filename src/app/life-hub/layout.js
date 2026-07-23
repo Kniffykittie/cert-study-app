@@ -3,6 +3,7 @@ import LifeHubClientShell from '@/components/LifeHubClientShell'
 import HealthSyncBar from '@/components/HealthSyncBar'
 import LifeHubBottomNav from '@/components/LifeHubBottomNav'
 import Toast from '@/components/Toast'
+import PwaInstallBanner from '@/components/PwaInstallBanner'
 
 export default function LifeHubLayout({ children }) {
   return (
@@ -22,6 +23,7 @@ export default function LifeHubLayout({ children }) {
       <HealthSyncBar />
       <LifeHubBottomNav />
       <Toast />
+      <PwaInstallBanner />
     </>
   )
 }

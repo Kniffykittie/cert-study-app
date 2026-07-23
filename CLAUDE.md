@@ -396,6 +396,7 @@ src/
         config.toml                      verify_jwt = false
     study/AnswerArea.js                Shared answer-rendering surface for the test flow — dispatches on question_type (mc/multi/ordering/matching/cli); one component for all 4 states via revealed + explanationScope + verboseMarks props; ordering=tap-to-sequence, matching=lettered picker, cli=terminal transcript (Enter runs each line, prompt evolves by mode via iosCliEngine), all show rationale on reveal; new question types add a branch here
     QuestionExhibit.js                 Renders question exhibits (topology diagram via LabTopology + monospace CLI/config block, both horizontally scrollable); used in test page (all 3 question views), study mode, bookmarks expanded view
+    PwaInstallBanner.js                Dismissible install-to-home-screen banner (captures beforeinstallprompt; iOS shows manual Share→Add instructions); once-dismissed via localStorage; mounted in life-hub layout; improves push reliability
     Toast.js                           Shared toast notifications — exports showToast(message, type); mounted in both hub layouts; success (green ✓, 2.2s) and error (red ✕, 4.5s) variants; fired via 'app-toast' CustomEvent
     InfoChip.js                        Reusable ℹ️ education chip — grey pill, orange when active, toggles inline callout; props: text, label (default "ℹ️"), style; used at 11 touchpoints across 8 pages for domain-knowledge data points
     BookmarkModal.js                   Bookmark reason + notes modal

@@ -24,6 +24,20 @@ const TABS = [
   { key: 'danger', label: '⚠ Danger Zone' },
 ]
 
+function fmt12(hhmm) {
+  if (!hhmm) return '—'
+  const [h, m] = hhmm.split(':').map(Number)
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
+}
+function addMinutes(hhmm, mins) {
+  if (!hhmm) return ''
+  const [h, m] = hhmm.split(':').map(Number)
+  let total = (h * 60 + m + mins + 1440) % 1440
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
 const NOTIF_TYPES = [
   {
     group: 'DAILY BRIEFS',
@@ -71,6 +85,10 @@ function SettingsPageInner() {
   const [notifSubscribed, setNotifSubscribed] = useState(false)
   const [notifLoading, setNotifLoading] = useState(false)
   const [notifMsg, setNotifMsg] = useState('')
+  const [wakeTime, setWakeTime] = useState('')
+  const [bedtime, setBedtime] = useState('')
+  const [hasGoalsProfile, setHasGoalsProfile] = useState(false)
+  const [scheduleSaved, setScheduleSaved] = useState(false)
   const [notifPrefs, setNotifPrefs] = useState({
     morning_brief: true, midday_checkin: true, evening_wrap: true,
     workout_reminder: false, hydration_nudge: false, study_streak: false,
@@ -153,6 +171,13 @@ function SettingsPageInner() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       setEmail(user.email)
+      supabase.from('goals_profiles').select('wake_time, bedtime').eq('user_id', user.id).maybeSingle().then(({ data: gp }) => {
+        if (gp) {
+          if (gp.wake_time) setWakeTime(gp.wake_time.slice(0, 5))
+          if (gp.bedtime) setBedtime(gp.bedtime.slice(0, 5))
+          setHasGoalsProfile(true)
+        }
+      })
       const { data } = await supabase.from('profiles').select('display_name, exam_dates, daily_goal, default_cert, settings_pin_hash, authenticator_name, notification_preferences').eq('id', user.id).single()
       if (data) {
         if (data.display_name) { setDisplayName(data.display_name); setSavedName(data.display_name) }
@@ -259,6 +284,24 @@ function SettingsPageInner() {
       setNotifMsg(`Failed to enable notifications: ${err?.message || 'unknown error'}`)
     }
     setNotifLoading(false)
+  }
+
+  async function saveSchedule() {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const patch = {}
+    if (wakeTime) patch.wake_time = wakeTime + ':00'
+    if (bedtime) patch.bedtime = bedtime + ':00'
+    if (!Object.keys(patch).length) return
+    if (hasGoalsProfile) {
+      await supabase.from('goals_profiles').update(patch).eq('user_id', user.id)
+    } else {
+      await supabase.from('goals_profiles').upsert({ user_id: user.id, ...patch }, { onConflict: 'user_id' })
+      setHasGoalsProfile(true)
+    }
+    setScheduleSaved(true)
+    setTimeout(() => setScheduleSaved(false), 2500)
   }
 
   async function handleTogglePref(key) {
@@ -751,6 +794,42 @@ function SettingsPageInner() {
                 </p>
               )}
             </div>
+
+            {/* Schedule — set wake/bedtime, see computed send times */}
+            {notifSubscribed && (
+              <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+                <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Schedule</h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 16px' }}>Your brief times are based on when you wake and sleep. Set them here (also used across your plan).</p>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600' }}>🌅 Wake time</span>
+                    <input type="time" value={wakeTime} onChange={e => setWakeTime(e.target.value)}
+                      style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', colorScheme: 'dark' }} />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '600' }}>🌙 Bedtime</span>
+                    <input type="time" value={bedtime} onChange={e => setBedtime(e.target.value)}
+                      style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', colorScheme: 'dark' }} />
+                  </label>
+                </div>
+                <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '12px 14px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {[
+                    ['🌅 Morning Brief', wakeTime ? fmt12(wakeTime) : 'set wake time'],
+                    ['☀️ Midday Check-in', wakeTime ? fmt12(addMinutes(wakeTime, 360)) : 'set wake time'],
+                    ['🌙 Evening Wrap', bedtime ? fmt12(addMinutes(bedtime, -60)) : 'set bedtime'],
+                  ].map(([label, time]) => (
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{time}</span>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={saveSchedule} disabled={!wakeTime && !bedtime}
+                  style={{ backgroundColor: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 20px', fontSize: '13px', fontWeight: '600', cursor: (!wakeTime && !bedtime) ? 'not-allowed' : 'pointer', opacity: (!wakeTime && !bedtime) ? 0.5 : 1 }}>
+                  {scheduleSaved ? '✓ Saved' : 'Save Schedule'}
+                </button>
+              </div>
+            )}
 
             {/* Preference toggles — only shown when subscribed */}
             {notifSubscribed && NOTIF_TYPES.map(group => (

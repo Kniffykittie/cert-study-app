@@ -3178,7 +3178,7 @@ This supersedes all scattered "Session N" numbering below. Detailed specs for ea
 
 ### BLOCK D — Rest of App (previously planned, pull forward anytime user wants a break from the track)
 - **S11 — Life Hub Home Restructure** ✅ largely pre-built (Phase 91); see Phase 106 note — recovery ring hero, single tabbed brief, zone reorder, skeleton loaders, split 971-line page (2026-07-09 audit spec).
-- **S12 — Notification Schedule UI + PWA** ⬜ — settings shows/edits send times (wake/bedtime), PWA install banner.
+- **S12 — Notification Schedule UI + PWA** ✅ BUILT (Phase 107) — settings shows/edits send times (wake/bedtime), PWA install banner.
 - **S13 — Study Hub Motivation Layer** ✅ BUILT (Phase 106) — exam countdown chips (exam_dates), jump-back-in row (paused test/labs/flashcards).
 - **S14 — Polish Wave** ⬜ — typography, card variety, empty states, milestones, theme presets, personality layer, accessibility (ARIA/keyboard).
 
@@ -3394,6 +3394,13 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 107 — S12: Notification Schedule UI + PWA Install Banner — Complete
+- **Schedule card (Settings → Notifications):** wake time + bedtime pickers writing to goals_profiles (update if profile exists, else upsert); shows the computed send times live (Morning = wake, Midday = wake+6h, Evening = bedtime−1h) in 12-hour format. Fixes the NULL wake/bedtime problem that made notifications fire at default 4 AM / 6 PM EST — now settable outside the 5-step Goals Setup. fmt12/addMinutes helpers.
+- **PWA install banner:** new `PwaInstallBanner.js` — captures `beforeinstallprompt`, shows a dismissible bottom banner ("Add to home screen for reliable notifications"); iOS Safari (no beforeinstallprompt) gets manual Share→Add instructions; once-dismissed persisted in localStorage; hidden when already standalone; mounted in life-hub layout.
+- Build verified passing.
+- Files: settings/page.js, components/PwaInstallBanner.js (new), life-hub/layout.js, CLAUDE.md
+- Roadmap: S12 ✅
 
 ### Phase 106 — S13 (+ S11 note): Study Hub Motivation Layer — Complete
 - **⚠️ S11 finding:** the Life Hub home restructure is LARGELY ALREADY BUILT (Recovery Score is already an SVG ring hero with tier label + component bars; Daily Brief is already a single tabbed Morning/Afternoon/Evening card; check-in+heatmap combined) — done in Phase 91/85, superseding the stale 2026-07-09 audit spec. Did NOT rebuild. Remaining S11 = optional zone-reorder/dedup (low value now) + Life Hub skeleton loader (follow-up).
