@@ -3,7 +3,8 @@
 // Replaces the 4 inline option blocks (practice-reveal, simulation, real, results-review).
 // Types: 'mc' (single letter), 'multi' (checkbox, all-or-nothing), 'ordering' (tap-to-sequence),
 // 'matching' (lettered picker). Future: 'cli'.
-import { useMemo } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
+import { runCli, correctCliSequence } from '@/lib/iosCliEngine'
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F']
 
@@ -33,6 +34,9 @@ export default function AnswerArea({ question, value, onChange, revealed = false
   }
   if (type === 'matching') {
     return <MatchingQuestion question={question} value={value} onChange={onChange} revealed={revealed} />
+  }
+  if (type === 'cli') {
+    return <CliQuestion question={question} value={value} onChange={onChange} revealed={revealed} />
   }
   if (type === 'mc') {
     return <MCOptions question={question} value={value} onChange={onChange} revealed={revealed} explanationScope={explanationScope} verboseMarks={verboseMarks} />
@@ -89,6 +93,78 @@ function OrderingQuestion({ question, value, onChange, revealed }) {
         </div>
       )}
       {revealed && <Rationale text={question.rationale} />}
+    </div>
+  )
+}
+
+function CliQuestion({ question, value, onChange, revealed }) {
+  const lines = Array.isArray(value) ? value : []
+  const [input, setInput] = useState('')
+  const scrollRef = useRef(null)
+  const payload = question.type_payload || {}
+  const run = runCli(payload, lines)
+  const selectable = !revealed && typeof onChange === 'function'
+
+  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight }, [lines.length])
+
+  function submitLine() {
+    if (!selectable) return
+    onChange([...lines, input])
+    setInput('')
+  }
+
+  const mono = 'ui-monospace, SFMono-Regular, Menlo, monospace'
+  return (
+    <div>
+      {!revealed && <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 8px' }}>Type IOS commands. Press Enter after each one — the prompt changes as you move between modes. Then Submit.</p>}
+      <div ref={scrollRef} style={{ backgroundColor: '#0a0a14', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 14px', fontFamily: mono, fontSize: '13px', lineHeight: '1.6', maxHeight: '300px', overflowY: 'auto' }}>
+        {run.steps.map((s, i) => (
+          <div key={i}>
+            <div style={{ color: '#7ee787', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              <span style={{ color: '#6ab0ff' }}>{s.prompt}</span>{s.raw}
+            </div>
+            {s.error && <div style={{ color: '#ff7b72', whiteSpace: 'pre-wrap' }}>{s.error}</div>}
+          </div>
+        ))}
+        {!revealed && (
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <span style={{ color: '#6ab0ff', flexShrink: 0 }}>{run.prompt}</span>
+            <input value={input} onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitLine() } }}
+              autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#7ee787', fontFamily: mono, fontSize: '13px', padding: '0 0 0 2px' }} />
+          </div>
+        )}
+      </div>
+
+      {!revealed && (
+        <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+          <button onClick={submitLine} disabled={!input.trim()}
+            style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 14px', color: 'var(--text-secondary)', fontSize: '12px', cursor: input.trim() ? 'pointer' : 'default', opacity: input.trim() ? 1 : 0.5 }}>↵ Run line</button>
+          {lines.length > 0 && (
+            <button onClick={() => onChange(lines.slice(0, -1))}
+              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 14px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>⌫ Undo last</button>
+          )}
+        </div>
+      )}
+
+      {revealed && (
+        <>
+          <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <span style={{ color: run.correct ? 'var(--success)' : 'var(--error)', fontWeight: '700', fontSize: '14px' }}>
+              {run.correct ? '✓ Configuration goal met' : '✗ Goal not met'}
+            </span>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+              {run.satisfied.filter(Boolean).length}/{run.goals.length} required commands entered correctly
+            </span>
+          </div>
+          <div style={{ marginTop: '10px', padding: '10px 14px', backgroundColor: 'rgba(46,204,113,0.05)', border: '1px solid var(--success-border)', borderRadius: '8px' }}>
+            <div style={{ color: 'var(--success)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', marginBottom: '6px' }}>Correct commands</div>
+            <pre style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.55, fontFamily: mono, whiteSpace: 'pre-wrap' }}>{correctCliSequence(payload).join('\n')}</pre>
+          </div>
+          <Rationale text={question.rationale} />
+        </>
+      )}
     </div>
   )
 }

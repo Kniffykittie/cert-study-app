@@ -37,6 +37,11 @@ export function fillTemplate(template) {
     if (Array.isArray(p.items)) typePayload.items = p.items.map(s => fill(String(s), vars))
     if (Array.isArray(p.terms)) typePayload.terms = p.terms.map(s => fill(String(s), vars))
     if (Array.isArray(p.defs)) typePayload.defs = p.defs.map(s => fill(String(s), vars))
+    if (Array.isArray(p.goal)) typePayload.goal = p.goal.map(g => ({
+      ...g,
+      cmd: g.cmd ? fill(String(g.cmd), vars) : g.cmd,
+      accept: Array.isArray(g.accept) ? g.accept.map(a => fill(String(a), vars)) : g.accept,
+    }))
   }
 
   return {

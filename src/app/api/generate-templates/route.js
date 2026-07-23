@@ -93,6 +93,14 @@ PERFORMANCE-BASED (PBQ-lite) — the real exams open with drag/drop ordering and
 - MATCHING: "question_type": "matching", "type_payload": { "terms": ["t1","t2",...], "defs": ["d1","d2",...] } where defs[i] is the correct match for terms[i] (parallel arrays, 3-5 pairs). Provide a "rationale". No options/correct_answer needed.
 - PBQs use "rationale" (a single explanation), NOT per-letter "explanations".
 
+CLI SIMULATION (CCNA ONLY — the real exam has live device configuration; make AT MOST 1 of every ${count} a CLI task for config-heavy CCNA domains like IP Connectivity, Network Access, IP Services):
+- "question_type": "cli", "type_payload": { "hostname": "R1", "starting_mode": "user_exec", "goal": [ ...ordered command objects... ] }
+- Each goal object: transition commands use { "cmd": "enable", "type": "transition" } (enable, configure terminal, interface X, router X, line X, vlan N). Config commands use { "cmd": "ip address 10.1.1.1 255.255.255.0", "type": "config", "mode": "interface_config" }.
+- Modes: user_exec, priv_exec, global_config, interface_config, router_config, line_config, vlan_config.
+- ALWAYS include the full navigation path (enable → configure terminal → interface ... ) as transition goals so the student practices mode changes. The engine rejects config commands typed in the wrong mode.
+- Provide a "rationale" explaining what the config accomplishes. NO options/correct_answer/explanations.
+- The stem should state the goal clearly (e.g. "Configure GigabitEthernet0/0 on R1 with 10.1.1.1/24 and enable the interface.").
+
 Return a JSON array of exactly ${count} template objects. Each object must have:
 {
   "question_template": "string with {{placeholders}}",
@@ -137,10 +145,10 @@ Return ONLY the JSON array, no markdown, no explanation.`
       question_template: t.question_template,
       variable_sets: t.variable_sets || [],
       options_templates: t.options_templates || [],
-      correct_answer: ['ordering', 'matching'].includes(t.question_type) ? null : t.correct_answer,
-      question_type: ['multi', 'ordering', 'matching'].includes(t.question_type) ? t.question_type : 'mc',
+      correct_answer: ['ordering', 'matching', 'cli'].includes(t.question_type) ? null : t.correct_answer,
+      question_type: ['multi', 'ordering', 'matching', 'cli'].includes(t.question_type) ? t.question_type : 'mc',
       correct_answers: t.question_type === 'multi' ? (t.correct_answers || null) : null,
-      type_payload: ['ordering', 'matching'].includes(t.question_type) ? (t.type_payload || null) : null,
+      type_payload: ['ordering', 'matching', 'cli'].includes(t.question_type) ? (t.type_payload || null) : null,
       rationale: t.rationale || null,
       explanations: t.explanations || {},
       exhibit: t.exhibit || null,

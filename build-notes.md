@@ -3171,7 +3171,7 @@ This supersedes all scattered "Session N" numbering below. Detailed specs for ea
 - **S6 — QuestionBody + scoreAnswer Refactor** ✅ BUILT (Phase 98) — extract one `<QuestionBody>` component (switch on question_type) replacing all 3 inline render paths + pure `scoreAnswer(q, answer)` used by saveResults AND live scoring; make answers-map + resume tolerate non-string values. INVISIBLE to user. FULL regression of every existing flow (checklist). Foundation — blocks S7-S9.
 - **S7 — Multi-select / "Choose two" (R5)** ✅ BUILT (Phase 99) — `correct_answers TEXT[]` (null=legacy); checkbox UI; exact-set (all-or-nothing) scoring; carries through snapshots/bookmarks/resume.
 - **S8 — PBQ-lite (R6)** ✅ BUILT (Phase 100) — `question_type` ordering + matching; `type_payload JSONB`; tap-to-place (no drag) for mobile; `rationale` explanation (concern #3).
-- **S9 — CCNA CLI Mode Engine (R8, Tier 1.5)** ⬜ — `src/lib/iosCliEngine.js` (mode state machine + command table + abbrev expansion + replay grading); terminal-transcript UI (Enter runs line, prompt evolves, mode practice enforced via wrong-mode rejection); per-command rationale. Biggest single build. Desktop-recommended banner + mobile hints (UX gap #18). Disable global 1-4/Enter handler when CLI focused.
+- **S9 — CCNA CLI Mode Engine (R8, Tier 1.5)** ✅ BUILT (Phase 101) — `src/lib/iosCliEngine.js` (mode state machine + command table + abbrev expansion + replay grading); terminal-transcript UI (Enter runs line, prompt evolves, mode practice enforced via wrong-mode rejection); per-command rationale. Biggest single build. Desktop-recommended banner + mobile hints (UX gap #18). Disable global 1-4/Enter handler when CLI focused.
 
 ### BLOCK C — Real Exam Experience (needs all formats to exist)
 - **S10 — Real Exam Blend + Pacing (R7 + R3)** ⬜ — per-cert recipe assembly (official domain weights, ~70/30 medium/hard, PBQ-first, 2-3 multi-select, exhibits, real count+timer), graceful degradation when pool can't fill (gap #15), CLI/PBQ excluded from Mixed (gap #14); pacing feedback on results (~1 min/q budget, R3); readiness signal (gap #8). Ties the exam experience together.
@@ -3394,6 +3394,21 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 101 — S9: CCNA CLI Mode Engine (Tier 1.5) — Complete
+- **`src/lib/iosCliEngine.js` (new):** mode state machine (user_exec/priv_exec/global/interface/router/line/vlan config) + prompt rendering + IOS abbreviation expansion (PHRASE_RULES: en, conf t, int, no shut, ip add, etc.) + interface-name canonicalization (gi/g/gig→GigabitEthernet) + replay grading. `runCli(payload, lines)` returns transcript steps (prompt+error per line), current mode/prompt, satisfied goals, correct. Grades by mode-aware replay: config commands typed in the wrong mode are REJECTED with a real IOS-style error → skipping enable/conf t/interface fails the question → forces navigation practice. Does NOT simulate the network (documented).
+- **UNIT-VERIFIED** before shipping: abbreviations correct=true, full-form correct=true, skip conf t → interface-from-priv errors + question fails, skip enable → fails, normalization expands + canonicalizes correctly.
+- **scoreAnswer:** cli branch → runCli(...).correct; isAnswered = ≥1 non-empty line.
+- **AnswerArea CliQuestion:** terminal transcript (dark, monospace, green-on-black), single input line where Enter runs the command and appends to transcript with evolving prompt; "Run line" + "Undo last" buttons; global 1-4/Enter shortcuts naturally bypassed (handler ignores INPUT); reveal shows goal-met + N/total commands + correct sequence + rationale.
+- **fillTemplate:** fills {{placeholders}} inside type_payload.goal[].cmd + accept (so CLI questions can randomize IPs/interfaces).
+- **test/page.js:** results helpers handle cli; snapshot + bookmark already carry type_payload + rationale (S8).
+- **Bookmarks page:** CLI correct-command sequence + rationale shown.
+- **Generator:** prompt documents cli schema (≤1 per batch, config-heavy CCNA domains, full navigation path as transition goals); insert maps cli type_payload.
+- **1 seed template:** CCNA IP Connectivity — configure GigabitEthernet0/0 IP + no shutdown (randomized IP/mask via variable_sets).
+- Build verified passing. Regression: mc/multi/ordering/matching unchanged; CLI input isolates its own Enter (no question-advance conflict).
+- **Honest boundary (documented):** grades mode navigation + commands, not simulated device state; `show` output not reflective; edge-case abbreviations covered by per-goal `accept` escape hatch.
+- Files: iosCliEngine.js (new), scoreAnswer.js, fillTemplate.js, components/study/AnswerArea.js, study-hub/test/page.js, study-hub/bookmarks/page.js, api/generate-templates/route.js, CLAUDE.md
+- Roadmap: S9 ✅
 
 ### Phase 100 — S8: PBQ-lite (Ordering + Matching Question Types) — Complete
 - **Migration:** `type_payload JSONB` + `rationale TEXT` on question_templates AND bookmarked_questions.

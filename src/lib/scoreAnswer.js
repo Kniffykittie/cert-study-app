@@ -1,6 +1,7 @@
 // Central answer scoring — single source of truth for correctness across the test flow.
 // Dispatches on question.question_type so new types (multi-select, cli, ordering, matching)
 // add one branch here instead of touching every scoring site.
+import { runCli } from '@/lib/iosCliEngine'
 
 export function isAnswered(question, answer) {
   const type = question?.question_type || 'mc'
@@ -13,6 +14,7 @@ export function isAnswered(question, answer) {
     const n = question?.type_payload?.terms?.length ?? 0
     return Array.isArray(answer) && answer.length === n && n > 0 && answer.every(x => x != null && x !== '')
   }
+  if (type === 'cli') return Array.isArray(answer) && answer.some(l => (l || '').trim() !== '')
   return answer !== undefined && answer !== null && answer !== ''
 }
 
@@ -43,7 +45,8 @@ export function scoreAnswer(question, answer) {
       if (answer.length !== terms.length) return false
       return terms.every((_, i) => answer[i] === defs[i])
     }
-    // future: 'cli' (via iosCliEngine)
+    case 'cli':
+      return runCli(question.type_payload || {}, Array.isArray(answer) ? answer : []).correct
     case 'mc':
     default:
       return answer != null && answer === question.correct

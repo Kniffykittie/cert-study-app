@@ -51,19 +51,21 @@ const PASS_THRESHOLD = { ccna: 82.5, 'network-plus': 80, 'security-plus': 83.3, 
 // Display helpers for answers (letter for MC, array for multi/ordering, term→def for matching)
 function fmtAnswer(a, q) {
   const type = q?.question_type || 'mc'
+  if (type === 'cli') return Array.isArray(a) && a.some(l => (l || '').trim()) ? 'see terminal' : 'No answer'
   if (type === 'ordering') return Array.isArray(a) && a.length ? a.join(' → ') : 'No answer'
   if (type === 'matching') return Array.isArray(a) && a.some(x => x != null) ? 'see below' : 'No answer'
   if (Array.isArray(a)) return a.length ? [...a].sort().join(', ') : 'No answer'
   return a || 'No answer'
 }
 function correctDisplay(q) {
+  if (q.question_type === 'cli') return (q.type_payload?.goal || []).map(g => g.cmd).join('; ')
   if (q.question_type === 'ordering') return (q.type_payload?.items || []).join(' → ')
   if (q.question_type === 'matching') return (q.type_payload?.terms || []).map((t, i) => `${t} = ${q.type_payload.defs[i]}`).join('; ')
   if (q.question_type === 'multi') return [...(q.correct_answers || [])].sort().join(', ')
   return q.correct
 }
 function explForResult(q) {
-  if (q.question_type === 'ordering' || q.question_type === 'matching') return q.rationale || null
+  if (q.question_type === 'ordering' || q.question_type === 'matching' || q.question_type === 'cli') return q.rationale || null
   if (q.question_type === 'multi') {
     const parts = (q.correct_answers || []).map(l => q.explanations?.[l]).filter(Boolean)
     return parts.length ? parts.join(' ') : null
