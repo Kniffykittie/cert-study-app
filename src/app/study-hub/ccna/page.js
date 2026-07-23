@@ -33,10 +33,12 @@ export default function CCNAPage() {
   useEffect(() => {
     async function load() {
       const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setLoading(false); return }
       const [{ data: perf }, { data: sess }, { data: realSess }] = await Promise.all([
-        supabase.from('topic_performance').select('topic, total_seen, total_correct, last_seen').eq('cert', CERT),
-        supabase.from('test_sessions').select('score_pct, total_questions, correct, completed_at').eq('cert', CERT).order('completed_at', { ascending: false }).limit(50),
-        supabase.from('test_sessions').select('score_pct, total_questions').eq('cert', CERT).eq('mode', 'real').order('score_pct', { ascending: false }).limit(1)
+        supabase.from('topic_performance').select('topic, total_seen, total_correct, last_seen').eq('user_id', user.id).eq('cert', CERT),
+        supabase.from('test_sessions').select('score_pct, total_questions, correct, completed_at').eq('user_id', user.id).eq('cert', CERT).order('completed_at', { ascending: false }).limit(50),
+        supabase.from('test_sessions').select('score_pct, total_questions').eq('user_id', user.id).eq('cert', CERT).eq('mode', 'real').order('score_pct', { ascending: false }).limit(1)
       ])
       setTopicRows(perf ?? [])
       setSessions(sess ?? [])

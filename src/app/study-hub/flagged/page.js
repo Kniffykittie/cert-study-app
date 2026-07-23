@@ -23,9 +23,12 @@ export default function FlaggedPage() {
 
   async function load() {
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setLoading(false); return }
     const { data } = await supabase
       .from('flagged_questions')
       .select('*')
+      .eq('user_id', user.id)
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
     setItems(data ?? [])

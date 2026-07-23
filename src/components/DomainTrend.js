@@ -9,9 +9,12 @@ export default function DomainTrend({ cert }) {
   useEffect(() => {
     async function load() {
       const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
       const { data: answers } = await supabase
         .from('question_answers')
         .select('topic, is_correct, answered_at')
+        .eq('user_id', user.id)
         .eq('cert', cert)
         .order('answered_at', { ascending: true })
 

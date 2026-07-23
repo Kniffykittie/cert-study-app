@@ -3401,6 +3401,15 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 127 — #10 defense-in-depth user_id on reads + #2 plan captured — Complete
+- **#10 — explicit `user_id` on authenticated reads (defense-in-depth).** Motivated by the `question_templates` RLS gap we just found: if RLS is ever misconfigured, an explicit filter is the backstop. Added `getUser()` + `.eq('user_id', user.id)` to: cert pages (ccna/network-plus/security-plus — topic_performance + 2× test_sessions each), `DomainTrend` (question_answers), flagged page load (flagged_questions). Progress page already had it. RLS remains the primary guard; this is belt-and-suspenders.
+- **#2 shared-cache hardening — plan captured for the nutrition/Life Hub audit:**
+  - `nutrient_profiles` (encyclopedia — FINITE nutrient list): owner generates all profiles once (folds into Generation Day), then lock INSERT/UPDATE to owner (like flashcards/question_templates). Everyone reads the same locked rows.
+  - `ai_food_intel_cache` (food-keyed — OPEN-ENDED, on-demand): can't pre-generate all foods; instead switch the `ai-food-intel` route to write via the service-role client and lock RLS to deny direct client writes. Cache still fills on demand through the trusted server route.
+- Note: flagged page `replace`/`saveEdit` write `question_templates`; now correctly blocked for non-owners by Phase 123 RLS (owner still works). Should gate those buttons to owner in a later UI polish pass.
+- Build verified passing.
+- Files: study-hub/ccna|network-plus|security-plus/page.js, components/DomainTrend.js, study-hub/flagged/page.js
+
 ### Phase 126 — Audit follow-ups: prompt sanitizer, exam timer resume, flashcard counter — Complete
 - **Tier 3 (#3/#4) — `<user_input>` tag-breakout fixed:** new `src/lib/aiSafety.js` — `wrapUserInput(text, cap)` strips any `</user_input>`/`<user_input>` from the content before wrapping (so a user can't break the data envelope), `sanitizeForPrompt(text, cap)` for untagged context fields. Applied to the study-hub AI routes: `test-chat` (message wrapped, topic/question/options sanitized), `lab-doc-feedback` (user doc wrapped + title/content/prompts sanitized — closes #4), `lab-summary` (docs/notes wrapped, titles sanitized). The 18 Life Hub AI routes will adopt the same helper during the Life Hub audit.
 - **Tier 4 — Real Exam timer now resumes where you left off:** manual pause already preserved `seconds_remaining` (Supabase); the gap was *navigating away* (localStorage snapshot omitted it). `RealExam` now mirrors its live remaining seconds into a parent `liveSecondsRef`, the interrupted-test snapshot stores `seconds`, and local resume restores it via `setInitialSeconds`. Both pause paths now restore the clock.
