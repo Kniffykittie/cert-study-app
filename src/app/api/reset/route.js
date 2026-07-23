@@ -100,6 +100,14 @@ export async function POST(req) {
     return NextResponse.json({ ok: true })
   }
 
+  if (scope === 'schedule') {
+    await Promise.all([
+      supabase.from('schedule_events').delete().eq('user_id', userId),
+      supabase.from('schedule_notes').delete().eq('user_id', userId),
+    ])
+    return NextResponse.json({ ok: true })
+  }
+
   if (scope === 'stretch_logs') {
     await supabase.from('stretch_logs').delete().eq('user_id', userId)
     return NextResponse.json({ ok: true })

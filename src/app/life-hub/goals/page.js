@@ -277,8 +277,8 @@ export default function GoalsPage() {
             onMouseEnter={e => e.currentTarget.style.backgroundColor = '#06b6d410'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--surface)'}>
             <div>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>📅 Weekly Schedule</div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Manage your weekly schedule, meal times, and workout plan in My Week →</p>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>📅 My Schedule</div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Plan your month — work hours, events, meal &amp; workout times in My Schedule →</p>
             </div>
             <span style={{ fontSize: '20px', color: '#06b6d4', flexShrink: 0 }}>→</span>
           </div>

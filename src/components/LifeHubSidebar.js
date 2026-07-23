@@ -169,7 +169,7 @@ export default function LifeHubSidebar() {
 
       {sectionHeader('Overview', SECTION_COLORS.overview)}
       {navLink('Dashboard', '/life-hub', SECTION_COLORS.overview)}
-      {navLink('My Week', '/life-hub/my-week', SECTION_COLORS.overview)}
+      {navLink('My Schedule', '/life-hub/my-week', SECTION_COLORS.overview)}
       {navLink('Weekly Wrap', '/life-hub/weekly-wrap', SECTION_COLORS.overview)}
       {navLink('Monthly Wrap', '/life-hub/monthly-wrap', SECTION_COLORS.overview)}
 

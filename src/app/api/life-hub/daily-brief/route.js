@@ -380,6 +380,24 @@ export async function POST(req) {
   const { data: myWeekRows } = await supabase.from('my_week').select('*').eq('user_id', user.id).eq('week_start', monday)
   const todayMyWeek = myWeekRows?.find(r => r.day_of_week === todayDayOfWeek)
 
+  // Timed schedule events — today's blocks (recurring weekday + one-off) and upcoming one-offs (next 14 days)
+  const in14Days = (() => { const d = new Date(today); d.setUTCDate(d.getUTCDate() + 14); return d.toISOString().split('T')[0] })()
+  const [{ data: todayRecurring }, { data: upcomingOneoff }] = await Promise.all([
+    supabase.from('schedule_events').select('*').eq('user_id', user.id).eq('recurrence', 'weekly').eq('day_of_week', todayDayOfWeek),
+    supabase.from('schedule_events').select('*').eq('user_id', user.id).eq('recurrence', 'once').gte('event_date', today).lte('event_date', in14Days).order('event_date').order('start_time', { nullsFirst: true }),
+  ])
+  const fmtRange = (s, e) => (s && e) ? ` ${s.slice(0,5)}–${e.slice(0,5)}` : (s || e) ? ` at ${(s || e).slice(0,5)}` : ''
+  const fmtEvent = (ev) => `${ev.category}:${fmtRange(ev.start_time, ev.end_time)} <user_input>${ev.title}${ev.notes ? ` — ${ev.notes}` : ''}</user_input>`
+  const todayEvents = [...(todayRecurring || []), ...(upcomingOneoff || []).filter(e => e.event_date === today)]
+    .sort((a, b) => (a.start_time || '99').localeCompare(b.start_time || '99'))
+  const laterEvents = (upcomingOneoff || []).filter(e => e.event_date > today)
+  const todayEventsContext = todayEvents.length
+    ? `TODAY'S PLANNED EVENTS (use real start/end times to plan meals, workout, hydration around them):\n` + todayEvents.map(e => `- ${fmtEvent(e)}`).join('\n')
+    : null
+  const upcomingEventsContext = laterEvents.length
+    ? `UPCOMING EVENTS (next 14 days — mention if relevant, e.g. prep or scheduling):\n` + laterEvents.map(e => `- ${e.event_date} ${fmtEvent(e)}`).join('\n')
+    : null
+
   const SCHED_LABELS = { active_work: 'active work day (on feet all day — occupational steps, not exercise)', desk_work: 'desk/sedentary work day', day_off: 'day off', travel: 'travel day (disrupted routine)' }
   const scheduleContext = (() => {
     if (todayMyWeek) {
@@ -427,6 +445,8 @@ export async function POST(req) {
     dietaryPrefs.length ? `DIETARY PREFERENCES: ${dietaryPrefs.join(', ')} — factor into any nutrition commentary (e.g. if vegan and protein is low, suggest plant-based sources; if dairy-free, skip dairy suggestions)` : null,
     calorieHistoryNote ? `CALORIE HISTORY (user's lived experience — treat as ground truth over formula estimates): <user_input>${calorieHistoryNote}</user_input>` : null,
     scheduleContext,
+    todayEventsContext,
+    upcomingEventsContext,
     suppTimingContext,
   ].filter(Boolean).join('\n')
 

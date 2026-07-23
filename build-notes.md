@@ -149,6 +149,8 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 |-------|---------|
 | `daily_briefs` | Cached daily AI paragraph — brief_text, data_snapshot JSONB; UNIQUE on user_id+date; generated once per day; RLS user-scoped |
 | `monthly_wraps` | Cached monthly AI wrap-up — month TEXT (YYYY-MM), report_data JSONB, ai_narrative TEXT; UNIQUE on user_id+month; cached forever; RLS user-scoped |
+| `schedule_events` | Timed My Schedule blocks — title, category (work/social/appointment/travel/other), start_time/end_time TIME, notes; recurrence 'weekly' (day_of_week 0–6) or 'once' (event_date DATE); CHECK enforces anchor per recurrence; RLS user-scoped |
+| `schedule_notes` | My Schedule planning notes — scope ('month'|'week'), period (YYYY-MM or Monday date), note TEXT; UNIQUE on user_id+scope+period; RLS user-scoped |
 
 ---
 
@@ -3398,6 +3400,15 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 111 — My Week → My Schedule: monthly calendar + timed events — Complete
+- **Problem:** My Week was a routine template (day-type pills + meal/workout times + freeform "commitments" textarea). No way to say how long you're at work, or to add a concrete dated event like "Zach Bryan concert July 26, 5–10pm" with real start/end times the AI could reason about.
+- **New model — two event kinds by recurrence:** `schedule_events` table. **Recurring weekly** blocks (work hours, standing commitments) attach to a weekday and repeat every week automatically — set once, no copy-forward. **One-off** events attach to a real date and never repeat. Each event has title, category (work/social/appointment/travel/other), start/end time, notes. CHECK constraint enforces `event_date` for 'once' and `day_of_week` for 'weekly'. RLS user-scoped.
+- **Monthly calendar redesign:** page rebuilt as a Mon-first month grid (event dots + labels per day, day-type colored top border, today highlighted, prev/next month nav). Tap a day → DayDetail modal: timed events list with ＋Add (title/category chips/start-end/"Just this day" vs "Every {Weekday}"/notes/edit/delete) + the daily routine (day_type pills + meal/workout times, still stored in `my_week`, edited inline). Month-level notes via `schedule_notes` (scope month/week). Renamed tab to "My Schedule" (route path kept `/life-hub/my-week`).
+- **AI wiring:** Daily Brief now injects TODAY'S PLANNED EVENTS (recurring for the weekday + one-offs for the date, with real start/end times to plan meals/workout/hydration around) and UPCOMING EVENTS (next 14 days) — all user text wrapped in `<user_input>`. Gives the brief month-ahead awareness the day-of-week model couldn't.
+- **Plumbing:** new API routes `schedule-events` + `schedule-notes`; reset scope `schedule` (clears both tables) + Settings reset row; sidebar/goals-page labels updated to "My Schedule".
+- Migration `schedule_events_and_notes` applied + verified (both tables rls_enabled). Build verified passing.
+- Files: life-hub/my-week/page.js (rebuilt), api/life-hub/schedule-events/route.js (new), api/life-hub/schedule-notes/route.js (new), api/life-hub/daily-brief/route.js, api/reset/route.js, settings/page.js, components/LifeHubSidebar.js, life-hub/goals/page.js, CLAUDE.md
 
 ### Phase 110 — Settings notifications: remove duplicate brief-time entry — Complete
 - **Problem:** the notifications tab asked for wake/bedtime AND showed a preview list of the three brief send times, while (since Phase 108) each brief also has its own time picker below — so brief times appeared/were-asked in two places, which read as double entry.

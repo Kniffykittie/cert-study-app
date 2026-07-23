@@ -62,7 +62,7 @@ const NOTIF_TYPES = [
     group: 'SMART NUDGES',
     items: [
       { key: 'workout_reminder', emoji: '💪', label: 'Workout Reminder', desc: 'On workout days, 1 hr before planned time', base: 'workout', offset: -60,
-        how: 'Only fires on days your plan has a workout, one hour before the time you set in My Week. Skipped entirely on rest days.' },
+        how: 'Only fires on days your plan has a workout, one hour before the time you set in My Schedule. Skipped entirely on rest days.' },
       { key: 'hydration_nudge', emoji: '💧', label: 'Hydration Nudge', desc: 'Only if you\'re behind on water', base: 'wake', offset: 360,
         how: 'Checks your water total against where you should be to hit your daily goal by bedtime. It tells you your exact intake and how many oz you\'re behind — it stays silent if you\'re on pace.' },
       { key: 'study_streak', emoji: '📚', label: 'Study Streak Alert', desc: 'Evening if your question goal isn\'t hit', base: 'bed', offset: -120,
@@ -907,7 +907,7 @@ function SettingsPageInner() {
                         {on && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
                             {item.base === 'workout' ? (
-                              <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Timed from your workout — set the time in My Week.</span>
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Timed from your workout — set the time in My Schedule.</span>
                             ) : (
                               <>
                                 <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Send at</span>
@@ -1122,6 +1122,7 @@ function SettingsPageInner() {
                     { scope: 'food_log', label: 'Food Log History', desc: 'Delete all logged food entries' },
                     { scope: 'my_foods', label: 'My Foods Library', desc: 'Delete all saved custom foods' },
                     { scope: 'stretch_logs', label: 'Stretch Log History', desc: 'Delete all stretch session logs' },
+                    { scope: 'schedule', label: 'My Schedule', desc: 'Delete all schedule events (work hours, one-off events) and month/week notes' },
                     { scope: 'progress_photos', label: 'Progress Photos', desc: 'Delete all progress photos permanently' },
                   ].map(item => (
                     <div key={item.scope} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}>
