@@ -12,6 +12,25 @@ function dateStr(daysBack = 0) {
   return d.toISOString().split('T')[0]
 }
 
+// Current local minute-of-day for an IANA timezone
+function localMinutesInTz(tz) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz || 'UTC', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date())
+    const h = parseInt(parts.find(p => p.type === 'hour').value) % 24
+    const m = parseInt(parts.find(p => p.type === 'minute').value)
+    return h * 60 + m
+  } catch { const d = new Date(); return d.getUTCHours() * 60 + d.getUTCMinutes() }
+}
+function toMinutes(t, fallback) {
+  if (!t) return fallback
+  const [h, m] = t.split(':').map(Number)
+  return h * 60 + m
+}
+function minutesToHHMM(min) {
+  const h = Math.floor(((min % 1440) + 1440) % 1440 / 60), m = ((min % 60) + 60) % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
 const VALID_WINDOWS = ['morning', 'afternoon', 'evening']
 
 export async function GET(req) {
@@ -55,6 +74,33 @@ export async function POST(req) {
 
   // Evening brief — past-tense summary of today
   if (window === 'evening') {
+    const forceRefresh = body.refresh === true
+
+    // Readiness gate: don't generate a premature snapshot. The day is "done"
+    // at max(bedtime-60, last scheduled event's end today). Before that, hold
+    // off on first generation so we don't lock in a stale 7pm version when the
+    // user has, say, a concert running until 10. A manual refresh bypasses this.
+    const todayDow = (new Date(today).getUTCDay() + 6) % 7
+    const [{ data: schedGoals }, { data: tzRow }, { data: existing }, { data: recEnds }, { data: oneoffEnds }] = await Promise.all([
+      supabase.from('goals_profiles').select('bedtime').eq('user_id', user.id).maybeSingle(),
+      supabase.from('profiles').select('timezone').eq('id', user.id).maybeSingle(),
+      supabase.from('daily_briefs').select('id').eq('user_id', user.id).eq('date', today).eq('window', 'evening').maybeSingle(),
+      supabase.from('schedule_events').select('start_time, end_time').eq('user_id', user.id).eq('recurrence', 'weekly').eq('day_of_week', todayDow),
+      supabase.from('schedule_events').select('start_time, end_time').eq('user_id', user.id).eq('recurrence', 'once').eq('event_date', today),
+    ])
+    const bedMin = toMinutes(schedGoals?.bedtime, 23 * 60)
+    const eventEnds = [...(recEnds || []), ...(oneoffEnds || [])]
+      .map(e => toMinutes(e.end_time || e.start_time, null))
+      .filter(v => v !== null)
+    const lastEventEnd = eventEnds.length ? Math.max(...eventEnds) : 0
+    const readyMin = Math.max(bedMin - 60, lastEventEnd)
+    const nowLocalMin = localMinutesInTz(tzRow?.timezone)
+
+    // Only gate the FIRST generation; never block a refresh or regen of an existing wrap.
+    if (!forceRefresh && !existing && nowLocalMin < readyMin) {
+      return NextResponse.json({ notReady: true, readyAt: minutesToHHMM(readyMin) })
+    }
+
     const [
       { data: foodLog },
       { data: workoutLog },

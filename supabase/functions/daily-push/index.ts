@@ -227,6 +227,7 @@ interface Ctx {
   bedMin: number
   waterGoal: number
   dailyGoal: number
+  lastEventEndMin: number
 }
 type Built = { title: string; body: string; url: string } | null
 
@@ -240,7 +241,8 @@ const NOTIF_REGISTRY: Record<string, { defaultTime: (c: Ctx) => number; build: (
     build: async () => ({ title: 'Midday check-in ☀️', body: "How's your day going? Log your afternoon check-in.", url: '/life-hub' }),
   },
   evening_wrap: {
-    defaultTime: c => c.bedMin - 60,
+    // Fire once the day has actually wound down: later of bedtime-1h and the last event's end.
+    defaultTime: c => Math.max(c.bedMin - 60, c.lastEventEndMin),
     build: async () => ({ title: 'Evening wrap-up 🌙', body: 'Log dinner and review your day before winding down.', url: '/life-hub' }),
   },
   hydration_nudge: {
@@ -379,12 +381,25 @@ Deno.serve(async (req) => {
         const nowLocalMin = localMinutesInTz(tz)
         const localToday = localDateInTz(tz)
 
+        // Last scheduled-event end today (recurring for the local weekday + one-offs on the date),
+        // so the evening wrap can wait until the day actually winds down.
+        const localDow = (new Date(localToday + 'T00:00:00Z').getUTCDay() + 6) % 7
+        const { data: todayEvents } = await supabase.from('schedule_events')
+          .select('start_time, end_time, recurrence, day_of_week, event_date')
+          .eq('user_id', sub.user_id)
+          .or(`and(recurrence.eq.weekly,day_of_week.eq.${localDow}),and(recurrence.eq.once,event_date.eq.${localToday})`)
+        const eventEnds = (todayEvents ?? [])
+          .map((e: { start_time: string | null; end_time: string | null }) => toMinutes(e.end_time ?? e.start_time, -1))
+          .filter((v: number) => v >= 0)
+        const lastEventEndMin = eventEnds.length ? Math.max(...eventEnds) : 0
+
         const c: Ctx = {
           supabase, userId: sub.user_id, localToday, nowLocalMin,
           wakeMin: toMinutes(goalsRes.data?.wake_time, 7 * 60),
           bedMin: toMinutes(goalsRes.data?.bedtime, 23 * 60),
           waterGoal: goalsRes.data?.water_goal_oz ?? 64,
           dailyGoal: profileRes.data?.daily_goal ?? 30,
+          lastEventEndMin,
         }
 
         // Collect every notification whose target time lands in the current slot, is enabled,

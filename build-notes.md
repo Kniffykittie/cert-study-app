@@ -3401,6 +3401,14 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 112 — Evening wrap: readiness gate + refresh (schedule-aware) — Complete
+- **Problem:** the evening wrap generated on first view after 6pm and cached write-once for the day. For an early bedtime with late events (e.g. bedtime 8pm + concert till 10pm), the notification fired ~7pm and, if opened, locked in a stale snapshot of an unfinished day; reopening at 11pm showed that same premature version.
+- **Readiness gate (daily-brief route, evening POST):** first generation is held until `max(bedtime−60, last scheduled event's end today)` in the user's local timezone. Reads `schedule_events` (recurring for the weekday + one-offs on the date) for the last end time. Before that, POST returns `{ notReady, readyAt }` instead of generating — so a concert-till-10 day waits until 10 rather than snapshotting at 7. Only gates the FIRST generation; refresh/existing are never blocked.
+- **Refresh:** evening card now has a `↻ Refresh` button that re-POSTs with `refresh: true` (bypasses the gate, overwrites the cached wrap). Life Hub home shows a "ready around HH:MM" placeholder when `notReady`.
+- **Notification sync:** daily-push `evening_wrap` default time changed from `bedMin−60` to `max(bedMin−60, lastEventEndMin)` (last event end computed per-user in the main loop from `schedule_events`), so the reminder and the generation readiness stay in lockstep. **Edge Function code complete on disk; deploy pending (user action).**
+- Build verified passing.
+- Files: api/life-hub/daily-brief/route.js, life-hub/page.js, supabase/functions/daily-push/index.ts, CLAUDE.md
+
 ### Phase 111 — My Week → My Schedule: monthly calendar + timed events — Complete
 - **Problem:** My Week was a routine template (day-type pills + meal/workout times + freeform "commitments" textarea). No way to say how long you're at work, or to add a concrete dated event like "Zach Bryan concert July 26, 5–10pm" with real start/end times the AI could reason about.
 - **New model — two event kinds by recurrence:** `schedule_events` table. **Recurring weekly** blocks (work hours, standing commitments) attach to a weekday and repeat every week automatically — set once, no copy-forward. **One-off** events attach to a real date and never repeat. Each event has title, category (work/social/appointment/travel/other), start/end time, notes. CHECK constraint enforces `event_date` for 'once' and `day_of_week` for 'weekly'. RLS user-scoped.

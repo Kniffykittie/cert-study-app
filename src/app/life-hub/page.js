@@ -19,6 +19,14 @@ function dateStr(daysBack = 0) {
   return d.toLocaleDateString('en-CA')
 }
 
+function fmtTime12(hhmm) {
+  if (!hhmm) return ''
+  const [h, m] = hhmm.split(':').map(Number)
+  const ap = h >= 12 ? 'PM' : 'AM'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${h12}:${String(m).padStart(2, '0')} ${ap}`
+}
+
 function getCheckinContext(ctx) {
   if (!ctx) return null
   const LEG_KEYWORDS = ['squat', 'deadlift', 'lunge', 'leg press', 'leg curl', 'leg extension', 'calf', 'hip thrust', 'glute', 'rdl', 'step up', 'sumo']
@@ -104,6 +112,8 @@ export default function LifeHubPage() {
   const [briefLoading, setBriefLoading] = useState(false)
   const [briefExpanded, setBriefExpanded] = useState({ morning: false, afternoon: false, evening: false })
   const [activeBrief, setActiveBrief] = useState('morning')
+  const [eveningReadyAt, setEveningReadyAt] = useState(null)
+  const [eveningRefreshing, setEveningRefreshing] = useState(false)
   const [recoveryExpanded, setRecoveryExpanded] = useState(false)
   const [checkinWhyOpen, setCheckinWhyOpen] = useState(false)
   const [afternoonCheckin, setAfternoonCheckin] = useState(null)
@@ -320,6 +330,7 @@ export default function LifeHubPage() {
             const genRes = await fetch('/api/life-hub/daily-brief', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ window: 'evening' }) })
             const genJson = await genRes.json()
             if (genJson.brief) setBriefs(prev => ({ ...prev, evening: genJson.brief }))
+            else if (genJson.notReady) setEveningReadyAt(genJson.readyAt)
           }
         }
       }
@@ -341,6 +352,17 @@ export default function LifeHubPage() {
     document.addEventListener('visibilitychange', refreshKcal)
     return () => document.removeEventListener('visibilitychange', refreshKcal)
   }, [])
+
+  async function refreshEvening() {
+    setEveningRefreshing(true)
+    try {
+      const res = await fetch('/api/life-hub/daily-brief', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ window: 'evening', refresh: true }) })
+      const json = await res.json()
+      if (json.brief) { setBriefs(prev => ({ ...prev, evening: json.brief })); setEveningReadyAt(null) }
+    } finally {
+      setEveningRefreshing(false)
+    }
+  }
 
   async function handleSave() {
     if (!energy && !mood) return
@@ -735,7 +757,12 @@ export default function LifeHubPage() {
               {resolvedKey === 'afternoon' && !text && (
                 <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Complete your morning or afternoon check-in to see your midday insight here.</p>
               )}
-              {resolvedKey === 'evening' && !text && (
+              {resolvedKey === 'evening' && !text && eveningReadyAt && (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0, lineHeight: 1.6 }}>
+                  🌙 Your evening wrap will be ready around <strong style={{ color: 'var(--text-primary)' }}>{fmtTime12(eveningReadyAt)}</strong>, once your day winds down (after your last scheduled event). Check back then for the full recap.
+                </p>
+              )}
+              {resolvedKey === 'evening' && !text && !eveningReadyAt && (
                 <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Generating your end-of-day summary…</p>
               )}
               {text && (
@@ -743,12 +770,20 @@ export default function LifeHubPage() {
                   <p style={{ color: 'var(--text-primary)', fontSize: '14px', lineHeight: '1.7', margin: 0, display: briefExpanded[resolvedKey] ? 'block' : '-webkit-box', WebkitLineClamp: briefExpanded[resolvedKey] ? 'unset' : 3, WebkitBoxOrient: 'vertical', overflow: briefExpanded[resolvedKey] ? 'visible' : 'hidden' }}>
                     {text}
                   </p>
-                  {text.length > 200 && (
-                    <button onClick={() => setBriefExpanded(prev => ({ ...prev, [resolvedKey]: !prev[resolvedKey] }))}
-                      style={{ background: 'none', border: 'none', color: activeCfg?.color || SC.overview, fontSize: '12px', cursor: 'pointer', marginTop: '4px', padding: 0 }}>
-                      {briefExpanded[resolvedKey] ? 'Show less' : 'Read more'}
-                    </button>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '4px' }}>
+                    {text.length > 200 && (
+                      <button onClick={() => setBriefExpanded(prev => ({ ...prev, [resolvedKey]: !prev[resolvedKey] }))}
+                        style={{ background: 'none', border: 'none', color: activeCfg?.color || SC.overview, fontSize: '12px', cursor: 'pointer', padding: 0 }}>
+                        {briefExpanded[resolvedKey] ? 'Show less' : 'Read more'}
+                      </button>
+                    )}
+                    {resolvedKey === 'evening' && (
+                      <button onClick={refreshEvening} disabled={eveningRefreshing}
+                        style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', cursor: eveningRefreshing ? 'default' : 'pointer', padding: 0 }}>
+                        {eveningRefreshing ? 'Refreshing…' : '↻ Refresh'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
