@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import useEscapeKey from '@/lib/useEscapeKey'
 
 const ENERGY_LABELS = ['Exhausted', 'Low', 'Okay', 'Good', 'Energized']
 const MOOD_LABELS = ['Rough', 'Low', 'Neutral', 'Good', 'Great']
@@ -26,6 +27,7 @@ function extractSoreSpots(text) {
 const MAX_TURNS = 8
 
 export default function CheckInSheet({ checkInWindow, wakeTime, onClose, onInsight }) {
+  useEscapeKey(onClose)
   const [energy, setEnergy] = useState(null)
   const [mood, setMood] = useState(null)
   const [note, setNote] = useState('')
@@ -194,7 +196,7 @@ export default function CheckInSheet({ checkInWindow, wakeTime, onClose, onInsig
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 9990 }}>
-      <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: `1px solid ${accentColor}`, borderTop: `3px solid ${accentColor}`, borderRadius: '16px 16px 0 0', width: '100%', maxWidth: 520, padding: '20px 20px 32px', maxHeight: chatOpen ? '85vh' : '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Daily check-in" style={{ backgroundColor: 'var(--surface)', border: `1px solid ${accentColor}`, borderTop: `3px solid ${accentColor}`, borderRadius: '16px 16px 0 0', width: '100%', maxWidth: 520, padding: '20px 20px 32px', maxHeight: chatOpen ? '85vh' : '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
 
         {insight ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -213,7 +215,7 @@ export default function CheckInSheet({ checkInWindow, wakeTime, onClose, onInsig
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: accentColor }}>💬 Keep Talking</div>
-                  <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 18, cursor: 'pointer' }}>✕</button>
+                  <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 18, cursor: 'pointer' }}>✕</button>
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12, paddingRight: 4, minHeight: 200 }}>
@@ -275,7 +277,7 @@ export default function CheckInSheet({ checkInWindow, wakeTime, onClose, onInsig
                 <div style={{ fontSize: 13, fontWeight: 700, color: accentColor }}>{label} Check-In</div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Quick pulse — how are you feeling?</div>
               </div>
-              <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 20, cursor: 'pointer', padding: '4px 8px' }}>✕</button>
+              <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 20, cursor: 'pointer', padding: '4px 8px' }}>✕</button>
             </div>
 
             <div style={{ marginBottom: 16 }}>

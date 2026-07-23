@@ -3401,6 +3401,14 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 116 — S14 accessibility pass: shared modals — Complete
+- **New `useEscapeKey(handler)` hook** (`src/lib/useEscapeKey.js`) centralizes Escape-to-close.
+- Applied Escape-to-close + `role="dialog"`/`aria-modal`/`aria-label` + icon-button `aria-label`s across all **shared modal components**: LogConfirmModal, EditFoodModal, MealBuilderModal, SearchModal, BarcodeScannerModal, CheckInSheet, DailyLogReview (plus BookmarkModal + My Schedule from Phase 115). These are reused across the nutrition/hydration/check-in surfaces, so the fix propagates app-wide.
+- Policy: Escape + aria everywhere; backdrop-click-close only where already present or clearly safe (not added to form-heavy modals, to avoid accidental data loss).
+- **Still open:** page-embedded modals (settings confirms, templates delete confirm, test/workout/exercise/measurement/encyclopedia/supplement page modals) — next batch.
+- Build verified passing.
+- Files: lib/useEscapeKey.js (new) + the shared modal components above.
+
 ### Phase 115 — S14 polish (slice 2): modal accessibility — Complete
 - **Escape-to-close + backdrop semantics on modals:** My Schedule DayDetail modal and the shared BookmarkModal now close on Escape; BookmarkModal also closes on backdrop click (with inner `stopPropagation`). Both got `role="dialog"` + `aria-modal="true"` + `aria-label`.
 - **aria-labels on icon-only buttons:** My Schedule modal ✕ (Close), ✏️ (Edit {title}), × (Delete {title}) now have screen-reader labels.

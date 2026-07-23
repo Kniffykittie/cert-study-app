@@ -1,11 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import useEscapeKey from '@/lib/useEscapeKey'
 
 export default function DailyLogReview() {
   const router = useRouter()
   const [state, setState] = useState(null) // null | 'loading' | 'normal' | 'sparse' | 'empty' | 'done'
   const [summary, setSummary] = useState(null)
+  useEscapeKey(() => { if (summary?.yesterday) dismiss(summary.yesterday) })
 
   useEffect(() => {
     const hour = new Date().getHours()
@@ -52,7 +54,7 @@ export default function DailyLogReview() {
 
   return (
     <div onClick={() => dismiss(yesterday)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '560px', backgroundColor: 'var(--surface)', borderRadius: '16px 16px 0 0', padding: '24px 20px 32px', borderTop: '1px solid var(--border)', animation: 'slideUp 0.25s ease-out' }}>
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Daily log review" style={{ width: '100%', maxWidth: '560px', backgroundColor: 'var(--surface)', borderRadius: '16px 16px 0 0', padding: '24px 20px 32px', borderTop: '1px solid var(--border)', animation: 'slideUp 0.25s ease-out' }}>
         <style>{`@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
 
         <div style={{ width: '36px', height: '4px', backgroundColor: 'var(--border)', borderRadius: '2px', margin: '0 auto 20px' }} />

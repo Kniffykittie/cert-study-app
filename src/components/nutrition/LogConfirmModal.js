@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import useEscapeKey from '@/lib/useEscapeKey'
 import { MEAL_SLOTS, MEAL_NUTRITION_KEYS, DV } from '@/lib/nutritionUtils'
 
 function nowTimeString() {
@@ -52,6 +53,7 @@ const MICRO_DISPLAY = [
 const DRINK_EDITABLE_KEYS = new Set(['caffeine_mg', 'water_g'])
 
 export default function LogConfirmModal({ food, defaultSlot, onLog, onCancel, logging, mode, initialServings, initialSlot, extra }) {
+  useEscapeKey(onCancel)
   const isDrink = mode === 'drink'
   const [servings, setServings] = useState(initialServings || '1')
   const [logTime, setLogTime] = useState(nowTimeString)
@@ -97,8 +99,8 @@ export default function LogConfirmModal({ food, defaultSlot, onLog, onCancel, lo
   if (!food) return null
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div style={{ backgroundColor: 'var(--surface)', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '540px', maxHeight: '90vh', overflowY: 'auto', paddingBottom: 'env(safe-area-inset-bottom, 20px)' }}>
+    <div onClick={onCancel} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Log ${food.name}`} style={{ backgroundColor: 'var(--surface)', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '540px', maxHeight: '90vh', overflowY: 'auto', paddingBottom: 'env(safe-area-inset-bottom, 20px)' }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '20px 20px 0' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -106,7 +108,7 @@ export default function LogConfirmModal({ food, defaultSlot, onLog, onCancel, lo
             {food.brand && <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '2px' }}>{food.brand}</div>}
             <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>Per {food.serving_size_label || '1 serving'}</div>
           </div>
-          <button onClick={onCancel} style={{ background: 'none', border: 'none', fontSize: '22px', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0 0 0 12px', lineHeight: 1 }}>✕</button>
+          <button onClick={onCancel} aria-label="Close" style={{ background: 'none', border: 'none', fontSize: '22px', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0 0 0 12px', lineHeight: 1 }}>✕</button>
         </div>
 
         {/* Macro grid */}

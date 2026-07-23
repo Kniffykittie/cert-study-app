@@ -1,7 +1,9 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import useEscapeKey from '@/lib/useEscapeKey'
 
 export default function BarcodeScannerModal({ onResult, onClose }) {
+  useEscapeKey(onClose)
   const videoRef = useRef(null)
   const [status, setStatus] = useState('starting')
   const [errorMsg, setErrorMsg] = useState(null)
@@ -88,10 +90,10 @@ export default function BarcodeScannerModal({ onResult, onClose }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 900, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: '480px', backgroundColor: 'var(--surface)', borderRadius: '16px', overflow: 'hidden', margin: '16px' }}>
+      <div role="dialog" aria-modal="true" aria-label="Scan barcode" style={{ width: '100%', maxWidth: '480px', backgroundColor: 'var(--surface)', borderRadius: '16px', overflow: 'hidden', margin: '16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
           <span style={{ color: 'var(--text-primary)', fontWeight: '700', fontSize: '15px' }}>📷 Scan Barcode</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>✕</button>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>✕</button>
         </div>
 
         <div style={{ position: 'relative', backgroundColor: '#000', aspectRatio: '4/3' }}>

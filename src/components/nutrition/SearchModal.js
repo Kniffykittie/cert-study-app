@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import useEscapeKey from '@/lib/useEscapeKey'
 import { MEAL_SLOTS, getDietaryWarnings, FOOD_CATEGORIES, categoryToFlags, DV } from '@/lib/nutritionUtils'
 import FoodIntelCard from '@/components/nutrition/FoodIntelCard'
 
@@ -101,6 +102,7 @@ function FoodRow({ food, selected, onSelect, isSaved, onSave, savingId, dietaryW
 }
 
 export default function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood, libraryOnly, workoutCtx, dietaryPrefs }) {
+  useEscapeKey(onClose)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
@@ -322,13 +324,13 @@ export default function SearchModal({ slot, onClose, onAdd, myFoods, onSaveFood,
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', width: '100%', maxWidth: '540px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+      <div role="dialog" aria-modal="true" aria-label="Add food" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', width: '100%', maxWidth: '540px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
 
         <div style={{ padding: '18px 20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', margin: 0 }}>
             {libraryOnly ? '⭐ Add to My Foods Library' : `${mealLabel?.emoji} ${mealLabel?.label}`}
           </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '22px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '22px', cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
         {libraryOnly && <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '6px 20px 0' }}>Save foods for quick logging later — nothing gets added to today&apos;s log.</p>}
 

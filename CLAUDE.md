@@ -389,6 +389,7 @@ src/
     CheckInSheet.js                    Bottom-sheet check-in (morning=#f59e0b, afternoon=#a78bfa); energy+mood 1-5 raters; note textarea; extractSoreSpots keyword parser; assembles 8-table context on save; calls /api/checkin/insight; shows AI insight 5s then auto-closes; onInsight(proposed_actions, sore_spots) callback
   lib/
     iosCliEngine.js                    Tier 1.5 IOS CLI engine — mode state machine (user_exec→priv_exec→global/interface/router/line/vlan config) + abbreviation expansion + interface canonicalization + replay grading; `runCli(payload, lines)` returns transcript steps/prompt/correctness; grades by mode-aware replay so skipping enable/conf t/interface rejects config commands (forces navigation practice); does NOT simulate network (show output not reflective)
+    useEscapeKey.js                    Hook — calls handler on Escape keypress; used to make modals keyboard-dismissable (a11y)
     scoreAnswer.js                     Central answer scoring — `scoreAnswer(question, answer)` + `isAnswered(question, answer)`; dispatches on question_type (mc now; multi/cli/ordering/matching add branches); single source of truth used by saveResults, results screen, domain breakdown
     coachMemory.js                     `getCoachMemoryContext(supabase, userId)` — fetches top 8 active coach_memory rows ordered by confidence; returns formatted block or '' when empty; imported by daily-brief, coaching-response, exercise-chat, meal-insight routes
   supabase/

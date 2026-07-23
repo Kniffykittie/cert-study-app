@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef } from 'react'
+import useEscapeKey from '@/lib/useEscapeKey'
 
 const MACRO_FIELDS = [
   { key: 'calories', label: 'Calories', unit: '' },
@@ -38,6 +39,7 @@ const ALL_MICRO_KEYS = MICRO_GROUPS.flatMap(g => g.keys)
 const INGR_FIELDS = [...MACRO_FIELDS, ...ALL_MICRO_KEYS]
 
 export default function MealBuilderModal({ onClose, onSave, savedIngredients = [] }) {
+  useEscapeKey(onClose)
   const [mealName, setMealName] = useState('')
   const [servingsInMeal, setServingsInMeal] = useState('4')
   const [ingredients, setIngredients] = useState([])
@@ -147,14 +149,14 @@ export default function MealBuilderModal({ onClose, onSave, savedIngredients = [
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', width: '100%', maxWidth: '580px', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
+      <div role="dialog" aria-modal="true" aria-label="Create a meal" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', width: '100%', maxWidth: '580px', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
 
         <div style={{ padding: '18px 20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <div>
             <h2 style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '700', margin: '0 0 2px' }}>🍳 Create a Meal</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>Add ingredients, fill in any missing nutrition, set portions.</p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '22px', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '22px', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>×</button>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px' }}>
