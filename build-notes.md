@@ -3176,6 +3176,31 @@ This supersedes all scattered "Session N" numbering below. Detailed specs for ea
 ### BLOCK C — Real Exam Experience (needs all formats to exist)
 - **S10 — Real Exam Blend + Pacing (R7 + R3)** ✅ BUILT (Phase 102) — per-cert recipe assembly (official domain weights, ~70/30 medium/hard, PBQ-first, 2-3 multi-select, exhibits, real count+timer), graceful degradation when pool can't fill (gap #15), CLI/PBQ excluded from Mixed (gap #14); pacing feedback on results (~1 min/q budget, R3); readiness signal (gap #8). Ties the exam experience together.
 
+### 🔔 NOTIFICATIONS 2.0 (user-requested 2026-07-23) — build as ONE coherent session
+Three related upgrades that all touch the daily-push Edge Function + Settings notifications tab:
+
+**N1. Per-notification custom timing (user chose full per-type control over window-bundling).**
+- Schema: `notification_times JSONB` on profiles — `{ morning_brief: "07:00", hydration_nudge: "15:00", supplement_evening: "21:00", ... }`; unset keys fall back to today's derived defaults (morning=wake, midday=wake+6h, evening=bed−1h, workout=workout_time−60).
+- Edge Function REWRITE: currently bundles nudges into 3 windows. New model: each enabled notification has its own target time; the cron (every 30 min) checks each type's time. **Reconcile with the anti-spam concern:** bundle ONLY notifications whose times fall in the SAME 30-min slot — so same-time = one combined push, different times = separate. Best of both (user picks times; no accidental 5-at-once).
+- Settings UI: a time picker next to each notification toggle.
+
+**N3. Per-notification explanations (what it notifies + how it works).**
+- Each notification type gets an expandable "how this works" explainer in Settings (what triggers it, what data it uses, when it fires). Expand the current one-line `desc` into a fuller info panel (InfoChip or expandable row).
+
+**N4. Meaningful, data-rich notification content (not "drink water" but "you're at X, aim for ~Y by now to hit Z").**
+- The Edge Function already fetches the data (water_logs+goal, question count+goal, supplements taken/total, etc.) — this is message-formatting + pace math, not new data.
+- Per nudge, compute progress-vs-expected-pace and phrase it concretely:
+  - Hydration: "You're at {current} oz. To hit {goal} oz by bedtime you should be near {pace_target} oz by now — about {remaining} oz to go."
+  - Study streak: "You've done {count}/{goal} questions today — {remaining} more to keep your {streak}-day streak."
+  - Supplements: name which ones are still untaken.
+  - Weigh-in/measurement: "last logged {n} days ago."
+- Keep messages short but specific (numbers + target + gap).
+
+Build order within the session: N1 schema + Edge Function rewrite (timing + same-slot bundling) → N4 rich message builders (same Edge Function) → N3 + N1 Settings UI (time picker + explainer per type). Big session — Edge Function is the bulk.
+
+### 📱 STUDY HUB BOTTOM NAV (user-requested 2026-07-23)
+Mirror the Life Hub mobile bottom tab bar (LifeHubBottomNav) for the Study Hub. New `StudyHubBottomNav.js` — emoji tabs (e.g. 🏠 Overview / 📝 Test / 📖 Study / 🧪 Labs / 🃏 Flashcards), section-colored active state, mounted in study-hub/layout.js, mobile-only (≤768px), hamburger hidden on mobile like Life Hub. Standalone UI build.
+
 ### BLOCK D — Rest of App (previously planned, pull forward anytime user wants a break from the track)
 - **S11 — Life Hub Home Restructure** ✅ largely pre-built (Phase 91); see Phase 106 note — recovery ring hero, single tabbed brief, zone reorder, skeleton loaders, split 971-line page (2026-07-09 audit spec).
 - **S12 — Notification Schedule UI + PWA** ✅ BUILT (Phase 107) — settings shows/edits send times (wake/bedtime), PWA install banner.
