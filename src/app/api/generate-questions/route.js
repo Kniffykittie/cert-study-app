@@ -51,7 +51,7 @@ export async function POST(request) {
   const { data: profile } = await supabase.from('profiles').select('is_disabled').eq('id', user.id).single()
   if (profile?.is_disabled) return Response.json({ error: 'Account disabled' }, { status: 403 })
 
-  const { cert, count, topics, difficulty = 'hard', personalize = true } = await request.json()
+  const { cert, count, topics, difficulty = 'hard', difficulties = null, personalize = true } = await request.json()
 
   if (!DOMAINS[cert]) return Response.json({ error: 'Invalid cert' }, { status: 400 })
   if (!count || typeof count !== 'number' || count < 1 || count > 150) {
@@ -94,13 +94,17 @@ export async function POST(request) {
   const distribution = weightedDistribution(spacedDomains, count)
   const domainNames = activeDomains.map(d => `${d.id} ${d.name}`)
 
-  const { data: poolTemplates } = await supabase
+  let poolQuery = supabase
     .from('question_templates')
     .select('*')
     .eq('cert', cert)
-    .eq('difficulty', difficulty)
     .eq('is_retired', false)
     .in('domain', domainNames)
+  // Real Exam passes a difficulty blend (medium+hard); everything else a single difficulty
+  poolQuery = Array.isArray(difficulties) && difficulties.length
+    ? poolQuery.in('difficulty', difficulties)
+    : poolQuery.eq('difficulty', difficulty)
+  const { data: poolTemplates } = await poolQuery
 
   const pool = (poolTemplates ?? []).sort(() => Math.random() - 0.5)
   if (!pool.length) return Response.json({ questions: [] })

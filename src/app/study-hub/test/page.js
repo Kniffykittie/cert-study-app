@@ -264,6 +264,7 @@ function TestPageInner() {
   const [error, setError] = useState('')
 
   const [questions, setQuestions] = useState(null)
+  const [finalDuration, setFinalDuration] = useState(null)
   const [current, setCurrent] = useState(0)
   const [selectedAnswer, setSelectedAnswer] = useState(null)
   const [revealed, setRevealed] = useState(false)
@@ -695,8 +696,8 @@ function TestPageInner() {
         ))
         for (const res of results) {
           if (res.error) throw new Error(res.error)
-          // Tag each question with its source cert so we can show a badge
-          allQuestions.push(...(res.questions ?? []).map(q => ({ ...q, source_cert: res._cert })))
+          // Tag each question with its source cert; CLI is CCNA-specific so exclude from Mixed
+          allQuestions.push(...(res.questions ?? []).filter(q => q.question_type !== 'cli').map(q => ({ ...q, source_cert: res._cert })))
         }
         // Shuffle merged questions
         for (let i = allQuestions.length - 1; i > 0; i--) {
@@ -705,17 +706,24 @@ function TestPageInner() {
         }
       } else {
         const actualCount = mode === 'real' ? REAL_EXAM[cert].questions : count
-        const actualDifficulty = mode === 'real' ? 'hard' : difficulty
-        // Real Exam: force ALL domains (official weighting) + disable spaced-rep personalization for an authentic draw
+        // Real Exam: all domains (official weighting), no personalization, medium+hard blend (authentic level, not hard-only)
         const actualTopics = mode === 'real' ? [] : selectedTopics
+        const body = mode === 'real'
+          ? { cert, count: actualCount, topics: actualTopics, difficulties: ['medium', 'hard'], personalize: false }
+          : { cert, count: actualCount, topics: actualTopics, difficulty, personalize: true }
         const res = await fetch('/api/generate-questions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cert, count: actualCount, topics: actualTopics, difficulty: actualDifficulty, personalize: mode !== 'real' })
+          body: JSON.stringify(body)
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Failed to generate questions')
         allQuestions = data.questions
+        // Real exam opens with performance-based questions — front-load PBQ/CLI, keep the rest in order
+        if (mode === 'real') {
+          const pbqFirst = t => (['cli', 'ordering', 'matching'].includes(t.question_type) ? 0 : 1)
+          allQuestions = [...allQuestions].sort((a, b) => pbqFirst(a) - pbqFirst(b))
+        }
       }
       if (!allQuestions?.length) throw new Error('No questions available. Try adding more templates for this cert and difficulty.')
       startTimeRef.current = Date.now()
@@ -741,6 +749,7 @@ function TestPageInner() {
     const correct = questions.filter((q, i) => scoreAnswer(q, finalAnswers[i])).length
     const scorePct = Math.round((correct / questions.length) * 100)
     const durationSeconds = startTimeRef.current ? Math.round((Date.now() - startTimeRef.current) / 1000) : null
+    setFinalDuration(durationSeconds)
     const { data: session } = await supabase.from('test_sessions').insert({
       user_id: user.id, cert, mode, total_questions: questions.length, correct, score_pct: scorePct, duration_seconds: durationSeconds
     }).select().single()
@@ -1148,6 +1157,29 @@ function TestPageInner() {
               <p style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: 1.5, margin: '8px 0 0' }}>
                 Weighted by official domain percentages — an estimate, not the exam's real scaled score (CompTIA/Cisco don't publish that formula).
                 {lowConfidence && ' Low confidence: build a bigger sample across all domains for a reliable read.'}
+              </p>
+            </div>
+          )
+        })()}
+
+        {/* Pacing — avg time/question vs the real exam budget */}
+        {finalDuration != null && questions.length > 0 && (() => {
+          const perQ = finalDuration / questions.length
+          const budget = REAL_EXAM[cert] ? (REAL_EXAM[cert].minutes * 60) / REAL_EXAM[cert].questions : 60
+          const ratio = perQ / budget
+          const pc = ratio <= 1.05 ? 'var(--success)' : ratio <= 1.4 ? 'var(--warning)' : 'var(--error)'
+          const label = ratio <= 1.05 ? 'On exam pace' : ratio <= 1.4 ? 'A bit slow' : 'Too slow for the real exam'
+          const fmt = s => s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${Math.round(s)}s`
+          return (
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px 20px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
+                <span style={{ color: pc, fontSize: '14px', fontWeight: '700' }}>⏱ {label}</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+                  <span style={{ color: pc, fontWeight: '700' }}>{fmt(perQ)}</span>/question · real exam ≈ {fmt(budget)}
+                </span>
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '6px 0 0' }}>
+                Total {fmt(finalDuration)} over {questions.length} questions.{['cli', 'ordering', 'matching'].some(t => questions.find(q => q.question_type === t)) ? ' PBQs eat extra time on the real exam, so bank speed on the multiple-choice.' : ''}
               </p>
             </div>
           )

@@ -340,7 +340,7 @@ src/
       ccna/page.js                     CCNA cert page (DomainTrend + Recommended Focus + Predicted Score)
       network-plus/page.js             Network+ cert page
       security-plus/page.js            Security+ cert page
-      test/page.js                     Take a Test (practice / simulation / real exam); Real Exam mode = all domains forced + official weights (no spaced-rep personalization, personalize:false) + NO going back (linear, must answer to advance, read-only progress dots) + honest pass-likelihood estimate on results (weighted by official domain %, vs PASS_THRESHOLD, not a fake scaled score)
+      test/page.js                     Take a Test (practice / simulation / real exam); Real Exam mode = all domains forced + official weights (no spaced-rep personalization) + medium+hard difficulty blend (not hard-only) + PBQ/CLI questions front-loaded + NO going back (linear, must answer to advance) + honest pass-likelihood estimate + pacing feedback (avg time/question vs real exam budget) on results; Mixed mode excludes CLI (CCNA-specific); question types mc/multi/ordering/matching/cli via AnswerArea
       study/page.js                    Study Mode (concept cards + per-domain question)
       bookmarks/page.js                Saved bookmarks with cert tabs + reason badges
       flashcards/page.js               Flashcard landing — per-cert deck stats + weak domain section

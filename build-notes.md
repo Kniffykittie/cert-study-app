@@ -3174,7 +3174,7 @@ This supersedes all scattered "Session N" numbering below. Detailed specs for ea
 - **S9 — CCNA CLI Mode Engine (R8, Tier 1.5)** ✅ BUILT (Phase 101) — `src/lib/iosCliEngine.js` (mode state machine + command table + abbrev expansion + replay grading); terminal-transcript UI (Enter runs line, prompt evolves, mode practice enforced via wrong-mode rejection); per-command rationale. Biggest single build. Desktop-recommended banner + mobile hints (UX gap #18). Disable global 1-4/Enter handler when CLI focused.
 
 ### BLOCK C — Real Exam Experience (needs all formats to exist)
-- **S10 — Real Exam Blend + Pacing (R7 + R3)** ⬜ — per-cert recipe assembly (official domain weights, ~70/30 medium/hard, PBQ-first, 2-3 multi-select, exhibits, real count+timer), graceful degradation when pool can't fill (gap #15), CLI/PBQ excluded from Mixed (gap #14); pacing feedback on results (~1 min/q budget, R3); readiness signal (gap #8). Ties the exam experience together.
+- **S10 — Real Exam Blend + Pacing (R7 + R3)** ✅ BUILT (Phase 102) — per-cert recipe assembly (official domain weights, ~70/30 medium/hard, PBQ-first, 2-3 multi-select, exhibits, real count+timer), graceful degradation when pool can't fill (gap #15), CLI/PBQ excluded from Mixed (gap #14); pacing feedback on results (~1 min/q budget, R3); readiness signal (gap #8). Ties the exam experience together.
 
 ### BLOCK D — Rest of App (previously planned, pull forward anytime user wants a break from the track)
 - **S11 — Life Hub Home Restructure** ⬜ — recovery ring hero, single tabbed brief, zone reorder, skeleton loaders, split 971-line page (2026-07-09 audit spec).
@@ -3394,6 +3394,17 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 102 — S10: Real Exam Blend + Pacing (R7 + R3) — Complete
+- **Difficulty blend:** generate-questions accepts `difficulties` array (falls back to single `difficulty` — backward compatible). Real Exam now requests `['medium','hard']` instead of hard-only → authentic level once the medium pool exists (graceful today: serves hard + medium seeds).
+- **PBQ-first:** real mode sorts cli/ordering/matching questions to the front (real exams open with performance-based questions).
+- **Mixed excludes CLI:** CLI is CCNA-specific, filtered out of Mixed-cert assembly (gap #14).
+- **Pacing feedback (R3):** results screen shows avg time/question vs the real exam budget (minutes*60/questions per cert), color-coded (on pace / a bit slow / too slow), with a PBQ time-warning when the test contained performance-based questions. `finalDuration` frozen in saveResults.
+- **Graceful degradation (gap #15):** blend is best-effort — generate-questions cycles the pool to fill the real count even when the pool is small; no crash. Auto-improves after Generation Day.
+- Readiness signal = the S2 pass-likelihood estimate (already on results).
+- Build verified passing. Regression: practice/simulation use single difficulty + personalize (unchanged); difficulties param backward-compatible (null → single-difficulty query).
+- Files: api/generate-questions/route.js, study-hub/test/page.js, CLAUDE.md
+- Roadmap: S10 ✅ — **Block A/B/C exam-realism track complete except Generation Day (S1 decks, S3 verify, S4 coverage, S5 purge+regen all deferred per user's generation hold)**
 
 ### Phase 101 — S9: CCNA CLI Mode Engine (Tier 1.5) — Complete
 - **`src/lib/iosCliEngine.js` (new):** mode state machine (user_exec/priv_exec/global/interface/router/line/vlan config) + prompt rendering + IOS abbreviation expansion (PHRASE_RULES: en, conf t, int, no shut, ip add, etc.) + interface-name canonicalization (gi/g/gig→GigabitEthernet) + replay grading. `runCli(payload, lines)` returns transcript steps (prompt+error per line), current mode/prompt, satisfied goals, correct. Grades by mode-aware replay: config commands typed in the wrong mode are REJECTED with a real IOS-style error → skipping enable/conf t/interface fails the question → forces navigation practice. Does NOT simulate the network (documented).
