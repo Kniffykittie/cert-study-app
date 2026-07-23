@@ -90,7 +90,7 @@ A personal command center combining a study platform for CCNA, CompTIA Network+,
 ### User & Auth
 | Table | Purpose |
 |-------|---------|
-| `profiles` | User display name, exam_dates JSONB, daily_goal INT, default_cert TEXT, is_disabled BOOLEAN, settings_pin_hash TEXT (bcrypt), authenticator_name TEXT, notification_preferences JSONB (10 boolean keys; briefs default true, nudges default false) |
+| `profiles` | User display name, exam_dates JSONB, daily_goal INT, default_cert TEXT, is_disabled BOOLEAN, settings_pin_hash TEXT (bcrypt), authenticator_name TEXT, notification_preferences JSONB (10 boolean keys; briefs default true, nudges default false), notification_times JSONB (per-type "HH:MM" custom send-time overrides; unset = derived default), timezone TEXT (IANA tz for local-time notification firing) |
 | `invite_codes` | Single-use signup codes — code TEXT UNIQUE, created_by, used_by, used_at TIMESTAMPTZ; null = unused |
 | `join_attempts` | IP brute force tracking for /join — ip TEXT, attempted_at, success BOOLEAN; `check_join_rate_limit(ip)` Postgres function |
 | `recovery_codes` | 2FA recovery codes — user_id, code_hash TEXT (bcrypt), used_at TIMESTAMPTZ (null = unused); RLS user-scoped |
@@ -3176,30 +3176,9 @@ This supersedes all scattered "Session N" numbering below. Detailed specs for ea
 ### BLOCK C — Real Exam Experience (needs all formats to exist)
 - **S10 — Real Exam Blend + Pacing (R7 + R3)** ✅ BUILT (Phase 102) — per-cert recipe assembly (official domain weights, ~70/30 medium/hard, PBQ-first, 2-3 multi-select, exhibits, real count+timer), graceful degradation when pool can't fill (gap #15), CLI/PBQ excluded from Mixed (gap #14); pacing feedback on results (~1 min/q budget, R3); readiness signal (gap #8). Ties the exam experience together.
 
-### 🔔 NOTIFICATIONS 2.0 (user-requested 2026-07-23) — build as ONE coherent session
-Three related upgrades that all touch the daily-push Edge Function + Settings notifications tab:
+### 🔔 NOTIFICATIONS 2.0 ✅ BUILT (Phase 108) — N1 per-type timing + N3 explainers + N4 rich content; timezone-aware Edge Function rewrite with same-slot bundling. Edge Function code complete on disk, **deploy pending** (user must deploy `daily-push` via Supabase).
 
-**N1. Per-notification custom timing (user chose full per-type control over window-bundling).**
-- Schema: `notification_times JSONB` on profiles — `{ morning_brief: "07:00", hydration_nudge: "15:00", supplement_evening: "21:00", ... }`; unset keys fall back to today's derived defaults (morning=wake, midday=wake+6h, evening=bed−1h, workout=workout_time−60).
-- Edge Function REWRITE: currently bundles nudges into 3 windows. New model: each enabled notification has its own target time; the cron (every 30 min) checks each type's time. **Reconcile with the anti-spam concern:** bundle ONLY notifications whose times fall in the SAME 30-min slot — so same-time = one combined push, different times = separate. Best of both (user picks times; no accidental 5-at-once).
-- Settings UI: a time picker next to each notification toggle.
-
-**N3. Per-notification explanations (what it notifies + how it works).**
-- Each notification type gets an expandable "how this works" explainer in Settings (what triggers it, what data it uses, when it fires). Expand the current one-line `desc` into a fuller info panel (InfoChip or expandable row).
-
-**N4. Meaningful, data-rich notification content (not "drink water" but "you're at X, aim for ~Y by now to hit Z").**
-- The Edge Function already fetches the data (water_logs+goal, question count+goal, supplements taken/total, etc.) — this is message-formatting + pace math, not new data.
-- Per nudge, compute progress-vs-expected-pace and phrase it concretely:
-  - Hydration: "You're at {current} oz. To hit {goal} oz by bedtime you should be near {pace_target} oz by now — about {remaining} oz to go."
-  - Study streak: "You've done {count}/{goal} questions today — {remaining} more to keep your {streak}-day streak."
-  - Supplements: name which ones are still untaken.
-  - Weigh-in/measurement: "last logged {n} days ago."
-- Keep messages short but specific (numbers + target + gap).
-
-Build order within the session: N1 schema + Edge Function rewrite (timing + same-slot bundling) → N4 rich message builders (same Edge Function) → N3 + N1 Settings UI (time picker + explainer per type). Big session — Edge Function is the bulk.
-
-### 📱 STUDY HUB BOTTOM NAV (user-requested 2026-07-23)
-Mirror the Life Hub mobile bottom tab bar (LifeHubBottomNav) for the Study Hub. New `StudyHubBottomNav.js` — emoji tabs (e.g. 🏠 Overview / 📝 Test / 📖 Study / 🧪 Labs / 🃏 Flashcards), section-colored active state, mounted in study-hub/layout.js, mobile-only (≤768px), hamburger hidden on mobile like Life Hub. Standalone UI build.
+### 📱 STUDY HUB BOTTOM NAV ✅ BUILT (Phase 108) — `StudyHubBottomNav.js` (Home/Test/Cards/Labs/Progress), mobile-only, test-in-progress guard, mounted in study-hub/layout.js; FloatingChat lifted above nav on mobile.
 
 ### BLOCK D — Rest of App (previously planned, pull forward anytime user wants a break from the track)
 - **S11 — Life Hub Home Restructure** ✅ largely pre-built (Phase 91); see Phase 106 note — recovery ring hero, single tabbed brief, zone reorder, skeleton loaders, split 971-line page (2026-07-09 audit spec).
@@ -3419,6 +3398,15 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 108 — Notifications 2.0 (N1/N3/N4) + Study Hub Bottom Nav — Complete
+- **N1 — Per-notification custom timing:** `notification_times JSONB` + `timezone TEXT` columns added to `profiles` (migration `notification_times_and_timezone`). Each notification in Settings → Notifications now shows a `<input type="time">` picker when enabled; custom time saved per-key to `notification_times`, empty resets to the derived default. Defaults computed client-side via `defaultTimeFor(item, wake, bed)` mirroring the Edge Function offsets (morning=wake, midday=wake+6h, evening=bed−1h, hydration=wake+6h, streak=bed−2h, supplement=wake+30, weigh-in=wake+15, measurement=wake+20, wrap=bed−90, workout=schedule-derived). Timezone captured via `Intl.DateTimeFormat().resolvedOptions().timeZone` on schedule save + any time save.
+- **N3 — Per-notification explainers:** each row has an ⓘ button toggling a "how this works" panel describing the trigger, data used, and cadence (added `how` field to NOTIF_TYPES).
+- **N4 — Rich, data-driven message content:** Edge Function `NOTIF_REGISTRY` builders compute progress-vs-pace and phrase concretely (hydration: "You're at X oz… ~Y oz by now — about Z oz to catch up"; study streak: "X/Y questions — Z more"; supplements: names untaken; weigh-in/measurement: "last logged N days ago"). Nudges return null (silent) when their condition isn't met.
+- **Edge Function rewrite (`supabase/functions/daily-push/index.ts`):** timezone-aware (`localMinutesInTz`/`localDateInTz` via Intl — fixes the "fires at UTC" bug); per-type target time (`customTimes[key] ?? defaultTime`); collects all fired notifications in the current 30-min slot and applies **same-slot bundling** (1 → own push; ≥2 → one combined `🔔 N reminders` push) to avoid spam; `deliverPush`/`alreadySent`/`logSent` helpers; dedup via `push_notification_log` keyed on notification type + local date. **Code complete on disk; deploy to Supabase still pending (user action).**
+- **Study Hub bottom nav:** new `StudyHubBottomNav.js` — mobile-only emoji tab bar (⊞ Home / 📝 Test / 🃏 Cards / 🔬 Labs / 📈 Progress) mirroring `LifeHubBottomNav`; carries the test-in-progress leave-guard modal; mounted in study-hub/layout.js with 72px bottom padding on mobile. `FloatingChat` bubble + panel lifted above the nav on mobile via `.fc-bubble`/`.fc-panel` media query.
+- Build verified passing.
+- Files: settings/page.js, supabase/functions/daily-push/index.ts, components/StudyHubBottomNav.js (new), app/study-hub/layout.js, components/FloatingChat.js, CLAUDE.md
 
 ### Phase 107 — S12: Notification Schedule UI + PWA Install Banner — Complete
 - **Schedule card (Settings → Notifications):** wake time + bedtime pickers writing to goals_profiles (update if profile exists, else upsert); shows the computed send times live (Morning = wake, Midday = wake+6h, Evening = bedtime−1h) in 12-hour format. Fixes the NULL wake/bedtime problem that made notifications fire at default 4 AM / 6 PM EST — now settable outside the 5-step Goals Setup. fmt12/addMinutes helpers.

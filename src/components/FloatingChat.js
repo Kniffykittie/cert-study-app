@@ -96,9 +96,15 @@ export default function FloatingChat() {
 
   return (
     <>
+      <style>{`
+        @media (max-width: 768px) {
+          .fc-bubble { bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important; }
+          .fc-panel { bottom: calc(140px + env(safe-area-inset-bottom, 0px)) !important; }
+        }
+      `}</style>
       {/* Chat panel */}
       {open && (
-        <div style={{ position: 'fixed', bottom: '80px', right: '24px', width: '360px', height: '520px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', zIndex: 500, overflow: 'hidden' }}>
+        <div className="fc-panel" style={{ position: 'fixed', bottom: '80px', right: '24px', width: '360px', height: '520px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', zIndex: 500, overflow: 'hidden' }}>
           {/* Header */}
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--background)' }}>
             <div>
@@ -183,6 +189,7 @@ export default function FloatingChat() {
       {/* Floating bubble */}
       <button
         onClick={() => setOpen(o => !o)}
+        className="fc-bubble"
         style={{ position: 'fixed', bottom: '24px', right: '24px', width: '52px', height: '52px', borderRadius: '50%', backgroundColor: open ? 'var(--surface)' : 'var(--accent-blue)', border: open ? '1px solid var(--border)' : 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', zIndex: 500, transition: 'background-color 0.15s' }}
         aria-label={open ? 'Close chat' : 'Open chat'}
       >

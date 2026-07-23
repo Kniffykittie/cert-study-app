@@ -59,10 +59,25 @@ function nowUTCMinutes(): number {
   return now.getUTCHours() * 60 + now.getUTCMinutes()
 }
 
-// True if nowUTC is within [windowMin, windowMin+30) — the 30-min cron bucket
-function inWindow(windowMin: number): boolean {
-  const now = nowUTCMinutes()
-  return now >= windowMin && now < windowMin + 30
+// Current LOCAL minute-of-day for a given IANA timezone (fixes "fires at UTC time" bug)
+function localMinutesInTz(tz: string | null): number {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz || 'UTC', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date())
+    const h = parseInt(parts.find(p => p.type === 'hour')!.value) % 24
+    const m = parseInt(parts.find(p => p.type === 'minute')!.value)
+    return h * 60 + m
+  } catch { return nowUTCMinutes() }
+}
+function localDateInTz(tz: string | null): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: tz || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date())
+    const g = (t: string) => parts.find(p => p.type === t)!.value
+    return `${g('year')}-${g('month')}-${g('day')}`
+  } catch { return todayUTC() }
+}
+// True if `now` is within the 30-min cron slot starting at `target`
+function inSlot(target: number, now: number): boolean {
+  return now >= target && now < target + 30
 }
 
 // ---------------------------------------------------------------------------
@@ -163,19 +178,10 @@ async function encryptPayload(plaintext: string, p256dh: string, auth: string): 
 // Send a single push
 // ---------------------------------------------------------------------------
 
-async function sendPush(supabase: ReturnType<typeof createClient>, sub: { user_id: string; endpoint: string; p256dh: string; auth_key: string }, msg: PushMessage, windowKey: string): Promise<void> {
-  const sentDate = todayUTC()
+type Sub = { user_id: string; endpoint: string; p256dh: string; auth_key: string }
 
-  // Dedup check
-  const { data: existing } = await supabase
-    .from('push_notification_log')
-    .select('id')
-    .eq('user_id', sub.user_id)
-    .eq('sent_date', sentDate)
-    .eq('window', windowKey)
-    .maybeSingle()
-  if (existing) return
-
+// Raw encrypted delivery — no dedup, no logging (caller handles those)
+async function deliverPush(supabase: ReturnType<typeof createClient>, sub: Sub, msg: PushMessage): Promise<boolean> {
   const headers = await buildVapidHeaders(sub.endpoint)
   const payload = JSON.stringify({ title: msg.title, body: msg.body, url: msg.url, tag: msg.tag })
   const encrypted = await encryptPayload(payload, sub.p256dh, sub.auth_key)
@@ -184,123 +190,147 @@ async function sendPush(supabase: ReturnType<typeof createClient>, sub: { user_i
     headers: { ...headers, 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream' },
     body: encrypted,
   })
-
   if (res.status === 410 || res.status === 404) {
     await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint)
-    return
+    return false
   }
+  if (!res.ok) throw new Error(`push failed ${res.status}: ${(await res.text()).slice(0, 200)}`)
+  return true
+}
 
-  if (!res.ok) {
-    throw new Error(`push failed ${res.status}: ${(await res.text()).slice(0, 200)}`)
-  }
+async function alreadySent(supabase: ReturnType<typeof createClient>, userId: string, sentDate: string, key: string): Promise<boolean> {
+  const { data } = await supabase.from('push_notification_log').select('id').eq('user_id', userId).eq('sent_date', sentDate).eq('window', key).maybeSingle()
+  return !!data
+}
 
-  await supabase.from('push_notification_log').insert({
-    user_id: sub.user_id,
-    sent_date: sentDate,
-    window: windowKey,
-    title: msg.title,
-    body: msg.body,
-    delivered: true,
-  })
+async function logSent(supabase: ReturnType<typeof createClient>, userId: string, sentDate: string, key: string, title: string, body: string): Promise<void> {
+  await supabase.from('push_notification_log').insert({ user_id: userId, sent_date: sentDate, window: key, title, body, delivered: true })
+}
+
+// Convenience for the manual test path
+async function sendPush(supabase: ReturnType<typeof createClient>, sub: Sub, msg: PushMessage, windowKey: string): Promise<void> {
+  if (await alreadySent(supabase, sub.user_id, todayUTC(), windowKey)) return
+  const ok = await deliverPush(supabase, sub, msg)
+  if (ok) await logSent(supabase, sub.user_id, todayUTC(), windowKey, msg.title, msg.body)
 }
 
 // ---------------------------------------------------------------------------
-// Nudge condition checks
+// Notification registry — each type has a default local time + a rich message builder
 // ---------------------------------------------------------------------------
 
-async function checkHydrationNudge(supabase: ReturnType<typeof createClient>, userId: string): Promise<boolean> {
-  const today = todayUTC()
-  const { data: logs } = await supabase.from('water_logs').select('amount_oz').eq('user_id', userId).eq('date', today)
-  const { data: goals } = await supabase.from('goals_profiles').select('water_goal_oz').eq('user_id', userId).maybeSingle()
-  const total = (logs ?? []).reduce((s: number, r: { amount_oz: number }) => s + parseFloat(String(r.amount_oz)), 0)
-  const goal = goals?.water_goal_oz ?? 64
-  return total < goal * 0.5
+interface Ctx {
+  supabase: ReturnType<typeof createClient>
+  userId: string
+  localToday: string
+  nowLocalMin: number
+  wakeMin: number
+  bedMin: number
+  waterGoal: number
+  dailyGoal: number
+}
+type Built = { title: string; body: string; url: string } | null
+
+const NOTIF_REGISTRY: Record<string, { defaultTime: (c: Ctx) => number; build: (c: Ctx) => Promise<Built> }> = {
+  morning_brief: {
+    defaultTime: c => c.wakeMin,
+    build: async () => ({ title: 'Good morning 🌅', body: 'Your morning brief is ready — see how today is shaping up.', url: '/life-hub' }),
+  },
+  midday_checkin: {
+    defaultTime: c => c.wakeMin + 360,
+    build: async () => ({ title: 'Midday check-in ☀️', body: "How's your day going? Log your afternoon check-in.", url: '/life-hub' }),
+  },
+  evening_wrap: {
+    defaultTime: c => c.bedMin - 60,
+    build: async () => ({ title: 'Evening wrap-up 🌙', body: 'Log dinner and review your day before winding down.', url: '/life-hub' }),
+  },
+  hydration_nudge: {
+    defaultTime: c => c.wakeMin + 360,
+    build: async (c) => {
+      const { data: logs } = await c.supabase.from('water_logs').select('amount_oz').eq('user_id', c.userId).eq('date', c.localToday)
+      const total = Math.round((logs ?? []).reduce((s: number, r: { amount_oz: number }) => s + parseFloat(String(r.amount_oz)), 0))
+      const goal = c.waterGoal
+      const frac = Math.min(1, Math.max(0, (c.nowLocalMin - c.wakeMin) / Math.max(1, c.bedMin - c.wakeMin)))
+      const paceTarget = Math.round(goal * frac)
+      if (total >= paceTarget || total >= goal) return null
+      const gap = paceTarget - total
+      return { title: 'Hydration 💧', body: `You're at ${total} oz. To hit ${goal} oz by bedtime you'd want ~${paceTarget} oz by now — about ${gap} oz to catch up.`, url: '/life-hub/health/water' }
+    },
+  },
+  study_streak: {
+    defaultTime: c => c.bedMin - 120,
+    build: async (c) => {
+      const { count } = await c.supabase.from('question_answers').select('id', { count: 'exact', head: true }).eq('user_id', c.userId).gte('created_at', `${c.localToday}T00:00:00`)
+      const done = count ?? 0
+      if (done >= c.dailyGoal) return null
+      const remaining = c.dailyGoal - done
+      return { title: 'Study streak 📚', body: `You've done ${done}/${c.dailyGoal} questions today — ${remaining} more to keep your streak alive.`, url: '/study-hub/test' }
+    },
+  },
+  supplement_reminder: {
+    defaultTime: c => c.wakeMin + 30,
+    build: async (c) => {
+      const { data: supps } = await c.supabase.from('supplement_stack').select('id, name').eq('user_id', c.userId).eq('is_active', true)
+      if (!supps?.length) return null
+      const ids = supps.map((s: { id: string }) => s.id)
+      const { data: logs } = await c.supabase.from('supplement_logs').select('supplement_id').eq('user_id', c.userId).eq('date', c.localToday).in('supplement_id', ids)
+      const taken = new Set((logs ?? []).map((l: { supplement_id: string }) => l.supplement_id))
+      const untaken = supps.filter((s: { id: string }) => !taken.has(s.id)).map((s: { name: string }) => s.name)
+      if (!untaken.length) return null
+      const list = untaken.slice(0, 4).join(', ') + (untaken.length > 4 ? `, +${untaken.length - 4} more` : '')
+      return { title: 'Supplements 💊', body: `Still to take today: ${list}.`, url: '/life-hub/goals/supplements' }
+    },
+  },
+  weigh_in_reminder: {
+    defaultTime: c => c.wakeMin + 15,
+    build: async (c) => {
+      const { data } = await c.supabase.from('body_measurements').select('date').eq('user_id', c.userId).not('weight_lbs', 'is', null).order('date', { ascending: false }).limit(1).maybeSingle()
+      const days = data ? Math.floor((Date.now() - new Date(data.date).getTime()) / 86400000) : null
+      if (days !== null && days < 3) return null
+      return { title: 'Weigh-in ⚖️', body: days === null ? "Log your first weight to start tracking your trend." : `Last weigh-in was ${days} days ago — hop on the scale to keep your trend accurate.`, url: '/life-hub/goals/measurements' }
+    },
+  },
+  body_measurement_reminder: {
+    defaultTime: c => c.wakeMin + 20,
+    build: async (c) => {
+      const { data } = await c.supabase.from('body_measurements').select('date').eq('user_id', c.userId).not('waist_in', 'is', null).order('date', { ascending: false }).limit(1).maybeSingle()
+      const days = data ? Math.floor((Date.now() - new Date(data.date).getTime()) / 86400000) : null
+      if (days !== null && days < 7) return null
+      return { title: 'Measurements 📏', body: days === null ? 'Log body measurements to track changes the scale misses.' : `Body measurements last logged ${days} days ago — a weekly check catches recomposition.`, url: '/life-hub/goals/measurements' }
+    },
+  },
+  wrap_ready: {
+    defaultTime: c => c.bedMin - 90,
+    build: async (c) => {
+      const now = new Date()
+      if (now.getUTCDay() === 6) {
+        const lastMon = new Date(now); lastMon.setUTCDate(now.getUTCDate() - 6)
+        const { data } = await c.supabase.from('weekly_wraps').select('id').eq('user_id', c.userId).eq('week_start', lastMon.toISOString().slice(0, 10)).maybeSingle()
+        if (!data) return { title: 'Weekly Wrap 📅', body: 'Your week is complete — generate your weekly summary to see the highlights.', url: '/life-hub/weekly-wrap' }
+      }
+      if (now.getUTCDate() === 1) {
+        const lastMonth = new Date(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)
+        const { data } = await c.supabase.from('monthly_wraps').select('id').eq('user_id', c.userId).eq('month', lastMonth.toISOString().slice(0, 7)).maybeSingle()
+        if (!data) return { title: 'Monthly Wrap 📅', body: "A new month started — generate last month's summary.", url: '/life-hub/monthly-wrap' }
+      }
+      return null
+    },
+  },
 }
 
-async function checkStudyStreak(supabase: ReturnType<typeof createClient>, userId: string): Promise<boolean> {
-  const today = todayUTC()
-  const { data: profile } = await supabase.from('profiles').select('daily_goal').eq('id', userId).maybeSingle()
-  const dailyGoal = profile?.daily_goal ?? 30
-  const { count } = await supabase.from('question_answers').select('id', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', `${today}T00:00:00`)
-  return (count ?? 0) < dailyGoal
-}
-
-async function checkWeighInReminder(supabase: ReturnType<typeof createClient>, userId: string): Promise<boolean> {
-  const { data } = await supabase.from('body_measurements').select('date').eq('user_id', userId).not('weight_lbs', 'is', null).order('date', { ascending: false }).limit(1).maybeSingle()
-  if (!data) return true
-  const daysSince = (Date.now() - new Date(data.date).getTime()) / 86400000
-  return daysSince >= 3
-}
-
-async function checkBodyMeasurementReminder(supabase: ReturnType<typeof createClient>, userId: string): Promise<boolean> {
-  const { data } = await supabase.from('body_measurements').select('date').eq('user_id', userId).not('waist_in', 'is', null).order('date', { ascending: false }).limit(1).maybeSingle()
-  if (!data) return true
-  const daysSince = (Date.now() - new Date(data.date).getTime()) / 86400000
-  return daysSince >= 7
-}
-
-async function checkWorkoutReminder(supabase: ReturnType<typeof createClient>, userId: string, workoutWindowMin: number): Promise<{ fire: boolean; workoutMin: number }> {
-  const today = todayUTC()
+// Workout reminder is schedule-derived (fires relative to the day's planned workout), handled separately
+async function buildWorkoutReminder(c: Ctx): Promise<{ targetMin: number; built: Built } | null> {
   const now = new Date()
-  const dow = now.getUTCDay() // 0=Sun
-  // my_week uses 0=Mon, so adjust
+  const dow = now.getUTCDay()
   const myWeekDow = dow === 0 ? 6 : dow - 1
-  const weekStart = new Date(now)
-  weekStart.setUTCDate(now.getUTCDate() - myWeekDow)
-  const weekStartStr = weekStart.toISOString().slice(0, 10)
-
-  const { data: dayRow } = await supabase.from('my_week').select('workout_time, day_type').eq('user_id', userId).eq('week_start', weekStartStr).eq('day_of_week', myWeekDow).maybeSingle()
-  if (!dayRow?.workout_time || dayRow.day_type === 'day_off') return { fire: false, workoutMin: 0 }
-
-  // Compute workout window in UTC minutes (workout_time is local — approximate as UTC for now)
-  const wMin = toMinutes(dayRow.workout_time, 10 * 60)
-  const nudgeMin = wMin - 60 // fire 1hr before workout
-  const targetMin = nudgeMin < 0 ? 0 : nudgeMin
-
-  if (!inWindow(targetMin)) return { fire: false, workoutMin: targetMin }
-
-  // Check not already logged today
-  const { count } = await supabase.from('workout_logs').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('date', today)
-  return { fire: (count ?? 0) === 0, workoutMin: targetMin }
-}
-
-async function checkSupplementReminder(supabase: ReturnType<typeof createClient>, userId: string, isEvening: boolean): Promise<boolean> {
-  const today = todayUTC()
-  const timings = isEvening ? ['evening', 'post_workout'] : ['morning', 'pre_workout', 'with_meals']
-  const { data: supplements } = await supabase.from('supplement_stack').select('id').eq('user_id', userId).eq('is_active', true).in('timing', timings)
-  if (!supplements?.length) return false
-  const ids = supplements.map((s: { id: string }) => s.id)
-  const { data: logs } = await supabase.from('supplement_logs').select('supplement_id').eq('user_id', userId).eq('date', today).in('supplement_id', ids)
-  const takenIds = new Set((logs ?? []).map((l: { supplement_id: string }) => l.supplement_id))
-  return ids.some(id => !takenIds.has(id))
-}
-
-async function checkWrapReady(supabase: ReturnType<typeof createClient>, userId: string): Promise<{ weekly: boolean; monthly: boolean }> {
-  const now = new Date()
-  const utcDay = now.getUTCDay() // 6=Saturday
-  const utcDate = now.getUTCDate()
-
-  let weekly = false
-  let monthly = false
-
-  if (utcDay === 6) {
-    // Saturday — check if weekly wrap not yet generated for the completed week
-    const lastMon = new Date(now)
-    lastMon.setUTCDate(now.getUTCDate() - 6)
-    const weekStart = lastMon.toISOString().slice(0, 10)
-    const { data } = await supabase.from('weekly_wraps').select('id').eq('user_id', userId).eq('week_start', weekStart).maybeSingle()
-    weekly = !data
-  }
-
-  if (utcDate === 1) {
-    // 1st of month — check if monthly wrap not yet generated for last month
-    const lastMonth = new Date(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)
-    const monthStr = lastMonth.toISOString().slice(0, 7)
-    const { data } = await supabase.from('monthly_wraps').select('id').eq('user_id', userId).eq('month', monthStr).maybeSingle()
-    monthly = !data
-  }
-
-  return { weekly, monthly }
+  const weekStart = new Date(now); weekStart.setUTCDate(now.getUTCDate() - myWeekDow)
+  const { data: dayRow } = await c.supabase.from('my_week').select('workout_time, day_type').eq('user_id', c.userId).eq('week_start', weekStart.toISOString().slice(0, 10)).eq('day_of_week', myWeekDow).maybeSingle()
+  if (!dayRow?.workout_time || dayRow.day_type === 'day_off') return null
+  const wMin = toMinutes(dayRow.workout_time, 600)
+  const targetMin = Math.max(0, wMin - 60)
+  const { count } = await c.supabase.from('workout_logs').select('id', { count: 'exact', head: true }).eq('user_id', c.userId).eq('date', c.localToday)
+  if ((count ?? 0) > 0) return { targetMin, built: null }
+  const timeStr = dayRow.workout_time.slice(0, 5)
+  return { targetMin, built: { title: 'Workout soon 💪', body: `Your workout is at ${timeStr} — fuel up and get ready.`, url: '/life-hub/workouts' } }
 }
 
 // ---------------------------------------------------------------------------
@@ -339,128 +369,55 @@ Deno.serve(async (req) => {
         }
         // Load profile + goals in parallel
         const [profileRes, goalsRes] = await Promise.all([
-          supabase.from('profiles').select('notification_preferences, daily_goal').eq('id', sub.user_id).maybeSingle(),
+          supabase.from('profiles').select('notification_preferences, notification_times, timezone, daily_goal').eq('id', sub.user_id).maybeSingle(),
           supabase.from('goals_profiles').select('wake_time, bedtime, water_goal_oz').eq('user_id', sub.user_id).maybeSingle(),
         ])
 
         const prefs: NotifPrefs = { ...DEFAULT_PREFS, ...(profileRes.data?.notification_preferences ?? {}) }
-        const wakeMin = toMinutes(goalsRes.data?.wake_time, 8 * 60)   // default 08:00
-        const bedMin = toMinutes(goalsRes.data?.bedtime, 23 * 60)     // default 23:00
-        const midMin = wakeMin + 6 * 60
-        const eveMin = bedMin - 60
+        const customTimes: Record<string, string> = profileRes.data?.notification_times ?? {}
+        const tz = profileRes.data?.timezone ?? 'UTC'
+        const nowLocalMin = localMinutesInTz(tz)
+        const localToday = localDateInTz(tz)
 
-        // Determine which window(s) we're in right now
-        const isMorning = inWindow(wakeMin)
-        const isMidday = inWindow(midMin)
-        const isEvening = inWindow(eveMin)
-
-        if (!isMorning && !isMidday && !isEvening) continue
-
-        // ── MORNING WINDOW — one bundled notification ──────────────────────
-        if (isMorning && prefs.morning_brief) {
-          const nudges: string[] = []
-
-          const [weighIn, bodyMeasure, suppMorning] = await Promise.all([
-            prefs.weigh_in_reminder ? checkWeighInReminder(supabase, sub.user_id) : Promise.resolve(false),
-            prefs.body_measurement_reminder ? checkBodyMeasurementReminder(supabase, sub.user_id) : Promise.resolve(false),
-            prefs.supplement_reminder ? checkSupplementReminder(supabase, sub.user_id, false) : Promise.resolve(false),
-          ])
-
-          if (suppMorning) nudges.push('take your supplements')
-          if (weighIn) nudges.push('log your weight')
-          if (bodyMeasure) nudges.push('log measurements')
-
-          const body = nudges.length
-            ? `Your morning brief is ready. Don't forget to ${nudges.join(' · ')}.`
-            : 'Your morning brief is ready.'
-
-          await sendPush(supabase, sub, {
-            title: 'Good morning 🌅',
-            body,
-            url: '/life-hub',
-            tag: 'morning-brief',
-          }, 'morning')
-          totalSent++
+        const c: Ctx = {
+          supabase, userId: sub.user_id, localToday, nowLocalMin,
+          wakeMin: toMinutes(goalsRes.data?.wake_time, 7 * 60),
+          bedMin: toMinutes(goalsRes.data?.bedtime, 23 * 60),
+          waterGoal: goalsRes.data?.water_goal_oz ?? 64,
+          dailyGoal: profileRes.data?.daily_goal ?? 30,
         }
 
-        // Workout reminder fires separately at workout_time − 60min, not at wake
-        if (isMorning && prefs.workout_reminder) {
-          const { fire } = await checkWorkoutReminder(supabase, sub.user_id, wakeMin)
-          if (fire) {
-            const { data: dayRow } = await supabase.from('my_week').select('workout_time').eq('user_id', sub.user_id).maybeSingle()
-            const timeStr = dayRow?.workout_time ? dayRow.workout_time.slice(0, 5) : '—'
-            await sendPush(supabase, sub, {
-              title: 'Workout day 💪',
-              body: `You have a workout planned at ${timeStr}. Fuel up and get ready!`,
-              url: '/life-hub/workouts',
-              tag: 'workout-reminder',
-            }, 'morning-workout')
-            totalSent++
-          }
+        // Collect every notification whose target time lands in the current slot, is enabled,
+        // its condition fires, and hasn't already been sent today.
+        const fired: { key: string; title: string; body: string; url: string }[] = []
+
+        for (const [key, def] of Object.entries(NOTIF_REGISTRY)) {
+          if (!(prefs as Record<string, boolean>)[key]) continue
+          const targetMin = customTimes[key] ? toMinutes(customTimes[key], def.defaultTime(c)) : def.defaultTime(c)
+          if (!inSlot(targetMin, nowLocalMin)) continue
+          if (await alreadySent(supabase, sub.user_id, localToday, key)) continue
+          const built = await def.build(c)
+          if (built) fired.push({ key, ...built })
         }
 
-        // ── MIDDAY WINDOW — one bundled notification ────────────────────────
-        if (isMidday && prefs.midday_checkin) {
-          let body = "How's your day going? Log your afternoon check-in."
-
-          if (prefs.hydration_nudge) {
-            const lowWater = await checkHydrationNudge(supabase, sub.user_id)
-            if (lowWater) body += ' You\'re under halfway on your water goal — drink up! 💧'
-          }
-
-          await sendPush(supabase, sub, {
-            title: 'Midday check-in ☀️',
-            body,
-            url: '/life-hub',
-            tag: 'midday-checkin',
-          }, 'midday')
-          totalSent++
+        // Workout reminder — schedule-derived time
+        if (prefs.workout_reminder && !(await alreadySent(supabase, sub.user_id, localToday, 'workout_reminder'))) {
+          const wr = await buildWorkoutReminder(c)
+          if (wr && wr.built && inSlot(wr.targetMin, nowLocalMin)) fired.push({ key: 'workout_reminder', ...wr.built })
         }
 
-        // ── EVENING WINDOW — one bundled notification ───────────────────────
-        if (isEvening && prefs.evening_wrap) {
-          const nudges: string[] = []
+        if (!fired.length) continue
 
-          const [streak, suppEvening] = await Promise.all([
-            prefs.study_streak ? checkStudyStreak(supabase, sub.user_id) : Promise.resolve(false),
-            prefs.supplement_reminder ? checkSupplementReminder(supabase, sub.user_id, true) : Promise.resolve(false),
-          ])
-
-          if (streak) nudges.push("you haven't hit your study goal yet")
-          if (suppEvening) nudges.push('evening supplements to take')
-
-          const body = nudges.length
-            ? `Log dinner and wind down. Heads up: ${nudges.join(' · ')}.`
-            : 'Log dinner and review your day before winding down.'
-
-          await sendPush(supabase, sub, {
-            title: 'Evening wrap-up 🌙',
-            body,
-            url: '/life-hub',
-            tag: 'evening-wrap',
-          }, 'evening')
-          totalSent++
-        }
-
-        // Wrap ready fires as its own notification (weekly/monthly — infrequent enough to warrant it)
-        if (isEvening && prefs.wrap_ready) {
-          const { weekly, monthly } = await checkWrapReady(supabase, sub.user_id)
-          if (weekly) {
-            await sendPush(supabase, sub, {
-              title: 'Weekly Wrap ready 📅',
-              body: 'Your week is complete. Generate your weekly summary!',
-              url: '/life-hub/weekly-wrap',
-              tag: 'wrap-weekly',
-            }, 'evening-wrap-weekly')
-            totalSent++
-          }
-          if (monthly) {
-            await sendPush(supabase, sub, {
-              title: 'Monthly Wrap ready 📅',
-              body: "A new month started — generate last month's summary!",
-              url: '/life-hub/monthly-wrap',
-              tag: 'wrap-monthly',
-            }, 'evening-wrap-monthly')
+        // Same-slot bundling: 1 → its own push; ≥2 → one combined push (avoids notification spam)
+        if (fired.length === 1) {
+          const f = fired[0]
+          const ok = await deliverPush(supabase, sub, { title: f.title, body: f.body, url: f.url, tag: f.key })
+          if (ok) { await logSent(supabase, sub.user_id, localToday, f.key, f.title, f.body); totalSent++ }
+        } else {
+          const body = fired.map(f => f.body).join('\n\n')
+          const ok = await deliverPush(supabase, sub, { title: `🔔 ${fired.length} reminders`, body, url: '/life-hub', tag: `bundle-${nowLocalMin}` })
+          if (ok) {
+            for (const f of fired) await logSent(supabase, sub.user_id, localToday, f.key, f.title, f.body)
             totalSent++
           }
         }

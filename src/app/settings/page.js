@@ -37,26 +37,44 @@ function addMinutes(hhmm, mins) {
   let total = (h * 60 + m + mins + 1440) % 1440
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
 }
+// Default HH:MM for a notification given the user's wake/bedtime, or '' if the anchor isn't set.
+function defaultTimeFor(item, wakeTime, bedtime) {
+  if (item.base === 'wake') return wakeTime ? addMinutes(wakeTime, item.offset) : ''
+  if (item.base === 'bed') return bedtime ? addMinutes(bedtime, item.offset) : ''
+  return '' // workout — schedule-derived, no fixed default
+}
 
+// base = 'wake' | 'bed' | 'workout' ; offset in minutes from that anchor.
+// The Edge Function uses these exact offsets — keep in sync.
 const NOTIF_TYPES = [
   {
     group: 'DAILY BRIEFS',
     items: [
-      { key: 'morning_brief', emoji: '🌅', label: 'Morning Brief', desc: 'Fires at your wake time from Goals setup' },
-      { key: 'midday_checkin', emoji: '☀️', label: 'Midday Check-in', desc: 'Fires 6 hours after your wake time' },
-      { key: 'evening_wrap', emoji: '🌙', label: 'Evening Wrap', desc: 'Fires 1 hour before your bedtime' },
+      { key: 'morning_brief', emoji: '🌅', label: 'Morning Brief', desc: 'Fires at your wake time', base: 'wake', offset: 0,
+        how: 'A short AI-written summary of your day — today\'s schedule, planned workout, meal timing, and anything from your check-ins. It reads 10+ of your tracked tables and is cached so it only generates once each morning.' },
+      { key: 'midday_checkin', emoji: '☀️', label: 'Midday Check-in', desc: 'Fires 6 hours after wake', base: 'wake', offset: 360,
+        how: 'A nudge to log your afternoon energy and mood so the app can spot low-energy streaks and adjust recommendations. Tapping it opens the check-in sheet.' },
+      { key: 'evening_wrap', emoji: '🌙', label: 'Evening Wrap', desc: 'Fires 1 hour before bedtime', base: 'bed', offset: -60,
+        how: 'A past-tense recap of how the day actually went — calories, water, workout, steps — so you can close the loop before bed.' },
     ],
   },
   {
     group: 'SMART NUDGES',
     items: [
-      { key: 'workout_reminder', emoji: '💪', label: 'Workout Reminder', desc: 'On workout days, 1 hour before your planned time' },
-      { key: 'hydration_nudge', emoji: '💧', label: 'Hydration Nudge', desc: 'Midday if you\'re under 50% of your water goal' },
-      { key: 'study_streak', emoji: '📚', label: 'Study Streak Alert', desc: 'Evening if your daily question goal isn\'t hit' },
-      { key: 'supplement_reminder', emoji: '💊', label: 'Supplement Reminder', desc: 'Morning and evening based on your stack\'s timing' },
-      { key: 'weigh_in_reminder', emoji: '⚖️', label: 'Weigh-in Reminder', desc: 'Morning if no weight logged in 3+ days' },
-      { key: 'body_measurement_reminder', emoji: '📏', label: 'Body Measurements', desc: 'Morning if no measurements logged in 7+ days' },
-      { key: 'wrap_ready', emoji: '📅', label: 'Wrap Ready', desc: 'Saturday evening (weekly) and 1st of month (monthly)' },
+      { key: 'workout_reminder', emoji: '💪', label: 'Workout Reminder', desc: 'On workout days, 1 hr before planned time', base: 'workout', offset: -60,
+        how: 'Only fires on days your plan has a workout, one hour before the time you set in My Week. Skipped entirely on rest days.' },
+      { key: 'hydration_nudge', emoji: '💧', label: 'Hydration Nudge', desc: 'Only if you\'re behind on water', base: 'wake', offset: 360,
+        how: 'Checks your water total against where you should be to hit your daily goal by bedtime. It tells you your exact intake and how many oz you\'re behind — it stays silent if you\'re on pace.' },
+      { key: 'study_streak', emoji: '📚', label: 'Study Streak Alert', desc: 'Evening if your question goal isn\'t hit', base: 'bed', offset: -120,
+        how: 'Fires in the evening only if you haven\'t reached your daily question goal, and tells you exactly how many questions you have left.' },
+      { key: 'supplement_reminder', emoji: '💊', label: 'Supplement Reminder', desc: 'Morning, lists what\'s still untaken', base: 'wake', offset: 30,
+        how: 'Lists the supplements in your stack you haven\'t marked taken yet today, by name. Silent once everything is logged.' },
+      { key: 'weigh_in_reminder', emoji: '⚖️', label: 'Weigh-in Reminder', desc: 'Morning if no weight in 3+ days', base: 'wake', offset: 15,
+        how: 'A gentle morning reminder to step on the scale, only when your last logged weight is 3 or more days old. Consistent data makes the TDEE calibration accurate.' },
+      { key: 'body_measurement_reminder', emoji: '📏', label: 'Body Measurements', desc: 'Morning if none in 7+ days', base: 'wake', offset: 20,
+        how: 'A weekly-cadence nudge to log tape measurements, only when your last set is 7+ days old. Measurements catch recomposition the scale misses.' },
+      { key: 'wrap_ready', emoji: '📅', label: 'Wrap Ready', desc: 'When a weekly/monthly wrap is ready', base: 'bed', offset: -90,
+        how: 'Lets you know your Weekly Wrap (Saturday evening) or Monthly Wrap (1st of the month) has been generated and is ready to read.' },
     ],
   },
 ]
@@ -96,6 +114,8 @@ function SettingsPageInner() {
     body_measurement_reminder: false, wrap_ready: false,
   })
   const [prefsSaving, setPrefsSaving] = useState(false)
+  const [notifTimes, setNotifTimes] = useState({})
+  const [expandedHow, setExpandedHow] = useState(null)
 
   const [resetConfirm, setResetConfirm] = useState(null)
   const [resetting, setResetting] = useState(false)
@@ -178,13 +198,14 @@ function SettingsPageInner() {
           setHasGoalsProfile(true)
         }
       })
-      const { data } = await supabase.from('profiles').select('display_name, exam_dates, daily_goal, default_cert, settings_pin_hash, authenticator_name, notification_preferences').eq('id', user.id).single()
+      const { data } = await supabase.from('profiles').select('display_name, exam_dates, daily_goal, default_cert, settings_pin_hash, authenticator_name, notification_preferences, notification_times').eq('id', user.id).single()
       if (data) {
         if (data.display_name) { setDisplayName(data.display_name); setSavedName(data.display_name) }
         if (data.exam_dates) setExamDates({ ccna: '', 'network-plus': '', 'security-plus': '', ...data.exam_dates })
         if (data.daily_goal) setDailyGoal(data.daily_goal)
         if (data.default_cert) setDefaultCert(data.default_cert)
         if (data.notification_preferences) setNotifPrefs(p => ({ ...p, ...data.notification_preferences }))
+        if (data.notification_times) setNotifTimes(data.notification_times)
 
         // Privacy PIN gate
         if (data.authenticator_name) setSavedAuthName(data.authenticator_name)
@@ -300,8 +321,33 @@ function SettingsPageInner() {
       await supabase.from('goals_profiles').upsert({ user_id: user.id, ...patch }, { onConflict: 'user_id' })
       setHasGoalsProfile(true)
     }
+    // Capture the browser timezone so the Edge Function fires at the user's LOCAL time.
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      if (tz) await supabase.from('profiles').update({ timezone: tz }).eq('id', user.id)
+    } catch {}
     setScheduleSaved(true)
     setTimeout(() => setScheduleSaved(false), 2500)
+  }
+
+  // key -> 'HH:MM' custom override, or '' to clear back to the default.
+  async function handleSetNotifTime(key, value) {
+    const updated = { ...notifTimes }
+    if (value) updated[key] = value
+    else delete updated[key]
+    setNotifTimes(updated)
+    setPrefsSaving(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const patch = { notification_times: updated }
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+        if (tz) patch.timezone = tz
+      } catch {}
+      await supabase.from('profiles').update(patch).eq('id', user.id)
+    }
+    setPrefsSaving(false)
   }
 
   async function handleTogglePref(key) {
@@ -838,22 +884,56 @@ function SettingsPageInner() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                   {group.items.map((item, idx) => {
                     const on = notifPrefs[item.key]
+                    const def = defaultTimeFor(item, wakeTime, bedtime)
+                    const custom = notifTimes[item.key] || ''
+                    const effective = custom || def
+                    const expanded = expandedHow === item.key
                     return (
-                      <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 0', borderBottom: idx < group.items.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: '18px', lineHeight: 1 }}>{item.emoji}</span>
-                          <div>
-                            <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{item.label}</div>
-                            <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: 2 }}>{item.desc}</div>
+                      <div key={item.key} style={{ padding: '12px 0', borderBottom: idx < group.items.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                            <span style={{ fontSize: '18px', lineHeight: 1 }}>{item.emoji}</span>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>{item.label}</span>
+                                <button onClick={() => setExpandedHow(expanded ? null : item.key)}
+                                  aria-label="How this works"
+                                  style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '12px', padding: 0, lineHeight: 1 }}>ⓘ</button>
+                              </div>
+                              <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: 2 }}>{item.desc}</div>
+                            </div>
                           </div>
+                          {/* Toggle switch */}
+                          <button
+                            onClick={() => handleTogglePref(item.key)}
+                            style={{ width: 44, height: 24, borderRadius: 12, backgroundColor: on ? 'var(--accent-blue)' : 'var(--border)', border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0, transition: 'background-color 0.2s' }}
+                          >
+                            <span style={{ position: 'absolute', top: 3, left: on ? 23 : 3, width: 18, height: 18, borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s', display: 'block' }} />
+                          </button>
                         </div>
-                        {/* Toggle switch */}
-                        <button
-                          onClick={() => handleTogglePref(item.key)}
-                          style={{ width: 44, height: 24, borderRadius: 12, backgroundColor: on ? 'var(--accent-blue)' : 'var(--border)', border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0, transition: 'background-color 0.2s' }}
-                        >
-                          <span style={{ position: 'absolute', top: 3, left: on ? 23 : 3, width: 18, height: 18, borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s', display: 'block' }} />
-                        </button>
+                        {expanded && (
+                          <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '10px 12px', marginTop: 10, color: 'var(--text-secondary)', fontSize: '12px', lineHeight: 1.5 }}>
+                            {item.how}
+                          </div>
+                        )}
+                        {on && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+                            {item.base === 'workout' ? (
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Timed from your workout — set the time in My Week.</span>
+                            ) : (
+                              <>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Send at</span>
+                                <input type="time" value={effective}
+                                  onChange={e => handleSetNotifTime(item.key, e.target.value)}
+                                  style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '13px', colorScheme: 'dark' }} />
+                                {custom
+                                  ? <button onClick={() => handleSetNotifTime(item.key, '')}
+                                      style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', padding: 0 }}>Reset to default{def ? ` (${fmt12(def)})` : ''}</button>
+                                  : <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>default</span>}
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
