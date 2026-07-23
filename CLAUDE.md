@@ -97,6 +97,7 @@ Run through this before committing any new route:
 - [ ] Inline styles only — no Tailwind classes
 - [ ] `useSearchParams()` wrapped in `<Suspense>` if used (Vercel build fails otherwise)
 - [ ] Modals have `maxHeight: '90vh'` and `overflow-y: auto`
+- [ ] Modals close on Escape + backdrop click, and carry `role="dialog"` + `aria-modal="true"` + `aria-label`; icon-only buttons have `aria-label`
 
 ## Partial Feature Discipline
 - **⚠️ Partial entries must list exactly what's missing** — not just the flag. A ⚠️ Partial entry without a bullet list of unbuilt sub-items is ambiguous and will cause re-work.

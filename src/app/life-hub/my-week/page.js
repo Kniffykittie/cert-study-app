@@ -283,6 +283,12 @@ function DayDetail({ dateStr, routine, events, onClose, onEventsChanged, onRouti
   const [saving, setSaving] = useState(false)
   const [localRoutine, setLocalRoutine] = useState(() => routine || {})
 
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   async function saveRoutineField(field, value) {
     const day = {
       day_of_week: dow,
@@ -331,10 +337,10 @@ function DayDetail({ dateStr, routine, events, onClose, onEventsChanged, onRouti
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '16px' }}>
-      <div onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', padding: '20px' }}>
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Schedule for ${title}`} style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
           <h2 style={{ color: 'var(--text-primary)', fontSize: '17px', fontWeight: '700', margin: 0 }}>{title}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>✕</button>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>✕</button>
         </div>
 
         {/* Events */}
@@ -361,8 +367,9 @@ function DayDetail({ dateStr, routine, events, onClose, onEventsChanged, onRouti
                   </div>
                 </div>
                 <button onClick={() => setForm({ id: e.id, title: e.title, category: e.category, start_time: e.start_time?.slice(0, 5) || '', end_time: e.end_time?.slice(0, 5) || '', notes: e.notes || '', recurrence: e.recurrence })}
+                  aria-label={`Edit ${e.title}`}
                   style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>✏️</button>
-                <button onClick={() => deleteEvent(e.id)} style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '15px' }}>×</button>
+                <button onClick={() => deleteEvent(e.id)} aria-label={`Delete ${e.title}`} style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '15px' }}>×</button>
               </div>
             ))}
           </div>

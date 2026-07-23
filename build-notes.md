@@ -3401,6 +3401,13 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 115 — S14 polish (slice 2): modal accessibility — Complete
+- **Escape-to-close + backdrop semantics on modals:** My Schedule DayDetail modal and the shared BookmarkModal now close on Escape; BookmarkModal also closes on backdrop click (with inner `stopPropagation`). Both got `role="dialog"` + `aria-modal="true"` + `aria-label`.
+- **aria-labels on icon-only buttons:** My Schedule modal ✕ (Close), ✏️ (Edit {title}), × (Delete {title}) now have screen-reader labels.
+- Bounded a11y slice; broader ARIA/keyboard coverage across the rest of the app remains part of open S14.
+- Build verified passing.
+- Files: life-hub/my-week/page.js, components/BookmarkModal.js
+
 ### Phase 114 — S14 polish (slice 1): shared EmptyState + streak milestones — Complete
 - **Reusable `EmptyState` component** (icon + title + subtitle + optional CTA link, `compact` variant) for a consistent "feels finished" empty look. Applied to Study Hub results (📊 + Take a Test CTA), flagged (🚩), and bookmarks (unified the previously-bespoke block). Replaces bare one-line empty messages.
 - **Streak milestones/personality (DailyStreak):** milestone banner celebrates 3/7/14/30/60/100/200/365-day streaks (gold, 🎉), and between milestones nudges toward the next one or reminds how many questions remain today to keep the streak alive.
