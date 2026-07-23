@@ -3395,6 +3395,16 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 104 — S3: Generation Quality Engine (Fact-Check + Dedup + Difficulty Redefinition) — Complete
+- **Fact-check verify pass:** after generation, a SECOND batched Claude call (SME persona) reviews every mc/multi question — is the marked answer definitively correct, is any distractor CO-EQUALLY correct (with explicit best-answer nuance so legit "pick the best" questions are NOT rejected), any factual error. Failures dropped before insert. Fail-open with a warning if the verify call errors. (PBQ/CLI correctness is structural — not sent to verify.)
+- **Real Jaccard dedup:** tokenize stems (drop placeholders + short words), ≥0.55 overlap = duplicate; checked against the existing pool (ALL difficulties now, was single-difficulty) AND within the batch. Dropped before insert.
+- **Difficulty redefinition:** difficultyGuide rewritten to the locked definition — hard = SAME voice/length/genre as medium, only nastier DISTRACTORS (no CySA+ drift). Medium = the real exam baseline.
+- **Owner feedback:** route returns {generated, rejected, duplicates, warning}; templates page shows "Added N — X failed fact-check, Y duplicates dropped".
+- **maxDuration=60** on the route (two sequential AI calls).
+- Build verified passing. NOT executed (generation held until Generation Day) — logic verified by trace; gap #5 (best-answer) and gap #11 (timeout) addressed.
+- Files: api/generate-templates/route.js, study-hub/templates/page.js, CLAUDE.md
+- Roadmap: S3 ✅ (verify + dedup + difficulty). Remaining Generation-Day machinery: S4 examObjectives sub-objective coverage + fill-gaps orchestrator; S1 decks; then purge+regen.
+
 ### Phase 103 — S4/S5 (partial): Template Pool Control Panel — Complete
 Owner tooling for Generation Day. Machinery built now; actual generation still held per user.
 - **`/api/owner/delete-templates` (new):** owner-guarded HARD delete of question_templates by cert or 'all'; returns deleted count. Safe (verified: flagged_questions FK is SET NULL; answer history + topic_performance are snapshot/aggregate, unaffected).

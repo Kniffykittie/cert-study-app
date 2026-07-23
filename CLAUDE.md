@@ -228,7 +228,7 @@ src/
       reset/route.js                   POST — scoped data reset; uses getUser() + is_disabled check
       bookmarks/route.js               CRUD for bookmarked questions
       generate-questions/route.js      Template-only question serving (spaced repetition weighting, no AI calls); uses getUser() + is_disabled check
-      generate-templates/route.js      AI template generation (batch of 5, dedup); owner-only; uses getUser()
+      generate-templates/route.js      AI template generation (batch of 5); owner-only; TWO-stage quality gate → (1) fact-check verify pass (second SME Claude call checks each mc/multi: marked answer correct? co-equal distractor? factual error? — with best-answer nuance; rejects failures) (2) Jaccard dedup ≥0.55 vs existing pool (all difficulties) + within batch; returns {generated, rejected, duplicates, warning}; maxDuration=60; difficulty guide = voice-constant, only distractor depth changes
       generate-flashcards/route.js     AI flashcard generation; owner-only; uses getUser()
       test-chat/route.js               Tutor chat during practice tests; uses getUser()
       chat/route.js                    General study chat (FloatingChat component); uses getUser() + is_disabled check

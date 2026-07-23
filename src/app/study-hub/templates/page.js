@@ -112,7 +112,10 @@ export default function TemplatesPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setLastResult(`✓ Generated ${data.generated} templates for ${selectedDomain} (${selectedDifficulty})`)
+      const extras = []
+      if (data.rejected) extras.push(`${data.rejected} failed fact-check`)
+      if (data.duplicates) extras.push(`${data.duplicates} duplicates dropped`)
+      setLastResult(`✓ Added ${data.generated} templates for ${selectedDomain} (${selectedDifficulty})${extras.length ? ` — ${extras.join(', ')}` : ''}${data.warning ? ` ⚠ ${data.warning}` : ''}`)
       await loadCounts()
     } catch (e) {
       setLastResult(`✗ Error: ${e.message}`)

@@ -3,7 +3,63 @@ import { createClient } from '@/lib/supabase/server'
 
 const client = new Anthropic()
 
+// Two sequential Claude calls (generate + fact-check verify) — allow headroom on Vercel
+export const maxDuration = 60
+
 const OWNER_EMAIL = 'sethproper40@yahoo.com'
+
+// --- dedup helpers (Jaccard word-overlap on the stem) ---
+function tokenize(s) {
+  return new Set((s || '').toLowerCase().replace(/\{\{\w+\}\}/g, ' ').replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 3))
+}
+function jaccard(a, b) {
+  if (!a.size || !b.size) return 0
+  const inter = [...a].filter(x => b.has(x)).length
+  return inter / new Set([...a, ...b]).size
+}
+const DUP_THRESHOLD = 0.55
+
+// concrete instance of a template (first variable set) for fact-checking
+function fillFirst(t) {
+  const vars = (Array.isArray(t.variable_sets) && t.variable_sets[0]) || {}
+  const f = s => String(s || '').replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? `{{${k}}}`)
+  return {
+    question: f(t.question_template),
+    options: (t.options_templates || []).map(f),
+    marked: t.question_type === 'multi' ? (t.correct_answers || []).join(', ') : t.correct_answer,
+  }
+}
+
+// Fact-check the batch in ONE call. Returns a Set of indices that FAILED.
+async function verifyBatch(cert, items) {
+  const prompt = `You are a certified ${cert.toUpperCase()} subject-matter expert reviewing DRAFT exam questions for factual accuracy before they go into a study bank.
+
+For EACH question check three things:
+1. Is the marked correct answer definitively correct?
+2. Is any OTHER listed option ALSO fully correct, making the question genuinely ambiguous? — CRITICAL: many real certification questions are "best answer" questions where several options are partially valid and one is simply the BEST. That is CORRECT and expected. ONLY flag ambiguity if another option is EQUALLY or MORE correct than the marked answer.
+3. Any outright factual error, outdated information, or technically impossible scenario?
+
+Fail a question ONLY when there is a real correctness problem (wrong marked answer, a co-equal correct distractor, or a factual error). Do NOT fail for style, difficulty, or best-answer subtlety.
+
+Respond with ONLY a JSON array, one object per question:
+[{ "index": <number>, "verdict": "pass" | "fail", "reason": "<short>" }]
+
+QUESTIONS:
+${JSON.stringify(items)}`
+
+  const msg = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 4000,
+    messages: [{ role: 'user', content: prompt }],
+  })
+  let txt = msg.content[0].text.trim()
+  if (txt.startsWith('```')) txt = txt.replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '')
+  let verdicts
+  try { verdicts = JSON.parse(txt) } catch { const s = txt.indexOf('['), e = txt.lastIndexOf(']'); verdicts = JSON.parse(txt.slice(s, e + 1)) }
+  const failed = new Map()
+  for (const v of verdicts) if (v.verdict === 'fail') failed.set(v.index, v.reason || 'correctness issue')
+  return failed
+}
 
 export async function POST(req) {
   try {
@@ -17,20 +73,24 @@ export async function POST(req) {
       return Response.json({ error: 'Template generation is managed by the app owner.' }, { status: 403 })
     }
 
-    // Fetch existing templates for this domain so Claude can avoid duplicates
+    // Fetch existing templates for this domain (ALL difficulties) — for the prompt hint AND server-side dedup
     const { data: existing } = await supabase
       .from('question_templates')
       .select('question_template')
       .eq('cert', cert)
       .eq('domain', domain)
-      .eq('difficulty', difficulty)
+      .eq('is_retired', false)
 
     const existingList = (existing ?? []).map((t, i) => `${i + 1}. ${t.question_template}`)
+    const existingTokens = (existing ?? []).map(t => tokenize(t.question_template))
 
+    // Difficulty changes ONLY the depth of thinking / distractor trickiness — NEVER the exam's voice,
+    // length, or genre. A hard question is the SAME kind of question as a medium one, just with nastier
+    // distractors. Do not turn "hard" into a different (CySA+-style) subject.
     const difficultyGuide = {
-      easy: 'Recall-level questions testing basic definitions and concepts. Wrong answers are clearly incorrect to someone who studied.',
-      medium: 'Application-level questions requiring understanding of how concepts work together. Wrong answers are plausible to someone with partial knowledge.',
-      hard: 'Analysis and scenario-based questions. Wrong answers are specifically designed to catch common misconceptions or require precise knowledge to eliminate. Include CLI output, routing tables, subnet calculations, or multi-step reasoning where appropriate.',
+      easy: 'Recall level — definitions and direct facts, phrased in real-exam style. Distractors are clearly wrong to anyone who studied. Same length and voice as the real exam; just an easy question.',
+      medium: 'THE real exam level. Short scenario, apply one concept, standard plausible distractors (right idea, wrong detail). This is the baseline the exam actually feels like — most questions should read like this.',
+      hard: 'SAME format, voice, and length as medium — do NOT make it longer or a different genre. Only the DISTRACTORS get harder: two options both look plausible and you need precise knowledge to pick the best; include "correct in another context but wrong here" traps and edge cases. Over-preparation comes from tricky distractors, NOT from a different/longer question style.',
     }
 
     const existingSection = existingList.length > 0
@@ -138,6 +198,36 @@ Return ONLY the JSON array, no markdown, no explanation.`
       templates = JSON.parse(text.slice(start, end + 1))
     }
 
+    // --- QUALITY GATE 1: fact-check verify pass (mc/multi only; PBQ/CLI correctness is structural) ---
+    let rejected = 0
+    let verifyWarning = null
+    const verifiableIdx = templates.map((t, i) => i).filter(i => !['ordering', 'matching', 'cli'].includes(templates[i].question_type))
+    if (verifiableIdx.length) {
+      try {
+        const items = verifiableIdx.map(i => ({ index: i, ...fillFirst(templates[i]) }))
+        const failed = await verifyBatch(cert, items)
+        rejected = failed.size
+        templates = templates.filter((_, i) => !failed.has(i))
+      } catch (e) {
+        verifyWarning = 'Fact-check pass could not run — templates inserted without verification.'
+      }
+    }
+
+    // --- QUALITY GATE 2: dedup vs existing pool + within this batch ---
+    let duplicates = 0
+    const acceptedTokens = [...existingTokens]
+    templates = templates.filter(t => {
+      const tok = tokenize(t.question_template)
+      const isDup = acceptedTokens.some(ex => jaccard(tok, ex) >= DUP_THRESHOLD)
+      if (isDup) { duplicates++; return false }
+      acceptedTokens.push(tok)
+      return true
+    })
+
+    if (!templates.length) {
+      return Response.json({ generated: 0, rejected, duplicates, warning: verifyWarning, message: 'All generated templates were rejected or duplicates — try again.' })
+    }
+
     const rows = templates.map(t => ({
       cert,
       domain,
@@ -157,7 +247,7 @@ Return ONLY the JSON array, no markdown, no explanation.`
     const { data, error } = await supabase.from('question_templates').insert(rows).select('id')
     if (error) throw error
 
-    return Response.json({ generated: data.length })
+    return Response.json({ generated: data.length, rejected, duplicates, warning: verifyWarning })
   } catch (e) {
     console.error(e)
     return Response.json({ error: e.message }, { status: 500 })
