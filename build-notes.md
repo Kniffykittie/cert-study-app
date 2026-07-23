@@ -3401,6 +3401,12 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 122 — Audit: study mode (#8) — Complete
+- **Study mode rendered every question as multiple-choice (real limitation):** the inline options block assumed `question.options` + `question.correct` + A–D letters, so a `multi`/`ordering`/`matching`/`cli` question from `generate-questions` would render broken (empty options, no correct answer, unanswerable). Replaced the bespoke MC block with the shared `<AnswerArea>` (handles all 5 types) + `isAnswered()` gating the Check-Answer button. Removes ~30 lines and keeps study mode in lockstep with the test flow. Rare today (non-mc seeds aren't medium-difficulty, which study mode requests) but correct now.
+- Study mode intentionally does not persist answers to `question_answers`/`topic_performance` (pure learn tool) — unchanged.
+- Build verified passing.
+- Files: study-hub/study/page.js
+
 ### Phase 121 — Audit: flashcards (#7) — 2 fixes — Complete
 - **Weak Domain Study section never worked (real):** `flashcards/page.js` `loadWeakDomains` queried `topic_performance` for `correct_count`/`total_count` — columns that don't exist (real ones are `total_seen`/`total_correct`). PostgREST errored, `data` was null, and the section always showed its empty state. Fixed the column names + accuracy math.
 - **StudySession mastered count leaked across certs (real):** the header "Mastered X / Y" used `Object.values(progress).filter(mastered)`, but `progress` holds the user's rows for **all** decks (no cert filter), so X counted mastered cards from other certs and the bar could overflow. Now `cards.filter(c => progress[c.id]?.mastered)` (this deck only). The landing page's per-cert `loadStats` was already correct (keyed per card).

@@ -3,9 +3,10 @@ import { useState } from 'react'
 import Link from 'next/link'
 import BookmarkModal from '@/components/BookmarkModal'
 import QuestionExhibit from '@/components/QuestionExhibit'
+import AnswerArea from '@/components/study/AnswerArea'
+import { isAnswered } from '@/lib/scoreAnswer'
 
 const CERT_LABELS = { ccna: 'CCNA', 'network-plus': 'Network+', 'security-plus': 'Security+' }
-const letters = ['A', 'B', 'C', 'D']
 
 const CONCEPTS = {
   ccna: [
@@ -177,38 +178,18 @@ export default function StudyModePage() {
               </div>
               <p style={{ color: 'var(--text-primary)', fontSize: '15px', lineHeight: '1.7', marginBottom: '20px', whiteSpace: 'pre-wrap' }}>{question.question}</p>
               <QuestionExhibit exhibit={question.exhibit} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-                {question.options.map((opt, i) => {
-                  const letter = letters[i]
-                  const isSelected = selectedAnswer === letter
-                  const isCorrect = letter === question.correct
-                  let bg = 'var(--background)', border = 'var(--border)', color = 'var(--text-secondary)'
-                  if (phase === 'revealed') {
-                    if (isCorrect) { bg = 'rgba(46,204,113,0.08)'; border = 'var(--success)'; color = 'var(--success)' }
-                    else if (isSelected) { bg = 'rgba(204,0,0,0.08)'; border = 'var(--error)'; color = 'var(--error)' }
-                  } else if (isSelected) {
-                    bg = 'rgba(0,128,255,0.1)'; border = 'var(--accent-blue)'; color = 'var(--accent-blue)'
-                  }
-                  return (
-                    <div key={letter}>
-                      <div onClick={() => phase === 'question' && setSelectedAnswer(letter)}
-                        style={{ padding: '12px 16px', backgroundColor: bg, border: `1px solid ${border}`, borderRadius: phase === 'revealed' && question.explanations?.[letter] ? '8px 8px 0 0' : '8px', color, fontSize: '14px', cursor: phase === 'question' ? 'pointer' : 'default', fontWeight: isSelected || (phase === 'revealed' && isCorrect) ? '600' : '400', display: 'flex', justifyContent: 'space-between' }}>
-                        <span>{opt}</span>
-                        {phase === 'revealed' && isCorrect && <span>✓</span>}
-                        {phase === 'revealed' && isSelected && !isCorrect && <span>✗</span>}
-                      </div>
-                      {phase === 'revealed' && question.explanations?.[letter] && (
-                        <div style={{ padding: '8px 16px', backgroundColor: isCorrect ? 'rgba(46,204,113,0.05)' : 'rgba(204,0,0,0.05)', border: `1px solid ${isCorrect ? 'var(--success-border)' : 'var(--error-border)'}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
-                          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5', margin: 0 }}>{question.explanations[letter]}</p>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
+              <div style={{ marginBottom: '20px' }}>
+                <AnswerArea
+                  question={question}
+                  value={selectedAnswer}
+                  onChange={phase === 'question' ? setSelectedAnswer : undefined}
+                  revealed={phase === 'revealed'}
+                  explanationScope="answered"
+                />
               </div>
               {phase === 'question' && (
-                <button onClick={() => setPhase('revealed')} disabled={!selectedAnswer}
-                  style={{ backgroundColor: selectedAnswer ? 'var(--accent-blue)' : 'var(--border)', color: selectedAnswer ? '#E8E8E8' : 'var(--text-secondary)', border: 'none', borderRadius: '8px', padding: '11px 24px', fontSize: '14px', fontWeight: '600', cursor: selectedAnswer ? 'pointer' : 'not-allowed' }}>
+                <button onClick={() => setPhase('revealed')} disabled={!isAnswered(question, selectedAnswer)}
+                  style={{ backgroundColor: isAnswered(question, selectedAnswer) ? 'var(--accent-blue)' : 'var(--border)', color: isAnswered(question, selectedAnswer) ? '#E8E8E8' : 'var(--text-secondary)', border: 'none', borderRadius: '8px', padding: '11px 24px', fontSize: '14px', fontWeight: '600', cursor: isAnswered(question, selectedAnswer) ? 'pointer' : 'not-allowed' }}>
                   Check Answer
                 </button>
               )}
