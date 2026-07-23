@@ -3401,6 +3401,13 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 113 — Schedule follow-ons: today's events on home + wraps — Complete
+- **Life Hub home:** new "📅 Today's Schedule" card (below the status pills) lists today's events (recurring for the weekday + one-offs for the date) with category dot/emoji + time range, sorted by start time; links to My Schedule; hidden when empty. Fetches `schedule-events?month=` and filters client-side.
+- **Weekly Wrap:** injects "NOTABLE EVENTS THIS WEEK" (one-off events dated in the week, weekday-labeled, category, titles in `<user_input>`) so the narrative can connect a busy social week to energy/nutrition patterns.
+- **Monthly Wrap:** injects "NOTABLE EVENTS THIS MONTH" (one-off events dated in the month) alongside the existing schedule day-type summary.
+- Build verified passing.
+- Files: life-hub/page.js, api/life-hub/weekly-wrap/route.js, api/life-hub/monthly-wrap/route.js, CLAUDE.md
+
 ### Phase 112 — Evening wrap: readiness gate + refresh (schedule-aware) — Complete
 - **Problem:** the evening wrap generated on first view after 6pm and cached write-once for the day. For an early bedtime with late events (e.g. bedtime 8pm + concert till 10pm), the notification fired ~7pm and, if opened, locked in a stale snapshot of an unfinished day; reopening at 11pm showed that same premature version.
 - **Readiness gate (daily-brief route, evening POST):** first generation is held until `max(bedtime−60, last scheduled event's end today)` in the user's local timezone. Reads `schedule_events` (recurring for the weekday + one-offs on the date) for the last end time. Before that, POST returns `{ notReady, readyAt }` instead of generating — so a concert-till-10 day waits until 10 rather than snapshotting at 7. Only gates the FIRST generation; refresh/existing are never blocked.

@@ -84,6 +84,7 @@ export async function POST(req) {
     { data: sleepSessions },
     { data: hrDaily },
     { data: stepRows },
+    { data: oneoffEvents },
   ] = await Promise.all([
     supabase.from('daily_checkins').select('date, energy_level, mood_level, sleep_hours').eq('user_id', user.id).gte('date', weekStart).lte('date', end),
     supabase.from('workout_logs').select('created_at, duration_seconds, day_label, hr_zones').eq('user_id', user.id).gte('created_at', weekStart).lte('created_at', end + 'T23:59:59Z'),
@@ -94,7 +95,16 @@ export async function POST(req) {
     supabase.from('health_sleep_sessions').select('date, sleep_minutes, sleep_score, stages').eq('user_id', user.id).gte('date', weekStart).lte('date', end).eq('is_nap', false),
     supabase.from('health_heart_rate_daily').select('date, resting_bpm, hrv_rmssd').eq('user_id', user.id).gte('date', weekStart).lte('date', end).not('resting_bpm', 'is', null),
     supabase.from('health_steps_hourly').select('date, steps').eq('user_id', user.id).gte('date', weekStart).lte('date', end),
+    supabase.from('schedule_events').select('title, category, event_date, start_time, end_time').eq('user_id', user.id).eq('recurrence', 'once').gte('event_date', weekStart).lte('event_date', end).order('event_date'),
   ])
+
+  // Notable one-off events this week (routine recurring work isn't worth narrating)
+  const scheduleEventsText = (oneoffEvents || []).length
+    ? `NOTABLE EVENTS THIS WEEK: ${(oneoffEvents || []).map(e => {
+        const wd = new Date(e.event_date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })
+        return `${wd} — <user_input>${e.title}</user_input> (${e.category})`
+      }).join('; ')} — reference these when they'd plausibly explain energy, nutrition, or workout patterns that week.`
+    : null
 
   const avgEnergy = checkins?.length ? (checkins.reduce((s, c) => s + (c.energy_level || 0), 0) / checkins.length).toFixed(1) : null
   const avgMood = checkins?.length ? (checkins.reduce((s, c) => s + (c.mood_level || 0), 0) / checkins.length).toFixed(1) : null
@@ -206,6 +216,7 @@ Goals: ${(goals?.goals || []).join(', ') || 'not set'}`
 
   const fullDataText = dataText
     + (healthLines.length ? '\nHEALTH METRICS:\n' + healthLines.map(l => '  ' + l).join('\n') : '')
+    + (scheduleEventsText ? '\n' + scheduleEventsText : '')
     + (personalContextLines ? '\nPERSONAL CONTEXT:\n' + personalContextLines : '')
 
   const message = await client.messages.create({

@@ -19,6 +19,14 @@ function dateStr(daysBack = 0) {
   return d.toLocaleDateString('en-CA')
 }
 
+const SCHED_CAT = {
+  work: { emoji: '💼', color: '#3b82f6' },
+  social: { emoji: '🎉', color: '#a78bfa' },
+  appointment: { emoji: '📌', color: '#f97316' },
+  travel: { emoji: '✈️', color: '#06b6d4' },
+  other: { emoji: '📎', color: '#22c55e' },
+}
+
 function fmtTime12(hhmm) {
   if (!hhmm) return ''
   const [h, m] = hhmm.split(':').map(Number)
@@ -115,6 +123,7 @@ export default function LifeHubPage() {
   const [eveningReadyAt, setEveningReadyAt] = useState(null)
   const [eveningRefreshing, setEveningRefreshing] = useState(false)
   const [recoveryExpanded, setRecoveryExpanded] = useState(false)
+  const [todaySchedule, setTodaySchedule] = useState([])
   const [checkinWhyOpen, setCheckinWhyOpen] = useState(false)
   const [afternoonCheckin, setAfternoonCheckin] = useState(null)
   const [checkinTab, setCheckinTab] = useState('morning')
@@ -353,6 +362,23 @@ export default function LifeHubPage() {
     return () => document.removeEventListener('visibilitychange', refreshKcal)
   }, [])
 
+  useEffect(() => {
+    async function loadSchedule() {
+      const t = dateStr()
+      const month = t.slice(0, 7)
+      const dow = (new Date(t + 'T00:00:00Z').getUTCDay() + 6) % 7
+      try {
+        const res = await fetch(`/api/life-hub/schedule-events?month=${month}`)
+        const json = await res.json()
+        const rec = (json.recurring || []).filter(e => e.day_of_week === dow)
+        const one = (json.oneoff || []).filter(e => e.event_date === t)
+        const all = [...rec, ...one].sort((a, b) => (a.start_time || '99').localeCompare(b.start_time || '99'))
+        setTodaySchedule(all)
+      } catch { /* non-critical */ }
+    }
+    loadSchedule()
+  }, [])
+
   async function refreshEvening() {
     setEveningRefreshing(true)
     try {
@@ -532,6 +558,31 @@ export default function LifeHubPage() {
             href="/life-hub/health/water"
           />
         </div>
+      )}
+
+      {/* Today's Schedule — from My Schedule events */}
+      {todaySchedule.length > 0 && (
+        <Link href="/life-hub/my-week" style={{ textDecoration: 'none' }}>
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', padding: '14px 18px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', fontWeight: '700', color: SC.overview, textTransform: 'uppercase', letterSpacing: '0.08em' }}>📅 Today's Schedule</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Manage →</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+              {todaySchedule.map(e => {
+                const meta = SCHED_CAT[e.category] || SCHED_CAT.other
+                const range = (e.start_time && e.end_time) ? `${fmtTime12(e.start_time.slice(0,5))} – ${fmtTime12(e.end_time.slice(0,5))}` : e.start_time ? fmtTime12(e.start_time.slice(0,5)) : 'All day'
+                return (
+                  <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: meta.color, flexShrink: 0 }} />
+                    <span style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta.emoji} {e.title}</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '12px', marginLeft: 'auto', flexShrink: 0 }}>{range}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </Link>
       )}
 
       {/* Recovery Score — prominent banner above section cards */}

@@ -232,6 +232,22 @@ Goals: ${(goals?.goals || []).join(', ') || 'not set'}${sleepTarget && avgSleepH
     .gte('week_start', start)
     .lte('week_start', end)
 
+  const { data: monthEvents } = await supabase
+    .from('schedule_events')
+    .select('title, category, event_date')
+    .eq('user_id', user.id)
+    .eq('recurrence', 'once')
+    .gte('event_date', start)
+    .lte('event_date', end)
+    .order('event_date')
+
+  const scheduleEventsMonthly = (monthEvents || []).length
+    ? `NOTABLE EVENTS THIS MONTH: ${(monthEvents || []).map(e => {
+        const d = new Date(e.event_date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+        return `${d} — <user_input>${e.title}</user_input> (${e.category})`
+      }).join('; ')} — mention any that shaped the month's rhythm.`
+    : null
+
   const scheduleMonthlyContext = (() => {
     if (myWeekMonth?.length > 0) {
       const counts = { active_work: 0, desk_work: 0, day_off: 0, travel: 0 }
@@ -261,6 +277,7 @@ Goals: ${(goals?.goals || []).join(', ') || 'not set'}${sleepTarget && avgSleepH
     obstacles.length ? `KNOWN OBSTACLES: <user_input>${obstacles.join(', ')}</user_input> — if any are relevant to this month's patterns (e.g. "staying consistent" and they hit a PR in workouts), call it out as overcoming a stated barrier` : null,
     dietaryPrefs.length ? `DIETARY PREFERENCES: ${dietaryPrefs.join(', ')} — factor into any nutrition or protein commentary` : null,
     scheduleMonthlyContext,
+    scheduleEventsMonthly,
   ].filter(Boolean).join('\n')
 
   const healthLines = [
