@@ -195,10 +195,13 @@ function useTimer(initialSeconds, onExpire) {
   return { display: `${m}:${s}`, urgent, secondsLeft, secondsRef }
 }
 
-function RealExam({ cert, questions, answers, setAnswers, current, setCurrent, saving, onTimeout, onSubmit, onPause, initialSeconds, templateBar }) {
+function RealExam({ cert, questions, answers, setAnswers, current, setCurrent, saving, onTimeout, onSubmit, onPause, initialSeconds, templateBar, liveSecondsRef }) {
   const { display, urgent, secondsRef } = useTimer(initialSeconds ?? REAL_EXAM[cert].minutes * 60, onTimeout)
   const q = questions[current]
   const isLast = current === questions.length - 1
+  // Mirror the live remaining seconds up so the navigate-away localStorage
+  // snapshot can restore the clock where the user left it (not full time).
+  useEffect(() => { if (liveSecondsRef) liveSecondsRef.current = secondsRef.current })
 
   return (
     <div>
@@ -310,6 +313,7 @@ function TestPageInner() {
   const doneRef = useRef(false)
   const manualPausedRef = useRef(false)
   const startTimeRef = useRef(null)
+  const liveSecondsRef = useRef(null) // Real Exam: latest remaining seconds, mirrored from the timer
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 768)
@@ -339,7 +343,8 @@ function TestPageInner() {
   useEffect(() => {
     if (!questions || done) return
     localStorage.setItem('interruptedTest', JSON.stringify({
-      cert, mode, questions, answers, current
+      cert, mode, questions, answers, current,
+      seconds: mode === 'real' ? liveSecondsRef.current : null
     }))
   }, [questions, answers, current, done, cert, mode])
 
@@ -479,6 +484,7 @@ function TestPageInner() {
       setRevealed(false)
       setDone(false)
       setTimedOut(false)
+      if (snap.mode === 'real' && snap.seconds) setInitialSeconds(snap.seconds)
       setMostRecentPaused(null)
       return
     }
@@ -1271,7 +1277,7 @@ function TestPageInner() {
   if (mode === 'real') {
     return (
       <>
-        <RealExam cert={cert} questions={questions} answers={answers} setAnswers={setAnswers} current={current} setCurrent={setCurrent} saving={saving} onTimeout={async () => { manualPausedRef.current = true; localStorage.removeItem('interruptedTest'); setTimedOut(true); await saveResults(answers); setDone(true) }} onSubmit={async () => { manualPausedRef.current = true; localStorage.removeItem('interruptedTest'); await saveResults(answers); setDone(true) }} onPause={triggerPause} initialSeconds={initialSeconds} templateBar={templateBar} />
+        <RealExam cert={cert} questions={questions} answers={answers} setAnswers={setAnswers} current={current} setCurrent={setCurrent} saving={saving} onTimeout={async () => { manualPausedRef.current = true; localStorage.removeItem('interruptedTest'); setTimedOut(true); await saveResults(answers); setDone(true) }} onSubmit={async () => { manualPausedRef.current = true; localStorage.removeItem('interruptedTest'); await saveResults(answers); setDone(true) }} onPause={triggerPause} initialSeconds={initialSeconds} templateBar={templateBar} liveSecondsRef={liveSecondsRef} />
         {pauseModal}
       </>
     )

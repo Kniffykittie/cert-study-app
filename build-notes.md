@@ -3401,6 +3401,14 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 126 — Audit follow-ups: prompt sanitizer, exam timer resume, flashcard counter — Complete
+- **Tier 3 (#3/#4) — `<user_input>` tag-breakout fixed:** new `src/lib/aiSafety.js` — `wrapUserInput(text, cap)` strips any `</user_input>`/`<user_input>` from the content before wrapping (so a user can't break the data envelope), `sanitizeForPrompt(text, cap)` for untagged context fields. Applied to the study-hub AI routes: `test-chat` (message wrapped, topic/question/options sanitized), `lab-doc-feedback` (user doc wrapped + title/content/prompts sanitized — closes #4), `lab-summary` (docs/notes wrapped, titles sanitized). The 18 Life Hub AI routes will adopt the same helper during the Life Hub audit.
+- **Tier 4 — Real Exam timer now resumes where you left off:** manual pause already preserved `seconds_remaining` (Supabase); the gap was *navigating away* (localStorage snapshot omitted it). `RealExam` now mirrors its live remaining seconds into a parent `liveSecondsRef`, the interrupted-test snapshot stores `seconds`, and local resume restores it via `setInitialSeconds`. Both pause paths now restore the clock.
+- **Tier 4 — flashcard counter fixed:** "Card N of total" could read "Card 12 of 10" because "Still Learning" re-queues a card. Now shows `Card {seen+1} of {seen + deck.length}` (total grows with re-queues, never overflows). Removed the now-dead `sessionTotal` state.
+- Deferred to Generation Day: CLI duplicate-goal grader fix (fix with real CLI content in hand). Deferred to "before scaling past trusted users": shared-cache write hardening. Left with rationale: >6-option/duplicate-string guards (content-quality, covered by verify pass).
+- Build verified passing.
+- Files: lib/aiSafety.js (new), api/test-chat/route.js, api/lab-doc-feedback/route.js, api/lab-summary/route.js, study-hub/test/page.js, study-hub/flashcards/StudySession.js
+
 ### Phase 125 — Audit: API routes (#12) + RLS write sweep — Complete (Study Hub audit done)
 - **API routes — all clean/secure.** bookmarks (auth + DELETE `.eq('user_id')` IDOR guard), wrong-answers (auth + PATCH IDOR guard, text-dedup), chat (reference message-history sanitization: role whitelist + `slice(-20)` + `slice(0,2000)`), test-chat (auth + is_disabled + rate-limit + input caps + `<user_input>` wrap + cert whitelist), flag-question (auth + feedback/cert/difficulty whitelists + text cap + user-scoped insert; verified `flag_count` column + `increment_flag_count` fn exist).
 - **flagged page** relies on RLS — verified `flagged_questions` has a single `ALL` policy `auth.uid() = user_id`, so self-service dismiss/replace is correctly scoped.

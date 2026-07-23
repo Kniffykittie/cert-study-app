@@ -14,7 +14,6 @@ export default function StudySession({ cert, label, color }) {
   const [showExample, setShowExample] = useState(false)
   const [sessionDone, setSessionDone] = useState(false)
   const [seen, setSeen] = useState(0)
-  const [sessionTotal, setSessionTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [addingCard, setAddingCard] = useState(false)
   const [newFront, setNewFront] = useState('')
@@ -79,7 +78,6 @@ export default function StudySession({ cert, label, color }) {
     setShowExample(false)
     setSessionDone(sessionCards.length === 0)
     setSeen(0)
-    setSessionTotal(sessionCards.length)
   }
 
   async function markCard(gotIt) {
@@ -198,7 +196,7 @@ export default function StudySession({ cert, label, color }) {
         <>
           {/* Card counter */}
           <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '12px', textAlign: 'center' }}>
-            Card {seen + 1} of {sessionTotal} · <span style={{ fontSize: '12px' }}>Space to flip · ← Still Learning · → Got It</span>
+            Card {seen + 1} of {seen + deck.length} · <span style={{ fontSize: '12px' }}>Space to flip · ← Still Learning · → Got It</span>
           </div>
 
           {/* Flashcard */}

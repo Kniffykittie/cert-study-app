@@ -743,6 +743,7 @@ src/
 ---
 
 ## Gotchas
+- **Wrap user free text for AI prompts with `wrapUserInput()` from `src/lib/aiSafety.js`**, not a bare `<user_input>${x}</user_input>` — the helper strips `</user_input>` from the content so a user can't break out of the data envelope. Use `sanitizeForPrompt()` for untagged context fields the client echoes back. (Study-hub routes done; Life Hub routes adopt it during that audit.)
 - **Shared tables need owner-only write RLS, not just UI/API gating** — `question_templates` had `INSERT`/`UPDATE` policies of `true`, so any authenticated user could write the shared pool despite owner-only buttons. Writes are now `lower(auth.jwt()->>'email') = owner`. When a table is "owner-writes, everyone-reads," enforce it in RLS, not only in the client.
 - **Render questions via `<AnswerArea>`, never a bespoke A–D options map** — only `AnswerArea` handles all 5 `question_type`s; a hand-rolled MC block silently breaks on multi/ordering/matching/cli (empty options, null correct). Study mode was fixed to use it.
 - **`topic_performance` columns are `total_seen` / `total_correct`** (not `total_count`/`correct_count`). A wrong column name makes the PostgREST select error and return `null` data — the feature silently shows its empty state instead of throwing. Double-check column names against the schema when a section is "always empty."
