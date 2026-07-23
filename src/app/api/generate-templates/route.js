@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { objectivesFor } from '@/data/examObjectives'
 
 const client = new Anthropic()
 
@@ -76,13 +77,25 @@ export async function POST(req) {
     // Fetch existing templates for this domain (ALL difficulties) — for the prompt hint AND server-side dedup
     const { data: existing } = await supabase
       .from('question_templates')
-      .select('question_template')
+      .select('question_template, sub_objective')
       .eq('cert', cert)
       .eq('domain', domain)
       .eq('is_retired', false)
 
     const existingList = (existing ?? []).map((t, i) => `${i + 1}. ${t.question_template}`)
     const existingTokens = (existing ?? []).map(t => tokenize(t.question_template))
+
+    // Sub-objective coverage: steer generation toward UNCOVERED objectives (fixes the "brand new question" gap)
+    const objectives = objectivesFor(cert, domain)
+    const coveredIds = new Set((existing ?? []).map(t => t.sub_objective).filter(Boolean))
+    const uncovered = objectives.filter(o => !coveredIds.has(o.id))
+    const objectiveIds = objectives.map(o => o.id)
+    const objectiveSection = objectives.length ? `
+OFFICIAL SUB-OBJECTIVES for this domain — each new question MUST target one and be tagged with its id in a "sub_objective" field:
+${objectives.map(o => `${o.id}: ${o.title}${coveredIds.has(o.id) ? '  [covered]' : '  [NOT YET COVERED — prioritize]'}`).join('\n')}
+
+Prioritize the [NOT YET COVERED] sub-objectives so the bank spans the whole domain. Set "sub_objective" to the matching id (e.g. "${objectiveIds[0]}") on every template.
+` : ''
 
     // Difficulty changes ONLY the depth of thinking / distractor trickiness — NEVER the exam's voice,
     // length, or genre. A hard question is the SAME kind of question as a medium one, just with nastier
@@ -121,7 +134,7 @@ export async function POST(req) {
     const prompt = `Generate exactly ${count} question TEMPLATES for ${cert.toUpperCase()} certification, domain: "${domain}", difficulty: ${difficulty}.${existingSection}
 
 ${styleGuides[cert] ?? ''}
-
+${objectiveSection}
 Difficulty guidance: ${difficultyGuide[difficulty]}
 
 TEMPLATE FORMAT RULES:
@@ -164,6 +177,7 @@ CLI SIMULATION (CCNA ONLY — the real exam has live device configuration; make 
 Return a JSON array of exactly ${count} template objects. Each object must have:
 {
   "question_template": "string with {{placeholders}}",
+  "sub_objective": "${objectiveIds[0] ?? '1.1'}",   // REQUIRED — the domain sub-objective id this question targets
   "variable_sets": [{"var1": "value1", "var2": "value2"}, ...],
   "options_templates": ["A. option text", "B. option text", "C. option text", "D. option text"],
   "correct_answer": "A" | "B" | "C" | "D",   // single-answer questions
@@ -232,6 +246,7 @@ Return ONLY the JSON array, no markdown, no explanation.`
       cert,
       domain,
       difficulty,
+      sub_objective: objectiveIds.includes(t.sub_objective) ? t.sub_objective : null,
       question_template: t.question_template,
       variable_sets: t.variable_sets || [],
       options_templates: t.options_templates || [],

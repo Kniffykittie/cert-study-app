@@ -1,0 +1,155 @@
+// Official exam sub-objective lists — current versions:
+// CCNA 200-301 (v1.1), CompTIA Network+ N10-009, CompTIA Security+ SY0-701.
+// Keyed by cert → domain (matching question_templates.domain) → [{ id, title }].
+// Used to (a) target UNCOVERED sub-objectives during generation and (b) show coverage.
+
+export const EXAM_OBJECTIVES = {
+  ccna: {
+    '1.0 Network Fundamentals': [
+      { id: '1.1', title: 'Role/function of network components (routers, L2/L3 switches, firewalls, IPS, APs, WLC, endpoints, servers, PoE)' },
+      { id: '1.2', title: 'Network topology architectures (2-tier, 3-tier, spine-leaf, WAN, SOHO, on-prem/cloud)' },
+      { id: '1.3', title: 'Physical interface and cabling types (fiber single/multimode, copper)' },
+      { id: '1.4', title: 'Identify interface and cable issues (collisions, errors, duplex/speed mismatch)' },
+      { id: '1.5', title: 'Compare TCP to UDP' },
+      { id: '1.6', title: 'Configure and verify IPv4 addressing and subnetting' },
+      { id: '1.7', title: 'Describe private IPv4 addressing' },
+      { id: '1.8', title: 'Configure and verify IPv6 addressing and prefix' },
+      { id: '1.9', title: 'IPv6 address types (GUA, ULA, link-local, anycast, multicast, EUI-64)' },
+      { id: '1.10', title: 'Verify IP parameters for client OS (Windows/Mac/Linux)' },
+      { id: '1.11', title: 'Wireless principles (nonoverlapping channels, SSID, RF, encryption)' },
+      { id: '1.12', title: 'Virtualization fundamentals (VMs, containers, VRF)' },
+      { id: '1.13', title: 'Switching concepts (MAC learning/aging, frame switching, flooding)' },
+    ],
+    '2.0 Network Access': [
+      { id: '2.1', title: 'Configure and verify VLANs across multiple switches (access ports, default VLAN)' },
+      { id: '2.2', title: 'Configure and verify interswitch connectivity (trunk ports, 802.1Q, native VLAN)' },
+      { id: '2.3', title: 'Configure and verify L2 discovery protocols (CDP, LLDP)' },
+      { id: '2.4', title: 'Configure and verify EtherChannel (LACP)' },
+      { id: '2.5', title: 'Rapid PVST+ Spanning Tree (root election, port states/roles, PortFast, guards)' },
+      { id: '2.6', title: 'Cisco wireless architectures and AP modes' },
+      { id: '2.7', title: 'Physical infrastructure connections of WLAN components' },
+      { id: '2.8', title: 'AP and WLC management access connections' },
+      { id: '2.9', title: 'Interpret wireless LAN GUI config for client connectivity (WLAN, security, QoS)' },
+    ],
+    '3.0 IP Connectivity': [
+      { id: '3.1', title: 'Interpret routing table components (code, prefix, mask, next hop, AD, metric, gateway of last resort)' },
+      { id: '3.2', title: 'How a router makes a forwarding decision (longest match, AD, metric)' },
+      { id: '3.3', title: 'Configure and verify IPv4/IPv6 static routing (default, network, host, floating)' },
+      { id: '3.4', title: 'Configure and verify single-area OSPFv2 (adjacencies, P2P/broadcast, router ID)' },
+      { id: '3.5', title: 'Purpose and function of first hop redundancy protocols (FHRP)' },
+    ],
+    '4.0 IP Services': [
+      { id: '4.1', title: 'Configure and verify inside source NAT (static and pools)' },
+      { id: '4.2', title: 'Configure and verify NTP (client and server mode)' },
+      { id: '4.3', title: 'Role of DHCP and DNS' },
+      { id: '4.4', title: 'Function of SNMP in network operations' },
+      { id: '4.5', title: 'Syslog features (facilities and severity levels)' },
+      { id: '4.6', title: 'Configure and verify DHCP client and relay' },
+      { id: '4.7', title: 'Per-hop behavior for QoS (classification, marking, queuing, policing, shaping)' },
+      { id: '4.8', title: 'Configure network devices for remote access using SSH' },
+      { id: '4.9', title: 'Capabilities and functions of TFTP/FTP' },
+    ],
+    '5.0 Security Fundamentals': [
+      { id: '5.1', title: 'Key security concepts (threats, vulnerabilities, exploits, mitigation)' },
+      { id: '5.2', title: 'Security program elements (awareness, training, physical access control)' },
+      { id: '5.3', title: 'Configure and verify device access control using local passwords' },
+      { id: '5.4', title: 'Password policy elements (management, complexity, MFA, certificates, biometrics)' },
+      { id: '5.5', title: 'IPsec remote-access and site-to-site VPNs' },
+      { id: '5.6', title: 'Configure and verify access control lists' },
+      { id: '5.7', title: 'Configure and verify L2 security (DHCP snooping, DAI, port security)' },
+      { id: '5.8', title: 'Compare authentication, authorization, and accounting (AAA)' },
+      { id: '5.9', title: 'Wireless security protocols (WPA, WPA2, WPA3)' },
+      { id: '5.10', title: 'Configure and verify WLAN with WPA2 PSK using the GUI' },
+    ],
+    '6.0 Automation & Programmability': [
+      { id: '6.1', title: 'How automation impacts network management' },
+      { id: '6.2', title: 'Compare traditional vs controller-based networking' },
+      { id: '6.3', title: 'Controller-based / SDN architecture (overlay/underlay/fabric, control vs data plane, NB/SB APIs)' },
+      { id: '6.4', title: 'AI and machine learning in network operations' },
+      { id: '6.5', title: 'Characteristics of REST-based APIs (CRUD, HTTP verbs, data encoding)' },
+      { id: '6.6', title: 'Configuration management mechanisms (Ansible, Terraform)' },
+      { id: '6.7', title: 'Interpret JSON-encoded data' },
+    ],
+  },
+  'network-plus': {
+    '1.0 Networking Concepts': [
+      { id: '1.1', title: 'OSI model layers and functions' },
+      { id: '1.2', title: 'Networking appliances/applications/functions (routers, switches, firewalls, IDS/IPS, load balancers, proxy, NAS/SAN)' },
+      { id: '1.3', title: 'Cloud concepts and connectivity (NFV, VPC, security groups, service/deployment models, scalability, multitenancy)' },
+      { id: '1.4', title: 'Ports, protocols, services, and traffic types' },
+      { id: '1.5', title: 'Transmission media and transceivers (wireless, copper/fiber, connectors)' },
+      { id: '1.6', title: 'Network topologies, architectures, and types' },
+      { id: '1.7', title: 'IPv4 addressing (subnetting, VLSM, CIDR, public/private, APIPA, loopback)' },
+      { id: '1.8', title: 'Modern network environments (SDN, SD-WAN, VXLAN, ZTA, SASE/SSE, IaC)' },
+    ],
+    '2.0 Network Implementation': [
+      { id: '2.1', title: 'Routing technologies (static/dynamic, RIP/OSPF/EIGRP/BGP, AD, subinterfaces, NAT/PAT, FHRP/VRRP)' },
+      { id: '2.2', title: 'Switching features (VLANs, 802.1Q trunking, native/VoIP VLAN, LACP, STP, MAC/ARP, jumbo frames, PoE)' },
+      { id: '2.3', title: 'Wireless devices installation (channels, bands, encryption, SSID, antennas, mesh, site survey)' },
+      { id: '2.4', title: 'Physical installations (IDF/MDF, power, environmental factors)' },
+    ],
+    '3.0 Network Operations': [
+      { id: '3.1', title: 'Documentation (physical/logical diagrams, rack/cable maps, IPAM, SLA, baselines, policies)' },
+      { id: '3.2', title: 'Network monitoring (SNMP, flow data, packet capture, baseline metrics, logs, SIEM)' },
+      { id: '3.3', title: 'Disaster recovery (RPO, RTO, MTTR, MTBF, HA, cold/warm/hot sites, active-active/passive)' },
+      { id: '3.4', title: 'IPv4/IPv6 support services (DHCP, DNS, NTP)' },
+      { id: '3.5', title: 'Network access and management methods (SSH, GUI, API, console, jump box, in/out-of-band, VPN)' },
+    ],
+    '4.0 Network Security': [
+      { id: '4.1', title: 'Security concepts (CIA, AAA, zero trust, defense in depth, MFA, RADIUS/TACACS+)' },
+      { id: '4.2', title: 'Common attacks (DoS/DDoS, VLAN hopping, MAC flooding, ARP/DNS poisoning, rogue/evil twin, on-path, social engineering, malware)' },
+      { id: '4.3', title: 'Security defenses (device hardening, NAC, key management, ACLs, content filtering, trust zones, screened subnet)' },
+    ],
+    '5.0 Network Troubleshooting': [
+      { id: '5.1', title: 'Troubleshooting methodology (7 steps)' },
+      { id: '5.2', title: 'Cable connectivity issues and tools' },
+      { id: '5.3', title: 'Network services issues (STP/VLAN/ARP, routing, DHCP/DNS addressing)' },
+      { id: '5.4', title: 'Network performance issues' },
+      { id: '5.5', title: 'Troubleshooting tools/protocols (ping, traceroute, nslookup/dig, ipconfig, tcpdump, netstat)' },
+    ],
+  },
+  'security-plus': {
+    '1.0 General Security Concepts': [
+      { id: '1.1', title: 'Compare security control categories (technical/managerial/operational/physical) and types (preventive, deterrent, detective, corrective, compensating, directive)' },
+      { id: '1.2', title: 'Fundamental security concepts (CIA, AAA, gap analysis, zero trust, physical security, deception/honeypots)' },
+      { id: '1.3', title: 'Importance of change management processes' },
+      { id: '1.4', title: 'Cryptographic solutions (PKI, symmetric/asymmetric, key exchange, hashing/salting, signatures, certificates, obfuscation, tokenization)' },
+    ],
+    '2.0 Threats, Vulnerabilities & Mitigations': [
+      { id: '2.1', title: 'Threat actors and motivations' },
+      { id: '2.2', title: 'Threat vectors and attack surfaces (message/image/file/voice, removable device, unsecure networks, default creds, supply chain, social engineering)' },
+      { id: '2.3', title: 'Types of vulnerabilities (application, OS, web, hardware, cloud, virtualization, supply chain, cryptographic, misconfiguration, zero-day)' },
+      { id: '2.4', title: 'Indicators of malicious activity (malware, physical, network, application, cryptographic, password attacks)' },
+      { id: '2.5', title: 'Mitigation techniques (segmentation, access control, isolation, patching, encryption, monitoring, least privilege, hardening)' },
+    ],
+    '3.0 Security Architecture': [
+      { id: '3.1', title: 'Security implications of architecture models (cloud, IaC, serverless, microservices, on-prem, virtualization, IoT, ICS/SCADA, RTOS, embedded)' },
+      { id: '3.2', title: 'Apply security principles to enterprise infrastructure (device placement, security zones, failure modes, port security, firewall types, secure comms/VPN)' },
+      { id: '3.3', title: 'Data protection (types, classifications, states, sovereignty; encryption, hashing, masking, tokenization, obfuscation, segmentation)' },
+      { id: '3.4', title: 'Resilience and recovery (HA, site considerations, platform diversity, multicloud, continuity, capacity planning, testing, backups, power)' },
+    ],
+    '4.0 Security Operations': [
+      { id: '4.1', title: 'Apply security techniques to computing resources (secure baselines, hardening, wireless/mobile, WPA3, sandboxing)' },
+      { id: '4.2', title: 'Security implications of asset management (hardware/software/data)' },
+      { id: '4.3', title: 'Vulnerability management (identification, analysis, response/remediation, validation, reporting)' },
+      { id: '4.4', title: 'Alerting and monitoring (SIEM/SCAP/SNMP/NetFlow; aggregation, alerting, scanning, reporting, archiving)' },
+      { id: '4.5', title: 'Enterprise security capabilities (firewall, IDS/IPS, web/DNS filter, email security DKIM/SPF/DMARC, DLP, NAC, EDR/XDR, UBA)' },
+      { id: '4.6', title: 'Identity and access management (provisioning, federation, SSO, LDAP, OAuth, SAML, RBAC/ABAC/MAC/DAC, MFA, PAM)' },
+      { id: '4.7', title: 'Automation and orchestration for secure operations' },
+      { id: '4.8', title: 'Incident response (process, training, testing, root cause analysis, threat hunting, digital forensics)' },
+      { id: '4.9', title: 'Use data sources to support an investigation (logs, dashboards, packet captures, vulnerability scans)' },
+    ],
+    '5.0 Security Program Management & Oversight': [
+      { id: '5.1', title: 'Security governance (guidelines, policies, standards, procedures, roles, monitoring/revision)' },
+      { id: '5.2', title: 'Risk management process (identification, assessment, analysis, register, tolerance/appetite, strategies, BIA)' },
+      { id: '5.3', title: 'Third-party risk (vendor assessment/selection, agreements SLA/MOA/MOU/MSA/BPA/NDA, monitoring)' },
+      { id: '5.4', title: 'Security compliance (reporting, monitoring, attestation, privacy, legal consequences)' },
+      { id: '5.5', title: 'Audits and assessments (attestation, internal, external, penetration testing)' },
+      { id: '5.6', title: 'Security awareness practices (phishing, anomalous behavior, user training, reporting/monitoring)' },
+    ],
+  },
+}
+
+export function objectivesFor(cert, domain) {
+  return EXAM_OBJECTIVES[cert]?.[domain] ?? []
+}

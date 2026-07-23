@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { objectivesFor } from '@/data/examObjectives'
 
 const CERTS = {
   ccna: [
@@ -45,6 +46,7 @@ export default function TemplatesPage() {
   const [lastResult, setLastResult] = useState(null)
   const [isOwner, setIsOwner] = useState(false)
   const [typeCounts, setTypeCounts] = useState({})
+  const [subCoverage, setSubCoverage] = useState({})
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -60,21 +62,28 @@ export default function TemplatesPage() {
     const supabase = createClient()
     const { data } = await supabase
       .from('question_templates')
-      .select('cert, domain, difficulty, is_retired, question_type')
+      .select('cert, domain, difficulty, is_retired, question_type, sub_objective')
     const c = {}
     const tc = {}
+    const sc = {}
     for (const row of data ?? []) {
       const key = `${row.cert}||${row.domain}||${row.difficulty}`
       if (!c[key]) c[key] = { total: 0, active: 0 }
       c[key].total++
-      if (!row.is_retired) c[key].active++
       if (!row.is_retired) {
+        c[key].active++
         const tk = `${row.cert}||${row.question_type || 'mc'}`
         tc[tk] = (tc[tk] || 0) + 1
+        if (row.sub_objective) {
+          const dk = `${row.cert}||${row.domain}`
+          if (!sc[dk]) sc[dk] = new Set()
+          sc[dk].add(row.sub_objective)
+        }
       }
     }
     setCounts(c)
     setTypeCounts(tc)
+    setSubCoverage(sc)
     setLoading(false)
   }
 
@@ -209,6 +218,34 @@ export default function TemplatesPage() {
           {generating ? 'Generating... (~30s)' : 'Generate 5 Templates'}
         </button>
         <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>Templates are added to the pool permanently. Generating more for the same domain adds to the existing set.</p>
+
+        {/* Sub-objective coverage for the selected domain */}
+        {(() => {
+          const objs = objectivesFor(selectedCert, selectedDomain)
+          if (!objs.length) return null
+          const covered = subCoverage[`${selectedCert}||${selectedDomain}`] || new Set()
+          const nCov = objs.filter(o => covered.has(o.id)).length
+          return (
+            <div style={{ marginTop: '20px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <span style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600' }}>Sub-objective coverage</span>
+                <span style={{ color: nCov === objs.length ? 'var(--success)' : 'var(--warning)', fontSize: '13px', fontWeight: '700' }}>{nCov}/{objs.length} covered</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {objs.map(o => {
+                  const has = covered.has(o.id)
+                  return (
+                    <div key={o.id} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px' }}>
+                      <span style={{ color: has ? 'var(--success)' : 'var(--text-secondary)', flexShrink: 0, fontWeight: '700', minWidth: '30px' }}>{has ? '✓' : '○'} {o.id}</span>
+                      <span style={{ color: has ? 'var(--text-secondary)' : 'var(--text-primary)' }}>{o.title}</span>
+                    </div>
+                  )
+                })}
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '11px', margin: '10px 0 0' }}>Generation prioritizes ○ uncovered sub-objectives so the bank spans the whole domain — this is what prevents "brand new" questions on the real exam.</p>
+            </div>
+          )
+        })()}
       </div> : null}
 
       {/* Question-type breakdown */}

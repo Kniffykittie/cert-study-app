@@ -228,7 +228,7 @@ src/
       reset/route.js                   POST — scoped data reset; uses getUser() + is_disabled check
       bookmarks/route.js               CRUD for bookmarked questions
       generate-questions/route.js      Template-only question serving (spaced repetition weighting, no AI calls); uses getUser() + is_disabled check
-      generate-templates/route.js      AI template generation (batch of 5); owner-only; TWO-stage quality gate → (1) fact-check verify pass (second SME Claude call checks each mc/multi: marked answer correct? co-equal distractor? factual error? — with best-answer nuance; rejects failures) (2) Jaccard dedup ≥0.55 vs existing pool (all difficulties) + within batch; returns {generated, rejected, duplicates, warning}; maxDuration=60; difficulty guide = voice-constant, only distractor depth changes
+      generate-templates/route.js      AI template generation (batch of 5); owner-only; TWO-stage quality gate → (1) fact-check verify pass (second SME Claude call checks each mc/multi: marked answer correct? co-equal distractor? factual error? — with best-answer nuance; rejects failures) (2) Jaccard dedup ≥0.55 vs existing pool (all difficulties) + within batch; returns {generated, rejected, duplicates, warning}; maxDuration=60; difficulty guide = voice-constant, only distractor depth changes; injects domain sub-objectives (from examObjectives.js) marking uncovered ones to prioritize, tags each template with `sub_objective` id
       generate-flashcards/route.js     AI flashcard generation; owner-only; uses getUser()
       test-chat/route.js               Tutor chat during practice tests; uses getUser()
       chat/route.js                    General study chat (FloatingChat component); uses getUser() + is_disabled check
@@ -351,7 +351,7 @@ src/
       results/page.js                  Past test results with mode badges, Discard button
       reference/page.js                Reference sheets (subnetting, ports, OSI, etc.)
       flagged/page.js                  Flagged/reported questions
-      templates/page.js                Generate AI templates (5 per batch); question-type breakdown (mc/multi/ordering/matching/cli active counts per cert); Coverage vs weighted Target bars (target ∝ official domain %); owner Danger Zone (delete all templates per cert or globally, confirm modal) → /api/owner/delete-templates
+      templates/page.js                Generate AI templates (5 per batch); question-type breakdown (mc/multi/ordering/matching/cli active counts per cert); Coverage vs weighted Target bars (target ∝ official domain %); sub-objective coverage checklist per selected domain (✓ covered / ○ uncovered from examObjectives.js); owner Danger Zone (delete all templates per cert or globally, confirm modal) → /api/owner/delete-templates
       premade-templates/page.js        Browse/manage template library (duplicates, retired)
       labs/page.js                     Packet Tracer Labs landing — all lab sets, per-lab progress dots
       labs/commands/page.js            IOS Command Reference — exports IOS_COMMANDS for FloatingCommandPanel
@@ -359,6 +359,7 @@ src/
       labs/[setId]/page.js             Lab set overview — weak domain labs highlighted in yellow
       labs/[setId]/[labId]/page.js     Individual lab — FloatingCommandPanel mounted here
   data/
+    examObjectives.js                Official sub-objective lists per cert/domain (CCNA 200-301 v1.1, N10-009, SY0-701); `objectivesFor(cert, domain)`; drives generation targeting + coverage checklist on templates page
     labs/
       index.js                         Exports LAB_SETS, getLabSet(), getLab() helpers
       ccna-fundamentals.js             CCNA lab set — 8 labs, 49 steps — all steps have document arrays
@@ -417,7 +418,7 @@ src/
 | `topic_performance` | Aggregated accuracy per cert+topic — drives spaced repetition and weak domain features |
 | `test_sessions` | Completed test records — cert, mode, score_pct, correct, total_questions, duration_seconds, completed_at |
 | `paused_tests` | In-progress tests saved as JSON with full state for resume |
-| `question_templates` | Template library with variable_sets and is_retired flag; `exhibit` JSONB (topology/config), `question_type` TEXT default 'mc' (mc/multi/ordering/matching/cli), `correct_answers` TEXT[] (multi, null=single), `correct_answer` nullable, `type_payload` JSONB (ordering items / matching terms+defs / cli goal+modes), `rationale` TEXT (PBQ/CLI explanation) |
+| `question_templates` | Template library with variable_sets and is_retired flag; `exhibit` JSONB (topology/config), `question_type` TEXT default 'mc' (mc/multi/ordering/matching/cli), `correct_answers` TEXT[] (multi, null=single), `correct_answer` nullable, `type_payload` JSONB (ordering items / matching terms+defs / cli goal+modes), `rationale` TEXT (PBQ/CLI explanation), `sub_objective` TEXT (official exam sub-objective id this template targets) |
 | `bookmarked_questions` | Bookmarks with reason, notes, and full question snapshot |
 | `flagged_questions` | User-reported question issues |
 | `profiles` | User display name, exam_dates JSONB, daily_goal INT, default_cert TEXT, is_disabled BOOLEAN (owner ban flag, checked in every AI route), settings_pin_hash TEXT (bcrypt hash for Settings page Privacy PIN), authenticator_name TEXT (e.g. "Google Authenticator" — shown on 2FA login screen), notification_preferences JSONB (10 boolean keys: morning_brief/midday_checkin/evening_wrap/workout_reminder/hydration_nudge/study_streak/supplement_reminder/weigh_in_reminder/body_measurement_reminder/wrap_ready; briefs default true, nudges default false) |

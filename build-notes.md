@@ -3156,7 +3156,7 @@ This supersedes all scattered "Session N" numbering below. Detailed specs for ea
   - **DECIDED (user, 2026-07-22):** Scaled score = show an HONEST pass-likelihood estimate, made AS ACCURATE AS POSSIBLE from available data (weighted domain accuracy vs official pass threshold, green/yellow/red readiness), NOT a fabricated exact scaled number — CompTIA/Cisco scaling formulas are proprietary/unpublished so a precise scaled score is impossible; never fake one. Accuracy levers to use: weight by official domain %, require minimum sample size per domain before showing confidence, factor in recency (recent accuracy > old), and only draw on real-exam-style questions (not easy-tier) for the estimate. Show the estimate with a plain-language confidence caveat.
   - **DECIDED (user, 2026-07-22):** Real Exam mode = NO going back, ALL certs (not just CCNA). Once you advance past a question it is locked — remove Previous button + block navigation to answered questions in real mode. Practice/Simulation keep free navigation.
 - **S3 — Generation Quality Engine** ⬜ — fact-check verify pass with BEST-answer nuance (gap #5, must NOT reject correct-but-not-best distractors) + real Jaccard dedup vs all difficulties (concern #1) + rewrite difficulty guide to the locked definition (voice constant, only distractor depth changes) + confirm current exam versions SY0-701/N10-009/200-301 v1.1 (gap #6). Design verify as a second BATCHED call to avoid serverless timeout (gap #11). Generation-API only; no test-render changes.
-- **S4 — Coverage Engine (R1)** ⬜ — `src/data/examObjectives.js` (current-version sub-objective lists, all 3 certs) + `sub_objective TEXT` column + generator targets UNCOVERED sub-objectives + coverage table UI on templates page (X/Y per domain).
+- **S4 — Coverage Engine (R1)** ✅ BUILT (Phase 105) — `src/data/examObjectives.js` (current-version sub-objective lists, all 3 certs) + `sub_objective TEXT` column + generator targets UNCOVERED sub-objectives + coverage table UI on templates page (X/Y per domain).
   - **"EVEN / CORRECT SPACING" — the BETTER way (user asked 2026-07-22):** don't rely on the owner remembering to generate per domain. Build a coverage-aware generation orchestrator:
     1. **Coverage dashboard** per cert — grid of domain × difficulty with counts, color-coded (red = below target, green = at target), + sub-objective coverage once S4 data exists.
     2. **Weight-proportional targets, not flat-even:** the CORRECT spacing mirrors the REAL exam = proportional to official domain weights (e.g. Sec+ dom 4 = 28% → more questions than dom 1 = 12%). Target per domain = base × (domain weight). This is more authentic than flat-even. Difficulty mix per the S10 blend (mostly medium, some hard).
@@ -3394,6 +3394,17 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 105 — S4: Sub-Objective Coverage Engine — Complete
+Fixes the "brand new questions on the real exam" gap by making generation span every official sub-objective.
+- **`src/data/examObjectives.js` (new):** official sub-objective lists for all 3 current exams (CCNA 200-301 v1.1, N10-009, SY0-701), keyed cert→domain→[{id,title}]; `objectivesFor(cert, domain)`.
+- **Migration:** `sub_objective TEXT` on question_templates.
+- **Generator:** injects the domain's full sub-objective list marking which are already [covered] vs [NOT YET COVERED], instructs Claude to prioritize uncovered ones and TAG each template with its `sub_objective` id; insert validates the id against the domain's list.
+- **Templates page:** per selected domain, a sub-objective coverage checklist (✓ covered / ○ uncovered, "N/total covered") so the owner sees exactly which objectives lack questions.
+- Build verified passing. NOT executed (generation held).
+- **Remaining Generation-Day machinery:** auto "fill gaps" sequential orchestrator (generate batches until targets/objectives met) + S1 flashcard decks; then the purge + regenerate. Sub-objective + weighted-target + type coverage all now VISIBLE for manual Generation Day.
+- Files: data/examObjectives.js (new), api/generate-templates/route.js, study-hub/templates/page.js, CLAUDE.md + migration
+- Roadmap: S4 ✅ (coverage engine complete; optional auto-orchestrator remains a nice-to-have)
 
 ### Phase 104 — S3: Generation Quality Engine (Fact-Check + Dedup + Difficulty Redefinition) — Complete
 - **Fact-check verify pass:** after generation, a SECOND batched Claude call (SME persona) reviews every mc/multi question — is the marked answer definitively correct, is any distractor CO-EQUALLY correct (with explicit best-answer nuance so legit "pick the best" questions are NOT rejected), any factual error. Failures dropped before insert. Fail-open with a warning if the verify call errors. (PBQ/CLI correctness is structural — not sent to verify.)
