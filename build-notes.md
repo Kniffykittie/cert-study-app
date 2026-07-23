@@ -3401,6 +3401,13 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 117 — Fix: Real Exam crash (undefined templateBar) — Complete
+- **Root cause found (parked bug):** `RealExam` (module-level component in `test/page.js`) referenced `templateBar` in its JSX, but `templateBar` is defined inside `TestPageInner`'s scope and was never passed to `RealExam` as a prop. Every Real Exam render threw `ReferenceError: templateBar is not defined` at runtime — invisible to the build (it's a valid identifier at compile time, only undefined at runtime).
+- **Fix:** added `templateBar` to `RealExam`'s props and passed `templateBar={templateBar}` at the call site. Verified `isAnswered` (import) and `REAL_EXAM` (module const) are module-scoped and safe inside `RealExam`.
+- Build verified passing.
+- Files: study-hub/test/page.js
+- **Parked bug resolved:** Real Exam crash. (Sidebar bottom cutoff still unconfirmed — needs a repro.)
+
 ### Phase 116 — S14 accessibility pass: shared modals — Complete
 - **New `useEscapeKey(handler)` hook** (`src/lib/useEscapeKey.js`) centralizes Escape-to-close.
 - Applied Escape-to-close + `role="dialog"`/`aria-modal`/`aria-label` + icon-button `aria-label`s across all **shared modal components**: LogConfirmModal, EditFoodModal, MealBuilderModal, SearchModal, BarcodeScannerModal, CheckInSheet, DailyLogReview (plus BookmarkModal + My Schedule from Phase 115). These are reused across the nutrition/hydration/check-in surfaces, so the fix propagates app-wide.

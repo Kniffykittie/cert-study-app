@@ -191,7 +191,7 @@ function useTimer(initialSeconds, onExpire) {
   return { display: `${m}:${s}`, urgent, secondsLeft, secondsRef }
 }
 
-function RealExam({ cert, questions, answers, setAnswers, current, setCurrent, saving, onTimeout, onSubmit, onPause, initialSeconds }) {
+function RealExam({ cert, questions, answers, setAnswers, current, setCurrent, saving, onTimeout, onSubmit, onPause, initialSeconds, templateBar }) {
   const { display, urgent, secondsRef } = useTimer(initialSeconds ?? REAL_EXAM[cert].minutes * 60, onTimeout)
   const q = questions[current]
   const isLast = current === questions.length - 1
@@ -1267,7 +1267,7 @@ function TestPageInner() {
   if (mode === 'real') {
     return (
       <>
-        <RealExam cert={cert} questions={questions} answers={answers} setAnswers={setAnswers} current={current} setCurrent={setCurrent} saving={saving} onTimeout={async () => { manualPausedRef.current = true; localStorage.removeItem('interruptedTest'); setTimedOut(true); await saveResults(answers); setDone(true) }} onSubmit={async () => { manualPausedRef.current = true; localStorage.removeItem('interruptedTest'); await saveResults(answers); setDone(true) }} onPause={triggerPause} initialSeconds={initialSeconds} />
+        <RealExam cert={cert} questions={questions} answers={answers} setAnswers={setAnswers} current={current} setCurrent={setCurrent} saving={saving} onTimeout={async () => { manualPausedRef.current = true; localStorage.removeItem('interruptedTest'); setTimedOut(true); await saveResults(answers); setDone(true) }} onSubmit={async () => { manualPausedRef.current = true; localStorage.removeItem('interruptedTest'); await saveResults(answers); setDone(true) }} onPause={triggerPause} initialSeconds={initialSeconds} templateBar={templateBar} />
         {pauseModal}
       </>
     )

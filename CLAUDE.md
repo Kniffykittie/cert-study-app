@@ -742,6 +742,9 @@ src/
 
 ---
 
+## Gotchas
+- **A JSX reference to an out-of-scope identifier is NOT a build error** — it compiles fine and throws `ReferenceError` only at runtime when that component renders. When splitting a render into a separate top-level component, verify every variable it uses is either a prop, a module-level import, or a module const (this caused the Real Exam crash: `RealExam` referenced `TestPageInner`'s `templateBar`). Build passing ≠ page renders.
+
 ## Vercel Build Notes
 - **`useSearchParams()` requires Suspense** in Next.js production builds — any page using it must wrap the component in `<Suspense>`. Pattern: rename default export to `XxxInner`, export `default function Xxx() { return <Suspense><XxxInner /></Suspense> }`. Fixed on: join, study-hub/test, life-hub/workouts/log, settings, life-hub/goals/setup.
 
