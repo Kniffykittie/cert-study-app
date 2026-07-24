@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { wrapUserInput } from '@/lib/aiSafety'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { checkRateLimit } from '@/lib/rateLimit'
@@ -50,7 +51,7 @@ export async function POST(req) {
   // Cap description to prevent oversized prompt injection attempts
   const descriptionClean = description?.trim().slice(0, 200) || ''
   const userHint = descriptionClean
-    ? `\n\nThe user also says: <user_input>${descriptionClean}</user_input>`
+    ? `\n\nThe user also says: ${wrapUserInput(descriptionClean)}`
     : ''
 
   const systemPrompt = `You are a registered dietitian analyzing food photos to help users log meals. Your ONLY job is to identify food items visible in the image and estimate their nutrition.

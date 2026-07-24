@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { wrapUserInput } from '@/lib/aiSafety'
 import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic()
@@ -66,7 +67,7 @@ export async function POST(req) {
     }
   }
 
-  const safeNote = note ? `<user_input>${note}</user_input>` : null
+  const safeNote = note ? wrapUserInput(note) : null
 
   const prompt = `You are a personal health coach giving a real-time check-in response. Be specific, warm, and concise.
 ${coach_memory_context ? `\n${coach_memory_context}\n` : ''}
@@ -76,7 +77,7 @@ CHECK-IN DATA (${checkInWindow} window):
 - Note: ${safeNote ?? '(none)'}
 - Sore spots: ${sore_spots.join(', ') || 'none'}
 
-TODAY'S WORKOUT EXERCISES: <user_input>${todays_exercises.slice(0, 20).map(e => String(e).slice(0, 100)).join(', ') || 'none planned'}</user_input>
+TODAY'S WORKOUT EXERCISES: ${wrapUserInput(todays_exercises.slice(0, 20).map(e => String(e).slice(0, 100)).join(', ') || 'none planned')}
 ${conflicts.length ? `\nEXERCISE CONFLICTS DETECTED: ${conflicts.map(c => `${c.exercise} (conflicts with sore ${c.sore_spot})`).join(', ')}` : ''}
 
 CONTEXT:

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { wrapUserInput } from '@/lib/aiSafety'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { checkRateLimit } from '@/lib/rateLimit'
@@ -244,7 +245,7 @@ Goals: ${(goals?.goals || []).join(', ') || 'not set'}${sleepTarget && avgSleepH
   const scheduleEventsMonthly = (monthEvents || []).length
     ? `NOTABLE EVENTS THIS MONTH: ${(monthEvents || []).map(e => {
         const d = new Date(e.event_date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
-        return `${d} — <user_input>${e.title}</user_input> (${e.category})`
+        return `${d} — ${wrapUserInput(e.title)} (${e.category})`
       }).join('; ')} — mention any that shaped the month's rhythm.`
     : null
 
@@ -273,8 +274,8 @@ Goals: ${(goals?.goals || []).join(', ') || 'not set'}${sleepTarget && avgSleepH
 
   const personalContextLines = [
     motivations.length ? `USER MOTIVATIONS (shape the narrative tone — don't recite verbatim): ${motivations.join(', ')}` : null,
-    whyText ? `WHY THEY WANT THIS: <user_input>${whyText}</user_input>` : null,
-    obstacles.length ? `KNOWN OBSTACLES: <user_input>${obstacles.join(', ')}</user_input> — if any are relevant to this month's patterns (e.g. "staying consistent" and they hit a PR in workouts), call it out as overcoming a stated barrier` : null,
+    whyText ? `WHY THEY WANT THIS: ${wrapUserInput(whyText)}` : null,
+    obstacles.length ? `KNOWN OBSTACLES: ${wrapUserInput(obstacles.join(', '))} — if any are relevant to this month's patterns (e.g. "staying consistent" and they hit a PR in workouts), call it out as overcoming a stated barrier` : null,
     dietaryPrefs.length ? `DIETARY PREFERENCES: ${dietaryPrefs.join(', ')} — factor into any nutrition or protein commentary` : null,
     scheduleMonthlyContext,
     scheduleEventsMonthly,
@@ -317,7 +318,7 @@ If a "COMPARED TO LAST MONTH" section is provided: weave the most meaningful mon
 PERSONAL CONTEXT rules: Use USER MOTIVATIONS to frame wins in terms that matter to this person (e.g. if motivated by "keeping up with my kids", frame stamina and energy wins — not abstract body comp). Use KNOWN OBSTACLES to specifically call out when data shows they overcame a stated barrier. Use WHY THEY WANT THIS to set the emotional tone. Use DIETARY PREFERENCES to tailor any nutrition commentary. Never recite these back verbatim — let them shape HOW you say things.`,
     messages: [{
       role: 'user',
-      content: `Write a monthly wrap-up paragraph for this data:\n<user_input>${fullDataText}</user_input>`,
+      content: `Write a monthly wrap-up paragraph for this data:\n${wrapUserInput(fullDataText, 20000)}`,
     }],
   })
 

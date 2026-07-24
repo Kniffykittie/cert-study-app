@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { wrapUserInput } from '@/lib/aiSafety'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { checkRateLimit } from '@/lib/rateLimit'
@@ -102,7 +103,7 @@ export async function POST(req) {
   const scheduleEventsText = (oneoffEvents || []).length
     ? `NOTABLE EVENTS THIS WEEK: ${(oneoffEvents || []).map(e => {
         const wd = new Date(e.event_date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })
-        return `${wd} — <user_input>${e.title}</user_input> (${e.category})`
+        return `${wd} — ${wrapUserInput(e.title)} (${e.category})`
       }).join('; ')} — reference these when they'd plausibly explain energy, nutrition, or workout patterns that week.`
     : null
 
@@ -209,8 +210,8 @@ Goals: ${(goals?.goals || []).join(', ') || 'not set'}`
 
   const personalContextLines = [
     motivations.length ? `USER MOTIVATIONS: ${motivations.join(', ')}` : null,
-    whyText ? `WHY THEY WANT THIS: <user_input>${whyText}</user_input>` : null,
-    obstacles.length ? `KNOWN OBSTACLES: <user_input>${obstacles.join(', ')}</user_input>` : null,
+    whyText ? `WHY THEY WANT THIS: ${wrapUserInput(whyText)}` : null,
+    obstacles.length ? `KNOWN OBSTACLES: ${wrapUserInput(obstacles.join(', '))}` : null,
     dietaryPrefs.length ? `DIETARY PREFERENCES: ${dietaryPrefs.join(', ')}` : null,
   ].filter(Boolean).join('\n')
 
@@ -227,7 +228,7 @@ Goals: ${(goals?.goals || []).join(', ') || 'not set'}`
 Your response MUST end with a paragraph starting with exactly "Next week:" containing one actionable observation tied to this week's data patterns. Format: "Next week: [specific action based on what the data shows]." This section is required — do not omit it.`,
     messages: [{
       role: 'user',
-      content: `Write a weekly wrap-up for this data:\n<user_input>${fullDataText}</user_input>`,
+      content: `Write a weekly wrap-up for this data:\n${wrapUserInput(fullDataText, 20000)}`,
     }],
   })
 

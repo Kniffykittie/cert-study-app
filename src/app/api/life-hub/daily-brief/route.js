@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { wrapUserInput } from '@/lib/aiSafety'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { calcTDEE } from '@/lib/tdee'
@@ -368,7 +369,7 @@ export async function POST(req) {
     lastExercises.length ? `  Yesterday's exercises: ${lastExercises.join(', ')}` : '',
     ywDifficulty ? `  Yesterday's workout difficulty: ${ywDifficulty}/5` : '',
     ywEnergy ? `  Post-workout energy yesterday: ${ywEnergy}/5` : '',
-    ywNote ? `  Post-workout note: <user_input>${ywNote}</user_input>` : '',
+    ywNote ? `  Post-workout note: ${wrapUserInput(ywNote)}` : '',
     ywHrZones ? `  Yesterday's HR zones: Fat burn ${ywHrZones.fat_burn_min || 0}min | Cardio ${ywHrZones.cardio_min || 0}min | Hard ${ywHrZones.hard_min || 0}min | Peak ${ywHrZones.peak_min || 0}min | Avg ${ywHrZones.avg_bpm || '?'}bpm` : '',
     '',
     `WELLNESS:`,
@@ -433,7 +434,7 @@ export async function POST(req) {
     supabase.from('schedule_events').select('*').eq('user_id', user.id).eq('recurrence', 'once').gte('event_date', today).lte('event_date', in14Days).order('event_date').order('start_time', { nullsFirst: true }),
   ])
   const fmtRange = (s, e) => (s && e) ? ` ${s.slice(0,5)}–${e.slice(0,5)}` : (s || e) ? ` at ${(s || e).slice(0,5)}` : ''
-  const fmtEvent = (ev) => `${ev.category}:${fmtRange(ev.start_time, ev.end_time)} <user_input>${ev.title}${ev.notes ? ` — ${ev.notes}` : ''}</user_input>`
+  const fmtEvent = (ev) => `${ev.category}:${fmtRange(ev.start_time, ev.end_time)} ${wrapUserInput(`${ev.title}${ev.notes ? ` — ${ev.notes}` : ''}`)}`
   const todayEvents = [...(todayRecurring || []), ...(upcomingOneoff || []).filter(e => e.event_date === today)]
     .sort((a, b) => (a.start_time || '99').localeCompare(b.start_time || '99'))
   const laterEvents = (upcomingOneoff || []).filter(e => e.event_date > today)
@@ -454,8 +455,8 @@ export async function POST(req) {
         todayMyWeek.lunch_time ? `Lunch scheduled: ${todayMyWeek.lunch_time.slice(0,5)}` : null,
         todayMyWeek.dinner_time ? `Dinner scheduled: ${todayMyWeek.dinner_time.slice(0,5)}` : null,
         todayMyWeek.workout_time ? `Workout scheduled: ${todayMyWeek.workout_time.slice(0,5)}${todayMyWeek.workout_duration_min ? ` (${todayMyWeek.workout_duration_min} min)` : ''}` : null,
-        todayMyWeek.commitments ? `Today's commitments: <user_input>${todayMyWeek.commitments}</user_input>` : null,
-        todayMyWeek.day_notes ? `Notes: <user_input>${todayMyWeek.day_notes}</user_input>` : null,
+        todayMyWeek.commitments ? `Today's commitments: ${wrapUserInput(todayMyWeek.commitments)}` : null,
+        todayMyWeek.day_notes ? `Notes: ${wrapUserInput(todayMyWeek.day_notes)}` : null,
         `Factor active_work day types when interpreting step counts (occupational steps, not fitness-driven), HR elevation, and energy context.`,
       ].filter(Boolean).join('\n')
     }
@@ -485,11 +486,11 @@ export async function POST(req) {
   const personalContext = [
     coachMemoryContext || null,
     motivations.length ? `USER MOTIVATIONS (use to frame tone — don't recite verbatim): ${motivations.join(', ')}` : null,
-    obstacles.length ? `KNOWN OBSTACLES: <user_input>${obstacles.join(', ')}</user_input> — acknowledge relevant ones if they're showing up in the data (e.g. time constraint + short workout = still a win)` : null,
-    whyText ? `WHY THEY WANT THIS: <user_input>${whyText}</user_input> — reference only if it genuinely connects to what happened today` : null,
+    obstacles.length ? `KNOWN OBSTACLES: ${wrapUserInput(obstacles.join(', '))} — acknowledge relevant ones if they're showing up in the data (e.g. time constraint + short workout = still a win)` : null,
+    whyText ? `WHY THEY WANT THIS: ${wrapUserInput(whyText)} — reference only if it genuinely connects to what happened today` : null,
     goalsTargetSleep ? `Sleep target: ${goalsTargetSleep}h/night${sleepGap !== null ? ` | Last night: ${sleepHours}h (${sleepGap >= 0 ? '+' : ''}${sleepGap}h vs target)` : ''}` : null,
     dietaryPrefs.length ? `DIETARY PREFERENCES: ${dietaryPrefs.join(', ')} — factor into any nutrition commentary (e.g. if vegan and protein is low, suggest plant-based sources; if dairy-free, skip dairy suggestions)` : null,
-    calorieHistoryNote ? `CALORIE HISTORY (user's lived experience — treat as ground truth over formula estimates): <user_input>${calorieHistoryNote}</user_input>` : null,
+    calorieHistoryNote ? `CALORIE HISTORY (user's lived experience — treat as ground truth over formula estimates): ${wrapUserInput(calorieHistoryNote)}` : null,
     scheduleContext,
     todayEventsContext,
     upcomingEventsContext,

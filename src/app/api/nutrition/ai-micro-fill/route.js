@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { wrapUserInput } from '@/lib/aiSafety'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { checkRateLimit } from '@/lib/rateLimit'
@@ -30,7 +31,7 @@ export async function POST(req) {
 
   const prompt = `You are a registered dietitian. Estimate the micronutrient content for this food per serving.
 
-<user_input>Food: ${foodDisplay}${macroContext ? `\nMacros per serving: ${macroContext}` : ''}</user_input>
+${wrapUserInput(`Food: ${foodDisplay}${macroContext ? `\nMacros per serving: ${macroContext}` : ''}`, 400)}
 
 Return ONLY valid JSON. Use null for any value you are not reasonably confident about. All values are per serving.
 

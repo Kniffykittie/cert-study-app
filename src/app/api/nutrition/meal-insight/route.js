@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { wrapUserInput } from '@/lib/aiSafety'
 import Anthropic from '@anthropic-ai/sdk'
 import { getCoachMemoryContext } from '@/lib/coachMemory'
 
@@ -35,10 +36,7 @@ Current time: ${current_time}
 Slots logged this session: ${slots_touched.join(', ')}
 ${catchupNote}
 
-<user_input>
-Foods logged this session:
-${foodSummary}
-</user_input>
+${wrapUserInput(`Foods logged this session:\n${foodSummary}`, 2000)}
 
 Day totals so far (including this session):
 - Calories: ${Math.round(day_totals.calories || 0)} / ${calorie_target || '?'} target

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { wrapUserInput } from '@/lib/aiSafety'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { calcTDEE } from '@/lib/tdee'
@@ -95,7 +96,7 @@ Return ONLY a valid JSON array (no markdown, no commentary) of 4-6 objects with 
 Type guide: warning=something worth fixing, tip=improvement opportunity, praise=something they're doing well, info=neutral observation worth knowing`,
     messages: [{
       role: 'user',
-      content: `Analyze this weekly meal plan and return JSON insights.\n\nUser goals: <user_input>${goalsList}</user_input>\nTDEE target: ${tdee || 'unknown'} cal/day\nProtein target: ${proteinTarget || 'unknown'}g/day\n\nWeekly Plan:\n<user_input>\n${planText}\n</user_input>`,
+      content: `Analyze this weekly meal plan and return JSON insights.\n\nUser goals: ${wrapUserInput(goalsList, 500)}\nTDEE target: ${tdee || 'unknown'} cal/day\nProtein target: ${proteinTarget || 'unknown'}g/day\n\nWeekly Plan:\n${wrapUserInput(planText, 8000)}`,
     }],
   })
 

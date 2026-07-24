@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { wrapUserInput } from '@/lib/aiSafety'
 import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic()
@@ -38,7 +39,7 @@ export async function POST(req) {
     coach_memory_context,
   } = contextSnapshot
 
-  const safeNote = note ? `<user_input>${note}</user_input>` : null
+  const safeNote = note ? wrapUserInput(note) : null
 
   const systemPrompt = `You are a personal health coach continuing a check-in conversation. You already gave an initial insight — now the user wants to keep talking.
 ${coach_memory_context ? `\n${coach_memory_context}\n` : ''}
@@ -47,7 +48,7 @@ CONTEXT SNAPSHOT (frozen at check-in time — do not re-fetch or ask about data)
 - Energy: ${energy_rating ?? 'not rated'}/5, Mood: ${mood_rating ?? 'not rated'}/5
 - Note: ${safeNote ?? '(none)'}
 - Sore spots: ${sore_spots.join(', ') || 'none'}
-- Today's exercises: <user_input>${todays_exercises.slice(0, 20).map(e => String(e).slice(0, 100)).join(', ') || 'none planned'}</user_input>
+- Today's exercises: ${wrapUserInput(todays_exercises.slice(0, 20).map(e => String(e).slice(0, 100)).join(', ') || 'none planned')}
 - Sleep score: ${sleep_score ?? 'N/A'}/100${deep_sleep_min != null ? ` (deep: ${deep_sleep_min}min, REM: ${rem_sleep_min}min)` : ''}
 - Yesterday workout: ${yesterday_workout ? 'yes' : 'no'}
 - Calories today: ${today_calories_so_far ?? 'not logged'}, Caffeine: ${today_caffeine_mg != null ? `${today_caffeine_mg}mg` : 'not tracked'}

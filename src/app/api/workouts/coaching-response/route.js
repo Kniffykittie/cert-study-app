@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { wrapUserInput } from '@/lib/aiSafety'
 import Anthropic from '@anthropic-ai/sdk'
 import { getCoachMemoryContext } from '@/lib/coachMemory'
 
@@ -47,7 +48,7 @@ export async function POST(req) {
     ? `fat_burn=${hr_zones.fat_burn_min ?? 0}min, cardio=${hr_zones.cardio_min ?? 0}min, hard=${hr_zones.hard_min ?? 0}min, peak=${hr_zones.peak_min ?? 0}min, avg=${hr_zones.avg_bpm ?? 0}bpm`
     : 'not available'
 
-  const safeNote = user_note ? `<user_input>${user_note}</user_input>` : null
+  const safeNote = user_note ? wrapUserInput(user_note) : null
   const coachMemoryContext = await getCoachMemoryContext(supabase, user.id)
 
   const prompt = `You are a personal trainer giving a brief post-workout coaching response. Be specific, warm, and direct. Reference the actual numbers — don't be generic.
@@ -57,7 +58,7 @@ ${nutritionCaveat}
 
 WORKOUT DATA:
 - Duration: ${durationMin} minutes
-- Exercises: <user_input>${(exercises_completed || []).slice(0, 30).map(e => String(e).slice(0, 100)).join(', ') || 'not provided'}</user_input>
+- Exercises: ${wrapUserInput((exercises_completed || []).slice(0, 30).map(e => String(e).slice(0, 100)).join(', ') || 'not provided')}
 - Sets completed: ${sets_completed ?? 'unknown'}${sets_skipped > 0 ? `, skipped: ${sets_skipped}` : ''}
 - Difficulty (self-rated): ${difficulty ?? 'not rated'}/5
 - Energy after (self-rated): ${energy_after ?? 'not rated'}/5

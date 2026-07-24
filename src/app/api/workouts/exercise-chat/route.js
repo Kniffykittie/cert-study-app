@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { wrapUserInput } from '@/lib/aiSafety'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { checkRateLimit } from '@/lib/rateLimit'
@@ -52,7 +53,7 @@ Tailor your advice to their experience level and goal. Answer questions about fo
         .filter(m => ['user', 'assistant'].includes(m.role) && typeof m.content === 'string')
         .slice(-20)
         .map(m => ({ role: m.role, content: m.content.slice(0, 2000) })),
-      { role: 'user', content: `<user_input>${userMessage}</user_input>` },
+      { role: 'user', content: wrapUserInput(userMessage) },
     ],
   })
 

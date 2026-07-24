@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { wrapUserInput } from '@/lib/aiSafety'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { checkRateLimit } from '@/lib/rateLimit'
@@ -22,7 +23,7 @@ export async function POST(req) {
 
   const prompt = `You are a registered dietitian. Estimate the nutrition facts for this food per typical single serving.
 
-<user_input>Food: ${name.trim()}</user_input>
+${wrapUserInput(`Food: ${name.trim()}`, 200)}
 
 Return ONLY valid JSON. Use null for any value you are not reasonably confident about. All numeric values are per serving.
 

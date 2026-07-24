@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabaseAdmin'
+import { wrapUserInput } from '@/lib/aiSafety'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { checkRateLimit } from '@/lib/rateLimit'
@@ -45,7 +46,7 @@ export async function POST(req) {
 
   const prompt = `You are a nutrition scientist. Analyze this food and return a JSON object. Be concise and practical.
 
-<user_input>Food: ${foodDisplay}${nutritionContext ? `\nNutrition per serving: ${nutritionContext}` : ''}</user_input>
+${wrapUserInput(`Food: ${foodDisplay}${nutritionContext ? `\nNutrition per serving: ${nutritionContext}` : ''}`, 400)}
 
 Return ONLY valid JSON with exactly these fields:
 {

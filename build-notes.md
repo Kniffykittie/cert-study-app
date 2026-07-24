@@ -3401,6 +3401,13 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 130 — Security: prompt-injection wrapper across all AI routes + admin-route spot-check — Complete
+- **Prompt-injection hardening — every AI route now uses `wrapUserInput()`** (from `aiSafety.js`, which strips `</user_input>` from content so a user can't break the data envelope). Applied to all remaining Life Hub / nutrition / workout AI routes (~18 files, ~38 sites): checkin/insight, checkin/chat, coaching-response, exercise-chat, generate-plan, goals/generate-overview, daily-brief (7 sites), weekly-wrap, monthly-wrap, meal-plan/analyze, meal-insight, ai-photo-log, ai-food-fill, ai-drink-fill, ai-micro-fill, ai-food-intel, supplements/generate-profile, supplements/ai-fill. Wrap routes (weekly/monthly) wrap the whole assembled data block (flattens nesting, caps 20000). Verified: no raw `<user_input>${...}` interpolations remain anywhere in `src/app/api`.
+- **Impact for the pentest:** a user typing "ignore all instructions…" into any free-text field (notes, food names, limitations, why-goals, commitments, photo caption, etc.) is now treated as literal data — it can't hijack their own AI response. (It was only ever self-targeted anyway; no cross-user or data-access risk.)
+- **Admin/owner-route spot-check — clean.** All 11 owner-gated routes (9 under `api/owner/*` + `generate-templates` + `generate-flashcards`) verify ownership **server-side** via `getUser()` (validated token, not `getSession`) + `user.email === OWNER_EMAIL` + a `!user` 401 guard. No button-only gating; no bypass.
+- Build verified passing.
+- Files: 18 AI route files across api/checkin, api/workouts, api/goals, api/nutrition, api/supplements, api/life-hub.
+
 ### Phase 129 — Security hardening: lock all shared/reference tables (pentest prep) — Complete
 - **Context:** user is having a friend attempt to break the app, so every client-writable shared table is a target — closed them all now instead of deferring.
 - **New helper `src/lib/supabaseAdmin.js`** — `createAdminClient()` (service-role, bypasses RLS, server-only) for writes to caches that are now read-only for clients.
