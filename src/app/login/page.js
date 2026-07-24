@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -17,6 +17,29 @@ export default function LoginPage() {
   const [authAppName, setAuthAppName] = useState('')
   const [useRecovery, setUseRecovery] = useState(false)
   const [recoveryCode, setRecoveryCode] = useState('')
+
+  // If a restored session is signed in but hasn't completed 2FA (aal1 while
+  // 2FA is enrolled), jump straight to the code screen — no password re-entry.
+  useEffect(() => {
+    async function checkPending() {
+      const supabase = createClient()
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      if (aal?.nextLevel === 'aal2' && aal?.currentLevel !== 'aal2') {
+        const { data: factors } = await supabase.auth.mfa.listFactors()
+        const totp = factors?.totp?.find(f => f.status === 'verified')
+        if (totp) {
+          setFactorId(totp.id)
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) {
+            const { data: profile } = await supabase.from('profiles').select('authenticator_name').eq('id', user.id).maybeSingle()
+            if (profile?.authenticator_name) setAuthAppName(profile.authenticator_name)
+          }
+          setTotpStep(true)
+        }
+      }
+    }
+    checkPending()
+  }, [])
 
   async function handleLogin(e) {
     e.preventDefault()

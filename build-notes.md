@@ -3401,6 +3401,17 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 131 — 2FA enforcement Stage 1: app gate + recovery hardening — Complete
+Goal: make 2FA optional-per-user but ENFORCED for anyone who enrolls (Path A), rolled out in 2 safe stages to avoid lock-out.
+- **Stage 1 (this phase — app-level, zero DB-lock risk):**
+  - `use-recovery` route now reads/updates `recovery_codes` via the **service-role** client (explicit `.eq('user_id')`), so the recovery escape hatch works even under the Stage-2 aal2 RLS.
+  - Login page: on mount, a restored **aal1-while-enrolled** session jumps straight to the TOTP code screen (no password re-entry).
+  - New `MfaGate` (mounted in root layout): redirects any signed-in aal1-while-enrolled session to `/login` to complete 2FA. Accounts with no 2FA (`nextLevel==='aal1'`) are never affected. Skips public paths.
+- **Stage 2 (next — the leak-proof part, applied only after Stage 1 verified):** restrictive RLS on personal-data tables requiring `aal2` OR "no verified factors" (so non-2FA users pass, enrolled-but-unverified sessions are blocked at the DB). Escape hatch = recovery codes (already service-role).
+- Why staged: this is the highest lock-out-risk change; Stage 1 confirms the owner can reliably reach aal2 before the DB rule goes live.
+- Build verified passing.
+- Files: api/2fa/use-recovery/route.js, login/page.js, components/MfaGate.js (new), app/layout.js
+
 ### Phase 130 — Security: prompt-injection wrapper across all AI routes + admin-route spot-check — Complete
 - **Prompt-injection hardening — every AI route now uses `wrapUserInput()`** (from `aiSafety.js`, which strips `</user_input>` from content so a user can't break the data envelope). Applied to all remaining Life Hub / nutrition / workout AI routes (~18 files, ~38 sites): checkin/insight, checkin/chat, coaching-response, exercise-chat, generate-plan, goals/generate-overview, daily-brief (7 sites), weekly-wrap, monthly-wrap, meal-plan/analyze, meal-insight, ai-photo-log, ai-food-fill, ai-drink-fill, ai-micro-fill, ai-food-intel, supplements/generate-profile, supplements/ai-fill. Wrap routes (weekly/monthly) wrap the whole assembled data block (flattens nesting, caps 20000). Verified: no raw `<user_input>${...}` interpolations remain anywhere in `src/app/api`.
 - **Impact for the pentest:** a user typing "ignore all instructions…" into any free-text field (notes, food names, limitations, why-goals, commitments, photo caption, etc.) is now treated as literal data — it can't hijack their own AI response. (It was only ever self-targeted anyway; no cross-user or data-access risk.)

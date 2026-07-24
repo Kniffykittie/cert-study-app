@@ -15,8 +15,16 @@ export async function POST(req) {
   const { code } = await req.json()
   if (!code?.trim()) return NextResponse.json({ error: 'No code provided' }, { status: 400 })
 
+  // Recovery must work for a password-only (aal1) session — that's the whole
+  // point. Use the service-role client so future aal2-enforcement RLS can't
+  // block the escape hatch. Ownership is enforced explicitly by user.id.
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
+
   // Fetch unused recovery codes for this user
-  const { data: stored } = await supabase
+  const { data: stored } = await admin
     .from('recovery_codes')
     .select('id, code_hash')
     .eq('user_id', user.id)
@@ -34,13 +42,7 @@ export async function POST(req) {
   if (!matchId) return NextResponse.json({ error: 'Invalid recovery code' }, { status: 401 })
 
   // Mark code as used
-  await supabase.from('recovery_codes').update({ used_at: new Date().toISOString() }).eq('id', matchId)
-
-  // Unenroll all TOTP factors for this user via admin client
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  )
+  await admin.from('recovery_codes').update({ used_at: new Date().toISOString() }).eq('id', matchId).eq('user_id', user.id)
 
   const { data: factors } = await admin.auth.admin.mfa.listFactors({ userId: user.id })
   const totp = factors?.all?.filter(f => f.factor_type === 'totp') ?? []
