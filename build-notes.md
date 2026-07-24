@@ -3401,10 +3401,16 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 128 — Security: enable RLS on join_attempts — Complete
+- **Fixed the priority RLS-off finding.** `join_attempts` (invite-signup brute-force tracker) had RLS disabled → client read/writable, so an anon attacker could delete their failed attempts to defeat the invite-code guess rate limit. Migration `enable_rls_join_attempts` turns RLS on with **no policies** (deny-all for clients).
+- **Verified safe:** only `api/invite/validate/route.js` accesses the table, via the service-role admin client (bypasses RLS); the `check_join_rate_limit` function is SECURITY DEFINER (reads as owner). Post-migration checks: `rls_enabled=true`, `policy_count=0`, function still returns `allowed=true` for a fresh IP — invite flow intact.
+- Remaining RLS-off tables (`food_cache`, `exercises`, `stretches`) are shared reference/cache data — lower risk, batched into the nutrition/Life Hub shared-write hardening.
+- DB-only change (migration).
+
 ### Phase 127 — #10 defense-in-depth user_id on reads + #2 plan captured — Complete
 - **#10 — explicit `user_id` on authenticated reads (defense-in-depth).** Motivated by the `question_templates` RLS gap we just found: if RLS is ever misconfigured, an explicit filter is the backstop. Added `getUser()` + `.eq('user_id', user.id)` to: cert pages (ccna/network-plus/security-plus — topic_performance + 2× test_sessions each), `DomainTrend` (question_answers), flagged page load (flagged_questions). Progress page already had it. RLS remains the primary guard; this is belt-and-suspenders.
 - **RLS-DISABLED tables found (blind spot of the earlier permissive-policy sweep):** `exercises`, `food_cache`, `join_attempts`, `stretches` have `relrowsecurity=false` → with Supabase default grants they're client read/writable.
-  - **`join_attempts` — PRIORITY security item:** it's the brute-force tracker for invite-code signup (failed `/join` attempts per IP). Client-writable = an attacker could delete their failed attempts to bypass the invite-code guess rate limit (anon-facing). **Fix: enable RLS with no client policies (server route / SECURITY DEFINER fn only). Confirm validate/redeem still work. Ask user before touching the invite flow.**
+  - **`join_attempts` — ✅ FIXED (Phase 128):** enabled RLS with no client policies. Verified: only `invite/validate/route.js` touches it, via the service-role admin client (bypasses RLS); `check_join_rate_limit` is SECURITY DEFINER (reads the table as owner). Post-change: rls_enabled=true, 0 policies (clients denied all access), function returns cleanly. Clients can no longer read/delete attempts to bypass the invite-code guess rate limit.
   - `food_cache` (Open Food Facts nutrition mirror — shared), `exercises`, `stretches` (shared reference data): lower risk (trusted-invitee vandalism only); fold into the shared-write hardening below. Note: food_cache holds ONLY OFF results — AI-filled foods are NOT cached (they go to the user's private `my_foods` after review).
 - **#2 shared-cache hardening — plan captured for the nutrition/Life Hub audit:**
   - `nutrient_profiles` (encyclopedia — FINITE nutrient list): owner generates all profiles once (folds into Generation Day), then lock INSERT/UPDATE to owner (like flashcards/question_templates). Everyone reads the same locked rows.
