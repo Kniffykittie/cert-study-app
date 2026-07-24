@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabaseAdmin'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { NUTRIENT_BY_SLUG } from '@/data/nutrients'
@@ -80,7 +81,8 @@ Include 5-6 food sources. Mix common and less-obvious sources.`,
     return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 500 })
   }
 
-  await supabase.from('nutrient_profiles').upsert({
+  // Shared cache table is locked to read-only for clients — write via service role.
+  await createAdminClient().from('nutrient_profiles').upsert({
     nutrient_key: slug,
     ai_profile: aiProfile,
     generated_at: new Date().toISOString(),

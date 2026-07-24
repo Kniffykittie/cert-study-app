@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabaseAdmin'
 import { NextResponse } from 'next/server'
 
 // OFF stores minerals in grams/100g — convert to mg
@@ -136,8 +137,8 @@ export async function GET(req) {
       ...nutrients,
     }
 
-    // Cache permanently (ODbL allows this)
-    const { data: inserted } = await supabase
+    // Cache permanently (ODbL allows this). Table is read-only for clients — write via service role.
+    const { data: inserted } = await createAdminClient()
       .from('food_cache')
       .upsert(entry, { onConflict: entry.barcode ? 'barcode' : undefined, ignoreDuplicates: false })
       .select()

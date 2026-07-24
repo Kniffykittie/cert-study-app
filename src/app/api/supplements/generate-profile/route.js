@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabaseAdmin'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { checkRateLimit } from '@/lib/rateLimit'
@@ -63,7 +64,8 @@ Write for a health-conscious adult who wants real information, not clinical jarg
     return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 500 })
   }
 
-  await supabase.from('supplement_profiles').upsert({
+  // Shared cache table is locked to read-only for clients — write via service role.
+  await createAdminClient().from('supplement_profiles').upsert({
     supplement_name: normalized,
     ai_profile: aiProfile,
     generated_at: new Date().toISOString(),

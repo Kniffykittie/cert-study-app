@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabaseAdmin'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { checkRateLimit } from '@/lib/rateLimit'
@@ -81,7 +82,8 @@ Ratings: satiety 1=very low 5=very high filling. nutrient_density 1=empty calori
     return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 500 })
   }
 
-  await supabase.from('ai_food_intel_cache').upsert({ food_key, intel, generated_at: new Date().toISOString() }, { onConflict: 'food_key' })
+  // Shared cache table is locked to read-only for clients — write via service role.
+  await createAdminClient().from('ai_food_intel_cache').upsert({ food_key, intel, generated_at: new Date().toISOString() }, { onConflict: 'food_key' })
 
   return NextResponse.json({ intel, cached: false })
 }

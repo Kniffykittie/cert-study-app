@@ -3401,6 +3401,18 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 129 — Security hardening: lock all shared/reference tables (pentest prep) — Complete
+- **Context:** user is having a friend attempt to break the app, so every client-writable shared table is a target — closed them all now instead of deferring.
+- **New helper `src/lib/supabaseAdmin.js`** — `createAdminClient()` (service-role, bypasses RLS, server-only) for writes to caches that are now read-only for clients.
+- **Cache routes switched to service-role writes** (so first-time generation still works for everyone while the tables are locked): `ai-food-intel` (ai_food_intel_cache), `encyclopedia/[nutrient]` (nutrient_profiles), `supplements/generate-profile` (supplement_profiles), `nutrition/search` (food_cache). Reads stay on the session client.
+- **Migration `lock_shared_tables_writes` (applied after routes deploy):**
+  - `ai_food_intel_cache`, `nutrient_profiles`: dropped open INSERT/UPDATE policies (kept SELECT `true`).
+  - `supplement_profiles`: dropped `auth.uid() IS NOT NULL` INSERT/UPDATE (kept authenticated SELECT).
+  - `food_cache`, `exercises`, `stretches`: were RLS-OFF → enabled RLS + authenticated SELECT policy, no write policies (clients read-only; `exercises` read at runtime, `stretches` table unused by app but locked anyway).
+- **Net:** no shared/reference/cache table is client-writable anymore. Combined with Phase 123 (question_templates owner-only) and Phase 128 (join_attempts RLS), every open write angle found in the RLS sweep is closed. Client reads and service-role writes preserved, so nothing user-facing breaks.
+- Build verified passing.
+- Files: lib/supabaseAdmin.js (new), api/nutrition/ai-food-intel/route.js, api/nutrition/encyclopedia/[nutrient]/route.js, api/supplements/generate-profile/route.js, api/nutrition/search/route.js
+
 ### Phase 128 — Security: enable RLS on join_attempts — Complete
 - **Fixed the priority RLS-off finding.** `join_attempts` (invite-signup brute-force tracker) had RLS disabled → client read/writable, so an anon attacker could delete their failed attempts to defeat the invite-code guess rate limit. Migration `enable_rls_join_attempts` turns RLS on with **no policies** (deny-all for clients).
 - **Verified safe:** only `api/invite/validate/route.js` accesses the table, via the service-role admin client (bypasses RLS); the `check_join_rate_limit` function is SECURITY DEFINER (reads as owner). Post-migration checks: `rls_enabled=true`, `policy_count=0`, function still returns `allowed=true` for a fresh IP — invite flow intact.
