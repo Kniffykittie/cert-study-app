@@ -3401,6 +3401,13 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 132 — Fixes: Settings PIN pre-render leak + hydration pace scoring — Complete
+- **Settings PIN gate leaked content before unlock:** `privacyPinGated` started `false`, so the full settings page rendered for a beat before the async profile fetch flipped the gate on. Added a `pinResolved` flag — the page now renders a blank screen until the PIN requirement is known, then shows either the lock screen or settings. No more flash of settings before the PIN.
+- **Hydration score was full-day-goal %, not pace:** score was `(totalOz / dynGoal) × 100`, so the morning always read "Dehydrated" until the raw fraction caught up mid-day. Now pace-aware: compares intake to `paceTarget = dynGoal × dayFrac` (7am–10pm window), with an early-morning grace (on-pace until there's a meaningful target). Relabeled to pace language: On Pace / On Track / A Bit Behind / Behind on Fluids (dropped the alarming "Dehydrated"). Electrolyte penalty now vs pace, not full goal.
+- Note: real-time hydration pace is already surfaced by the `hydration_nudge` notification ("you're at X oz, want ~Y by now"); the evening wrap already reports hydration totals.
+- Build verified passing (after reinstalling node_modules — deps had been cleared by an environment reset, unrelated to code).
+- Files: settings/page.js, life-hub/health/water/page.js
+
 ### Phase 131 — 2FA enforcement Stage 1: app gate + recovery hardening — Complete
 Goal: make 2FA optional-per-user but ENFORCED for anyone who enrolls (Path A), rolled out in 2 safe stages to avoid lock-out.
 - **Stage 1 (this phase — app-level, zero DB-lock risk):**

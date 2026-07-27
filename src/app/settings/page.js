@@ -139,6 +139,7 @@ function SettingsPageInner() {
   const [privacyPinInput, setPrivacyPinInput] = useState('')
   const [privacyPinError, setPrivacyPinError] = useState('')
   const [privacyPinChecking, setPrivacyPinChecking] = useState(false)
+  const [pinResolved, setPinResolved] = useState(false) // false until we know whether a PIN gate is needed
   const [showSetPinModal, setShowSetPinModal] = useState(false)
   const [showRemovePinModal, setShowRemovePinModal] = useState(false)
   const [newPin, setNewPin] = useState('')
@@ -216,6 +217,8 @@ function SettingsPageInner() {
           if (!unlocked) setPrivacyPinGated(true)
         }
       }
+      // PIN status now known — safe to render (gate screen or settings)
+      setPinResolved(true)
 
       // Check 2FA status
       const { data: factors } = await supabase.auth.mfa.listFactors()
@@ -703,6 +706,12 @@ function SettingsPageInner() {
       setDeleteError(json.error || 'Deletion failed. Try again.')
       setDeleting(false)
     }
+  }
+
+  // Hold all rendering until we know whether a PIN is required — never flash
+  // settings content before the gate resolves.
+  if (!pinResolved) {
+    return <div style={{ minHeight: '100vh', backgroundColor: 'var(--background)' }} />
   }
 
   // Privacy PIN gate — shown before any page content

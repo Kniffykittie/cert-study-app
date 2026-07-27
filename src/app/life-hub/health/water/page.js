@@ -597,18 +597,29 @@ export default function DrinksHydrationPage() {
     return reasons
   })()
 
-  // Hydration Score (0–100)
+  // How far into the hydration day we are (7am–10pm window) — used to judge PACE,
+  // so the morning doesn't read as "behind" just because the full-day goal isn't met yet.
+  const dayFrac = (() => {
+    const now = new Date()
+    const h = now.getHours() + now.getMinutes() / 60
+    return Math.min(1, Math.max(0, (h - 7) / 15))
+  })()
+  const paceTarget = dynGoal * dayFrac // oz you'd want by now to be on pace
+
+  // Hydration Score (0–100) — measured against PACE, not the full-day goal.
+  // 100 = on or ahead of where you should be by this hour.
   const hydrationScore = (() => {
     if (dynGoal <= 0) return 0
-    const base = Math.min((totalOz / dynGoal) * 100, 100)
+    // Too early to be "behind" — treat as on-pace until there's a meaningful target.
+    const base = paceTarget < 4 ? 85 : Math.min((totalOz / paceTarget) * 100, 100)
     // Timing bonus: +5 if logs spread across ≥4 different hours
     const hoursWithWater = new Set([
       ...waterLogs.map(l => new Date(l.created_at).getHours()),
       ...drinkEntries.map(e => new Date(e.created_at).getHours()),
     ])
     const timingBonus = hoursWithWater.size >= 4 ? 5 : 0
-    // Electrolyte penalty: high sodium + low hydration
-    const elecPenalty = (todayNutrients.sodium_mg > 3500 && totalOz < dynGoal * 0.5) ? -10 : 0
+    // Electrolyte penalty: high sodium + well behind pace
+    const elecPenalty = (todayNutrients.sodium_mg > 3500 && totalOz < paceTarget * 0.5) ? -10 : 0
     // Dilution penalty: over-hydrated but low potassium (only when food is logged)
     const dilutionPenalty = (todayNutrients.potassium_mg > 0 && totalOz > dynGoal * 0.9 && todayNutrients.potassium_mg < 2350) ? -5 : 0
     // Caffeine penalty: >500mg
@@ -617,10 +628,10 @@ export default function DrinksHydrationPage() {
   })()
 
   function scoreLabel(s) {
-    if (s >= 80) return { text: 'Well Hydrated', color: 'var(--success)' }
-    if (s >= 60) return { text: 'On Track', color: 'var(--accent-blue)' }
-    if (s >= 40) return { text: 'Drink More', color: 'var(--warning)' }
-    return { text: 'Dehydrated', color: 'var(--error)' }
+    if (s >= 85) return { text: 'On Pace', color: 'var(--success)' }
+    if (s >= 65) return { text: 'On Track', color: 'var(--accent-blue)' }
+    if (s >= 45) return { text: 'A Bit Behind', color: 'var(--warning)' }
+    return { text: 'Behind on Fluids', color: 'var(--error)' }
   }
   const scoreInfo = scoreLabel(hydrationScore)
 
