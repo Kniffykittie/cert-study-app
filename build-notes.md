@@ -3401,6 +3401,15 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 133 — 2FA enforcement Stage 2: leak-proof database RLS lock — Complete
+- **The real lock.** Stage 1 (Phase 131) enforced 2FA only in the app UI — a scripted password-only session could still hit the data layer. Stage 2 enforces it at the database, so 2FA can't be bypassed by anything talking directly to PostgREST.
+- **Helper:** `public.has_verified_mfa()` — SECURITY DEFINER, `stable`, `set search_path=''`, granted to `authenticated` only. Returns true when `auth.uid()` has a `verified` factor in `auth.mfa_factors`. SECURITY DEFINER is required because normal clients can't read `auth.mfa_factors`.
+- **Policy:** restrictive `FOR ALL` policy `require_aal2_if_enrolled` added to **45 personal-data tables**: `using ((select auth.jwt()->>'aal') = 'aal2' or not public.has_verified_mfa())`. Postgres reuses a `USING`-only `FOR ALL` clause as the INSERT `WITH CHECK`, so reads AND writes are both gated. Non-enrolled users pass via the `not has_verified_mfa()` branch (2FA stays optional); enrolled-but-only-aal1 sessions are blocked entirely at the DB.
+- **Excluded 3 tables on purpose:** `recovery_codes` (the escape hatch — already written via service-role in `use-recovery`), `api_rate_limits` (infra, service-role only), `flashcards` (shared read-only content, not personal data).
+- **Verified:** policy present on exactly the 45 intended tables (SQL confirmed), restrictive + `{authenticated}` scoped; owner has one `verified` TOTP factor so their aal2 session passes. Service-role/admin clients bypass RLS, so Edge Functions and shared-cache writers are unaffected.
+- **Instantly reversible:** `drop policy require_aal2_if_enrolled on public.<table>` per table (or drop the helper) removes the lock with zero data impact.
+- Migrations: `create_has_verified_mfa_helper`, `require_aal2_if_enrolled_on_personal_tables`.
+
 ### Phase 132 — Fixes: Settings PIN pre-render leak + hydration pace scoring — Complete
 - **Settings PIN gate leaked content before unlock:** `privacyPinGated` started `false`, so the full settings page rendered for a beat before the async profile fetch flipped the gate on. Added a `pinResolved` flag — the page now renders a blank screen until the PIN requirement is known, then shows either the lock screen or settings. No more flash of settings before the PIN.
 - **Hydration score was full-day-goal %, not pace:** score was `(totalOz / dynGoal) × 100`, so the morning always read "Dehydrated" until the raw fraction caught up mid-day. Now pace-aware: compares intake to `paceTarget = dynGoal × dayFrac` (7am–10pm window), with an early-morning grace (on-pace until there's a meaningful target). Relabeled to pace language: On Pace / On Track / A Bit Behind / Behind on Fluids (dropped the alarming "Dehydrated"). Electrolyte penalty now vs pace, not full goal.
