@@ -120,7 +120,7 @@ export default function LifeHubSidebar() {
     const active = pathname === href
     return (
       <Link key={href} href={href}
-        style={{ padding: '7px 12px', borderRadius: '6px', fontSize: '13px', textDecoration: 'none', display: 'block', backgroundColor: active ? `${color}1a` : 'transparent', color: active ? color : 'var(--text-secondary)', fontWeight: active ? '600' : '400', borderLeft: active ? `2px solid ${color}` : '2px solid transparent' }}
+        style={{ padding: '9px 12px', borderRadius: '6px', fontSize: '13px', textDecoration: 'none', display: 'block', backgroundColor: active ? `${color}1a` : 'transparent', color: active ? color : 'var(--text-secondary)', fontWeight: active ? '600' : '400', borderLeft: active ? `2px solid ${color}` : '2px solid transparent' }}
         onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = `${color}0d` }}
         onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}>
         {label}
@@ -137,7 +137,7 @@ export default function LifeHubSidebar() {
   const dropdownHeader = (label, isOpen, setOpen, isActive, color) => (
     <div
       onClick={() => setOpen(o => !o)}
-      style={{ padding: '7px 12px', borderRadius: '6px', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: isActive && !isOpen ? `${color}1a` : 'transparent', color: isActive ? color : 'var(--text-secondary)', fontWeight: isActive ? '600' : '400', borderLeft: isActive ? `2px solid ${color}` : '2px solid transparent' }}
+      style={{ padding: '9px 12px', borderRadius: '6px', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: isActive && !isOpen ? `${color}1a` : 'transparent', color: isActive ? color : 'var(--text-secondary)', fontWeight: isActive ? '600' : '400', borderLeft: isActive ? `2px solid ${color}` : '2px solid transparent' }}
       onMouseEnter={e => { if (!isActive) e.currentTarget.style.backgroundColor = `${color}0d` }}
       onMouseLeave={e => { if (!isActive) e.currentTarget.style.backgroundColor = isActive && !isOpen ? `${color}1a` : 'transparent' }}
     >

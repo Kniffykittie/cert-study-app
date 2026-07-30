@@ -480,7 +480,7 @@ export default function LifeHubPage() {
           onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--surface)' }}>
           <span style={{ fontSize: '22px', flexShrink: 0 }}>{icon}</span>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: '20px', fontWeight: '700', color, lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+            <div style={{ fontSize: '24px', fontWeight: '700', color, lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
             {sub && <div style={{ fontSize: '12px', color, opacity: 0.7, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>}
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: sub ? '1px' : '3px' }}>{label}</div>
           </div>
@@ -497,7 +497,7 @@ export default function LifeHubPage() {
         onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--surface)' }}>
         <div style={{ fontSize: '11px', fontWeight: '700', color, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{icon} {sectionLabel}</div>
         <div>
-          <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1.1, marginBottom: '3px' }}>{hero}</div>
+          <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1.1, marginBottom: '3px' }}>{hero}</div>
           {heroSub && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{heroSub}</div>}
         </div>
         <Link href={actionHref || href} style={{ textDecoration: 'none', marginTop: 'auto' }}>
@@ -519,14 +519,14 @@ export default function LifeHubPage() {
           .lh-recovery-bars { display: none !important; }
         }
       `}</style>
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: '32px' }}>
         <h1 style={{ color: SC.overview, fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Life Hub</h1>
         <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Your health, fitness, and nutrition — all in one place.</p>
       </div>
 
       {/* Zone 1 — Status Bar */}
       {loaded && sd && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '32px' }}>
           <StatusPill
             color={SC.nutrition} icon="🍽️"
             value={sd.todayKcal > 0 ? `${sd.todayKcal.toLocaleString()} kcal` : '— kcal'}
@@ -563,7 +563,7 @@ export default function LifeHubPage() {
       {/* Today's Schedule — from My Schedule events */}
       {todaySchedule.length > 0 && (
         <Link href="/life-hub/my-week" style={{ textDecoration: 'none' }}>
-          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', padding: '14px 18px', marginBottom: '20px' }}>
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', padding: '14px 18px', marginBottom: '32px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <span style={{ fontSize: '11px', fontWeight: '700', color: SC.overview, textTransform: 'uppercase', letterSpacing: '0.08em' }}>📅 Today's Schedule</span>
               <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Manage →</span>
@@ -673,7 +673,7 @@ export default function LifeHubPage() {
         ]
 
         return (
-          <div style={{ backgroundColor: 'var(--surface)', borderTop: `2px solid ${scoreColor}44`, borderRight: `2px solid ${scoreColor}44`, borderBottom: `2px solid ${scoreColor}44`, borderLeft: `4px solid ${scoreColor}`, borderRadius: '14px', padding: '20px 24px', marginBottom: '20px', cursor: 'pointer', transition: 'background-color 0.15s' }}
+          <div style={{ backgroundColor: 'var(--surface)', borderTop: `2px solid ${scoreColor}44`, borderRight: `2px solid ${scoreColor}44`, borderBottom: `2px solid ${scoreColor}44`, borderLeft: `4px solid ${scoreColor}`, borderRadius: '14px', padding: '20px 24px', marginBottom: '32px', cursor: 'pointer', transition: 'background-color 0.15s' }}
             onClick={() => setRecoveryExpanded(e => !e)}
             onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${scoreColor}0a` }}
             onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--surface)' }}>
@@ -682,16 +682,16 @@ export default function LifeHubPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 {/* SVG Ring */}
-                <svg width="76" height="76" viewBox="0 0 100 100" style={{ flexShrink: 0 }}>
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="var(--border)" strokeWidth="11" />
-                  <circle cx="50" cy="50" r="40" fill="none" stroke={scoreColor} strokeWidth="11"
+                <svg width="88" height="88" viewBox="0 0 100 100" style={{ flexShrink: 0 }}>
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="var(--border)" strokeWidth="10" />
+                  <circle cx="50" cy="50" r="40" fill="none" stroke={scoreColor} strokeWidth="10"
                     strokeDasharray="251.33"
                     strokeDashoffset={251.33 * (1 - score / 100)}
                     strokeLinecap="round"
                     style={{ transform: 'rotate(-90deg)', transformOrigin: '50px 50px', transition: 'stroke-dashoffset 0.5s ease' }}
                   />
-                  <text x="50" y="46" textAnchor="middle" dominantBaseline="middle" fill={scoreColor} fontSize="24" fontWeight="800">{score}</text>
-                  <text x="50" y="64" textAnchor="middle" dominantBaseline="middle" fill="var(--text-secondary)" fontSize="11">/100</text>
+                  <text x="50" y="45" textAnchor="middle" dominantBaseline="middle" fill={scoreColor} fontSize="34" fontWeight="800">{score}</text>
+                  <text x="50" y="68" textAnchor="middle" dominantBaseline="middle" fill="var(--text-secondary)" fontSize="11">/100</text>
                 </svg>
                 <div>
                   <div style={{ fontSize: '17px', fontWeight: '700', color: scoreColor, marginBottom: '2px' }}>⚡ {scoreLabel}</div>
@@ -780,7 +780,7 @@ export default function LifeHubPage() {
         const activeCfg = BRIEF_CONFIG.find(c => c.key === resolvedKey)
         const text = briefs[resolvedKey]
         return (
-          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', marginBottom: '20px', overflow: 'hidden' }}>
+          <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', marginBottom: '32px', overflow: 'hidden' }}>
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
               {visibleTabs.map(cfg => {
                 const isActive = resolvedKey === cfg.key
@@ -843,7 +843,7 @@ export default function LifeHubPage() {
       })()}
 
       {/* Check-In + Heatmap — combined card */}
-      <div style={{ backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', marginBottom: '20px', overflow: 'hidden' }}>
+      <div style={{ backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', marginBottom: '32px', overflow: 'hidden' }}>
         {/* Morning / Afternoon tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
           {[

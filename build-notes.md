@@ -3186,7 +3186,7 @@ This supersedes all scattered "Session N" numbering below. Detailed specs for ea
 - **S11 — Life Hub Home Restructure** ✅ largely pre-built (Phase 91); see Phase 106 note — recovery ring hero, single tabbed brief, zone reorder, skeleton loaders, split 971-line page (2026-07-09 audit spec).
 - **S12 — Notification Schedule UI + PWA** ✅ BUILT (Phase 107) — settings shows/edits send times (wake/bedtime), PWA install banner.
 - **S13 — Study Hub Motivation Layer** ✅ BUILT (Phase 106) — exam countdown chips (exam_dates), jump-back-in row (paused test/labs/flashcards).
-- **S14 — Polish Wave** ⬜ — typography, card variety, empty states, milestones, theme presets, personality layer, accessibility (ARIA/keyboard).
+- **S14 — Polish Wave** ⬜ (in progress) — ✅ empty states + streak milestones (Phase 114), ✅ modal a11y (Phases 115–116), ✅ Life Hub typography + spacing (Phase 134). Remaining: card variety (left-border diversification), theme presets, personality layer, broader ARIA/keyboard a11y across non-modal controls.
 
 ### PARKED (waiting on user — slot in when ready)
 - Stretch photos (user sourcing; checklist delivered) → then stretch image display build + optional 5 new stretches
@@ -3400,6 +3400,14 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 134 — S14 polish (slice 3): Life Hub typography + spacing pass — Complete
+- Applied the specced Visual Hierarchy fixes to the Life Hub landing to add breathing room and sharpen the type contrast between hero numbers and secondary text.
+- **Section spacing:** all 6 top-level section separators bumped `marginBottom` 20px → 32px (status bar, schedule, recovery, brief, check-in card).
+- **Hero typography:** status pill values 20px → 24px; section summary card hero 22px → 28px; Recovery Score ring enlarged (76→88px) with the score number 24 → 34 for a real hero-vs-body contrast.
+- **Tap targets:** LifeHubSidebar link/dropdown padding 7px → 9px vertical.
+- Build verified passing. Remaining S14 sub-areas (left-border card diversification, theme presets, broader ARIA/keyboard a11y) still ⬜.
+- Files: life-hub/page.js, components/LifeHubSidebar.js
 
 ### Phase 133 — 2FA enforcement Stage 2: leak-proof database RLS lock — Complete
 - **The real lock.** Stage 1 (Phase 131) enforced 2FA only in the app UI — a scripted password-only session could still hit the data layer. Stage 2 enforces it at the database, so 2FA can't be bypassed by anything talking directly to PostgREST.
