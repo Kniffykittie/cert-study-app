@@ -673,10 +673,10 @@ export default function LifeHubPage() {
         ]
 
         return (
-          <div style={{ backgroundColor: 'var(--surface)', borderTop: `2px solid ${scoreColor}44`, borderRight: `2px solid ${scoreColor}44`, borderBottom: `2px solid ${scoreColor}44`, borderLeft: `4px solid ${scoreColor}`, borderRadius: '14px', padding: '20px 24px', marginBottom: '32px', cursor: 'pointer', transition: 'background-color 0.15s' }}
+          <div style={{ backgroundColor: `${scoreColor}12`, border: `1px solid ${scoreColor}55`, borderRadius: '14px', padding: '22px 24px', marginBottom: '32px', cursor: 'pointer', transition: 'background-color 0.15s' }}
             onClick={() => setRecoveryExpanded(e => !e)}
-            onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${scoreColor}0a` }}
-            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--surface)' }}>
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${scoreColor}1c` }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = `${scoreColor}12` }}>
 
             {/* Header row */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -843,7 +843,7 @@ export default function LifeHubPage() {
       })()}
 
       {/* Check-In + Heatmap — combined card */}
-      <div style={{ backgroundColor: 'var(--surface)', borderTop: '1px solid var(--border)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${SC.overview}`, borderRadius: '12px', marginBottom: '32px', overflow: 'hidden' }}>
+      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', marginBottom: '32px', overflow: 'hidden' }}>
         {/* Morning / Afternoon tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
           {[

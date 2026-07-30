@@ -3186,7 +3186,7 @@ This supersedes all scattered "Session N" numbering below. Detailed specs for ea
 - **S11 — Life Hub Home Restructure** ✅ largely pre-built (Phase 91); see Phase 106 note — recovery ring hero, single tabbed brief, zone reorder, skeleton loaders, split 971-line page (2026-07-09 audit spec).
 - **S12 — Notification Schedule UI + PWA** ✅ BUILT (Phase 107) — settings shows/edits send times (wake/bedtime), PWA install banner.
 - **S13 — Study Hub Motivation Layer** ✅ BUILT (Phase 106) — exam countdown chips (exam_dates), jump-back-in row (paused test/labs/flashcards).
-- **S14 — Polish Wave** ⬜ (in progress) — ✅ empty states + streak milestones (Phase 114), ✅ modal a11y (Phases 115–116), ✅ Life Hub typography + spacing (Phase 134). Remaining: card variety (left-border diversification), theme presets, personality layer, broader ARIA/keyboard a11y across non-modal controls.
+- **S14 — Polish Wave** ⬜ (in progress) — ✅ empty states + streak milestones (Phase 114), ✅ modal a11y (Phases 115–116), ✅ Life Hub typography + spacing (Phase 134), ✅ card-type diversification (Phase 135). Remaining: theme presets, personality layer, broader ARIA/keyboard a11y across non-modal controls.
 
 ### PARKED (waiting on user — slot in when ready)
 - Stretch photos (user sourcing; checklist delivered) → then stretch image display build + optional 5 new stretches
@@ -3400,6 +3400,14 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 135 — S14 polish (slice 4): Life Hub card-type diversification — Complete
+- Broke the "every card has a 3px left accent bar" monotony on the Life Hub landing into three distinct card *types* so the eye has an anchor.
+- **Recovery Score → filled hero card:** dropped the left accent bar; now a filled score-color tint (`${scoreColor}12`, hover `1c`) with a full thin `${scoreColor}55` border. Visually breaks the pattern entirely, matching its role as the page's hero metric.
+- **Check-In → plain-border panel:** dropped the purple left bar for a full `1px solid var(--border)`, giving it a document/panel feel (same language as the Daily Brief card, which already used a full border).
+- **Kept the left-accent language** on the status pills and 2×2 section summary cards — they're a coherent "navigation/data card" group, so shared styling there is intentional, not monotony.
+- Build verified passing. Remaining S14: theme presets, broader ARIA/keyboard a11y on non-modal controls.
+- Files: life-hub/page.js
 
 ### Phase 134 — S14 polish (slice 3): Life Hub typography + spacing pass — Complete
 - Applied the specced Visual Hierarchy fixes to the Life Hub landing to add breathing room and sharpen the type contrast between hero numbers and secondary text.
