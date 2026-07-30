@@ -3,14 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-
-const SECTION_COLORS = {
-  overview: '#a78bfa',
-  health: '#22c55e',
-  nutrition: '#f97316',
-  workouts: '#3b82f6',
-  goals: '#06b6d4',
-}
+import { useSectionColors } from '@/lib/sectionColors'
 
 function getLastMonth() {
   const now = new Date()
@@ -25,6 +18,7 @@ function monthLabel(ym) {
 }
 
 export default function LifeHubSidebar() {
+  const SECTION_COLORS = useSectionColors()
   const [displayName, setDisplayName] = useState('')
   const [healthConnected, setHealthConnected] = useState(false)
   const [healthOpen, setHealthOpen] = useState(false)

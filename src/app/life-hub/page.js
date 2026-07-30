@@ -4,14 +4,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { calcTDEE } from '@/lib/tdee'
 import InfoChip from '@/components/InfoChip'
-
-const SC = {
-  overview: '#a78bfa',
-  nutrition: '#f97316',
-  workouts: '#3b82f6',
-  health: '#22c55e',
-  goals: '#06b6d4',
-}
+import { useSectionColors } from '@/lib/sectionColors'
 
 function dateStr(daysBack = 0) {
   const d = new Date()
@@ -99,6 +92,7 @@ function getMicroInsight(energy, mood, recentCheckins, ctx) {
 const DAYS_LABEL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 export default function LifeHubPage() {
+  const SC = useSectionColors()
   const today = dateStr()
   const yesterday = dateStr(1)
 

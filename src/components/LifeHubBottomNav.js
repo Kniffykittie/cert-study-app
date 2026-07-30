@@ -1,17 +1,19 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useSectionColors } from '@/lib/sectionColors'
 
 const TABS = [
-  { label: 'Home', icon: '⊞', href: '/life-hub', match: (p) => p === '/life-hub', color: '#a78bfa' },
-  { label: 'Goals', icon: '🎯', href: '/life-hub/goals', match: (p) => p.startsWith('/life-hub/goals'), color: '#06b6d4' },
-  { label: 'Health', icon: '💚', href: '/life-hub/health', match: (p) => p.startsWith('/life-hub/health'), color: '#22c55e' },
-  { label: 'Nutrition', icon: '🍊', href: '/life-hub/nutrition', match: (p) => p.startsWith('/life-hub/nutrition'), color: '#f97316' },
-  { label: 'Workouts', icon: '💪', href: '/life-hub/workouts', match: (p) => p.startsWith('/life-hub/workouts'), color: '#3b82f6' },
+  { label: 'Home', icon: '⊞', href: '/life-hub', match: (p) => p === '/life-hub', sec: 'overview' },
+  { label: 'Goals', icon: '🎯', href: '/life-hub/goals', match: (p) => p.startsWith('/life-hub/goals'), sec: 'goals' },
+  { label: 'Health', icon: '💚', href: '/life-hub/health', match: (p) => p.startsWith('/life-hub/health'), sec: 'health' },
+  { label: 'Nutrition', icon: '🍊', href: '/life-hub/nutrition', match: (p) => p.startsWith('/life-hub/nutrition'), sec: 'nutrition' },
+  { label: 'Workouts', icon: '💪', href: '/life-hub/workouts', match: (p) => p.startsWith('/life-hub/workouts'), sec: 'workouts' },
 ]
 
 export default function LifeHubBottomNav() {
   const pathname = usePathname()
+  const SC = useSectionColors()
 
   return (
     <>
@@ -34,6 +36,7 @@ export default function LifeHubBottomNav() {
       <nav className="lh-bottom-nav">
         {TABS.map(tab => {
           const active = tab.match(pathname)
+          const color = SC[tab.sec]
           return (
             <Link
               key={tab.href}
@@ -46,8 +49,8 @@ export default function LifeHubBottomNav() {
                 justifyContent: 'center',
                 padding: '8px 4px 6px',
                 textDecoration: 'none',
-                color: active ? tab.color : 'var(--text-secondary)',
-                borderTop: active ? `2px solid ${tab.color}` : '2px solid transparent',
+                color: active ? color : 'var(--text-secondary)',
+                borderTop: active ? `2px solid ${color}` : '2px solid transparent',
                 transition: 'color 0.15s',
               }}
             >

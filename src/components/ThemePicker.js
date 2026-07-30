@@ -15,6 +15,7 @@ export const THEME_PRESETS = [
 function applyTheme(key) {
   if (key === 'villainous') document.documentElement.removeAttribute('data-theme')
   else document.documentElement.setAttribute('data-theme', key)
+  window.dispatchEvent(new Event('themechange'))
 }
 
 export default function ThemePicker() {

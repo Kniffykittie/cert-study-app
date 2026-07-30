@@ -3401,6 +3401,14 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 137 — Themes recolor section identity colors (wave 1: chrome + landing) — Complete
+- **Problem (user feedback):** themes felt like a "cloudy overlay," not a real theme change. Root cause: nearly every colored element (status pills, nav, headers) uses the hardcoded Life Hub SECTION_COLORS (orange/blue/green/teal/purple), which did NOT change with theme — so only the near-black background shifted subtly. **User chose full recolor** (section colors become theme-driven), reversing the old "section colors are fixed identity" rule.
+- **Architecture:** new `src/lib/sectionColors.js` — `SECTION_PALETTES` (per-theme 5-color palettes for all 9 themes) + `useSectionColors()` hook. Returns **hex strings** (not CSS vars) so the pervasive `${color}22` alpha-tint concatenation keeps working. Hook defaults to villainous for SSR/first paint, syncs to `data-theme` in an effect, and re-renders on a `themechange` event dispatched by ThemePicker on selection (live recolor, no reload).
+- **Wave 1 converted (always-visible chrome + the screen in the report):** `life-hub/page.js` (SC), `LifeHubSidebar.js` (SECTION_COLORS), `LifeHubBottomNav.js` (per-tab colors). These now recolor live per theme.
+- **Remaining (waves 2+):** the ~30 per-section Life Hub pages still use local hardcoded section hexes; convert them to `useSectionColors()` so the whole app recolors consistently. Tracked in Future Features.
+- Build verified passing.
+- Files: lib/sectionColors.js (new), components/ThemePicker.js, components/LifeHubSidebar.js, components/LifeHubBottomNav.js, app/life-hub/page.js
+
 ### Phase 136 — S14 polish (slice 5): theme presets — Complete
 - Added user-selectable color themes. 9 presets: **Villainous** (default — the original electric-blue-on-black), **Midnight** (cool blue-black + sky accent), **Amethyst** (purple-forward warm dark), **Slate** (soft neutral grey + muted blue), **Rose Gold** (warm blush + gold), **Acid** (electric lime on green-black), **Sunshine** (happy yellows/amber), **Bubblegum** (hot pink/magenta). Last 5 added at user request.
 - **Mechanism:** each non-default preset is a `:root[data-theme="key"]` override block in `globals.css` that reassigns chrome + accent CSS variables (`--background`, `--surface`, `--border`, `--accent-blue`, `--accent-purple`, `--text-primary/secondary`). **Semantic colors (success/error/warning + borders) stay constant across all themes** so green=good / red=bad never shifts. Default = base `:root` (no attribute).
