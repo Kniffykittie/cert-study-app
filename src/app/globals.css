@@ -17,6 +17,37 @@
   --warning-border: #7B6000;
 }
 
+/* Theme presets — override chrome + accents only; semantic colors
+   (success/error/warning) stay constant so meaning never shifts.
+   Default ("Villainous") is the base :root above (no data-theme attribute). */
+:root[data-theme="midnight"] {
+  --background: #0A0F1A;
+  --surface: #131B2E;
+  --border: #24304A;
+  --accent-blue: #38BDF8;
+  --accent-purple: #818CF8;
+  --text-primary: #E6EDF6;
+  --text-secondary: #8496B0;
+}
+:root[data-theme="amethyst"] {
+  --background: #120E1A;
+  --surface: #1E1730;
+  --border: #322546;
+  --accent-blue: #A855F7;
+  --accent-purple: #E879F9;
+  --text-primary: #ECE6F5;
+  --text-secondary: #9A8CB0;
+}
+:root[data-theme="slate"] {
+  --background: #10141A;
+  --surface: #1B222C;
+  --border: #2C3644;
+  --accent-blue: #60A5FA;
+  --accent-purple: #94A3B8;
+  --text-primary: #E3E8EF;
+  --text-secondary: #94A3B8;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);

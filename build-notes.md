@@ -3186,7 +3186,7 @@ This supersedes all scattered "Session N" numbering below. Detailed specs for ea
 - **S11 — Life Hub Home Restructure** ✅ largely pre-built (Phase 91); see Phase 106 note — recovery ring hero, single tabbed brief, zone reorder, skeleton loaders, split 971-line page (2026-07-09 audit spec).
 - **S12 — Notification Schedule UI + PWA** ✅ BUILT (Phase 107) — settings shows/edits send times (wake/bedtime), PWA install banner.
 - **S13 — Study Hub Motivation Layer** ✅ BUILT (Phase 106) — exam countdown chips (exam_dates), jump-back-in row (paused test/labs/flashcards).
-- **S14 — Polish Wave** ⬜ (in progress) — ✅ empty states + streak milestones (Phase 114), ✅ modal a11y (Phases 115–116), ✅ Life Hub typography + spacing (Phase 134), ✅ card-type diversification (Phase 135). Remaining: theme presets, personality layer, broader ARIA/keyboard a11y across non-modal controls.
+- **S14 — Polish Wave** ⬜ (in progress) — ✅ empty states + streak milestones (Phase 114), ✅ modal a11y (Phases 115–116), ✅ Life Hub typography + spacing (Phase 134), ✅ card-type diversification (Phase 135), ✅ theme presets (Phase 136). Remaining: personality layer, broader ARIA/keyboard a11y across non-modal controls.
 
 ### PARKED (waiting on user — slot in when ready)
 - Stretch photos (user sourcing; checklist delivered) → then stretch image display build + optional 5 new stretches
@@ -3400,6 +3400,15 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 136 — S14 polish (slice 5): theme presets — Complete
+- Added user-selectable color themes. 4 presets: **Villainous** (default — the original electric-blue-on-black), **Midnight** (cool blue-black + sky accent), **Amethyst** (purple-forward warm dark), **Slate** (soft neutral grey + muted blue).
+- **Mechanism:** each non-default preset is a `:root[data-theme="key"]` override block in `globals.css` that reassigns chrome + accent CSS variables (`--background`, `--surface`, `--border`, `--accent-blue`, `--accent-purple`, `--text-primary/secondary`). **Semantic colors (success/error/warning + borders) stay constant across all themes** so green=good / red=bad never shifts. Default = base `:root` (no attribute).
+- **No flash of wrong theme:** a tiny synchronous inline script in the root `<head>` reads `localStorage.theme_preset` and stamps `data-theme` before first paint.
+- **Picker:** new `ThemePicker.js` component (swatch cards, live-applies + persists to `localStorage`, `aria-pressed`/`aria-label` on each) in a new **🎨 Appearance** tab in Settings.
+- **Out of scope by design:** Life Hub `SECTION_COLORS` are hardcoded per-section identity colors (JS constants, not CSS vars) and intentionally do NOT change with theme — noted in the picker copy.
+- Build verified passing. Remaining S14: broader ARIA/keyboard a11y on non-modal controls (last slice).
+- Files: globals.css, app/layout.js, components/ThemePicker.js (new), settings/page.js
 
 ### Phase 135 — S14 polish (slice 4): Life Hub card-type diversification — Complete
 - Broke the "every card has a 3px left accent bar" monotony on the Life Hub landing into three distinct card *types* so the eye has an anchor.

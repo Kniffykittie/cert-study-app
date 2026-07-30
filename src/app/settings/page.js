@@ -3,6 +3,7 @@ import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import ThemePicker from '@/components/ThemePicker'
 
 const OWNER_EMAIL = 'sethproper40@yahoo.com'
 const PIN_SESSION_KEY = 'ownerPinExpiry'
@@ -17,6 +18,7 @@ const CERTS = [
 
 const TABS = [
   { key: 'account', label: 'Account' },
+  { key: 'appearance', label: '🎨 Appearance' },
   { key: 'notifications', label: '🔔 Notifications' },
   { key: 'study', label: 'Study' },
   { key: 'data', label: 'Data & Reset' },
@@ -810,6 +812,19 @@ function SettingsPageInner() {
             </div>
 
 
+          </div>
+        )}
+
+        {/* Appearance tab */}
+        {activeTab === 'appearance' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+              <h2 style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', marginBottom: '6px' }}>Theme</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '18px', lineHeight: 1.5 }}>
+                Pick a color theme. It applies instantly and is saved to this device. Life Hub section colors (Nutrition orange, Workouts blue, etc.) stay the same across themes.
+              </p>
+              <ThemePicker />
+            </div>
           </div>
         )}
 
