@@ -47,6 +47,42 @@
   --text-primary: #E3E8EF;
   --text-secondary: #94A3B8;
 }
+:root[data-theme="rosegold"] {
+  --background: #1A1214;
+  --surface: #271B1E;
+  --border: #3D2B2F;
+  --accent-blue: #E0A899;
+  --accent-purple: #F0C9A0;
+  --text-primary: #F3E7E4;
+  --text-secondary: #B39992;
+}
+:root[data-theme="acid"] {
+  --background: #0F140A;
+  --surface: #1A2213;
+  --border: #2E3B1F;
+  --accent-blue: #A3E635;
+  --accent-purple: #D9F99D;
+  --text-primary: #E9F3DC;
+  --text-secondary: #93A67C;
+}
+:root[data-theme="sunshine"] {
+  --background: #16130A;
+  --surface: #231D10;
+  --border: #3B311B;
+  --accent-blue: #FBBF24;
+  --accent-purple: #FDE047;
+  --text-primary: #F5ECD9;
+  --text-secondary: #ADA184;
+}
+:root[data-theme="bubblegum"] {
+  --background: #170A11;
+  --surface: #241320;
+  --border: #3D2035;
+  --accent-blue: #F472B6;
+  --accent-purple: #F0ABFC;
+  --text-primary: #F6E4EF;
+  --text-secondary: #B38FA5;
+}
 
 @theme inline {
   --color-background: var(--background);

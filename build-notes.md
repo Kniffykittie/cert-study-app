@@ -3402,7 +3402,7 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ## Phase Log
 
 ### Phase 136 — S14 polish (slice 5): theme presets — Complete
-- Added user-selectable color themes. 4 presets: **Villainous** (default — the original electric-blue-on-black), **Midnight** (cool blue-black + sky accent), **Amethyst** (purple-forward warm dark), **Slate** (soft neutral grey + muted blue).
+- Added user-selectable color themes. 9 presets: **Villainous** (default — the original electric-blue-on-black), **Midnight** (cool blue-black + sky accent), **Amethyst** (purple-forward warm dark), **Slate** (soft neutral grey + muted blue), **Rose Gold** (warm blush + gold), **Acid** (electric lime on green-black), **Sunshine** (happy yellows/amber), **Bubblegum** (hot pink/magenta). Last 5 added at user request.
 - **Mechanism:** each non-default preset is a `:root[data-theme="key"]` override block in `globals.css` that reassigns chrome + accent CSS variables (`--background`, `--surface`, `--border`, `--accent-blue`, `--accent-purple`, `--text-primary/secondary`). **Semantic colors (success/error/warning + borders) stay constant across all themes** so green=good / red=bad never shifts. Default = base `:root` (no attribute).
 - **No flash of wrong theme:** a tiny synchronous inline script in the root `<head>` reads `localStorage.theme_preset` and stamps `data-theme` before first paint.
 - **Picker:** new `ThemePicker.js` component (swatch cards, live-applies + persists to `localStorage`, `aria-pressed`/`aria-label` on each) in a new **🎨 Appearance** tab in Settings.

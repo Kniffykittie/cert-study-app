@@ -6,6 +6,10 @@ export const THEME_PRESETS = [
   { key: 'midnight', label: 'Midnight', desc: 'Cool blue-black with a bright sky accent', bg: '#0A0F1A', surface: '#131B2E', accent: '#38BDF8', purple: '#818CF8' },
   { key: 'amethyst', label: 'Amethyst', desc: 'Purple-forward, warm dark', bg: '#120E1A', surface: '#1E1730', accent: '#A855F7', purple: '#E879F9' },
   { key: 'slate', label: 'Slate', desc: 'Soft neutral grey, muted blue', bg: '#10141A', surface: '#1B222C', accent: '#60A5FA', purple: '#94A3B8' },
+  { key: 'rosegold', label: 'Rose Gold', desc: 'Warm blush + soft gold on dark', bg: '#1A1214', surface: '#271B1E', accent: '#E0A899', purple: '#F0C9A0' },
+  { key: 'acid', label: 'Acid', desc: 'Electric lime on deep green-black', bg: '#0F140A', surface: '#1A2213', accent: '#A3E635', purple: '#D9F99D' },
+  { key: 'sunshine', label: 'Sunshine', desc: 'Happy yellows and warm amber', bg: '#16130A', surface: '#231D10', accent: '#FBBF24', purple: '#FDE047' },
+  { key: 'bubblegum', label: 'Bubblegum', desc: 'Hot pink and soft magenta', bg: '#170A11', surface: '#241320', accent: '#F472B6', purple: '#F0ABFC' },
 ]
 
 function applyTheme(key) {
