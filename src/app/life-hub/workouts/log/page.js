@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import InfoChip from '@/components/InfoChip'
+import { useSectionColors } from '@/lib/sectionColors'
 
 const SET_TYPES = ['warmup', 'working', 'dropset']
 const SET_TYPE_COLORS = { warmup: 'var(--text-secondary)', working: 'var(--accent-blue)', dropset: 'var(--accent-purple)' }
@@ -256,6 +257,7 @@ function buildDefaultSets(ex) {
 }
 
 function LogWorkoutPageInner() {
+  const A = useSectionColors().workouts
   const router = useRouter()
   const params = useSearchParams()
   const day = params.get('day') || ''
@@ -839,7 +841,7 @@ function LogWorkoutPageInner() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
           <Link href="/life-hub/workouts" style={{ color: 'var(--text-secondary)', fontSize: 13, textDecoration: 'none' }}>← My Plan</Link>
-          <h1 style={{ margin: '4px 0 0', fontSize: 20, color: '#3b82f6' }}>{dayLabel}</h1>
+          <h1 style={{ margin: '4px 0 0', fontSize: 20, color: A }}>{dayLabel}</h1>
           {resumingLogId && <div style={{ fontSize: 11, color: 'var(--accent-purple)', marginTop: 2 }}>▶ Resuming paused workout</div>}
         </div>
         <div style={{ textAlign: 'right' }}>

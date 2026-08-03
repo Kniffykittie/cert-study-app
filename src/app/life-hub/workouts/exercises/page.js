@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useSectionColors } from '@/lib/sectionColors'
 
 async function fetchPR(exerciseName) {
   const supabase = createClient()
@@ -30,6 +31,7 @@ const MUSCLE_GROUPS = [
 const ALLOWED_EQUIPMENT = ['body weight', 'dumbbell', 'jump rope', 'none']
 
 export default function ExerciseLibraryPage() {
+  const A = useSectionColors().workouts
   const [exercises, setExercises] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -73,7 +75,7 @@ export default function ExerciseLibraryPage() {
       {/* Header */}
       <div style={{ marginBottom: '20px' }}>
         <Link href="/life-hub/workouts" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Workouts</Link>
-        <h1 style={{ color: '#3b82f6', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Exercise Library</h1>
+        <h1 style={{ color: A, fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Exercise Library</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
           {loading ? 'Loading...' : `${totalCount.toLocaleString()} dumbbell, bodyweight & cardio exercises`}
         </p>

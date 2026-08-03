@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSectionColors } from '@/lib/sectionColors'
 
 const DOW_INDEX = { Monday: 0, Tuesday: 1, Wednesday: 2, Thursday: 3, Friday: 4, Saturday: 5, Sunday: 6 }
 
@@ -28,6 +29,7 @@ function weekLabel(weekStart) {
 }
 
 export default function WorkoutHistoryPage() {
+  const A = useSectionColors().workouts
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(null)
@@ -61,7 +63,7 @@ export default function WorkoutHistoryPage() {
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <Link href="/life-hub/workouts" style={{ color: 'var(--text-secondary)', fontSize: 13, textDecoration: 'none' }}>← My Plan</Link>
-        <h1 style={{ margin: 0, fontSize: 22, color: '#3b82f6' }}>Workout History</h1>
+        <h1 style={{ margin: 0, fontSize: 22, color: A }}>Workout History</h1>
       </div>
 
       {logs.length === 0 ? (
@@ -81,7 +83,7 @@ export default function WorkoutHistoryPage() {
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{weekLabel(week)}</div>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                     {totalVolume > 0 && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{totalVolume.toLocaleString()} lbs total</div>}
-                    <div style={{ fontSize: 12, color: '#3b82f6', fontWeight: 600 }}>{weekLogs.length} {weekLogs.length === 1 ? 'workout' : 'workouts'}</div>
+                    <div style={{ fontSize: 12, color: A, fontWeight: 600 }}>{weekLogs.length} {weekLogs.length === 1 ? 'workout' : 'workouts'}</div>
                   </div>
                 </div>
 
@@ -107,7 +109,7 @@ export default function WorkoutHistoryPage() {
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                           <Link href={`/life-hub/workouts/day/${dowIndex}?date=${log._date}`}
                             onClick={e => e.stopPropagation()}
-                            style={{ fontSize: 11, color: '#3b82f6', textDecoration: 'none', fontWeight: 600, padding: '3px 8px', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 5 }}>
+                            style={{ fontSize: 11, color: A, textDecoration: 'none', fontWeight: 600, padding: '3px 8px', border: `1px solid ${A}4d`, borderRadius: 5 }}>
                             View Day →
                           </Link>
                           <span style={{ color: 'var(--text-secondary)', fontSize: 16 }}>{isOpen ? '▲' : '▼'}</span>

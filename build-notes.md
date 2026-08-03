@@ -3407,7 +3407,8 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 - **Wave 1 converted (always-visible chrome + the screen in the report):** `life-hub/page.js` (SC), `LifeHubSidebar.js` (SECTION_COLORS), `LifeHubBottomNav.js` (per-tab colors). These now recolor live per theme.
 - **Wave 2 (this commit):** the four section LANDING pages converted — `nutrition/page.js`, `workouts/page.js`, `health/page.js`, `goals/page.js`. Identity-accent hexes (+ alpha + rgba variants) → themed `SC.<section>`; semantic/category colors (micronutrient callout colors, stretch-type coding) left fixed.
 - **Wave 3a:** measurements, my-week, weekly-wrap, monthly-wrap, health steps/sleep/heart-rate converted.
-- **Remaining (waves 3b+):** encyclopedia, water internals, supplements, goals/setup, workouts sub-pages (setup/log/history/exercises/day/stretches/stretching-library) + a few components (CheckInSheet, DailyLogReview, nutrition modals). Convert to `useSectionColors()`. Tracked in Future Features.
+- **Wave 3b:** workouts sub-pages — setup, exercises, history, log, day/[dayIndex] (PhaseIndicator active-state → accent, done-state stays green).
+- **Remaining (waves 3c+):** encyclopedia, water internals, supplements, goals/setup, stretches, stretching/library + components (CheckInSheet, DailyLogReview, nutrition modals). Convert to `useSectionColors()`. Tracked in Future Features.
 - Build verified passing.
 - Files: lib/sectionColors.js (new), components/ThemePicker.js, components/LifeHubSidebar.js, components/LifeHubBottomNav.js, app/life-hub/page.js
 

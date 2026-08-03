@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getRecommendedStretches, STRETCHES } from '@/data/stretches'
+import { useSectionColors } from '@/lib/sectionColors'
 
 const DOW_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -37,18 +38,20 @@ function formatDate(dateStr) {
 }
 
 function PhaseIndicator({ number, label, done, active }) {
-  const color = done ? '#22c55e' : active ? '#3b82f6' : 'var(--border)'
+  const A = useSectionColors().workouts
+  const color = done ? '#22c55e' : active ? A : 'var(--border)'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-      <div style={{ width: 28, height: 28, borderRadius: '50%', border: `2px solid ${color}`, backgroundColor: done ? '#22c55e' : active ? 'rgba(59,130,246,0.15)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: done ? '#fff' : active ? '#3b82f6' : 'var(--text-secondary)' }}>
+      <div style={{ width: 28, height: 28, borderRadius: '50%', border: `2px solid ${color}`, backgroundColor: done ? '#22c55e' : active ? `${A}26` : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: done ? '#fff' : active ? A : 'var(--text-secondary)' }}>
         {done ? '✓' : number}
       </div>
-      <div style={{ fontSize: 10, color: done ? '#22c55e' : active ? '#3b82f6' : 'var(--text-secondary)', fontWeight: done || active ? 600 : 400, textAlign: 'center', lineHeight: 1.2, maxWidth: 56 }}>{label}</div>
+      <div style={{ fontSize: 10, color: done ? '#22c55e' : active ? A : 'var(--text-secondary)', fontWeight: done || active ? 600 : 400, textAlign: 'center', lineHeight: 1.2, maxWidth: 56 }}>{label}</div>
     </div>
   )
 }
 
 function DayHubInner({ params }) {
+  const A = useSectionColors().workouts
   const { dayIndex: dayIndexStr } = use(params)
   const dayIndex = parseInt(dayIndexStr)
   const searchParams = useSearchParams()
@@ -114,7 +117,7 @@ function DayHubInner({ params }) {
   if (!data || data.error) return (
     <div style={{ padding: 48, textAlign: 'center' }}>
       <div style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>Couldn't load this day.</div>
-      <Link href="/life-hub/workouts" style={{ color: '#3b82f6', textDecoration: 'none' }}>← My Plan</Link>
+      <Link href="/life-hub/workouts" style={{ color: A, textDecoration: 'none' }}>← My Plan</Link>
     </div>
   )
 
@@ -186,14 +189,14 @@ function DayHubInner({ params }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <Link href="/life-hub/workouts" style={{ color: 'var(--text-secondary)', fontSize: 13, textDecoration: 'none', flexShrink: 0 }}>← My Plan</Link>
         <div style={{ flex: 1 }}>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#3b82f6' }}>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: A }}>
             {dowName}
             {isReadOnly && <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 400, marginLeft: 8 }}>(past)</span>}
           </h1>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{formatDate(targetDate)}</div>
         </div>
         {plan_day?.focus && (
-          <span style={{ fontSize: 12, color: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 6, padding: '3px 10px', fontWeight: 600, flexShrink: 0 }}>
+          <span style={{ fontSize: 12, color: A, backgroundColor: `${A}1f`, border: `1px solid ${A}40`, borderRadius: 6, padding: '3px 10px', fontWeight: 600, flexShrink: 0 }}>
             {plan_day.focus}
           </span>
         )}
@@ -280,7 +283,7 @@ function DayHubInner({ params }) {
           <PhaseCard
             number={2}
             title={plan_day?.day_label ?? plan_day?.day_name ?? 'Workout'}
-            color="#3b82f6"
+            color={A}
             done={phase2Done}
             isToday={isToday}
             isReadOnly={isReadOnly}
@@ -338,7 +341,7 @@ function DayHubInner({ params }) {
               </div>
             ) : isToday ? (
               <Link href={`/life-hub/workouts/log?day=${encodeURIComponent(plan_day?.day_of_week ?? dowName)}`}
-                style={{ display: 'inline-block', padding: '10px 20px', backgroundColor: '#3b82f6', color: '#fff', borderRadius: 8, fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
+                style={{ display: 'inline-block', padding: '10px 20px', backgroundColor: A, color: '#fff', borderRadius: 8, fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
                 🏋️ Start Workout
               </Link>
             ) : null}
