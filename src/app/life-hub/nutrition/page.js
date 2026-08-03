@@ -12,6 +12,7 @@ import NutrientBars from '@/components/nutrition/NutrientBars'
 import EditFoodModal from '@/components/nutrition/EditFoodModal'
 import SavedFoodsTab from '@/components/nutrition/SavedFoodsTab'
 import InfoChip from '@/components/InfoChip'
+import { useSectionColors } from '@/lib/sectionColors'
 
 const TIMING_LABELS = {
   morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening',
@@ -68,6 +69,7 @@ function MacroBar({ value, goal, color, warn }) {
 }
 
 function NutritionPageInner() {
+  const A = useSectionColors().nutrition
   const searchParams = useSearchParams()
   const router = useRouter()
   const editDateParam = searchParams.get('editDate')
@@ -445,10 +447,10 @@ function NutritionPageInner() {
   return (
     <div style={{ paddingBottom: isEditing ? '80px' : '0' }}>
       {insightToast && (
-        <div style={{ position: 'fixed', bottom: isEditing ? '72px' : '16px', left: '50%', transform: 'translateX(-50%)', zIndex: 101, maxWidth: '440px', width: 'calc(100% - 32px)', backgroundColor: 'var(--surface)', border: '1px solid rgba(249,115,22,0.4)', borderRadius: '12px', padding: '14px 16px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+        <div style={{ position: 'fixed', bottom: isEditing ? '72px' : '16px', left: '50%', transform: 'translateX(-50%)', zIndex: 101, maxWidth: '440px', width: 'calc(100% - 32px)', backgroundColor: 'var(--surface)', border: `1px solid ${A}66`, borderRadius: '12px', padding: '14px 16px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
           <span style={{ fontSize: '18px', flexShrink: 0 }}>🤖</span>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '11px', fontWeight: '700', color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Meal Insight</div>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Meal Insight</div>
             <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: '1.5' }}>{insightToast}</div>
           </div>
           <button onClick={() => setInsightToast(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '18px', cursor: 'pointer', lineHeight: 1, flexShrink: 0, padding: 0 }}>×</button>
@@ -467,7 +469,7 @@ function NutritionPageInner() {
               Cancel
             </button>
             <button onClick={handleFinishEditing} disabled={insightLoading}
-              style={{ backgroundColor: '#f97316', border: 'none', borderRadius: '8px', padding: '8px 20px', fontSize: '13px', fontWeight: '700', color: '#fff', cursor: insightLoading ? 'wait' : 'pointer', opacity: insightLoading ? 0.7 : 1 }}>
+              style={{ backgroundColor: A, border: 'none', borderRadius: '8px', padding: '8px 20px', fontSize: '13px', fontWeight: '700', color: '#fff', cursor: insightLoading ? 'wait' : 'pointer', opacity: insightLoading ? 0.7 : 1 }}>
               {insightLoading ? 'Analyzing…' : 'Done'}
             </button>
           </div>
@@ -544,22 +546,22 @@ function NutritionPageInner() {
       <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <Link href="/life-hub" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Life Hub</Link>
-          <h1 style={{ color: '#f97316', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Nutrition</h1>
+          <h1 style={{ color: A, fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Nutrition</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Track meals, macros, and every nutrient that matters.</p>
             {logStreak > 0 && (
-              <span style={{ backgroundColor: '#f9731620', border: '1px solid #f9731650', borderRadius: '20px', padding: '2px 10px', fontSize: '12px', fontWeight: '700', color: '#f97316' }}>
+              <span style={{ backgroundColor: `${A}20`, border: `1px solid ${A}50`, borderRadius: '20px', padding: '2px 10px', fontSize: '12px', fontWeight: '700', color: A }}>
                 🔥 {logStreak}-day streak
               </span>
             )}
             <button onClick={() => setShowWhy(o => !o)}
-              style={{ background: 'none', border: '1px solid #f9731644', borderRadius: '20px', color: '#f97316', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
+              style={{ background: 'none', border: `1px solid ${A}44`, borderRadius: '20px', color: A, fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
               ℹ️ Why track this?
             </button>
           </div>
           {showWhy && (
-            <div style={{ marginTop: '12px', backgroundColor: '#f973160d', border: '1px solid #f9731630', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Why logging food changes everything</div>
+            <div style={{ marginTop: '12px', backgroundColor: `${A}0d`, border: `1px solid ${A}30`, borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Why logging food changes everything</div>
               {[
                 { icon: '🧠', text: 'Awareness is the mechanism — most people eat 20–30% more than they think. Seeing the real number changes your choices without willpower.' },
                 { icon: '🎯', text: 'Your calorie target comes from your TDEE (your actual metabolic rate). The food log tells you how close you are each day, and after 14+ days with weight data, the app recalibrates your target to match reality.' },
@@ -903,7 +905,7 @@ function NutritionPageInner() {
                   if (i === 0) { if (viewingDate) await returnToToday() }
                   else await loadDateEntries(dateStr)
                 }}
-                  style={{ padding: '5px 12px', borderRadius: '20px', border: 'none', fontSize: '12px', fontWeight: isActive ? '700' : '400', cursor: isEditing ? 'default' : 'pointer', backgroundColor: isActive ? '#f97316' : 'var(--surface)', color: isActive ? '#fff' : 'var(--text-secondary)', opacity: isEditing && !isActive ? 0.4 : 1, transition: 'all 0.15s' }}>
+                  style={{ padding: '5px 12px', borderRadius: '20px', border: 'none', fontSize: '12px', fontWeight: isActive ? '700' : '400', cursor: isEditing ? 'default' : 'pointer', backgroundColor: isActive ? A : 'var(--surface)', color: isActive ? '#fff' : 'var(--text-secondary)', opacity: isEditing && !isActive ? 0.4 : 1, transition: 'all 0.15s' }}>
                   {label}
                 </button>
               )
@@ -925,7 +927,7 @@ function NutritionPageInner() {
             {viewingDate && <div />}
             {!isEditing && (
               <button onClick={() => startEditing(viewingDate)}
-                style={{ background: 'none', border: '1px solid rgba(249,115,22,0.4)', borderRadius: '7px', fontSize: '12px', fontWeight: '600', color: '#f97316', cursor: 'pointer', padding: '4px 12px' }}>
+                style={{ background: 'none', border: `1px solid ${A}66`, borderRadius: '7px', fontSize: '12px', fontWeight: '600', color: A, cursor: 'pointer', padding: '4px 12px' }}>
                 ✏️ Edit Log
               </button>
             )}
@@ -947,16 +949,16 @@ function NutritionPageInner() {
             // Lunch reminder: 12–2pm, no lunch yet
             if (hour >= 12 && hour < 14 && !hasLunch && !dismissedBanners.has('lunch')) {
               banners.push(
-                <div key="lunch" style={{ backgroundColor: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                <div key="lunch" style={{ backgroundColor: `${A}14`, border: `1px solid ${A}4d`, borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ fontSize: '16px' }}>☀️</span>
                     <div>
-                      <span style={{ color: '#f97316', fontSize: '13px', fontWeight: '700' }}>Lunch time — nothing logged yet</span>
+                      <span style={{ color: A, fontSize: '13px', fontWeight: '700' }}>Lunch time — nothing logged yet</span>
                       <span style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block' }}>Logging lunch helps keep your calorie distribution on track.</span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                    <button onClick={() => router.push('/life-hub/nutrition/add-food?slot=lunch')} style={{ backgroundColor: '#f97316', border: 'none', color: '#fff', borderRadius: '7px', padding: '6px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Log Lunch</button>
+                    <button onClick={() => router.push('/life-hub/nutrition/add-food?slot=lunch')} style={{ backgroundColor: A, border: 'none', color: '#fff', borderRadius: '7px', padding: '6px 14px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Log Lunch</button>
                     <button onClick={() => setDismissedBanners(s => new Set([...s, 'lunch']))} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '16px', cursor: 'pointer', lineHeight: 1 }}>×</button>
                   </div>
                 </div>

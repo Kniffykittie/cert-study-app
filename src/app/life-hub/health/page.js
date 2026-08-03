@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSectionColors } from '@/lib/sectionColors'
 
 function ConnectModal({ onBack, onContinue }) {
   return (
@@ -30,6 +31,7 @@ function ConnectModal({ onBack, onContinue }) {
 }
 
 export default function HealthPage() {
+  const A = useSectionColors().health
   const [connected, setConnected] = useState(null)
   const [data, setData] = useState(null)
   const [hrData, setHrData] = useState(null)
@@ -206,7 +208,7 @@ export default function HealthPage() {
         </Link>
         <Link href="/life-hub/health/sleep" style={{ textDecoration: 'none' }}>
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px', cursor: 'pointer' }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = '#22c55e'}
+            onMouseEnter={e => e.currentTarget.style.borderColor = A}
             onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
             <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '6px' }}>Sleep Score</div>
             <div style={{ color: sleepScore != null ? (sleepScore >= 80 ? 'var(--success)' : sleepScore >= 60 ? 'var(--accent-blue)' : sleepScore >= 40 ? 'var(--warning)' : 'var(--error)') : 'var(--text-secondary)', fontSize: '24px', fontWeight: '700', lineHeight: 1 }}>

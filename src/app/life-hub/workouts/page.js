@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { showToast } from '@/components/Toast'
 import { BODY_PART_TO_STRETCH_GROUPS, getRecommendedStretches, getTimingLabel } from '@/data/stretches'
+import { useSectionColors } from '@/lib/sectionColors'
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -29,6 +30,7 @@ function focusColor(focus) {
 }
 
 export default function WorkoutsPage() {
+  const A = useSectionColors().workouts
   const router = useRouter()
   const [plan, setPlan] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -358,7 +360,7 @@ export default function WorkoutsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <Link href="/life-hub" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Life Hub</Link>
-          <h1 style={{ color: '#3b82f6', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>My Workout Plan</h1>
+          <h1 style={{ color: A, fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>My Workout Plan</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{profile.days_per_week} days/week · {goals} · {expLabels[profile.experience]}</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -394,12 +396,12 @@ export default function WorkoutsPage() {
             <div style={{ marginBottom: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>This Week</div>
-                <div style={{ fontSize: '12px', color: weekCompletionCount === weekWorkoutDays ? 'var(--success)' : '#3b82f6', fontWeight: '700' }}>
+                <div style={{ fontSize: '12px', color: weekCompletionCount === weekWorkoutDays ? 'var(--success)' : A, fontWeight: '700' }}>
                   {weekCompletionCount}/{weekWorkoutDays} workouts
                 </div>
               </div>
               <div style={{ height: 6, backgroundColor: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${weekWorkoutDays > 0 ? (weekCompletionCount / weekWorkoutDays) * 100 : 0}%`, backgroundColor: weekCompletionCount === weekWorkoutDays ? 'var(--success)' : '#3b82f6', borderRadius: 3, transition: 'width 0.4s ease' }} />
+                <div style={{ height: '100%', width: `${weekWorkoutDays > 0 ? (weekCompletionCount / weekWorkoutDays) * 100 : 0}%`, backgroundColor: weekCompletionCount === weekWorkoutDays ? 'var(--success)' : A, borderRadius: 3, transition: 'width 0.4s ease' }} />
               </div>
             </div>
           )}
@@ -565,10 +567,10 @@ export default function WorkoutsPage() {
           )}
 
           {todayStretches.length > 0 && (
-            <div style={{ marginTop: '20px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderLeft: '3px solid #3b82f6', borderRadius: '10px', padding: '16px 18px' }}>
+            <div style={{ marginTop: '20px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderLeft: `3px solid ${A}`, borderRadius: '10px', padding: '16px 18px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>🧘 Stretches for Today</div>
-                <Link href="/life-hub/workouts/stretches" style={{ fontSize: '12px', color: '#3b82f6', textDecoration: 'none', fontWeight: '600' }}>Open →</Link>
+                <Link href="/life-hub/workouts/stretches" style={{ fontSize: '12px', color: A, textDecoration: 'none', fontWeight: '600' }}>Open →</Link>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {todayStretches.map(s => (

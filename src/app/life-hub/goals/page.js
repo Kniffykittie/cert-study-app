@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { useSectionColors } from '@/lib/sectionColors'
 
 const BODY_COMP_LABELS = {
   lean_muscular: 'Lean & Muscular (6–17%)',
@@ -41,6 +42,7 @@ const TIMELINE_LABELS = {
 }
 
 export default function GoalsPage() {
+  const A = useSectionColors().goals
   const router = useRouter()
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -135,17 +137,17 @@ export default function GoalsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
           <Link href="/life-hub" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Life Hub</Link>
-          <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#06b6d4', margin: 0 }}>My Goals</h1>
+          <h1 style={{ fontSize: '28px', fontWeight: '700', color: A, margin: 0 }}>My Goals</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '6px' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>Your personal profile powers AI recommendations across the Life Hub.</p>
             <button onClick={() => setShowWhy(o => !o)}
-              style={{ background: 'none', border: '1px solid #06b6d444', borderRadius: '20px', color: '#06b6d4', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
+              style={{ background: 'none', border: `1px solid ${A}44`, borderRadius: '20px', color: A, fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
               ℹ️ How this works
             </button>
           </div>
           {showWhy && (
-            <div style={{ marginTop: '12px', backgroundColor: '#06b6d40d', border: '1px solid #06b6d430', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.06em' }}>What your goals profile does</div>
+            <div style={{ marginTop: '12px', backgroundColor: `${A}0d`, border: `1px solid ${A}30`, borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.06em' }}>What your goals profile does</div>
               {[
                 { icon: '🤖', text: 'The AI Overview above is generated from everything in your profile — your goals, body metrics, obstacles, motivations, dietary preferences, and sleep habits. Hit Regenerate any time you update your profile to get a fresh analysis.' },
                 { icon: '🍽️', text: 'Your TDEE (daily calorie target) is calculated from your profile. The more accurate your body stats and activity level, the more accurate your calorie and macro targets on the Nutrition page.' },
@@ -171,7 +173,7 @@ export default function GoalsPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '18px' }}>🤖</span>
-              <span style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Your Personalized Overview</span>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Your Personalized Overview</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               {regenMsg && <span style={{ fontSize: '12px', color: regenMsg === 'Updated!' ? 'var(--success)' : 'var(--error)' }}>{regenMsg}</span>}
@@ -188,7 +190,7 @@ export default function GoalsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         {/* Goals */}
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>🎯 Active Goals</div>
+          <div style={{ fontSize: '12px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>🎯 Active Goals</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {(profile.goals ?? []).map(g => (
               <span key={g} style={{ padding: '6px 14px', backgroundColor: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '20px', fontSize: '13px', color: 'var(--accent-purple)', fontWeight: '500' }}>
@@ -200,7 +202,7 @@ export default function GoalsPage() {
 
         {/* Body Metrics */}
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>📊 Body Metrics</div>
+          <div style={{ fontSize: '12px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>📊 Body Metrics</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {heightFt && <MetricRow label="Height" value={heightFt} />}
             {profile.weight_lbs && (
@@ -235,7 +237,7 @@ export default function GoalsPage() {
           const weeksToGoal = actual !== 0 ? Math.abs(lbsLeft / actual) : null
           return (
             <div style={{ backgroundColor: 'var(--surface)', border: `1px solid ${color}44`, borderRadius: '12px', padding: '20px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>📈 Goal Velocity</div>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>📈 Goal Velocity</div>
               <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '4px' }}>Last {weeksOfData}w avg</div>
@@ -263,7 +265,7 @@ export default function GoalsPage() {
 
         {/* Lifestyle */}
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>🏃 Lifestyle</div>
+          <div style={{ fontSize: '12px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>🏃 Lifestyle</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {profile.activity_level && <MetricRow label="Activity" value={ACTIVITY_LABELS[profile.activity_level] || profile.activity_level} />}
             {profile.daily_steps && <MetricRow label="Daily Steps" value={`~${Number(profile.daily_steps).toLocaleString()} / day`} />}
@@ -274,20 +276,20 @@ export default function GoalsPage() {
         {/* My Week link */}
         <Link href="/life-hub/my-week" style={{ textDecoration: 'none' }}>
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'background-color 0.15s', cursor: 'pointer' }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#06b6d410'}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = `${A}10`}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--surface)'}>
             <div>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>📅 My Schedule</div>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>📅 My Schedule</div>
               <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Plan your month — work hours, events, meal &amp; workout times in My Schedule →</p>
             </div>
-            <span style={{ fontSize: '20px', color: '#06b6d4', flexShrink: 0 }}>→</span>
+            <span style={{ fontSize: '20px', color: A, flexShrink: 0 }}>→</span>
           </div>
         </Link>
 
         {/* Notes */}
         {profile.notes && (
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>📝 Notes</div>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>📝 Notes</div>
             <p style={{ color: 'var(--text-primary)', fontSize: '14px', lineHeight: '1.6', margin: 0 }}>{profile.notes}</p>
           </div>
         )}
@@ -315,15 +317,15 @@ function GoalsSchedulePicker({ value, onChange }) {
         return (
           <div key={day} style={{ position: 'relative' }}>
             <button type="button" onClick={() => setOpenDay(isOpen ? null : day)}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '8px 10px', borderRadius: '10px', border: `1px solid ${isOpen ? '#06b6d4' : 'var(--border)'}`, backgroundColor: isOpen ? 'rgba(6,182,212,0.08)' : 'var(--background)', cursor: 'pointer', minWidth: '48px' }}>
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '8px 10px', borderRadius: '10px', border: `1px solid ${isOpen ? A : 'var(--border)'}`, backgroundColor: isOpen ? `${A}14` : 'var(--background)', cursor: 'pointer', minWidth: '48px' }}>
               <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)' }}>{day.charAt(0).toUpperCase() + day.slice(1)}</span>
-              <span style={{ fontSize: '10px', fontWeight: '600', color: current === 'day_off' ? 'var(--text-secondary)' : '#06b6d4' }}>{opt?.label}</span>
+              <span style={{ fontSize: '10px', fontWeight: '600', color: current === 'day_off' ? 'var(--text-secondary)' : A }}>{opt?.label}</span>
             </button>
             {isOpen && (
               <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 50, backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '6px', marginTop: '4px', minWidth: '140px', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
                 {SCHEDULE_OPTS.map(o => (
                   <button key={o.key} type="button" onClick={() => { onChange({ ...value, [day]: o.key }); setOpenDay(null) }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: '7px', border: 'none', backgroundColor: current === o.key ? 'rgba(6,182,212,0.12)' : 'transparent', color: current === o.key ? '#06b6d4' : 'var(--text-primary)', fontSize: '12px', fontWeight: current === o.key ? '700' : '400', cursor: 'pointer' }}>
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: '7px', border: 'none', backgroundColor: current === o.key ? `${A}1f` : 'transparent', color: current === o.key ? A : 'var(--text-primary)', fontSize: '12px', fontWeight: current === o.key ? '700' : '400', cursor: 'pointer' }}>
                     {o.label} <span style={{ color: 'var(--text-secondary)', fontWeight: '400' }}>— {o.desc}</span>
                   </button>
                 ))}
