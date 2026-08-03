@@ -3408,7 +3408,8 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 - **Wave 2 (this commit):** the four section LANDING pages converted — `nutrition/page.js`, `workouts/page.js`, `health/page.js`, `goals/page.js`. Identity-accent hexes (+ alpha + rgba variants) → themed `SC.<section>`; semantic/category colors (micronutrient callout colors, stretch-type coding) left fixed.
 - **Wave 3a:** measurements, my-week, weekly-wrap, monthly-wrap, health steps/sleep/heart-rate converted.
 - **Wave 3b:** workouts sub-pages — setup, exercises, history, log, day/[dayIndex] (PhaseIndicator active-state → accent, done-state stays green).
-- **Remaining (waves 3c+):** encyclopedia, water internals, supplements, goals/setup, stretches, stretching/library + components (CheckInSheet, DailyLogReview, nutrition modals). Convert to `useSectionColors()`. Tracked in Future Features.
+- **Wave 3c:** supplements, encyclopedia (nutrient color-map preserved), water (caffeine-level + fat-macro semantic hexes preserved) converted.
+- **Remaining (waves 3d+):** goals/setup, stretches, stretching/library + components (CheckInSheet, DailyLogReview, nutrition modals). Convert to `useSectionColors()`. Tracked in Future Features.
 - Build verified passing.
 - Files: lib/sectionColors.js (new), components/ThemePicker.js, components/LifeHubSidebar.js, components/LifeHubBottomNav.js, app/life-hub/page.js
 

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { NUTRIENTS, NUTRIENT_BY_SLUG, NUTRIENT_CATEGORIES } from '@/data/nutrients'
 import { calcMicroTargets } from '@/lib/tdee'
+import { useSectionColors } from '@/lib/sectionColors'
 
 const NUTRIENT_COLORS = {
   'iron':       '#f87171', // red
@@ -453,6 +454,7 @@ function NutrientCard({ nutrient, ctx, onClick, selected, microTargets }) {
 }
 
 function DetailPanel({ slug, ctx, onClose, microTargets }) {
+  const A = useSectionColors().nutrition
   const nutrient = NUTRIENT_BY_SLUG[slug]
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -499,7 +501,7 @@ function DetailPanel({ slug, ctx, onClose, microTargets }) {
         <div style={{ padding: '20px 24px', flex: 1 }}>
           {/* Your Status */}
           <div style={{ backgroundColor: 'var(--background)', borderRadius: '10px', padding: '14px 16px', marginBottom: '16px' }}>
-            <div style={{ fontSize: '11px', fontWeight: '700', color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>📊 Your Status</div>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>📊 Your Status</div>
             {ctx?.log_days >= 5 ? (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
@@ -648,15 +650,17 @@ function DetailPanel({ slug, ctx, onClose, microTargets }) {
 }
 
 function Section({ title, children }) {
+  const A = useSectionColors().nutrition
   return (
     <div style={{ backgroundColor: 'var(--background)', borderRadius: '8px', padding: '12px 14px' }}>
-      <div style={{ fontSize: '11px', fontWeight: '700', color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>{title}</div>
+      <div style={{ fontSize: '11px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>{title}</div>
       {children}
     </div>
   )
 }
 
 export default function EncyclopediaPage() {
+  const A = useSectionColors().nutrition
   const [ctx, setCtx] = useState(null)
   const [microTargets, setMicroTargets] = useState(null)
   const [selected, setSelected] = useState(null)
@@ -696,17 +700,17 @@ export default function EncyclopediaPage() {
     <div>
       <div style={{ marginBottom: '24px' }}>
         <Link href="/life-hub/nutrition" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Nutrition</Link>
-        <h1 style={{ color: '#f97316', fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Nutrient Encyclopedia</h1>
+        <h1 style={{ color: A, fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Nutrient Encyclopedia</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Every vitamin and mineral — what it does, where you stand, and what it means for your goals.</p>
           <button onClick={() => setShowWhy(o => !o)}
-            style={{ background: 'none', border: '1px solid #f9731644', borderRadius: '20px', color: '#f97316', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
+            style={{ background: 'none', border: `1px solid ${A}44`, borderRadius: '20px', color: A, fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
             ℹ️ How this works
           </button>
         </div>
         {showWhy && (
-          <div style={{ marginTop: '12px', backgroundColor: '#f973160d', border: '1px solid #f9731630', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '700', color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.06em' }}>How the Encyclopedia builds your picture</div>
+          <div style={{ marginTop: '12px', backgroundColor: `${A}0d`, border: `1px solid ${A}30`, borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.06em' }}>How the Encyclopedia builds your picture</div>
             {[
               { icon: '📊', text: 'Your intake for each nutrient is calculated from three sources: your food log (last 30 days averaged), your supplement stack (nutrients you entered from labels), and your meal plan. All three combine into a single daily total.' },
               { icon: '⚠️', text: 'The Gap Report at the top flags nutrients where you\'re consistently below 60% of the recommended daily value — based on real logged data, not estimates. These are the gaps most worth addressing.' },

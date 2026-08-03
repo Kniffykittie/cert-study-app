@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { useSectionColors } from '@/lib/sectionColors'
 
 const NUTRIENT_GROUPS = [
   { label: 'Minerals', color: '#60a5fa', keys: [
@@ -442,6 +443,7 @@ function EditModal({ supplement, onSave, onClose }) {
 }
 
 export default function SupplementsPage() {
+  const A = useSectionColors().nutrition
   const [stack, setStack] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -592,19 +594,19 @@ export default function SupplementsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
         <div>
           <Link href="/life-hub/nutrition" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Nutrition</Link>
-          <h1 style={{ color: '#f97316', fontSize: 22, fontWeight: 700, margin: 0 }}>💊 My Supplement Stack</h1>
+          <h1 style={{ color: A, fontSize: 22, fontWeight: 700, margin: 0 }}>💊 My Supplement Stack</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: 0 }}>
               Supplements listed here automatically count toward your daily nutrient totals
             </p>
             <button onClick={() => setShowWhy(o => !o)}
-              style={{ background: 'none', border: '1px solid #f9731644', borderRadius: '20px', color: '#f97316', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
+              style={{ background: 'none', border: `1px solid ${A}44`, borderRadius: '20px', color: A, fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
               ℹ️ Why track this?
             </button>
           </div>
           {showWhy && (
-            <div style={{ marginTop: '12px', backgroundColor: '#f973160d', border: '1px solid #f9731630', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.06em' }}>What your supplement stack does in the app</div>
+            <div style={{ marginTop: '12px', backgroundColor: `${A}0d`, border: `1px solid ${A}30`, borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.06em' }}>What your supplement stack does in the app</div>
               {[
                 { icon: '🔬', text: 'Nutrients you enter from labels — like Vitamin D, Magnesium, Iron, Zinc — automatically add to your daily totals in the Nutrient Encyclopedia. That gap report shows what you\'re short on across food and supplements combined.' },
                 { icon: '⚠️', text: 'The Stack Interactions card below analyzes timing conflicts between your supplements — like Iron and Calcium blocking each other\'s absorption, or caffeine affecting Iron uptake in the morning.' },
