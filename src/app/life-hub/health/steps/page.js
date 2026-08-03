@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { useSectionColors } from '@/lib/sectionColors'
 
 const RANGES = [
   { key: 'today', label: 'Today' },
@@ -9,6 +10,7 @@ const RANGES = [
 ]
 
 export default function StepTrackerPage() {
+  const A = useSectionColors().health
   const [range, setRange] = useState('today')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -130,7 +132,7 @@ export default function StepTrackerPage() {
           </div>
 
           <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-            <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>📅 Steps by Day</div>
+            <div style={{ color: A, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>📅 Steps by Day</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '140px', marginBottom: '8px' }} onMouseMove={handleMouseMove}>
               {weeklySteps.map(({ date, label, steps: s }) => {
                 const pct = (s / maxSteps) * 100
@@ -205,7 +207,7 @@ export default function StepTrackerPage() {
       )}
 
       <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-        <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>📊 Steps by Hour (Eastern)</div>
+        <div style={{ color: A, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>📊 Steps by Hour (Eastern)</div>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '120px', marginBottom: '8px' }} onMouseMove={handleMouseMove}>
           {hourlySteps.map(({ hour, steps: s }) => {
             const pct = (s / maxSteps) * 100
@@ -245,7 +247,7 @@ function Header({ range, onRange, onRefresh, syncing }) {
     <Link href="/life-hub/health" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Health</Link>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
       <div>
-        <h1 style={{ color: '#22c55e', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Step Tracker</h1>
+        <h1 style={{ color: A, fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Step Tracker</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Google Pixel Watch 4</p>
       </div>
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>

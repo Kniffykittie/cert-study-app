@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { estimateBodyFatPct } from '@/lib/tdee'
 import InfoChip from '@/components/InfoChip'
+import { useSectionColors } from '@/lib/sectionColors'
 
 const WEIGHT_FIELD = { key: 'weight_lbs', label: 'Weight', unit: 'lbs', placeholder: '175' }
 
@@ -152,6 +153,7 @@ function interpretBodyComp(history, goalsProfile, supplements, recentCarbAvg) {
 }
 
 export default function MeasurementsPage() {
+  const A = useSectionColors().goals
   const router = useRouter()
   const [history, setHistory] = useState([])
   const [goalsProfile, setGoalsProfile] = useState(null)
@@ -363,7 +365,7 @@ export default function MeasurementsPage() {
 
     return (
       <div style={{ marginBottom: '24px' }}>
-        <div style={{ color: '#06b6d4', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>📈 Weight Over Time</div>
+        <div style={{ color: A, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>📈 Weight Over Time</div>
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px', overflowX: 'auto' }}>
           <svg viewBox={`0 0 ${CW} ${CH}`} style={{ width: '100%', minWidth: '280px', display: 'block' }}>
             <path d={rawPath} fill="none" stroke="var(--accent-purple)" strokeWidth="2" strokeLinejoin="round" />
@@ -400,11 +402,11 @@ export default function MeasurementsPage() {
 
     if (pts.length < 2) return (
       <div style={{ marginBottom: '24px' }}>
-        <div style={{ color: '#06b6d4', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>📐 Measurement Trends</div>
+        <div style={{ color: A, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>📐 Measurement Trends</div>
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
           {MEAS_FIELDS.map(f => (
             <button key={f.key} onClick={() => setMeasChartField(f.key)}
-              style={{ backgroundColor: measChartField === f.key ? '#06b6d4' : 'var(--surface)', border: `1px solid ${measChartField === f.key ? '#06b6d4' : 'var(--border)'}`, color: measChartField === f.key ? '#fff' : 'var(--text-secondary)', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer', fontWeight: measChartField === f.key ? '600' : '400' }}>
+              style={{ backgroundColor: measChartField === f.key ? A : 'var(--surface)', border: `1px solid ${measChartField === f.key ? A : 'var(--border)'}`, color: measChartField === f.key ? '#fff' : 'var(--text-secondary)', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer', fontWeight: measChartField === f.key ? '600' : '400' }}>
               {f.label}
             </button>
           ))}
@@ -427,16 +429,16 @@ export default function MeasurementsPage() {
     const totalDelta = last - first
     const isDown = totalDelta < 0
     const color = measChartField === 'waist_in' || measChartField === 'hips_in'
-      ? (isDown ? 'var(--success)' : totalDelta > 0 ? 'var(--warning)' : '#06b6d4')
-      : (isDown ? 'var(--warning)' : totalDelta > 0 ? 'var(--accent-blue)' : '#06b6d4')
+      ? (isDown ? 'var(--success)' : totalDelta > 0 ? 'var(--warning)' : A)
+      : (isDown ? 'var(--warning)' : totalDelta > 0 ? 'var(--accent-blue)' : A)
 
     return (
       <div style={{ marginBottom: '24px' }}>
-        <div style={{ color: '#06b6d4', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>📐 Measurement Trends</div>
+        <div style={{ color: A, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>📐 Measurement Trends</div>
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
           {MEAS_FIELDS.map(f => (
             <button key={f.key} onClick={() => setMeasChartField(f.key)}
-              style={{ backgroundColor: measChartField === f.key ? '#06b6d4' : 'var(--surface)', border: `1px solid ${measChartField === f.key ? '#06b6d4' : 'var(--border)'}`, color: measChartField === f.key ? '#fff' : 'var(--text-secondary)', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer', fontWeight: measChartField === f.key ? '600' : '400' }}>
+              style={{ backgroundColor: measChartField === f.key ? A : 'var(--surface)', border: `1px solid ${measChartField === f.key ? A : 'var(--border)'}`, color: measChartField === f.key ? '#fff' : 'var(--text-secondary)', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer', fontWeight: measChartField === f.key ? '600' : '400' }}>
               {f.label}
             </button>
           ))}
@@ -509,17 +511,17 @@ export default function MeasurementsPage() {
 
       <div style={{ marginBottom: '28px' }}>
         <Link href="/life-hub/goals" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Goals</Link>
-        <h1 style={{ color: '#06b6d4', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Body Measurements</h1>
+        <h1 style={{ color: A, fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Body Measurements</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>Track your measurements over time to see real progress beyond the scale.</p>
           <button onClick={() => setShowWhy(o => !o)}
-            style={{ background: 'none', border: '1px solid #06b6d444', borderRadius: '20px', color: '#06b6d4', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
+            style={{ background: 'none', border: `1px solid ${A}44`, borderRadius: '20px', color: A, fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
             ℹ️ Why track this?
           </button>
         </div>
         {showWhy && (
-          <div style={{ marginTop: '12px', backgroundColor: '#06b6d40d', border: '1px solid #06b6d430', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '700', color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Why body measurements matter</div>
+          <div style={{ marginTop: '12px', backgroundColor: `${A}0d`, border: `1px solid ${A}30`, borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Why body measurements matter</div>
             {[
               { icon: '⚖️', text: 'The scale lies — weight fluctuates 2–5 lbs daily from water, food, and hormones. Measurements like waist and hips reveal actual fat loss or muscle gain that the scale completely masks.' },
               { icon: '📊', text: 'After you save a new entry, the app analyzes the pattern across weight, waist, and limbs — and explains in plain language whether you\'re losing fat, gaining muscle, or doing both simultaneously.' },
@@ -556,7 +558,7 @@ export default function MeasurementsPage() {
           <div>
             {weightMsg && <div style={{ fontSize: '12px', color: weightMsg === 'Saved!' ? 'var(--success)' : 'var(--error)', marginBottom: '6px' }}>{weightMsg}</div>}
             <button onClick={handleWeightSave} disabled={weightSaving}
-              style={{ backgroundColor: '#06b6d4', border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: weightSaving ? 'not-allowed' : 'pointer', opacity: weightSaving ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+              style={{ backgroundColor: A, border: 'none', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', cursor: weightSaving ? 'not-allowed' : 'pointer', opacity: weightSaving ? 0.6 : 1, whiteSpace: 'nowrap' }}>
               {weightSaving ? 'Saving...' : 'Save Weight'}
             </button>
           </div>

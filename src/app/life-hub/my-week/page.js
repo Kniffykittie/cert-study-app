@@ -1,8 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
-
-const SC = '#a78bfa'
+import { useSectionColors } from '@/lib/sectionColors'
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const DAY_LABELS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -75,6 +74,7 @@ function timeRange(s, e) {
 function monthName(d) { return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }) }
 
 export default function MySchedulePage() {
+  const SC = useSectionColors().overview
   const [monthDate, setMonthDate] = useState(() => {
     const n = new Date()
     return new Date(Date.UTC(n.getFullYear(), n.getMonth(), 1))

@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import InfoChip from '@/components/InfoChip'
 import { createClient } from '@/lib/supabase/client'
+import { useSectionColors } from '@/lib/sectionColors'
 
 const STAGE_COLORS = {
   'Deep': 'var(--accent-blue)',
@@ -103,6 +104,7 @@ function ScoreRing({ score }) {
 }
 
 export default function SleepTrackerPage() {
+  const A = useSectionColors().health
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -261,17 +263,17 @@ export default function SleepTrackerPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <Link href="/life-hub/health" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Health</Link>
-          <h1 style={{ color: '#22c55e', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Sleep Tracker</h1>
+          <h1 style={{ color: A, fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Sleep Tracker</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>Last night's sleep from Google Pixel Watch 4</p>
             <button onClick={() => setShowWhy(o => !o)}
-              style={{ background: 'none', border: '1px solid #22c55e44', borderRadius: '20px', color: '#22c55e', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
+              style={{ background: 'none', border: `1px solid ${A}44`, borderRadius: '20px', color: A, fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 9px', flexShrink: 0, opacity: 0.8 }}>
               ℹ️ Why track this?
             </button>
           </div>
           {showWhy && (
-            <div style={{ marginTop: '12px', backgroundColor: '#22c55e0d', border: '1px solid #22c55e30', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Why sleep data changes your whole dashboard</div>
+            <div style={{ marginTop: '12px', backgroundColor: `${A}0d`, border: `1px solid ${A}30`, borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: A, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Why sleep data changes your whole dashboard</div>
               {[
                 { icon: '⚡', text: 'Sleep is worth 25 of 100 points in your Recovery Score — more than any other single factor. 8 hours earns the full 25; under 5 hours earns 0. It\'s the biggest lever you have for improving your score.' },
                 { icon: '🧠', text: 'Short sleep (under 6 hours) triggers a smarter Daily Check-In — the Energy question becomes "Mental Sharpness" with labels like "Brain fog → Locked in" because the app knows your context.' },
@@ -397,7 +399,7 @@ export default function SleepTrackerPage() {
           {/* Stage breakdown bar */}
           {Object.keys(sleepStages).length > 0 && (
             <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
-              <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>💤 Sleep Stage Distribution</div>
+              <div style={{ color: A, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>💤 Sleep Stage Distribution</div>
               <div style={{ display: 'flex', gap: '4px', height: '24px', borderRadius: '6px', overflow: 'hidden', marginBottom: '12px' }}>
                 {Object.entries(sleepStages).map(([stage, mins]) => (
                   <div key={stage} style={{ flex: mins, backgroundColor: STAGE_COLORS[stage] ?? 'var(--border)', minWidth: '2px' }} title={`${stage}: ${mins}m`} />
@@ -420,7 +422,7 @@ export default function SleepTrackerPage() {
           {sleepTimeline.length > 0 && (
             <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}
               onMouseMove={handleMouseMove}>
-              <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>🌙 Sleep Timeline</div>
+              <div style={{ color: A, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>🌙 Sleep Timeline</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
                 {STAGE_ORDER.map(stage => (
                   <div key={stage} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -480,7 +482,7 @@ export default function SleepTrackerPage() {
 
           {/* Stage Education Cards */}
           <div style={{ marginBottom: '8px' }}>
-            <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>📖 What's Happening In Each Stage</div>
+            <div style={{ color: A, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>📖 What's Happening In Each Stage</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {STAGE_EDUCATION.map(ed => {
                 const isOpen = expandedStage === ed.stage

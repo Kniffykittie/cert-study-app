@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo, Component } from 'react'
 import Link from 'next/link'
 import InfoChip from '@/components/InfoChip'
+import { useSectionColors } from '@/lib/sectionColors'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
@@ -58,6 +59,7 @@ const PAD_BOTTOM = 24
 
 export default function HeartRatePage() { return <ErrorBoundary><HeartRatePageInner /></ErrorBoundary> }
 function HeartRatePageInner() {
+  const A = useSectionColors().health
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [tooltip, setTooltip] = useState(null)
@@ -196,7 +198,7 @@ function HeartRatePageInner() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <Link href="/life-hub/health" style={{ color: 'var(--text-secondary)', fontSize: '13px', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}>← Health</Link>
-          <h1 style={{ color: '#22c55e', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Heart Rate</h1>
+          <h1 style={{ color: A, fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>Heart Rate</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>5-minute view · {data?.date ?? 'Today'}</p>
         </div>
       </div>
@@ -223,7 +225,7 @@ function HeartRatePageInner() {
       {/* 24-hour line chart */}
       <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-          <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em' }}>❤️ Today's Heart Rate</div>
+          <div style={{ color: A, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em' }}>❤️ Today's Heart Rate</div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {[['< 60', 'var(--accent-blue)', 'Resting'], ['60–80', 'var(--success)', 'Light'], ['80–100', '#f59e0b', 'Moderate'], ['100–120', 'var(--warning)', 'Hard'], ['120+', 'var(--error)', 'Peak']].map(([range, color, label]) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -331,7 +333,7 @@ function HeartRatePageInner() {
       {/* 7-day resting HR trend */}
       {hasResting && (
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px', marginBottom: '24px' }}>
-          <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>📉 7-Day Resting Heart Rate</div>
+          <div style={{ color: A, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>📉 7-Day Resting Heart Rate</div>
           <div style={{ position: 'relative', marginBottom: '8px' }}>
             <svg width="100%" height="80" viewBox={`0 0 ${restingTrend.length * 60} 80`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
               {[0.25, 0.5, 0.75].map(pct => (
@@ -378,7 +380,7 @@ function HeartRatePageInner() {
       {/* HRV panel */}
       {data?.todayHrv != null && (
         <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-          <div style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>🧘 Heart Rate Variability (HRV)</div>
+          <div style={{ color: A, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>🧘 Heart Rate Variability (HRV)</div>
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ color: 'var(--accent-purple)', fontSize: '36px', fontWeight: '700', lineHeight: 1 }}>{Math.round(data.todayHrv)}</div>

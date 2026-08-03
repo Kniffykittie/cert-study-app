@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { useSectionColors } from '@/lib/sectionColors'
 
 function getMonday(dateStr) {
   const d = new Date(dateStr + 'T12:00:00Z')
@@ -40,6 +41,7 @@ function getLastCompletedMonday() {
 }
 
 export default function WeeklyWrapPage() {
+  const A = useSectionColors().overview
   const [week, setWeek] = useState(getLastCompletedMonday())
   const [wrap, setWrap] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -108,7 +110,7 @@ export default function WeeklyWrapPage() {
     <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
       {/* History sidebar */}
       <div style={{ width: '168px', flexShrink: 0 }}>
-        <div style={{ color: '#a78bfa', fontSize: '11px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>📅 Past Weeks</div>
+        <div style={{ color: A, fontSize: '11px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>📅 Past Weeks</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {history.length === 0 && (
             <div style={{ color: 'var(--text-secondary)', fontSize: '12px', padding: '8px 0' }}>No wraps yet</div>
@@ -173,7 +175,7 @@ export default function WeeklyWrapPage() {
                 </p>
               )}
               {nextNarrative && (
-                <div style={{ backgroundColor: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '8px', padding: '12px 16px' }}>
+                <div style={{ backgroundColor: `${A}1a`, border: `1px solid ${A}4d`, borderRadius: '8px', padding: '12px 16px' }}>
                   <p style={{ color: 'var(--text-primary)', fontSize: '14px', lineHeight: '1.7', margin: 0 }}>
                     {nextNarrative}
                   </p>
