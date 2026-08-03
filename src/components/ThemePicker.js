@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react'
 export const THEME_PRESETS = [
   { key: 'villainous', label: 'Villainous', desc: 'Electric blue on near-black — the original', bg: '#0D0D0D', surface: '#1A1A1A', accent: '#0080FF', purple: '#7B2FBE' },
   { key: 'midnight', label: 'Midnight', desc: 'Cool blue-black with a bright sky accent', bg: '#0A0F1A', surface: '#131B2E', accent: '#38BDF8', purple: '#818CF8' },
-  { key: 'amethyst', label: 'Amethyst', desc: 'Purple-forward, warm dark', bg: '#120E1A', surface: '#1E1730', accent: '#A855F7', purple: '#E879F9' },
+  { key: 'amethyst', label: 'Amethyst', desc: 'Violet accent on cool charcoal', bg: '#0E0D15', surface: '#191722', accent: '#A855F7', purple: '#E879F9' },
   { key: 'slate', label: 'Slate', desc: 'Soft neutral grey, muted blue', bg: '#10141A', surface: '#1B222C', accent: '#60A5FA', purple: '#94A3B8' },
-  { key: 'rosegold', label: 'Rose Gold', desc: 'Warm blush + soft gold on dark', bg: '#1A1214', surface: '#271B1E', accent: '#E0A899', purple: '#F0C9A0' },
-  { key: 'acid', label: 'Acid', desc: 'Electric lime on deep green-black', bg: '#0F140A', surface: '#1A2213', accent: '#A3E635', purple: '#D9F99D' },
-  { key: 'sunshine', label: 'Sunshine', desc: 'Happy yellows and warm amber', bg: '#16130A', surface: '#231D10', accent: '#FBBF24', purple: '#FDE047' },
-  { key: 'bubblegum', label: 'Bubblegum', desc: 'Hot pink and soft magenta', bg: '#170A11', surface: '#241320', accent: '#F472B6', purple: '#F0ABFC' },
+  { key: 'rosegold', label: 'Rose Gold', desc: 'Blush + gold on deep green', bg: '#0E1512', surface: '#18211D', accent: '#E0A899', purple: '#F0C9A0' },
+  { key: 'acid', label: 'Acid', desc: 'Electric lime on graphite', bg: '#0C0E10', surface: '#16191C', accent: '#A3E635', purple: '#D9F99D' },
+  { key: 'sunshine', label: 'Sunshine', desc: 'Warm yellow on deep indigo', bg: '#0D1020', surface: '#171B2E', accent: '#FBBF24', purple: '#FDE047' },
+  { key: 'bubblegum', label: 'Bubblegum', desc: 'Hot pink on cool graphite', bg: '#0E0D12', surface: '#1A1820', accent: '#F472B6', purple: '#F0ABFC' },
 ]
 
 function applyTheme(key) {

@@ -20,8 +20,11 @@
 /* Theme presets — override chrome + accents only; semantic colors
    (success/error/warning) stay constant so meaning never shifts.
    Default ("Villainous") is the base :root above (no data-theme attribute). */
+/* Backgrounds are chosen by color theory to FLATTER each accent — a
+   complementary/harmonious dark hue, never a darkened version of the accent
+   itself (that reads muddy). Charcoal is used where a complement would fight. */
 :root[data-theme="midnight"] {
-  --background: #0A0F1A;
+  --background: #0A0F1A;   /* cool navy — analogous to sky-blue accent */
   --surface: #131B2E;
   --border: #24304A;
   --accent-blue: #38BDF8;
@@ -30,16 +33,16 @@
   --text-secondary: #8496B0;
 }
 :root[data-theme="amethyst"] {
-  --background: #120E1A;
-  --surface: #1E1730;
-  --border: #322546;
+  --background: #0E0D15;   /* cool neutral charcoal, faint blue lean */
+  --surface: #191722;
+  --border: #2B2836;
   --accent-blue: #A855F7;
   --accent-purple: #E879F9;
-  --text-primary: #ECE6F5;
-  --text-secondary: #9A8CB0;
+  --text-primary: #ECE8F2;
+  --text-secondary: #948CA6;
 }
 :root[data-theme="slate"] {
-  --background: #10141A;
+  --background: #10141A;   /* neutral graphite */
   --surface: #1B222C;
   --border: #2C3644;
   --accent-blue: #60A5FA;
@@ -48,40 +51,40 @@
   --text-secondary: #94A3B8;
 }
 :root[data-theme="rosegold"] {
-  --background: #1A1214;
-  --surface: #271B1E;
-  --border: #3D2B2F;
+  --background: #0E1512;   /* very dark desaturated green — luxe rose-gold-on-green */
+  --surface: #18211D;
+  --border: #29342E;
   --accent-blue: #E0A899;
   --accent-purple: #F0C9A0;
-  --text-primary: #F3E7E4;
-  --text-secondary: #B39992;
+  --text-primary: #F1E9E5;
+  --text-secondary: #A99A92;
 }
 :root[data-theme="acid"] {
-  --background: #0F140A;
-  --surface: #1A2213;
-  --border: #2E3B1F;
+  --background: #0C0E10;   /* neutral graphite — lime's complement (magenta) would fight */
+  --surface: #16191C;
+  --border: #262A2F;
   --accent-blue: #A3E635;
   --accent-purple: #D9F99D;
-  --text-primary: #E9F3DC;
-  --text-secondary: #93A67C;
+  --text-primary: #E7EFE0;
+  --text-secondary: #8D9A83;
 }
 :root[data-theme="sunshine"] {
-  --background: #16130A;
-  --surface: #231D10;
-  --border: #3B311B;
+  --background: #0D1020;   /* deep indigo-navy — yellow's complement, the showcase pairing */
+  --surface: #171B2E;
+  --border: #2A3047;
   --accent-blue: #FBBF24;
   --accent-purple: #FDE047;
-  --text-primary: #F5ECD9;
-  --text-secondary: #ADA184;
+  --text-primary: #ECEEF6;
+  --text-secondary: #9198AE;
 }
 :root[data-theme="bubblegum"] {
-  --background: #170A11;
-  --surface: #241320;
-  --border: #3D2035;
+  --background: #0E0D12;   /* cool graphite — pink+green would be too loud */
+  --surface: #1A1820;
+  --border: #2C2834;
   --accent-blue: #F472B6;
   --accent-purple: #F0ABFC;
-  --text-primary: #F6E4EF;
-  --text-secondary: #B38FA5;
+  --text-primary: #F3E7EF;
+  --text-secondary: #A995A3;
 }
 
 @theme inline {

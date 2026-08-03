@@ -3401,6 +3401,20 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 
 ## Phase Log
 
+### Phase 139 — Theme backgrounds redesigned by color theory — Complete
+- **Problem (user feedback):** each theme's background was a darkened version of its own accent (dark yellow-brown for Sunshine, dark pink-maroon for Bubblegum), which read muddy — "a tint over black," not a designed theme.
+- **Fix:** backgrounds now chosen to FLATTER the accent, never derived from its hue. Complementary/harmonious where it sings, neutral charcoal where a complement would fight:
+  - **Sunshine** yellow → deep indigo-navy (#0D1020) — complement, showcase pairing.
+  - **Rose Gold** → very dark desaturated green (#0E1512) — luxe rose-gold-on-green.
+  - **Midnight** sky-blue → cool navy (analogous, kept).
+  - **Amethyst** violet → cool charcoal, faint blue lean (complement yellow-green would fight).
+  - **Acid** lime → neutral graphite (complement magenta would fight; lime pops on neutral dark).
+  - **Bubblegum** pink → cool graphite (pink+green too loud).
+  - **Slate** → neutral graphite (kept).
+- Accents unchanged; semantic colors still constant. Updated both `globals.css` `:root[data-theme]` blocks and the ThemePicker swatch previews + descriptions.
+- Build verified passing.
+- Files: globals.css, components/ThemePicker.js
+
 ### Phase 138 — S14 polish (final slice): accessibility on non-modal controls — Complete
 - Closes S14. Added ARIA + keyboard support to the custom (non-`<button>`/non-modal) interactive controls on the Life Hub landing that were mouse-only.
 - **Rating buttons (energy/mood 1–5):** each now carries `aria-pressed` + a descriptive `aria-label` (e.g. "Energy: 3 of 5 — Okay") so screen readers announce the scale value and current selection.
