@@ -3186,7 +3186,7 @@ This supersedes all scattered "Session N" numbering below. Detailed specs for ea
 - **S11 — Life Hub Home Restructure** ✅ largely pre-built (Phase 91); see Phase 106 note — recovery ring hero, single tabbed brief, zone reorder, skeleton loaders, split 971-line page (2026-07-09 audit spec).
 - **S12 — Notification Schedule UI + PWA** ✅ BUILT (Phase 107) — settings shows/edits send times (wake/bedtime), PWA install banner.
 - **S13 — Study Hub Motivation Layer** ✅ BUILT (Phase 106) — exam countdown chips (exam_dates), jump-back-in row (paused test/labs/flashcards).
-- **S14 — Polish Wave** ⬜ (in progress) — ✅ empty states + streak milestones (Phase 114), ✅ modal a11y (Phases 115–116), ✅ Life Hub typography + spacing (Phase 134), ✅ card-type diversification (Phase 135), ✅ theme presets (Phase 136). Remaining: personality layer, broader ARIA/keyboard a11y across non-modal controls.
+- **S14 — Polish Wave** ⬜ (in progress) — ✅ empty states + streak milestones (Phase 114), ✅ modal a11y (Phases 115–116), ✅ Life Hub typography + spacing (Phase 134), ✅ card-type diversification (Phase 135), ✅ theme presets (Phase 136), ✅ section-color theming (Phase 137), ✅ non-modal a11y (Phase 138). Remaining: optional personality layer + opportunistic chart ARIA. S14 core complete.
 
 ### PARKED (waiting on user — slot in when ready)
 - Stretch photos (user sourcing; checklist delivered) → then stretch image display build + optional 5 new stretches
@@ -3400,6 +3400,14 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 ---
 
 ## Phase Log
+
+### Phase 138 — S14 polish (final slice): accessibility on non-modal controls — Complete
+- Closes S14. Added ARIA + keyboard support to the custom (non-`<button>`/non-modal) interactive controls on the Life Hub landing that were mouse-only.
+- **Rating buttons (energy/mood 1–5):** each now carries `aria-pressed` + a descriptive `aria-label` (e.g. "Energy: 3 of 5 — Okay") so screen readers announce the scale value and current selection.
+- **Recovery Score card (was a click-only `<div>`):** now `role="button"`, `tabIndex={0}`, `aria-expanded`, descriptive `aria-label` (score + label + expand/collapse hint), and `onKeyDown` for Enter/Space — fully keyboard-operable. Its decorative SVG ring is `aria-hidden` so the value isn't double-announced.
+- Prior S14 a11y (Phases 115–116) covered shared modals; this covers the main dashboard's custom controls. Remaining charts on health sub-pages can get `role="img"` labels opportunistically when next touched.
+- Build verified passing.
+- Files: app/life-hub/page.js
 
 ### Phase 137 — Themes recolor section identity colors (wave 1: chrome + landing) — Complete
 - **Problem (user feedback):** themes felt like a "cloudy overlay," not a real theme change. Root cause: nearly every colored element (status pills, nav, headers) uses the hardcoded Life Hub SECTION_COLORS (orange/blue/green/teal/purple), which did NOT change with theme — so only the near-black background shifted subtly. **User chose full recolor** (section colors become theme-driven), reversing the old "section colors are fixed identity" rule.

@@ -98,6 +98,7 @@ Run through this before committing any new route:
 - [ ] `useSearchParams()` wrapped in `<Suspense>` if used (Vercel build fails otherwise)
 - [ ] Modals have `maxHeight: '90vh'` and `overflow-y: auto`
 - [ ] Modals close on Escape + backdrop click, and carry `role="dialog"` + `aria-modal="true"` + `aria-label`; icon-only buttons have `aria-label`
+- [ ] Click-only custom controls (clickable `<div>`s, rating chips, rings) carry `role="button"` + `tabIndex={0}` + `aria-label`/`aria-pressed`/`aria-expanded` + `onKeyDown` (Enter/Space); decorative SVGs are `aria-hidden` (S14 a11y pattern, Phase 138)
 
 ## Partial Feature Discipline
 - **⚠️ Partial entries must list exactly what's missing** — not just the flag. A ⚠️ Partial entry without a bullet list of unbuilt sub-items is ambiguous and will cause re-work.

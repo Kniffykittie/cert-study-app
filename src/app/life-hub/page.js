@@ -453,6 +453,8 @@ export default function LifeHubPage() {
             const col = activeColors[n]
             return (
               <button key={n} onClick={() => setValue(value === n ? 0 : n)} type="button"
+                aria-pressed={active}
+                aria-label={`${label}: ${n} of 5${sublabels?.[n] ? ` — ${sublabels[n]}` : ''}`}
                 style={{ flex: 1, padding: '10px 0', borderRadius: '8px', border: `1px solid ${active ? col : 'var(--border)'}`, backgroundColor: active ? `${col}22` : 'var(--background)', color: active ? col : 'var(--text-secondary)', fontSize: '11px', fontWeight: active ? '700' : '400', cursor: 'pointer', transition: 'all 0.1s', lineHeight: '1.3' }}>
                 <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '2px' }}>{n}</div>
                 <div style={{ fontSize: '10px' }}>{sublabels?.[n] || n}</div>
@@ -668,7 +670,11 @@ export default function LifeHubPage() {
 
         return (
           <div style={{ backgroundColor: `${scoreColor}12`, border: `1px solid ${scoreColor}55`, borderRadius: '14px', padding: '22px 24px', marginBottom: '32px', cursor: 'pointer', transition: 'background-color 0.15s' }}
+            role="button" tabIndex={0}
+            aria-expanded={recoveryExpanded}
+            aria-label={`Recovery score ${score} out of 100 — ${scoreLabel}. ${recoveryExpanded ? 'Collapse' : 'Expand'} breakdown.`}
             onClick={() => setRecoveryExpanded(e => !e)}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setRecoveryExpanded(x => !x) } }}
             onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${scoreColor}1c` }}
             onMouseLeave={e => { e.currentTarget.style.backgroundColor = `${scoreColor}12` }}>
 
@@ -676,7 +682,7 @@ export default function LifeHubPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 {/* SVG Ring */}
-                <svg width="88" height="88" viewBox="0 0 100 100" style={{ flexShrink: 0 }}>
+                <svg width="88" height="88" viewBox="0 0 100 100" style={{ flexShrink: 0 }} aria-hidden="true">
                   <circle cx="50" cy="50" r="40" fill="none" stroke="var(--border)" strokeWidth="10" />
                   <circle cx="50" cy="50" r="40" fill="none" stroke={scoreColor} strokeWidth="10"
                     strokeDasharray="251.33"
