@@ -3,6 +3,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { calcTDEE, tdeeBreakdown, calcGoalAdjustment, calcMacros } from '@/lib/tdee'
+import { useSectionColors } from '@/lib/sectionColors'
 
 const GOALS = [
   { key: 'lose_weight', label: 'Lose Weight', desc: 'Reduce body fat and reach a healthier weight', icon: '🔥' },
@@ -137,6 +138,7 @@ const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 const DAY_LABELS = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' }
 
 function WeeklySchedulePicker({ value, onChange }) {
+  const A = useSectionColors().nutrition
   const [openDay, setOpenDay] = useState(null)
   return (
     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -147,15 +149,15 @@ function WeeklySchedulePicker({ value, onChange }) {
         return (
           <div key={day} style={{ position: 'relative' }}>
             <button type="button" onClick={() => setOpenDay(isOpen ? null : day)}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '8px 10px', borderRadius: '10px', border: `1px solid ${isOpen ? '#f97316' : 'var(--border)'}`, backgroundColor: isOpen ? 'rgba(249,115,22,0.08)' : 'var(--surface)', cursor: 'pointer', minWidth: '48px' }}>
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', padding: '8px 10px', borderRadius: '10px', border: `1px solid ${isOpen ? A : 'var(--border)'}`, backgroundColor: isOpen ? `${A}14` : 'var(--surface)', cursor: 'pointer', minWidth: '48px' }}>
               <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)' }}>{DAY_LABELS[day]}</span>
-              <span style={{ fontSize: '10px', fontWeight: '600', color: current === 'day_off' ? 'var(--text-secondary)' : '#f97316' }}>{opt?.label}</span>
+              <span style={{ fontSize: '10px', fontWeight: '600', color: current === 'day_off' ? 'var(--text-secondary)' : A }}>{opt?.label}</span>
             </button>
             {isOpen && (
               <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 50, backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '6px', marginTop: '4px', minWidth: '140px', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
                 {SCHEDULE_OPTIONS.map(o => (
                   <button key={o.key} type="button" onClick={() => { onChange({ ...value, [day]: o.key }); setOpenDay(null) }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: '7px', border: 'none', backgroundColor: current === o.key ? 'rgba(249,115,22,0.12)' : 'transparent', color: current === o.key ? '#f97316' : 'var(--text-primary)', fontSize: '12px', fontWeight: current === o.key ? '700' : '400', cursor: 'pointer' }}>
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: '7px', border: 'none', backgroundColor: current === o.key ? `${A}1f` : 'transparent', color: current === o.key ? A : 'var(--text-primary)', fontSize: '12px', fontWeight: current === o.key ? '700' : '400', cursor: 'pointer' }}>
                     {o.label} <span style={{ color: 'var(--text-secondary)', fontWeight: '400' }}>— {o.desc}</span>
                   </button>
                 ))}
@@ -185,6 +187,7 @@ function ChipSelect({ options, selected, onSelect, multi = false }) {
 }
 
 function GoalsSetupPageInner() {
+  const SEC = useSectionColors().goals
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/life-hub/goals'
@@ -402,7 +405,7 @@ function GoalsSetupPageInner() {
 
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div style={{ fontSize: '32px', marginBottom: '8px' }}>🎯</div>
-          <h1 style={{ color: '#06b6d4', fontSize: '26px', fontWeight: '700', marginBottom: '6px' }}>Set Up Your Goals</h1>
+          <h1 style={{ color: SEC, fontSize: '26px', fontWeight: '700', marginBottom: '6px' }}>Set Up Your Goals</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>This helps the AI personalize your workout plan, nutrition advice, and health insights.</p>
         </div>
 

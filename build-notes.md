@@ -3409,7 +3409,9 @@ Typography/spacing pass · left-border card diversification · empty-state redes
 - **Wave 3a:** measurements, my-week, weekly-wrap, monthly-wrap, health steps/sleep/heart-rate converted.
 - **Wave 3b:** workouts sub-pages — setup, exercises, history, log, day/[dayIndex] (PhaseIndicator active-state → accent, done-state stays green).
 - **Wave 3c:** supplements, encyclopedia (nutrient color-map preserved), water (caffeine-level + fat-macro semantic hexes preserved) converted.
-- **Remaining (waves 3d+):** goals/setup, stretches, stretching/library + components (CheckInSheet, DailyLogReview, nutrition modals). Convert to `useSectionColors()`. Tracked in Future Features.
+- **Wave 3d:** goals/setup (h1 → goals-teal; embedded weekly-schedule picker → nutrition accent).
+- **Intentionally left fixed (not section identity — would lose meaning if themed):** stretches / stretching-library pages (colors encode stretch TYPE dynamic/static/both + TIMING pre/post/bedtime), CheckInSheet + Daily Brief tab colors (encode time-of-day morning/afternoon/evening: #f59e0b/#a78bfa/#818cf8), nutrition data-entry modals' category colors. These are semantic category palettes, treated like success/error/warning.
+- **Net:** the full Life Hub chrome + every section landing + all major sub-pages recolor per theme. Section-identity theming is functionally complete.
 - Build verified passing.
 - Files: lib/sectionColors.js (new), components/ThemePicker.js, components/LifeHubSidebar.js, components/LifeHubBottomNav.js, app/life-hub/page.js
 
